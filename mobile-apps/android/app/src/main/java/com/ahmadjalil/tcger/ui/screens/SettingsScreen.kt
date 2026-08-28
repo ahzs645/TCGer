@@ -21,6 +21,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.ahmadjalil.tcger.domain.AccentChoice
 import com.ahmadjalil.tcger.domain.DataSourceMode
 import com.ahmadjalil.tcger.domain.ThemeMode
+import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetInstallStatus
 import com.ahmadjalil.tcger.generated.ParityFeatureIDs
 import com.ahmadjalil.tcger.ui.AppUiState
 import com.ahmadjalil.tcger.ui.AppViewModel
@@ -151,6 +153,72 @@ fun SettingsScreen(
             }
         }
         item {
+            SettingsSection("Offline scanner models") {
+                listOf("pokemon", "magic", "yugioh").forEachIndexed { index, game ->
+                    if (index > 0) {
+                        androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 10.dp))
+                    }
+                    Text("${game.displayGame()} ArcFace", fontWeight = FontWeight.Medium)
+                    when (val status = state.scannerAssets[game] ?: ScannerAssetInstallStatus.NotInstalled) {
+                        ScannerAssetInstallStatus.NotInstalled -> {
+                            Text(
+                                "Download this game's model and card index for offline scanning.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            FilledTonalButton(
+                                onClick = { viewModel.installScannerAssets(game) },
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            ) { Text("Install") }
+                        }
+                        is ScannerAssetInstallStatus.Installing -> {
+                            LinearProgressIndicator(
+                                progress = { status.progress },
+                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                            )
+                            Text(
+                                "${formatAssetBytes(status.completedBytes)} of ${formatAssetBytes(status.totalBytes)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                        is ScannerAssetInstallStatus.Installed -> {
+                            Text(
+                                "Installed · ${status.manifest.cardCount} cards · ${formatAssetBytes(status.manifest.downloadBytes)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(onClick = { viewModel.removeScannerAssets(game) }) { Text("Remove") }
+                                TextButton(onClick = { viewModel.installScannerAssets(game) }) { Text("Check for update") }
+                            }
+                        }
+                        is ScannerAssetInstallStatus.Failed -> {
+                            Text(
+                                if (status.installedManifest == null) status.message
+                                else "The installed version remains active. Update failed: ${status.message}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                if (status.installedManifest != null) {
+                                    TextButton(onClick = { viewModel.removeScannerAssets(game) }) { Text("Remove") }
+                                }
+                                FilledTonalButton(onClick = { viewModel.installScannerAssets(game) }) { Text("Retry") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        item { CommunityGamePackagesSection(state.gamePackages, viewModel) }
+        item {
             Text(
                 "Android milestone 1 · Collection vertical slice",
                 style = MaterialTheme.typography.bodySmall,
@@ -174,6 +242,12 @@ fun SettingsScreen(
             onConfirm = { username, password -> viewModel.signIn(username, password) { success -> if (success) signInDialog = false } },
         )
     }
+}
+
+private fun formatAssetBytes(bytes: Long): String = when {
+    bytes <= 0L -> "preparing…"
+    bytes < 1_000_000L -> "${bytes / 1_000} KB"
+    else -> String.format("%.1f MB", bytes / 1_000_000.0)
 }
 
 @Composable

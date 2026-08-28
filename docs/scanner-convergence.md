@@ -1,5 +1,12 @@
 # Scanner convergence: one recognition stack, two runtimes
 
+> **Evolution note (2026-08-27).** The shared runtime/preprocessing/index
+> contract remains the direction, but current production-facing releases use
+> independent per-game ArcFace weights rather than one shared encoder. Web can
+> run heterogeneous encoders and merge candidates; mobile downloads remain
+> explicit-game runtimes pending cross-game calibration. See
+> [scanner-system/architecture.md](scanner-system/architecture.md).
+
 **Direction (set 2026-08-23):** iOS and web are not two scanners — they are
 one recognition stack with two runtimes. Same encoder, same index build,
 same preprocessing contract, same evaluation methodology; only delivery

@@ -16,7 +16,10 @@ data class ArcFaceRecognitionResult(
 class ArcFaceCardRecognizer private constructor(
     private val encoder: ArcFaceOnnxEncoder,
     private val index: PackedCardEmbeddingIndex,
+    private val contract: ArcFaceRuntimeContract,
 ) : Closeable {
+    val artifactVersion: String get() = contract.version
+
     fun recognize(
         imageBytes: ByteArray,
         candidateLimit: Int = 10,
@@ -31,12 +34,17 @@ class ArcFaceCardRecognizer private constructor(
             matches = index.nearest(
                 query = embedding,
                 limit = candidateLimit,
-                physicalPokemonOnly = true,
+                physicalPokemonOnly = contract.game == "pokemon",
+                game = contract.game,
                 setCode = setCode,
             )
         }
         return ArcFaceRecognitionResult(
-            decision = ArcFaceRecognitionPolicy.decide(matches),
+            decision = ArcFaceRecognitionPolicy.decide(
+                matches,
+                strongAcceptanceScore = contract.strongAcceptanceScore,
+                ambiguityMargin = contract.ambiguityMargin,
+            ),
             matches = matches,
             preprocessMs = preprocessNs / 1_000_000.0,
             inferenceMs = inferenceNs / 1_000_000.0,
@@ -50,16 +58,54 @@ class ArcFaceCardRecognizer private constructor(
         fun availability(context: Context): ScannerModelAvailability =
             ArcFaceModelBundle.probe(AndroidScannerModelAssetSource(context))
 
-        fun load(context: Context): ArcFaceCardRecognizer {
-            val bundle = ArcFaceModelBundle.load(AndroidScannerModelAssetSource(context))
+        fun availability(
+            context: Context,
+            game: String,
+            assetStore: ScannerAssetStore,
+        ): ScannerModelAvailability {
+            val normalized = normalizeScannerGame(game)
+            val runtime = assetStore.installedRuntime(normalized)
+            if (runtime == null && normalized == "pokemon") return availability(context)
+            if (runtime == null) {
+                return ScannerModelAvailability.Unavailable("Install the $normalized scanner model in Settings")
+            }
+            return ArcFaceModelBundle.probe(runtime.source, runtime.contract)
+        }
+
+        fun load(
+            context: Context,
+            game: String = "pokemon",
+            assetStore: ScannerAssetStore? = null,
+        ): ArcFaceCardRecognizer {
+            val normalized = normalizeScannerGame(game)
+            val installed = assetStore?.installedRuntime(normalized)
+            val runtime = installed ?: if (normalized == "pokemon") {
+                InstalledScannerRuntime(
+                    ArcFaceModelContract.pokemonRuntime,
+                    AndroidScannerModelAssetSource(context),
+                )
+            } else {
+                requireNotNull(assetStore?.installedRuntime(normalized)) {
+                    "Install the ${normalized.replaceFirstChar(Char::uppercase)} offline scanner model in Settings first"
+                }
+            }
+            val contract = runtime.contract
+            val bundle = ArcFaceModelBundle.load(runtime.source, contract)
             val index = PackedCardEmbeddingIndex.decode(bundle.vectorBytes, bundle.metadataBytes)
-            require(index.count == ArcFaceModelContract.expectedCardCount) {
-                "ArcFace index has ${index.count} cards; expected ${ArcFaceModelContract.expectedCardCount}"
+            require(index.count == contract.expectedCardCount) {
+                "ArcFace index has ${index.count} cards; expected ${contract.expectedCardCount}"
             }
-            require(index.dimension == ArcFaceModelContract.embeddingDimension) {
-                "ArcFace index dimension is ${index.dimension}; expected ${ArcFaceModelContract.embeddingDimension}"
+            require(index.dimension == contract.embeddingDimension) {
+                "ArcFace index dimension is ${index.dimension}; expected ${contract.embeddingDimension}"
             }
-            return ArcFaceCardRecognizer(ArcFaceOnnxEncoder(bundle.modelBytes), index)
+            require(index.cardCountForGame(contract.game) == contract.expectedCardCount) {
+                "ArcFace metadata contains cards outside ${contract.game}"
+            }
+            return ArcFaceCardRecognizer(
+                ArcFaceOnnxEncoder(bundle.modelBytes, contract.embeddingDimension),
+                index,
+                contract,
+            )
         }
     }
 }

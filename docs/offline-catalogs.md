@@ -1,5 +1,10 @@
 # Offline Card Catalogs
 
+> **Live-count note (2026-08-27).** The architectural behavior below remains
+> valid, but the static “What ships” counts are historical. Verified live R2
+> catalog versions, counts, sizes, and sealed-product totals are recorded in
+> [scanner-system/release-inventory-2026-08-27.md](scanner-system/release-inventory-2026-08-27.md).
+
 TCGer's web app (installable PWA) and iOS app can both run without a server in
 their local modes. Historically that meant card search only covered a handful of
 seeded demo cards plus cards the user already owned. Offline catalog packs close

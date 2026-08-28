@@ -65,6 +65,7 @@ actor CardIndexMetadataStore {
     static let shared = CardIndexMetadataStore()
 
     private let bundle: Bundle?
+    private let fileURL: URL?
     private let resource: String
     private let fileExtension: String
     private var cache: [Int: CardIndexMetadataEntry] = [:]
@@ -82,6 +83,7 @@ actor CardIndexMetadataStore {
         fileExtension: String = "json"
     ) {
         self.bundle = bundle
+        fileURL = nil
         self.resource = resource
         self.fileExtension = fileExtension
         supportedGames = Self.detectSupportedGames(
@@ -91,9 +93,18 @@ actor CardIndexMetadataStore {
         )
     }
 
+    init(fileURL: URL) {
+        bundle = nil
+        self.fileURL = fileURL
+        resource = ""
+        fileExtension = ""
+        supportedGames = Self.detectSupportedGames(at: fileURL)
+    }
+
     /// In-memory initializer for unit tests and imported replay manifests.
     init(entries: [CardIndexMetadataEntry]) {
         bundle = nil
+        fileURL = nil
         resource = ""
         fileExtension = ""
         cache = entries.reduce(into: [:]) { result, entry in
@@ -201,13 +212,18 @@ actor CardIndexMetadataStore {
     private func loadIfNeeded() {
         guard !isLoaded else { return }
         isLoaded = true
-        guard let bundle else { return }
-
-        let entries = Self.loadEntries(
-            from: bundle,
-            resource: resource,
-            fileExtension: fileExtension
-        )
+        let entries: [CardIndexMetadataEntry]
+        if let fileURL {
+            entries = Self.loadEntries(at: fileURL)
+        } else if let bundle {
+            entries = Self.loadEntries(
+                from: bundle,
+                resource: resource,
+                fileExtension: fileExtension
+            )
+        } else {
+            entries = []
+        }
         cache = entries.reduce(into: [:]) { result, entry in
             result[entry.annIndex] = entry
         }
@@ -252,6 +268,10 @@ actor CardIndexMetadataStore {
         guard let url = bundle.url(forResource: resource, withExtension: fileExtension) else {
             return []
         }
+        return loadEntries(at: url)
+    }
+
+    private nonisolated static func loadEntries(at url: URL) -> [CardIndexMetadataEntry] {
         do {
             let data = try Data(contentsOf: url)
             return try JSONDecoder().decode([CardIndexMetadataEntry].self, from: data)
@@ -269,11 +289,14 @@ actor CardIndexMetadataStore {
         resource: String,
         fileExtension: String
     ) -> Set<TCGGame> {
-        guard let url = bundle.url(forResource: resource, withExtension: fileExtension),
-              let data = try? Data(contentsOf: url, options: .mappedIfSafe)
-        else {
+        guard let url = bundle.url(forResource: resource, withExtension: fileExtension) else {
             return []
         }
+        return detectSupportedGames(at: url)
+    }
+
+    private nonisolated static func detectSupportedGames(at url: URL) -> Set<TCGGame> {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return [] }
 
         let tokens: [(TCGGame, [Data])] = [
             (.pokemon, [Data(#""game":"pokemon""#.utf8), Data(#""game": "pokemon""#.utf8)]),

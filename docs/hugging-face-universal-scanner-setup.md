@@ -1,5 +1,13 @@
 # Hugging Face universal scanner setup
 
+> **Historical workflow.** The mixed-game quick job described here completed,
+> followed by isolated full Pokémon, Magic, and Yu-Gi-Oh jobs. Full jobs now
+> require pinned catalog and durable image-library revisions unless explicitly
+> reproducing a legacy run. Use
+> [scanner-system/training-and-data-pipeline.md](scanner-system/training-and-data-pipeline.md)
+> and [scanner-system/operations-runbook.md](scanner-system/operations-runbook.md)
+> for the current process.
+
 The Hugging Face workflow is split deliberately so account setup and GPU
 billing cannot block or accidentally start training.
 

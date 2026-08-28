@@ -118,6 +118,7 @@ import com.ahmadjalil.tcger.data.scanner.withRequiredTrainingEvidence
 import com.ahmadjalil.tcger.data.scanner.model.ArcFaceCardRecognizer
 import com.ahmadjalil.tcger.data.scanner.model.DinoV2CardRecognizer
 import com.ahmadjalil.tcger.data.scanner.model.ScannerModelAvailability
+import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetInstallStatus
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerAssetDiagnostics
 import com.ahmadjalil.tcger.data.scanner.ScannerAssetDiagnosticItem
 import com.ahmadjalil.tcger.data.scanner.ScannerDeveloperAccessStore
@@ -174,12 +175,23 @@ fun ScannerScreen(
     var developerUnlocked by remember { mutableStateOf(developerStore.isUnlocked()) }
     val developerUnlockCounter = remember { DeveloperUnlockCounter() }
     var developerUnlockProgress by remember { mutableStateOf<DeveloperUnlockProgress?>(null) }
-    val localArcFaceAvailable = remember(context) {
+    val bundledArcFaceAvailable = remember(context) {
         ArcFaceCardRecognizer.availability(context) is ScannerModelAvailability.Available
     }
-    val localDinoV2Available = remember(context) {
+    val normalizedScannerGame = when (selectedGame.lowercase()) {
+        "yu-gi-oh", "yu-gi-oh!" -> "yugioh"
+        "mtg", "magic-the-gathering" -> "magic"
+        else -> selectedGame.lowercase()
+    }
+    val localArcFaceAvailable = when (val asset = state.scannerAssets[normalizedScannerGame]) {
+            is ScannerAssetInstallStatus.Installed -> true
+            is ScannerAssetInstallStatus.Failed -> asset.installedManifest != null
+            else -> normalizedScannerGame == "pokemon" && bundledArcFaceAvailable
+    }
+    val bundledDinoV2Available = remember(context) {
         DinoV2CardRecognizer.availability(context) is ScannerModelAvailability.Available
     }
+    val localDinoV2Available = selectedGame.equals("pokemon", ignoreCase = true) && bundledDinoV2Available
     val capabilities = scannerCapabilities ?: AndroidScannerCapabilities(
         serverConfigured = state.preferences.isSignedIn && state.preferences.serverUrl.isNotBlank(),
         priceLookupAvailable = state.preferences.isSignedIn && state.preferences.serverUrl.isNotBlank(),

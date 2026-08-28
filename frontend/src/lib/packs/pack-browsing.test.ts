@@ -47,21 +47,28 @@ test("groups variants and searches set or wrapper labels", () => {
       query: "black wrapper",
       availability: "all",
       isDownloaded: () => false,
-      canOpen: () => true,
     }).map((group) => group.id),
     ["me5"],
   );
 });
 
-test("filters sets by download status and offline accessibility", () => {
+test("filters sets by download status without hiding unavailable sets", () => {
   assert.deepEqual(
     filterPackSets(groups, {
       query: "",
       availability: "downloaded",
       isDownloaded: (setID) => setID === "base1",
-      canOpen: (setID) => setID === "base1",
     }).map((group) => group.id),
     ["base1"],
+  );
+
+  assert.deepEqual(
+    filterPackSets(groups, {
+      query: "",
+      availability: "all",
+      isDownloaded: (setID) => setID === "base1",
+    }).map((group) => group.id),
+    ["base1", "me5"],
   );
 });
 

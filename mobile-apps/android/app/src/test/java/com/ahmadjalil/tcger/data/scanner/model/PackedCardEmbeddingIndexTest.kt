@@ -37,6 +37,28 @@ class PackedCardEmbeddingIndexTest {
     }
 
     @Test
+    fun `explicit game search cannot return another games rows`() {
+        val metadata = """[
+          {"annIndex":0,"cardId":"pokemon","name":"Pokemon","game":"pokemon"},
+          {"annIndex":1,"cardId":"yugioh","name":"Yu-Gi-Oh!","game":"yugioh"}
+        ]""".encodeToByteArray()
+        val index = PackedCardEmbeddingIndex.decode(
+            packed(rows = listOf(byteArrayOf(127, 0), byteArrayOf(120, 0))),
+            metadata,
+        )
+
+        val matches = index.nearest(
+            floatArrayOf(1f, 0f),
+            limit = 2,
+            physicalPokemonOnly = false,
+            game = "yugioh",
+        )
+
+        assertEquals(listOf("yugioh"), matches.map { it.card.cardId })
+        assertEquals(1, index.cardCountForGame("yu-gi-oh!"))
+    }
+
+    @Test
     fun `rejects metadata and vector count mismatch`() {
         assertThrows(IllegalArgumentException::class.java) {
             PackedCardEmbeddingIndex.decode(

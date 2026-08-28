@@ -434,7 +434,15 @@ final class ScannerDevModeStoreTests: XCTestCase {
         var context = CardScannerContext.test(engine: .localOnly)
         context.diagnostics = diagnostics
 
-        let result = await CardScannerCoordinator.makeDefault().scan(
+        // Exercise a deterministic diagnostics path. The default ArcFace
+        // encoder intentionally has no DINO rejection gate and BossOrders is
+        // a documented known miss for that encoder, while this test verifies
+        // that the gate-backed DINO strategy records its evidence correctly.
+        let coordinator = CardScannerCoordinator(
+            strategies: [BoardCardEmbeddingScannerStrategy(variant: .dinov2)],
+            apiService: APIService()
+        )
+        let result = await coordinator.scan(
             image: image,
             context: context,
             source: .importedPhoto

@@ -50,6 +50,8 @@
 	<string>$(TCGER_CATALOG_BASE_URL)</string>
 	<key>TCGerPackAssetBaseURL</key>
 	<string>$(TCGER_PACK_ASSET_BASE_URL)</string>
+	<key>TCGerScannerAssetBaseURL</key>
+	<string>$(TCGER_SCANNER_ASSET_BASE_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

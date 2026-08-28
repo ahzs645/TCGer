@@ -102,6 +102,8 @@ git push origin ios-v1.0.1-b208
 
 The `iOS App Store release` GitHub Actions workflow rejects tags that do not match the checked-in marketing version, waits for that exact build to be valid, and then submits it. It never builds or signs an app itself, and it never substitutes a merely "latest" build for the build named in the tag.
 
+Xcode Cloud also runs `TCGer/ci_scripts/ci_pre_xcodebuild.sh` before every archive action. The guard rejects inconsistent app/widget versions, a version that is not newer than `APP_STORE_LIVE_VERSION` or the highest `ios-v…-b…` release tag, and any commit that decreases the marketing version from its parent. This prevents an archive from being uploaded to a closed App Store version train without interfering with pull-request test actions. Keep `APP_STORE_LIVE_VERSION` as the bootstrap version already on the store; release tags become the authoritative floor after subsequent submissions.
+
 ## Run on a physical device
 
 Open the project in Xcode, select the `TCGer` app target, and choose a signing team under Signing & Capabilities. If the checked-in bundle identifier is not available to that team, use a unique app identifier and apply the same prefix change to the widget identifier and the shared App Group entitlement. Select the connected iOS 26 device and Run.

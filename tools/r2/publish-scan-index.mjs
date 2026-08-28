@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
+import { gzipSync } from "node:zlib";
 
 import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
@@ -99,13 +100,21 @@ function localArtifactFilename(value, description) {
   return filename;
 }
 
-function immutableAsset(prefix, extension, contentType, contents) {
-  const digest = sha256(contents);
+function immutableAsset(
+  prefix,
+  extension,
+  contentType,
+  contents,
+  { identityContents = contents, contentEncoding } = {},
+) {
+  const digest = sha256(identityContents);
   return {
     key: `${prefix}/objects/${digest}${extension}`,
     url: `objects/${digest}${extension}`,
     sha256: digest,
     contentType,
+    contentEncoding,
+    decodedBytes: identityContents.byteLength,
     cacheControl: IMMUTABLE_CACHE,
     contents,
   };
@@ -221,17 +230,21 @@ async function buildPublicationPlan({
       delete publishedArtifact.gateUrl;
     }
 
+    const decodedIndex = jsonBuffer(publishedArtifact);
     const indexAsset = immutableAsset(
       prefix,
       ".json",
       JSON_TYPE,
-      jsonBuffer(publishedArtifact),
+      gzipSync(decodedIndex, { level: 9 }),
+      { identityContents: decodedIndex, contentEncoding: "gzip" },
     );
     assets.set(indexAsset.key, indexAsset);
     const published = {
       ...entry,
       file: indexAsset.url,
-      bytes: indexAsset.contents.byteLength,
+      // Fetch transparently decodes Content-Encoding before diagnostics and
+      // JSON parsing, so this is the decoded representation byte count.
+      bytes: indexAsset.decodedBytes,
     };
     publishedBySourceFile.set(entry.file, published);
     return published;
@@ -270,7 +283,8 @@ async function objectMatches(client, bucket, asset) {
     return (
       result.Metadata?.["source-sha256"] === asset.sha256 &&
       result.ContentType === asset.contentType &&
-      result.CacheControl === asset.cacheControl
+      result.CacheControl === asset.cacheControl &&
+      (result.ContentEncoding ?? undefined) === asset.contentEncoding
     );
   } catch (error) {
     if (isNotFound(error)) return false;
@@ -289,6 +303,7 @@ async function uploadWithS3(client, bucket, asset) {
       Key: asset.key,
       Body: asset.contents,
       ContentType: asset.contentType,
+      ContentEncoding: asset.contentEncoding,
       CacheControl: asset.cacheControl,
       StorageClass: "STANDARD",
       Metadata: { "source-sha256": asset.sha256 },
@@ -304,9 +319,7 @@ async function wranglerPut(bucket, asset, file) {
     ".bin",
     process.platform === "win32" ? "wrangler.cmd" : "wrangler",
   );
-  await execFileAsync(
-    executable,
-    [
+  const arguments_ = [
       "r2",
       "object",
       "put",
@@ -315,15 +328,23 @@ async function wranglerPut(bucket, asset, file) {
       file,
       "--content-type",
       asset.contentType,
+      ...(asset.contentEncoding ? ["--content-encoding", asset.contentEncoding] : []),
       "--cache-control",
       asset.cacheControl,
       "--storage-class",
       "Standard",
       "--remote",
       "--force",
-    ],
-    { cwd: REPO_ROOT, maxBuffer: 4 * 1024 * 1024 },
-  );
+  ];
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await execFileAsync(executable, arguments_, { cwd: REPO_ROOT, maxBuffer: 4 * 1024 * 1024 });
+      break;
+    } catch (error) {
+      if (attempt >= 4) throw error;
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 1_000 * 2 ** (attempt - 1)));
+    }
+  }
   console.log(JSON.stringify({ action: "upload", key: asset.key }));
 }
 
@@ -375,6 +396,8 @@ async function main() {
         objects: plan.assets.map((asset) => ({
           key: asset.key,
           bytes: asset.contents.byteLength,
+          decodedBytes: asset.decodedBytes,
+          contentEncoding: asset.contentEncoding,
           sha256: asset.sha256,
         })),
       },

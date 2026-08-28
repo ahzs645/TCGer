@@ -39,12 +39,10 @@ export function filterPackSets(
     query: string;
     availability: PackSetAvailabilityFilter;
     isDownloaded: (setID: string) => boolean;
-    canOpen: (setID: string) => boolean;
   },
 ): PackSetGroup[] {
   const query = options.query.trim().toLocaleLowerCase();
   return groups.filter((group) => {
-    if (!options.canOpen(group.id)) return false;
     const downloaded = options.isDownloaded(group.id);
     if (options.availability === "downloaded" && !downloaded) return false;
     if (options.availability === "notDownloaded" && downloaded) return false;

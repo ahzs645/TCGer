@@ -44,3 +44,28 @@ struct WidgetProgressRing: View {
         .accessibilityLabel("\(percent) percent complete")
     }
 }
+
+struct WidgetProgressBar: View {
+    let percent: Int
+    let tint: Color
+
+    private var progress: Double {
+        min(max(Double(percent) / 100, 0), 1)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(tint.opacity(0.18))
+                Capsule()
+                    .fill(tint)
+                    .frame(width: proxy.size.width * progress)
+            }
+        }
+        .frame(height: 7)
+        .widgetAccentable()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(percent) percent complete")
+    }
+}

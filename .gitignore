@@ -98,6 +98,10 @@ mobile-parity/results/
 research/
 /*-decompiled/
 .artifacts/huggingface/
+.artifacts/scanner-image-cache/
+.artifacts/scanner-image-library/
+.artifacts/scanner-source-plan/
+.artifacts/scanner-release/
 
 # Local recognition eval data (real user captures — do not commit)
 backend/eval-data/

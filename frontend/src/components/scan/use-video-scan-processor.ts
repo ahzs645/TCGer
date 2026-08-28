@@ -12,6 +12,8 @@ import {
 } from "@/lib/scan/browser-video-matcher";
 import {
   computeEmbeddingFromCanvas,
+  computeEmbeddingMatchesFromCanvas,
+  embeddingIndexesShareModel,
   ensureCardFaceGate,
   ensureEmbeddingModel,
   matchEmbeddingShardsTopK,
@@ -966,6 +968,13 @@ async function rescueWithRectify(
     0,
   );
 
+  if (!embeddingIndexesShareModel(embeddingIndexes)) {
+    return computeEmbeddingMatchesFromCanvas(warpedCanvas, embeddingIndexes, {
+      topK: EMBEDDING_SHORTLIST_SIZE,
+      tcgFilter: scanFilter,
+      proposalLabel: "yolo+embedding+rectified",
+    });
+  }
   const embedding = await computeEmbeddingFromCanvas(warpedCanvas);
   if (!embedding) return null;
   if (
@@ -1021,8 +1030,21 @@ async function matchDetectionEmbedding(
   }
 
   if (!skipLabel) {
-    const embedding = await computeEmbeddingFromCanvas(cropCanvas);
-    if (
+    const sharedModel = embeddingIndexesShareModel(embeddingIndexes);
+    const embedding = sharedModel
+      ? await computeEmbeddingFromCanvas(cropCanvas)
+      : null;
+    if (!sharedModel) {
+      candidates = await computeEmbeddingMatchesFromCanvas(
+        cropCanvas,
+        embeddingIndexes,
+        {
+          topK: EMBEDDING_SHORTLIST_SIZE,
+          tcgFilter: scanFilter,
+          proposalLabel: "yolo+embedding",
+        },
+      );
+    } else if (
       embedding &&
       cardFaceGate &&
       scoreCardFaceGate(cardFaceGate, embedding) < cardFaceGate.threshold
@@ -1043,26 +1065,28 @@ async function matchDetectionEmbedding(
         tcgFilter: scanFilter,
         proposalLabel: "yolo+embedding",
       });
+    }
 
-      // Rescue cascade: below-threshold plain result -> try the rectified
-      // (perspective-flattened) crop and keep whichever scores higher.
-      if (candidates[0]?.passedThreshold !== true) {
-        const rescue = await rescueWithRectify(
-          det,
-          cropFrameCanvas,
-          cropScale,
-          embeddingIndexes,
-          scanFilter,
-          cardFaceGate,
-        );
-        if (
-          rescue &&
-          (rescue[0]?.confidence ?? 0) > (candidates[0]?.confidence ?? 0)
-        ) {
-          candidates = rescue;
-        }
+    // Rescue cascade: below-threshold plain result -> try the rectified
+    // (perspective-flattened) crop and keep whichever scores higher.
+    if (!skipLabel && candidates[0]?.passedThreshold !== true) {
+      const rescue = await rescueWithRectify(
+        det,
+        cropFrameCanvas,
+        cropScale,
+        embeddingIndexes,
+        scanFilter,
+        sharedModel ? cardFaceGate : null,
+      );
+      if (
+        rescue &&
+        (rescue[0]?.confidence ?? 0) > (candidates[0]?.confidence ?? 0)
+      ) {
+        candidates = rescue;
       }
+    }
 
+    if (!skipLabel && candidates.length > 0) {
       // Tiebreaker: when the top-2 are close (twins), read the footer collector
       // number and intersect it with the shortlist's known numbers, voting
       // across frames. The embedding alone can't split same-art reprints.
@@ -1105,9 +1129,7 @@ async function matchDetectionEmbedding(
     bestMatch = {
       externalId: `yolo-${spatialKey}`,
       tcg:
-        scanFilter === "all"
-          ? (candidates[0]?.tcg ?? "pokemon")
-          : scanFilter,
+        scanFilter === "all" ? (candidates[0]?.tcg ?? "pokemon") : scanFilter,
       name: `Detected card`,
       setCode: null,
       setName: null,

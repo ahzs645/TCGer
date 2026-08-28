@@ -24,6 +24,11 @@ data class CardEmbeddingMetadata(
         get() = (game == null || game.equals("pokemon", ignoreCase = true)) &&
             !format.equals("pocket", ignoreCase = true) &&
             imageURL?.contains("/tcgp/", ignoreCase = true) != true
+
+    fun isEligibleForGame(requestedGame: String): Boolean = when (normalizeScannerGame(requestedGame)) {
+        "pokemon" -> isPhysicalPokemonCard
+        else -> game?.let(::normalizeScannerGame) == normalizeScannerGame(requestedGame)
+    }
 }
 
 data class CardEmbeddingMatch(
@@ -43,6 +48,7 @@ class PackedCardEmbeddingIndex private constructor(
         query: FloatArray,
         limit: Int,
         physicalPokemonOnly: Boolean = true,
+        game: String? = null,
         setCode: String? = null,
         normalizedCardName: String? = null,
     ): List<CardEmbeddingMatch> {
@@ -55,6 +61,7 @@ class PackedCardEmbeddingIndex private constructor(
         for (row in 0 until count) {
             val card = metadata[row]
             if (physicalPokemonOnly && !card.isPhysicalPokemonCard) continue
+            if (game != null && !card.isEligibleForGame(game)) continue
             if (setCode != null && !card.setCode.equals(setCode, ignoreCase = true)) continue
             if (normalizedCardName != null && normalizedScannerCardName(card.name) != normalizedCardName) continue
             val rowNorm = rowNorms[row]
@@ -82,6 +89,8 @@ class PackedCardEmbeddingIndex private constructor(
     fun physicalPokemonCardCount(normalizedCardName: String): Int = metadata.count { card ->
         card.isPhysicalPokemonCard && normalizedScannerCardName(card.name) == normalizedCardName
     }
+
+    fun cardCountForGame(game: String): Int = metadata.count { it.isEligibleForGame(game) }
 
     private data class ScoredRow(val index: Int, val similarity: Double)
 

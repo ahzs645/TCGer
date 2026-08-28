@@ -4,6 +4,7 @@ import test from "node:test";
 import type { PackOpeningPull } from "@tcg/pack-core/experience";
 
 import {
+  canOpenPackSet,
   offlinePackAssetURLs,
   offlinePackCacheName,
   parseOfflinePackRecords,
@@ -55,4 +56,20 @@ test("round trips valid download metadata and discards unsupported records", () 
     records,
   );
   assert.deepEqual(parseOfflinePackRecords("not-json"), {});
+});
+
+test("downloaded packs remain openable when a reported route is unusable", () => {
+  const records = {
+    base1: {
+      setID: "base1",
+      downloadedAt: "2026-08-26T00:00:00.000Z",
+      cardCount: 102,
+      assetCount: 207,
+      byteCount: 1234,
+    },
+  };
+
+  assert.equal(canOpenPackSet("base1", false, records), true);
+  assert.equal(canOpenPackSet("me5", false, records), false);
+  assert.equal(canOpenPackSet("me5", true, records), true);
 });

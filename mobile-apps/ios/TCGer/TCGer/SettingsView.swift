@@ -15,7 +15,9 @@ struct SettingsView: View {
     @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var scannerCropRescueEnabled = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var catalogStore = CatalogStore.shared
+    @StateObject private var scannerAssets = ScannerAssetStore.shared
     @StateObject private var offlinePackDownloads = PackOfflineDownloadManager.shared
+    @StateObject private var gamePackages = GamePackageStore.shared
     @State private var serverStatus: ServerStatusState = .checking
     @State private var showingResetAlert = false
     @State private var isApplyingRemotePreferences = false
@@ -322,6 +324,18 @@ struct SettingsView: View {
                             : "Only card catalogs are downloaded. Each game stays separate, and removing one never removes your saved cards.")
                     }
                 }
+
+                Section {
+                    ForEach(ScannerAssetStore.downloadableGames) { game in
+                        ScannerAssetInstallRow(game: game, store: scannerAssets)
+                    }
+                } header: {
+                    Text("Offline Scanner Models")
+                } footer: {
+                    Text("Optional game-specific recognition models run entirely on this phone. Install or update them over Wi-Fi, then reopen the scanner to use the new runtime.")
+                }
+
+                CommunityGameLibrariesSection(store: gamePackages)
 
                 // Display Preferences Section
                 Section {

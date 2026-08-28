@@ -95,6 +95,8 @@ final class PackOpeningResourceTests: XCTestCase {
             PackOpeningResource.cachePolicy(for: wrapper),
             .returnCacheDataElseLoad
         )
+        XCTAssertEqual(PackOpeningResource.requestTimeout(for: manifest), 3)
+        XCTAssertEqual(PackOpeningResource.requestTimeout(for: wrapper), 20)
     }
 
     func testPackOpeningAssetCachePersistsBytesByRemoteURL() throws {
@@ -124,6 +126,30 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(PackOfflineSetDefinition.matching("me5")?.metadataSetCode, "me05")
         XCTAssertEqual(PackOfflineSetDefinition.matching("ME05")?.packPool, "me5")
         XCTAssertNil(PackOfflineSetDefinition.matching("swsh7"))
+    }
+
+    @MainActor
+    func testDownloadedSetRemainsOpenableWhenNetworkRouteIsUnusable() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let record = PackOfflineDownloadRecord(
+            setID: "base1",
+            downloadedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            cardCount: 102,
+            byteCount: 1_024,
+            removableURLs: []
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(record).write(to: directory.appendingPathComponent("base1.json"))
+
+        let manager = PackOfflineDownloadManager(directory: directory)
+        XCTAssertTrue(manager.canOpen(setID: "base1", isConnected: false))
+        XCTAssertFalse(manager.canOpen(setID: "me5", isConnected: false))
+        XCTAssertTrue(manager.canOpen(setID: "me5", isConnected: true))
     }
 
     func testSharedAssetRequestsCanFallBackToTheEmbeddedPackDirectory() throws {
@@ -443,6 +469,40 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(schemeTask.callbackCount, 3)
         XCTAssertTrue(schemeTask.callbacksWereOnMainThread)
     }
+
+    @MainActor
+    func testCachedManifestStartsRendererWithoutWaitingForRemoteRefresh() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let remoteBaseURL = URL(string: "https://assets.example.com")!
+        let remoteManifestURL = remoteBaseURL.appendingPathComponent("pack/manifest.json")
+        let cache = PackOpeningAssetCache(directory: directory)
+        cache.store(Data(#"{"mesh":"/pack/models/pack.obj","covers":{}}"#.utf8), for: remoteManifestURL)
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StalledResponseURLProtocol.self]
+        let handler = PackOpeningSchemeHandler(
+            remoteBaseURL: remoteBaseURL,
+            session: URLSession(configuration: configuration),
+            assetCache: cache
+        )
+        var remoteAssetsUsable: Bool?
+        handler.setRemoteAvailabilityHandler { remoteAssetsUsable = $0 }
+        let finished = expectation(description: "Cached manifest delivered")
+        let schemeTask = RecordingURLSchemeTask(
+            request: URLRequest(url: URL(string: "tcger-pack://assets/pack/manifest.json")!),
+            onFinish: { finished.fulfill() }
+        )
+
+        handler.webView(WKWebView(), start: schemeTask)
+        await fulfillment(of: [finished], timeout: 0.5)
+
+        XCTAssertEqual(schemeTask.callbackCount, 3)
+        XCTAssertTrue(schemeTask.callbacksWereOnMainThread)
+        XCTAssertEqual(remoteAssetsUsable, false)
+    }
 }
 
 private final class ImmediateResponseURLProtocol: URLProtocol {
@@ -460,6 +520,19 @@ private final class ImmediateResponseURLProtocol: URLProtocol {
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data([0x89, 0x50, 0x4E, 0x47]))
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private final class StalledResponseURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        // Intentionally never completes: the cached response must already have
+        // unblocked WebKit while this simulates a weak, unusable route.
     }
 
     override func stopLoading() {}

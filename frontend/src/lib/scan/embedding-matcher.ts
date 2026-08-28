@@ -297,8 +297,9 @@ let modelPromise: Promise<void> | null = null;
 let loadingModelKey: string | null = null;
 let activeModelKey: string | null = null;
 /** Encoder closure: card crop canvas → raw (un-normalised) embedding vector. */
-let embedFn: ((cardCanvas: HTMLCanvasElement) => Promise<Float32Array>) | null =
-  null;
+type EmbedFunction = (cardCanvas: HTMLCanvasElement) => Promise<Float32Array>;
+let embedFn: EmbedFunction | null = null;
+const cachedEmbedFunctions = new Map<string, EmbedFunction>();
 
 export interface EmbeddingModelConfig {
   /** HF model id; must match the index's `model`. */
@@ -381,6 +382,12 @@ export async function ensureEmbeddingModel(
   });
 
   if (isEmbeddingModelReady() && activeModelKey === desiredModelKey) return;
+  const cached = cachedEmbedFunctions.get(desiredModelKey);
+  if (cached) {
+    embedFn = cached;
+    activeModelKey = desiredModelKey;
+    return;
+  }
   if (modelPromise) {
     if (loadingModelKey === desiredModelKey) return modelPromise;
     await modelPromise;
@@ -428,6 +435,7 @@ export async function ensureEmbeddingModel(
     try {
       await modelPromise;
       activeModelKey = desiredModelKey;
+      if (embedFn) cachedEmbedFunctions.set(desiredModelKey, embedFn);
     } finally {
       modelPromise = null;
       loadingModelKey = null;
@@ -502,6 +510,7 @@ export async function ensureEmbeddingModel(
   try {
     await modelPromise;
     activeModelKey = desiredModelKey;
+    if (embedFn) cachedEmbedFunctions.set(desiredModelKey, embedFn);
   } finally {
     modelPromise = null;
     loadingModelKey = null;
@@ -525,6 +534,42 @@ export async function computeEmbeddingFromCanvas(
   const norm = Math.sqrt(sq);
   if (norm > 1e-8) for (let i = 0; i < out.length; i++) out[i]! /= norm;
   return out;
+}
+
+/**
+ * Embed one crop with every distinct per-game model and merge their calibrated
+ * shard results. Model sessions are cached, so automatic mode downloads and
+ * initializes each model once, then only switches the active inference closure.
+ */
+export async function computeEmbeddingMatchesFromCanvas(
+  cardCanvas: HTMLCanvasElement,
+  indexes: readonly EmbeddingIndex[],
+  options: EmbeddingMatchOptions = {},
+): Promise<BrowserVideoScanCandidate[]> {
+  const groups = new Map<string, EmbeddingIndex[]>();
+  for (const index of indexes) {
+    const key = embeddingModelKey(index);
+    const group = groups.get(key) ?? [];
+    group.push(index);
+    groups.set(key, group);
+  }
+  const topK = options.topK ?? 20;
+  const candidates: BrowserVideoScanCandidate[] = [];
+  for (const group of groups.values()) {
+    const primary = group[0]!;
+    await ensureEmbeddingModel({
+      model: primary.model,
+      dtype: primary.dtype,
+      encoder: primary.encoder,
+      modelUrl: primary.modelUrl,
+    });
+    const embedding = await computeEmbeddingFromCanvas(cardCanvas);
+    if (!embedding) continue;
+    candidates.push(...matchEmbeddingShardsTopK(embedding, group, options));
+  }
+  return candidates
+    .sort((left, right) => right.confidence - left.confidence)
+    .slice(0, topK);
 }
 
 // ---------- matching ----------

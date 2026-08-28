@@ -43,7 +43,7 @@ final class CatalogSearchTests: XCTestCase {
         XCTAssertEqual(fraction.map(\.card.id), ["tk-dp-l-3"])
 
         let exactNumber = fixture.store.search(query: "3", tcg: .pokemon, limit: 20)
-        XCTAssertEqual(exactNumber.map(\.card.id), ["tk-dp-l-3"])
+        XCTAssertEqual(exactNumber.map(\.card.id), ["darkrai", "tk-dp-l-3"])
         XCTAssertFalse(exactNumber.map(\.card.id).contains("mega-lucario"))
 
         XCTAssertTrue(

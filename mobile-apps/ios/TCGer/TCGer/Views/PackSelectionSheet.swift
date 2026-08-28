@@ -14,8 +14,8 @@ struct PackSelectionSheet: View {
     let packSets: [PackOpeningInterfaceState.PackSet]
     let cardPools: [PackOpeningInterfaceState.CardPool]
     let selectedPackID: String
+    let remoteAssetsUsable: Bool
     @ObservedObject var downloadManager: PackOfflineDownloadManager
-    @ObservedObject private var networkMonitor = NetworkMonitor.shared
     let onSelect: (String) -> Void
     @State private var searchText = ""
     @State private var availabilityFilter = PackSetAvailabilityFilter.all
@@ -23,18 +23,14 @@ struct PackSelectionSheet: View {
     private var filteredPackSets: [PackOpeningInterfaceState.PackSet] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return packSets.filter { set in
-            guard downloadManager.canOpen(
-                setID: set.id,
-                isConnected: networkMonitor.isConnected
-            ) else { return false }
-
             let matchesSearch = query.isEmpty
                 || set.label.localizedCaseInsensitiveContains(query)
                 || set.options.contains { option in
                     option.resolvedVariationLabel.localizedCaseInsensitiveContains(query)
                 }
 
-            let matchesAvailability = switch availabilityFilter {
+            let effectiveFilter: PackSetAvailabilityFilter = remoteAssetsUsable ? availabilityFilter : .all
+            let matchesAvailability = switch effectiveFilter {
             case .all:
                 true
             case .downloaded:
@@ -51,26 +47,23 @@ struct PackSelectionSheet: View {
             List {
                 if filteredPackSets.isEmpty {
                     ContentUnavailableView {
-                        Label(
-                            networkMonitor.isConnected ? "No Sets Found" : "No Packs Available",
-                            systemImage: networkMonitor.isConnected ? "magnifyingglass" : "wifi.slash"
-                        )
+                        Label("No Sets Found", systemImage: "magnifyingglass")
                     } description: {
-                        Text(networkMonitor.isConnected
-                            ? "Try another search or download filter."
-                            : "Connect to the internet or download pack sets from Settings before opening them offline.")
+                        Text("Try another search or download filter.")
                     } actions: {
-                        if networkMonitor.isConnected {
-                            Button("Show All Sets") {
-                                searchText = ""
-                                availabilityFilter = .all
-                            }
+                        Button("Show All Sets") {
+                            searchText = ""
+                            availabilityFilter = .all
                         }
                     }
                     .listRowBackground(Color.clear)
                 }
 
                 ForEach(filteredPackSets) { set in
+                    let isAccessible = downloadManager.canOpen(
+                        setID: set.id,
+                        isConnected: remoteAssetsUsable
+                    )
                     Section {
                         NavigationLink {
                             PackSetBrowserView(
@@ -78,6 +71,7 @@ struct PackSelectionSheet: View {
                                 cardPools: cardPools,
                                 selectedPackID: selectedPackID,
                                 downloadManager: downloadManager,
+                                remoteAssetsUsable: remoteAssetsUsable,
                                 onSelect: onSelect,
                                 onDone: { dismiss() }
                             )
@@ -95,7 +89,11 @@ struct PackSelectionSheet: View {
                                     .foregroundStyle(.blue)
                             }
                         }
-                        .accessibilityHint("Choose a pack variant and browse every possible card from \(set.label)")
+                        .disabled(!isAccessible)
+                        .opacity(isAccessible ? 1 : 0.48)
+                        .accessibilityHint(isAccessible
+                            ? "Choose a pack variant and browse every possible card from \(set.label)"
+                            : "Download \(set.label) before opening it without a usable connection")
                     } header: {
                         HStack(spacing: 10) {
                             Text(set.label)
@@ -105,10 +103,16 @@ struct PackSelectionSheet: View {
                                     .foregroundStyle(.blue)
                                     .accessibilityLabel("Selected set")
                             }
+                            if !isAccessible {
+                                Label("Unavailable", systemImage: "wifi.slash")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
                             if let definition = PackOfflineSetDefinition.matching(set.id) {
                                 PackSetDownloadControl(
                                     definition: definition,
-                                    manager: downloadManager
+                                    manager: downloadManager,
+                                    remoteAssetsUsable: remoteAssetsUsable
                                 )
                             }
                         }
@@ -127,7 +131,7 @@ struct PackSelectionSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
-                if networkMonitor.isConnected {
+                if remoteAssetsUsable {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Picker("Download status", selection: $availabilityFilter) {
@@ -219,7 +223,7 @@ private struct PackSetBrowserView: View {
     let packSet: PackOpeningInterfaceState.PackSet
     let cardPools: [PackOpeningInterfaceState.CardPool]
     @ObservedObject var downloadManager: PackOfflineDownloadManager
-    @ObservedObject private var networkMonitor = NetworkMonitor.shared
+    let remoteAssetsUsable: Bool
     let onSelect: (String) -> Void
     let onDone: () -> Void
     @State private var selectedPackID: String
@@ -229,12 +233,14 @@ private struct PackSetBrowserView: View {
         cardPools: [PackOpeningInterfaceState.CardPool],
         selectedPackID: String,
         downloadManager: PackOfflineDownloadManager,
+        remoteAssetsUsable: Bool,
         onSelect: @escaping (String) -> Void,
         onDone: @escaping () -> Void
     ) {
         self.packSet = packSet
         self.cardPools = cardPools
         self.downloadManager = downloadManager
+        self.remoteAssetsUsable = remoteAssetsUsable
         self.onSelect = onSelect
         self.onDone = onDone
         _selectedPackID = State(initialValue:
@@ -256,7 +262,7 @@ private struct PackSetBrowserView: View {
     private var isAccessible: Bool {
         downloadManager.canOpen(
             setID: packSet.id,
-            isConnected: networkMonitor.isConnected
+            isConnected: remoteAssetsUsable
         )
     }
 
@@ -567,6 +573,7 @@ private struct PackPossiblePullCard: View {
 private struct PackSetDownloadControl: View {
     let definition: PackOfflineSetDefinition
     @ObservedObject var manager: PackOfflineDownloadManager
+    let remoteAssetsUsable: Bool
 
     var body: some View {
         switch manager.status(for: definition) {
@@ -593,7 +600,7 @@ private struct PackSetDownloadControl: View {
                 .font(.body.weight(.semibold))
         }
         .buttonStyle(.borderless)
-        .disabled(!NetworkMonitor.shared.isConnected)
+        .disabled(!remoteAssetsUsable)
         .accessibilityLabel(label)
     }
 }

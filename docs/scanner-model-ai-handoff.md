@@ -1,5 +1,10 @@
 # Scanner Model AI Handoff
 
+> **Historical engineering log.** This long-form handoff preserves experiment
+> detail and earlier implementation context. For the current architecture,
+> three-game release inventory, operational process, and open risks, start at
+> [scanner-system/README.md](scanner-system/README.md).
+
 Last updated: 2026-08-16 (per-pocket dev-mode coordinator evidence)
 
 ## Session Results 2026-08-11 (22:03 device binder export)

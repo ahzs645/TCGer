@@ -1,5 +1,11 @@
 # Scanner asset packaging: bundled now, R2 later
 
+> **Historical decision record.** Downloadable, content-addressed iOS and
+> Android per-game scanner packs are now implemented and published. Bundled
+> Pokémon assets still provide fallback behavior, but the current delivery
+> architecture is documented in
+> [scanner-system/client-integration-and-distribution.md](scanner-system/client-integration-and-distribution.md).
+
 Decision (2026-08-09): **all scanner assets ship inside the iOS app bundle,
 and the iOS ScanIndex assets are tracked in git.** Remote (Cloudflare R2)
 delivery is planned but deferred; when it lands, the artwork fingerprint
@@ -59,7 +65,7 @@ Why bundled-first:
 Cost accepted for now: ~105 MB of scanner payload in the app, and shipping a
 new Pokémon set's index requires an App Store release.
 
-## Later: R2 delivery (planned, not started)
+## Original R2 delivery plan (subsequently implemented)
 
 R2 infrastructure already exists in this repo (catalog + Yu-Gi-Oh image
 delivery; see `cloudflare/`), and the web scanner already does versioned

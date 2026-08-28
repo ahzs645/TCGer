@@ -85,6 +85,7 @@ struct PackOpeningView: View {
                     packSets: interfaceState.packSets,
                     cardPools: interfaceState.availableCardPools,
                     selectedPackID: interfaceState.selectedPackID,
+                    remoteAssetsUsable: webSession.remoteAssetsUsable,
                     downloadManager: offlinePackDownloads
                 ) { optionID in
                     send(.selectPack(optionID))
@@ -151,7 +152,7 @@ struct PackOpeningView: View {
     private var selectedPackIsAccessible: Bool {
         offlinePackDownloads.canOpen(
             setID: interfaceState.selectedSetID,
-            isConnected: networkMonitor.isConnected
+            isConnected: webSession.remoteAssetsUsable
         )
     }
 
@@ -159,13 +160,13 @@ struct PackOpeningView: View {
         interfaceState.packSets.contains { set in
             offlinePackDownloads.canOpen(
                 setID: set.id,
-                isConnected: networkMonitor.isConnected
+                isConnected: webSession.remoteAssetsUsable
             )
         }
     }
 
     private var noPacksAvailable: Bool {
-        guard !networkMonitor.isConnected else { return false }
+        guard !webSession.remoteAssetsUsable else { return false }
         return !offlinePackDownloads.definitions.contains { definition in
             if case .downloaded = offlinePackDownloads.status(for: definition) {
                 return true
@@ -508,6 +509,10 @@ struct PackOpeningView: View {
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
+            Button("View Packs") {
+                presentedSheet = .packSelection
+            }
+            .buttonStyle(.glass)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)

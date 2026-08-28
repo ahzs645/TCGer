@@ -9,7 +9,7 @@ vertical slice:
 - binder creation, detail, and card inventory
 - local and remote card search
 - CameraX card capture and photo-library import
-- selectable server pHash/embedding and bundled on-device ArcFace/OCR recognition
+- selectable server pHash/embedding and on-device ArcFace/OCR recognition
 - scanner results that can be confirmed and added directly to a binder
 - pack opening with shared pack-core, offline pack assets, pull review, Favorites,
   collection saves, and server-backed sealed-opening linkage
@@ -51,6 +51,15 @@ fallback. A DINOv2 q8 bundle is also production-selectable and preserves iOS's
 gate/threshold contract plus strict manual title/collector OCR rescue, verified
 on API 34 arm64. Camera permission is requested only for the live preview;
 choosing existing photos remains available.
+
+Pokémon retains its bundled fallback. The current Pokémon, Magic, and Yu-Gi-Oh!
+ArcFace runtimes are also independently downloadable under **Settings >
+Offline scanner models**. Each R2 manifest, model, vectors, and metadata set is
+checksum-validated as one version before app-private atomic activation. A
+downloaded runtime is used only for its explicitly selected game; it is not
+used for cross-game automatic classification. **Check for update** safely
+replaces the active version only after the replacement validates, and
+**Remove** deletes that game's downloaded runtime.
 
 ## Architecture
 

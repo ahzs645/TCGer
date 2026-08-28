@@ -23,8 +23,10 @@ import com.ahmadjalil.tcger.domain.ScanDebugReviewTag
 import com.ahmadjalil.tcger.domain.SealedInventoryItem
 import com.ahmadjalil.tcger.domain.Wishlist
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerRequest
+import com.ahmadjalil.tcger.data.gamepackage.GamePackageState
 import com.ahmadjalil.tcger.data.scanner.ScannerRecognitionEngine
 import com.ahmadjalil.tcger.data.scanner.ScannerEncoderVariant
+import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetInstallStatus
 import com.ahmadjalil.tcger.ui.packopening.PackOpeningPull
 import com.ahmadjalil.tcger.ui.packopening.PackOpeningPullSession
 import com.ahmadjalil.tcger.ui.packopening.PackOpeningSaveCheckpoint
@@ -56,6 +58,8 @@ data class AppUiState(
     val scanResult: CardScanResult? = null,
     val scanDebugCaptures: List<ScanDebugCapture> = emptyList(),
     val isLoadingScanDebugCaptures: Boolean = false,
+    val scannerAssets: Map<String, ScannerAssetInstallStatus> = emptyMap(),
+    val gamePackages: GamePackageState = GamePackageState(),
     val message: String? = null,
 ) {
     val stats get() = binders.dashboardStats()
@@ -68,6 +72,16 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private var searchJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            container.gamePackages.state.collectLatest { packages ->
+                _state.update { it.copy(gamePackages = packages) }
+            }
+        }
+        viewModelScope.launch {
+            container.scannerAssets.statuses.collectLatest { scannerAssets ->
+                _state.update { it.copy(scannerAssets = scannerAssets) }
+            }
+        }
         viewModelScope.launch {
             container.preferences.preferences.collectLatest { preferences ->
                 _state.update { it.copy(preferences = preferences) }
@@ -362,6 +376,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun setCurrency(currency: String) = viewModelScope.launch { container.preferences.setCurrency(currency) }
     fun setShowPricing(show: Boolean) = viewModelScope.launch { container.preferences.setShowPricing(show) }
     fun setGameEnabled(game: String, enabled: Boolean) = viewModelScope.launch { container.preferences.setGameEnabled(game, enabled) }
+    fun installScannerAssets(game: String) = viewModelScope.launch { container.scannerAssets.install(game) }
+    fun removeScannerAssets(game: String) = container.scannerAssets.remove(game)
+    fun installGamePackage(url: String) = viewModelScope.launch { container.gamePackages.install(url) }
+    fun removeGamePackage(game: String) = container.gamePackages.remove(game)
+    suspend fun communityGameCards(game: String) = container.gamePackages.cards(game)
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     private fun launchMutation(block: suspend () -> Unit) = viewModelScope.launch {

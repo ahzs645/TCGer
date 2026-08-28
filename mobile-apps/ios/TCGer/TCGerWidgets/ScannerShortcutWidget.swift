@@ -99,3 +99,15 @@ struct ScannerShortcutWidget: Widget {
         .supportedFamilies([.systemSmall, .accessoryCircular])
     }
 }
+
+#Preview("Scanner — Small", as: .systemSmall) {
+    ScannerShortcutWidget()
+} timeline: {
+    ScannerShortcutEntry(date: .now, game: .mtg)
+}
+
+#Preview("Scanner — Circular", as: .accessoryCircular) {
+    ScannerShortcutWidget()
+} timeline: {
+    ScannerShortcutEntry(date: .now, game: .pokemon)
+}

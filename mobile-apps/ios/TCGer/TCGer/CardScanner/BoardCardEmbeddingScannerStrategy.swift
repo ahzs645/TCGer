@@ -45,6 +45,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private let ocr: CollectorNumberOCR
     private let titleOCR: CardTitleOCR
     private let rejectionGate: CardFaceRejectionGate?
+    /// Downloaded per-game runtimes opt out of `.automatic` until their
+    /// cross-model open-set scores are calibrated against the other games.
+    /// Bundled runtimes leave this nil and retain their historical behavior.
+    private let supportedModes: Set<ScanMode>?
     /// Per-encoder operating points, resolved once at construction from the
     /// selected `ScannerEncoderVariant` (env overrides win for sweeps).
     private let strongAcceptanceScore: Double
@@ -76,7 +80,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         metadataStore: CardIndexMetadataStore = .shared,
         ocr: CollectorNumberOCR = CollectorNumberOCR(),
         titleOCR: CardTitleOCR = CardTitleOCR(),
-        rejectionGate: CardFaceRejectionGate? = nil
+        rejectionGate: CardFaceRejectionGate? = nil,
+        supportedModes: Set<ScanMode>? = nil
     ) {
         self.cropper = cropper
         self.encoder = encoder ?? CardEmbeddingEncoder(
@@ -86,6 +91,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         self.metadataStore = metadataStore
         self.ocr = ocr
         self.titleOCR = titleOCR
+        self.supportedModes = supportedModes
         self.rejectionGate = rejectionGate
             ?? (variant.usesRejectionGate ? CardFaceRejectionGate.loadBundled() : nil)
         self.strongAcceptanceScore = variant.strongAcceptanceScore
@@ -93,7 +99,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     }
 
     func supports(_ mode: ScanMode) -> Bool {
-        encoder.isAvailable &&
+        (supportedModes?.contains(mode) ?? true) &&
+            encoder.isAvailable &&
             indexStore.isAvailable &&
             (mode == .automatic
                 ? !metadataStore.supportedGames.isEmpty
@@ -107,11 +114,16 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     /// catalog metadata decode. A blank frame is enough — the outputs are
     /// discarded; only the side-effectful loading matters.
     func warmUp() async {
+        await warmUp(for: .pokemon)
+    }
+
+    func warmUp(for mode: ScanMode) async {
+        guard supports(mode) else { return }
         guard encoder.isAvailable, indexStore.isAvailable else { return }
         guard let blank = Self.makeWarmUpImage() else { return }
         _ = try? cropper.detectRectanglesDetailed(in: blank, intrinsics: nil)
         let embedding = (try? await encoder.embedding(for: blank)) ?? []
-        _ = await metadataStore.physicalCardIndices(for: .pokemon, setCode: nil)
+        _ = await metadataStore.physicalCardIndices(for: mode.tcgGame, setCode: nil)
         _ = try? await indexStore.nearestNeighbors(
             for: embedding,
             limit: 1,

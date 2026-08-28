@@ -35,13 +35,39 @@ object ArcFaceModelContract {
         sha256 = "e1b4ed3a64f59b0a1970f5c0d8d29dffa746f7cf02959bdb39bdeae2b3718141",
     )
     val assets = listOf(model, vectors, metadata)
+
+    val pokemonRuntime = ArcFaceRuntimeContract(
+        game = "pokemon",
+        version = "bundled",
+        model = model,
+        vectors = vectors,
+        metadata = metadata,
+        expectedCardCount = expectedCardCount,
+        embeddingDimension = embeddingDimension,
+        strongAcceptanceScore = strongAcceptanceScore,
+        ambiguityMargin = ambiguityMargin,
+    )
 }
 
 data class ScannerModelAsset(
     val path: String,
-    val sizeBytes: Int,
+    val sizeBytes: Long,
     val sha256: String,
 )
+
+data class ArcFaceRuntimeContract(
+    val game: String,
+    val version: String,
+    val model: ScannerModelAsset,
+    val vectors: ScannerModelAsset,
+    val metadata: ScannerModelAsset,
+    val expectedCardCount: Int,
+    val embeddingDimension: Int,
+    val strongAcceptanceScore: Double,
+    val ambiguityMargin: Double,
+) {
+    val assets: List<ScannerModelAsset> = listOf(model, vectors, metadata)
+}
 
 interface ScannerModelAssetSource {
     fun open(path: String): InputStream
@@ -51,6 +77,10 @@ class AndroidScannerModelAssetSource(context: Context) : ScannerModelAssetSource
     private val assets = context.applicationContext.assets
 
     override fun open(path: String): InputStream = assets.open(path)
+}
+
+class FileScannerModelAssetSource(private val directory: java.io.File) : ScannerModelAssetSource {
+    override fun open(path: String): InputStream = java.io.File(directory, path).inputStream()
 }
 
 sealed interface ScannerModelAvailability {
@@ -64,13 +94,16 @@ class ArcFaceModelBundle private constructor(
     val metadataBytes: ByteArray,
 ) {
     companion object {
-        fun probe(source: ScannerModelAssetSource): ScannerModelAvailability = try {
-            ArcFaceModelContract.assets.forEach { descriptor ->
+        fun probe(
+            source: ScannerModelAssetSource,
+            contract: ArcFaceRuntimeContract = ArcFaceModelContract.pokemonRuntime,
+        ): ScannerModelAvailability = try {
+            contract.assets.forEach { descriptor ->
                 source.open(descriptor.path).use { input ->
                     // AssetInputStream.available() reports the uncompressed
                     // asset length without inflating the full model on the UI
                     // thread. load() performs the authoritative digest check.
-                    val available = input.available()
+                    val available = input.available().toLong()
                     require(available == descriptor.sizeBytes) {
                         "${descriptor.path} is $available bytes; expected ${descriptor.sizeBytes}"
                     }
@@ -81,10 +114,13 @@ class ArcFaceModelBundle private constructor(
             ScannerModelAvailability.Unavailable(error.message ?: "ArcFace scanner assets are unavailable")
         }
 
-        fun load(source: ScannerModelAssetSource): ArcFaceModelBundle {
-            val loaded = ArcFaceModelContract.assets.associateWith { descriptor ->
+        fun load(
+            source: ScannerModelAssetSource,
+            contract: ArcFaceRuntimeContract = ArcFaceModelContract.pokemonRuntime,
+        ): ArcFaceModelBundle {
+            val loaded = contract.assets.associateWith { descriptor ->
                 val bytes = source.open(descriptor.path).use(InputStream::readBytes)
-                require(bytes.size == descriptor.sizeBytes) {
+                require(bytes.size.toLong() == descriptor.sizeBytes) {
                     "${descriptor.path} is ${bytes.size} bytes; expected ${descriptor.sizeBytes}"
                 }
                 val digest = MessageDigest.getInstance("SHA-256")
@@ -96,9 +132,9 @@ class ArcFaceModelBundle private constructor(
                 bytes
             }
             return ArcFaceModelBundle(
-                modelBytes = loaded.getValue(ArcFaceModelContract.model),
-                vectorBytes = loaded.getValue(ArcFaceModelContract.vectors),
-                metadataBytes = loaded.getValue(ArcFaceModelContract.metadata),
+                modelBytes = loaded.getValue(contract.model),
+                vectorBytes = loaded.getValue(contract.vectors),
+                metadataBytes = loaded.getValue(contract.metadata),
             )
         }
     }

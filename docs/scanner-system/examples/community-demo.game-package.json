@@ -1,0 +1,54 @@
+{
+  "schema": "https://tcger.app/schemas/game-package-manifest/v1",
+  "packageVersion": "1",
+  "publishedAt": "2026-08-27T00:00:00Z",
+  "game": {
+    "id": "community-demo",
+    "name": "Community Demo",
+    "description": "A two-card conformance package for testing user-supplied libraries.",
+    "accentColor": "#2563EB"
+  },
+  "publisher": { "name": "TCGer" },
+  "catalog": {
+    "schema": "tcger-catalog-v1",
+    "asset": {
+      "url": "./community-demo.catalog.json",
+      "bytes": 424,
+      "sha256": "63be31b1d9e65348b27343f34341616f212479becd9826bee7cfd30faf62cf24",
+      "mediaType": "application/json"
+    },
+    "cardCount": 2,
+    "setCount": 1
+  },
+  "filters": [
+    {
+      "id": "faction",
+      "label": "Faction",
+      "property": "attributes.faction",
+      "type": "multiSelect",
+      "options": [
+        { "value": "water", "label": "Water" },
+        { "value": "fire", "label": "Fire" }
+      ]
+    },
+    {
+      "id": "cost",
+      "label": "Cost",
+      "property": "attributes.cost",
+      "type": "numberRange",
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "id": "rarity",
+      "label": "Rarity",
+      "property": "rarity",
+      "type": "select",
+      "options": [
+        { "value": "common", "label": "Common" },
+        { "value": "rare", "label": "Rare" }
+      ]
+    }
+  ]
+}

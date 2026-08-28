@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "games": [
+    {
+      "game": "pokemon",
+      "provider": "pokemon-tcg-api",
+      "adapter": "pokemon-tcg-api",
+      "setsURL": "https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/sets/en.json",
+      "setsFallbackURL": "https://api.pokemontcg.io/v2/sets?pageSize=250&select=id,name,series,printedTotal,total,releaseDate,updatedAt",
+      "catalogURL": "https://api.pokemontcg.io/v2/cards?pageSize=250",
+      "catalogFallbackURL": "https://github.com/PokemonTCG/pokemon-tcg-data/archive/refs/heads/master.zip",
+      "apiKeyEnvironment": "POKEMON_TCG_API_KEY",
+      "policy": {
+        "catalogRefreshHours": 168,
+        "releaseWindowDaysBefore": 14,
+        "releaseWindowDaysAfter": 21,
+        "unchangedImageAuditPercent": 2
+      }
+    },
+    {
+      "game": "magic",
+      "provider": "scryfall",
+      "adapter": "scryfall",
+      "setsURL": "https://api.scryfall.com/sets",
+      "catalogMetadataURL": "https://api.scryfall.com/bulk-data/default-cards",
+      "policy": {
+        "catalogRefreshHours": 168,
+        "releaseWindowDaysBefore": 14,
+        "releaseWindowDaysAfter": 21,
+        "unchangedImageAuditPercent": 2
+      }
+    },
+    {
+      "game": "yugioh",
+      "provider": "ygoprodeck",
+      "adapter": "ygoprodeck",
+      "setsURL": "https://db.ygoprodeck.com/api/v7/cardsets.php",
+      "revisionURL": "https://db.ygoprodeck.com/api/v7/checkDBVer.php",
+      "catalogURL": "https://db.ygoprodeck.com/api/v7/cardinfo.php",
+      "policy": {
+        "catalogRefreshHours": 168,
+        "releaseWindowDaysBefore": 14,
+        "releaseWindowDaysAfter": 21,
+        "unchangedImageAuditPercent": 2
+      }
+    }
+  ],
+  "futureGameTemplate": {
+    "game": "future-game-key",
+    "provider": "provider-name",
+    "adapter": "generic-json",
+    "revision": {
+      "url": "https://provider.example/version.json",
+      "path": "version"
+    },
+    "sets": {
+      "url": "https://provider.example/sets.json",
+      "itemsPath": "data",
+      "fields": {
+        "setId": "id",
+        "setCode": "code",
+        "name": "name",
+        "releaseDate": "released_at",
+        "expectedCards": "card_count",
+        "updatedAt": "updated_at",
+        "digital": "digital",
+        "setType": "set_type"
+      }
+    },
+    "catalog": {
+      "url": "https://provider.example/catalog.zip",
+      "kind": "zip"
+    },
+    "policy": {
+      "catalogRefreshHours": 168,
+      "releaseWindowDaysBefore": 14,
+      "releaseWindowDaysAfter": 21,
+      "unchangedImageAuditPercent": 2
+    }
+  }
+}

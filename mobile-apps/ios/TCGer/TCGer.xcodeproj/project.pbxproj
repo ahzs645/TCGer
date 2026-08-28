@@ -517,6 +517,7 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TCGER_CATALOG_BASE_URL = "https://assets.tcger.ahmadjalil.com/catalogs";
 				TCGER_PACK_ASSET_BASE_URL = "https://assets.tcger.ahmadjalil.com";
+				TCGER_SCANNER_ASSET_BASE_URL = "https://assets.tcger.ahmadjalil.com/ios/scan-assets";
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
@@ -558,6 +559,7 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TCGER_CATALOG_BASE_URL = "https://assets.tcger.ahmadjalil.com/catalogs";
 				TCGER_PACK_ASSET_BASE_URL = "https://assets.tcger.ahmadjalil.com";
+				TCGER_SCANNER_ASSET_BASE_URL = "https://assets.tcger.ahmadjalil.com/ios/scan-assets";
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;

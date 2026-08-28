@@ -14,6 +14,13 @@ publishing a changed ONNX file gives it a new URL and the next scanner start
 loads the matching new index/model bundle; old cached bundles remain valid for
 offline clients.
 
+Index JSON is gzip-compressed at publication and stored with
+`Content-Encoding: gzip`. Fetch decompresses it natively before `res.json()`;
+the parsed vectors and metadata are then kept in `tcger-scan-cache` IndexedDB.
+The large transfer is therefore paid once per version. Content-address hashes
+and diagnostic byte counts describe the decoded representation, so integrity
+checks still run on the exact bytes the browser parses.
+
 ## Encoder variants (see docs/scanner-convergence.md)
 
 Two encoder generations are publishable per TCG; the manifest's per-TCG entry
@@ -21,16 +28,13 @@ decides which one clients run, so switching (or rolling back) is one
 `update-scan-index-manifest.ts --prefer <encoder>` + republish, no client
 change:
 
-- `pokemon-embeddings-arcface.json` (**preferred**): the in-house
-  ArcFace/FastViT-T8 encoder — the same model + vectors iOS ships as its
-  default. Version-2 artifact: carries its calibrated `thresholds` and the
-  encoder `modelUrl` (`card-embeddings-arcface.onnx`, fp16, ~8 MB) so model,
-  index, and operating point travel as one unit. Built by
-  `backend/src/scripts/build-arcface-web-index.ts` from the iOS index bin
-  (Drive: `TCGer-encoder/CardsIndexVectors-arcface.bin`); ONNX exported by
-  `mobile-apps/ios/scripts/export_arcface_onnx.py` from the Drive
-  checkpoint. NOTE: int8 dynamic quantization DESTROYS this model (FastViT
-  reparam convs) — ship fp16 or fp32, never q8.
+- `{pokemon,magic,yugioh}-embeddings-arcface.json` (**preferred**): the
+  per-game ArcFace/FastViT-T8 models and vectors also shipped to iOS and
+  Android. Each artifact carries its thresholds and matching per-game ONNX
+  URL so model, index, and operating point travel as one unit. Build from the
+  trainer's `CardsIndexMetadata.json` plus `CardsIndexVectors-arcface.bin`.
+  NOTE: int8 dynamic quantization destroys this model's FastViT reparameterized
+  convolutions—ship fp16 or fp32, never q8.
 - `pokemon-embeddings.json` (rollback): DINOv2-small via HF CDN, version-1
   artifact, code-default thresholds (0.72 DINOv2-scale).
 
@@ -47,9 +51,13 @@ npx tsx src/scripts/build-embedding-index.ts \
   --model onnx-community/dinov2-small --encoder dinov2 \
   --out ../frontend/public/scan-index/pokemon-embeddings.json
 
-# Build the ArcFace web index from the iOS bin (no image API needed).
+# Build one ArcFace web index from trainer outputs (no image API needed).
 npx tsx src/scripts/build-arcface-web-index.ts \
-  --bin <path-to>/CardsIndexVectors-arcface.bin
+  --bin <path-to>/CardsIndexVectors-arcface.bin \
+  --metadata <path-to>/CardsIndexMetadata.json \
+  --tcg magic \
+  --model-url magic-card-embeddings-arcface.onnx \
+  --version 1
 
 # Refresh the versioned manifest the loader checks (arcface preferred by
 # default; --prefer dinov2 to roll the fleet back).

@@ -10,8 +10,8 @@ replaceable per-game shards:
 
 - one or more catalog metadata files are supplied with repeatable `--metadata`
   arguments (the legacy /content/CardsIndexMetadata.json remains the default)
-- card images download from each entry's imageURL into /content/card-images
-  (resumable; skips files already cached)
+- card images come from a pinned durable library (`--image-library-root`) or,
+  for legacy runs, download from imageURL into an identity-keyed validated cache
 - everything the Mac needs lands in /content/outputs:
     arcface-checkpoint.pt        (resumable, per epoch)
     status.json                  (cheap to poll with `colab download`)
@@ -40,7 +40,12 @@ import os
 import random
 import shutil
 import struct
+import tarfile
+import tempfile
+import threading
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -50,6 +55,7 @@ OUT_DIR = Path(os.environ.get("TCGER_OUTPUT_DIR", "/content/outputs"))
 CKPT = OUT_DIR / "arcface-checkpoint.pt"
 STATUS = OUT_DIR / "status.json"
 PACKAGE_DIR = OUT_DIR.parent / "CardEmbeddings-arcface.mlpackage"
+COVERAGE_REPORT = OUT_DIR / "image-coverage.json"
 
 IMNET_MEAN = [0.485, 0.456, 0.406]
 IMNET_STD = [0.229, 0.224, 0.225]
@@ -57,6 +63,157 @@ IMG_SIZE = 224
 EMBED_DIM = 384
 ARC_S, ARC_M = 16.0, 0.50  # s=16: s=30 with AdamW saturates and never lifts off (measured)
 SEED = 22
+
+
+class ImageCoverageError(RuntimeError):
+    """Raised when a production catalog does not have a valid image per row."""
+
+
+class DurableImageLibrary:
+    """Verified, read-only view of a versioned scanner image-library release."""
+
+    def __init__(self, root: Path, manifest_path=None, pinned_revision=None):
+        self.root = Path(root).resolve()
+        library_path = self.root / "library.json"
+        if not library_path.is_file():
+            raise ImageCoverageError(f"durable image library is missing {library_path}")
+        with open(library_path, encoding="utf-8") as source:
+            release = json.load(source)
+        configured_manifest = manifest_path or release.get("manifest")
+        if not configured_manifest:
+            raise ImageCoverageError("durable image library does not name a manifest")
+        candidate = Path(configured_manifest)
+        if not candidate.is_absolute():
+            candidate = self.root / candidate
+        self.manifest_path = candidate.resolve()
+        if self.manifest_path.parent != self.root and self.root not in self.manifest_path.parents:
+            raise ImageCoverageError("durable image manifest escapes the library root")
+        manifest_bytes = self.manifest_path.read_bytes()
+        actual_manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+        expected_manifest_sha = release.get("manifestSHA256")
+        if expected_manifest_sha and expected_manifest_sha != actual_manifest_sha:
+            raise ImageCoverageError("durable image manifest SHA-256 mismatch")
+        self.descriptor = {
+            "schemaVersion": release.get("schemaVersion"),
+            "manifestSHA256": actual_manifest_sha,
+            "pinnedRevision": pinned_revision,
+        }
+        self.rows = []
+        for line_number, line in enumerate(manifest_bytes.decode("utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if not isinstance(row, dict):
+                raise ImageCoverageError(
+                    f"durable image manifest row {line_number} is not an object"
+                )
+            if row.get("status") == "valid" and row.get("trainingEligible") is True:
+                self.rows.append(row)
+        self._by_source = {}
+        self._by_visual_id = {}
+        for row in self.rows:
+            source_key = self._source_key(row)
+            self._by_source.setdefault(source_key, []).append(row)
+            self._by_visual_id.setdefault(str(row.get("visualIdentityId")), []).append(row)
+
+    @staticmethod
+    def _source_key(row):
+        source_url = str(row.get("sourceURL") or row.get("imageURL") or "")
+        parsed = urllib.parse.urlsplit(source_url)
+        stable_url = urllib.parse.urlunsplit(
+            (parsed.scheme, parsed.netloc, parsed.path, "", "")
+        )
+        return (
+            normalize_game(row.get("game")),
+            str(row.get("cardId")),
+            stable_url,
+        )
+
+    def record_for(self, entry):
+        explicit = entry.get("visualIdentityId")
+        if explicit:
+            candidates = self._by_visual_id.get(str(explicit), [])
+            if len(candidates) == 1:
+                return candidates[0]
+        candidates = self._by_source.get(self._source_key(entry), [])
+        if len(candidates) == 1:
+            return candidates[0]
+        if len(candidates) > 1:
+            raise ImageCoverageError(
+                f"durable library has duplicate eligible rows for {visual_identity(entry)}"
+            )
+        return None
+
+    def validate_facts(self, entry, facts) -> dict:
+        row = self.record_for(entry)
+        if row is None:
+            raise ImageCoverageError(
+                f"durable library has no eligible image for {visual_identity(entry)}"
+            )
+        expected = {
+            "sha256": row.get("blobSha256"),
+            "bytes": row.get("bytes"),
+            "width": row.get("width"),
+            "height": row.get("height"),
+        }
+        for key, value in expected.items():
+            if facts.get(key) != value:
+                raise ImageCoverageError(
+                    f"cached image {key} does not match the pinned durable library"
+                )
+        return row
+
+    def materialize(self, entry, destination: Path) -> dict:
+        row = self.record_for(entry)
+        if row is None:
+            raise ImageCoverageError(
+                f"durable library has no eligible image for {visual_identity(entry)}"
+            )
+        expected_sha = row.get("blobSha256")
+        expected_bytes = row.get("bytes")
+        if not expected_sha or not isinstance(expected_bytes, int):
+            raise ImageCoverageError("durable library row lacks blob integrity fields")
+        shard = (self.root / str(row.get("shard") or "")).resolve()
+        if shard.parent != self.root and self.root not in shard.parents:
+            raise ImageCoverageError("durable library shard escapes the library root")
+        member_name = str(row.get("member") or "")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tarfile.open(shard, "r") as archive:
+                member = archive.getmember(member_name)
+                if not member.isfile() or member.name != member_name:
+                    raise ImageCoverageError("durable library member is not a regular file")
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    raise ImageCoverageError("durable library member could not be read")
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    dir=destination.parent,
+                    prefix=f".{destination.name}.",
+                    suffix=".part",
+                    delete=False,
+                ) as output:
+                    temporary = Path(output.name)
+                    shutil.copyfileobj(extracted, output)
+            facts = validate_image(temporary)
+            expected_dimensions = (row.get("width"), row.get("height"))
+            if facts["sha256"] != expected_sha:
+                raise ImageCoverageError("durable library blob SHA-256 mismatch")
+            if facts["bytes"] != expected_bytes:
+                raise ImageCoverageError("durable library blob byte count mismatch")
+            if (facts["width"], facts["height"]) != expected_dimensions:
+                raise ImageCoverageError("durable library blob dimensions mismatch")
+            os.replace(temporary, destination)
+            temporary = None
+            atomic_write_json(
+                cache_sidecar_path(destination),
+                image_sidecar(entry, facts),
+            )
+            return facts
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
 
 def write_status(**kwargs):
@@ -105,44 +262,344 @@ def load_entries(metadata_paths):
     return combined
 
 
-def cached_path(i: int) -> Path:
-    return CACHE_DIR / f"{i:05d}.img"
+def canonical_json(value) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
 
 
-def materialize_images(entries, workers=24):
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+def catalog_fingerprint(entries) -> str:
+    """Fingerprint the complete, ordered class-to-metadata mapping."""
+    normalized = [
+        {key: value for key, value in entry.items() if key != "annIndex"}
+        for entry in entries
+    ]
+    return hashlib.sha256(canonical_json(normalized).encode()).hexdigest()
+
+
+def visual_identity(entry) -> str:
+    explicit = entry.get("visualIdentityId")
+    if explicit:
+        return str(explicit)
+    return f'{normalize_game(entry.get("game"))}:{entry["cardId"]}'
+
+
+def image_cache_key(entry) -> str:
+    """Bind cached bytes to a visual identity and its exact source URL."""
+    identity = {
+        "visualIdentity": visual_identity(entry),
+        "sourceURL": str(entry.get("imageURL") or ""),
+    }
+    return hashlib.sha256(canonical_json(identity).encode()).hexdigest()
+
+
+def cached_path(entry, cache_dir=None) -> Path:
+    cache_root = Path(cache_dir) if cache_dir is not None else CACHE_DIR
+    key = image_cache_key(entry)
+    return cache_root / normalize_game(entry.get("game")) / key[:2] / f"{key}.img"
+
+
+def cache_sidecar_path(image_path: Path) -> Path:
+    return image_path.with_suffix(".json")
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_image(path: Path) -> dict:
+    """Fully decode an image and return content facts used by the manifest."""
+    from PIL import Image
+
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise ValueError("image file is empty")
+    with Image.open(path) as image:
+        image_format = image.format or "unknown"
+        image.verify()
+    # ``verify`` intentionally invalidates the decoder, so reopen and force a
+    # full pixel decode. Truncated files can pass header inspection alone.
+    with Image.open(path) as image:
+        image.load()
+        width, height = image.size
+    if width <= 0 or height <= 0:
+        raise ValueError("image dimensions must be positive")
+    return {
+        "sha256": file_sha256(path),
+        "bytes": path.stat().st_size,
+        "width": width,
+        "height": height,
+        "format": image_format.lower(),
+    }
+
+
+def atomic_write_json(path: Path, value) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as output:
+        temporary = Path(output.name)
+        json.dump(value, output, ensure_ascii=False, indent=2, sort_keys=True)
+        output.write("\n")
+    os.replace(temporary, path)
+
+
+def image_sidecar(entry, facts) -> dict:
+    url = str(entry.get("imageURL") or "")
+    return {
+        "schema": "tcger-training-image-cache-v1",
+        "cacheKey": image_cache_key(entry),
+        "visualIdentity": visual_identity(entry),
+        "sourceURL": url,
+        "sourceURLSHA256": hashlib.sha256(url.encode()).hexdigest(),
+        **facts,
+    }
+
+
+def _cached_image_facts(entry, destination: Path):
+    """Validate both cached bytes and the identity/content sidecar."""
+    if not destination.is_file():
+        return None
+    facts = validate_image(destination)
+    expected = image_sidecar(entry, facts)
+    sidecar_path = cache_sidecar_path(destination)
+    if sidecar_path.is_file():
+        with open(sidecar_path, encoding="utf-8") as source:
+            stored = json.load(source)
+        if stored != expected:
+            raise ValueError("cached image sidecar does not match bytes or identity")
+    else:
+        # Safe migration for an identity-keyed cache created before sidecars:
+        # the path already commits to identity+URL and the bytes were decoded.
+        atomic_write_json(sidecar_path, expected)
+    return facts
+
+
+def _download_validated_image(entry, destination: Path) -> dict:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    request = urllib.request.Request(
+        entry["imageURL"],
+        headers={"User-Agent": "TCGer-trainer"},
+    )
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".part",
+            delete=False,
+        ) as output:
+            temporary = Path(output.name)
+            with urllib.request.urlopen(request, timeout=30) as response:
+                shutil.copyfileobj(response, output)
+        facts = validate_image(temporary)
+        os.replace(temporary, destination)
+        temporary = None
+        atomic_write_json(
+            cache_sidecar_path(destination),
+            image_sidecar(entry, facts),
+        )
+        return facts
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def coverage_record(entry, row: int, status: str, facts=None) -> dict:
+    url = str(entry.get("imageURL") or "")
+    record = {
+        "row": row,
+        "game": normalize_game(entry.get("game")),
+        "cardId": str(entry["cardId"]),
+        "visualIdentity": visual_identity(entry),
+        "sourceURL": url,
+        "sourceURLSHA256": hashlib.sha256(url.encode()).hexdigest(),
+        "cacheKey": image_cache_key(entry),
+        "status": status,
+    }
+    if facts:
+        record.update(facts)
+    return record
+
+
+def build_coverage_report(
+    entries,
+    records,
+    allow_quarantine=False,
+    source_library=None,
+) -> dict:
+    ordered = sorted(records, key=lambda item: item["row"])
+    export_index = 0
+    for record in ordered:
+        if record["status"] == "valid":
+            record["exportAnnIndex"] = export_index
+            export_index += 1
+        else:
+            record["exportAnnIndex"] = None
+    library_rows = [
+        {
+            "cacheKey": record["cacheKey"],
+            "sha256": record["sha256"],
+        }
+        for record in ordered
+        if record["status"] == "valid"
+    ]
+    counts = {
+        status: sum(record["status"] == status for record in ordered)
+        for status in ("valid", "missing", "unavailable", "corrupt")
+    }
+    invalid = len(ordered) - counts["valid"]
+    report = {
+        "schema": "tcger-training-image-coverage-v1",
+        "catalogFingerprint": catalog_fingerprint(entries),
+        "imageLibraryFingerprint": hashlib.sha256(
+            canonical_json(library_rows).encode()
+        ).hexdigest(),
+        "total": len(ordered),
+        "valid": counts["valid"],
+        "missing": counts["missing"],
+        "unavailable": counts["unavailable"],
+        "corrupt": counts["corrupt"],
+        "quarantined": invalid if allow_quarantine else 0,
+        "entries": ordered,
+    }
+    if source_library is not None:
+        report["sourceLibrary"] = source_library.descriptor
+    return report
+
+
+def compact_entries(entries, valid_indices):
+    """Drop quarantined rows and make exported ANN labels contiguous."""
+    compacted = []
+    for ann_index, source_index in enumerate(valid_indices):
+        item = dict(entries[source_index])
+        item["annIndex"] = ann_index
+        compacted.append(item)
+    return compacted
+
+
+def materialize_images(
+    entries,
+    workers=24,
+    *,
+    cache_dir=None,
+    coverage_path=None,
+    allow_quarantine=False,
+    image_library=None,
+    status_writer=write_status,
+):
+    cache_root = Path(cache_dir) if cache_dir is not None else CACHE_DIR
+    report_path = Path(coverage_path) if coverage_path is not None else COVERAGE_REPORT
+    cache_root.mkdir(parents=True, exist_ok=True)
+    path_locks = {}
+    path_locks_guard = threading.Lock()
+
+    def lock_for(path):
+        with path_locks_guard:
+            return path_locks.setdefault(path, threading.Lock())
 
     def fetch(i_entry):
-        i, e = i_entry
-        dst = cached_path(i)
-        if dst.exists() and dst.stat().st_size > 0:
-            return None
-        url = e.get("imageURL")
-        if not url:
-            return i
-        for attempt in range(3):
+        row, entry = i_entry
+        destination = cached_path(entry, cache_root)
+        if not entry.get("imageURL"):
+            return coverage_record(entry, row, "missing")
+        with lock_for(destination):
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": "TCGer-trainer"})
-                with urllib.request.urlopen(req, timeout=30) as r, open(dst, "wb") as f:
-                    shutil.copyfileobj(r, f)
-                return None
-            except Exception:
-                time.sleep(1 + attempt)
-        return i
+                facts = _cached_image_facts(entry, destination)
+                if facts is not None:
+                    if image_library is not None:
+                        image_library.validate_facts(entry, facts)
+                    return coverage_record(entry, row, "valid", facts)
+            except Exception as error:
+                print(f"discarding invalid cache {destination}: {error}", flush=True)
+                destination.unlink(missing_ok=True)
+                cache_sidecar_path(destination).unlink(missing_ok=True)
 
-    done = 0
-    missing = []
-    with cf.ThreadPoolExecutor(workers) as ex:
-        for result in ex.map(fetch, enumerate(entries)):
-            done += 1
-            if result is not None:
-                missing.append(result)
-            if done % 2000 == 0:
-                write_status(phase="caching-images", cached=done, total=len(entries),
-                             missing=len(missing))
-    write_status(phase="images-ready", total=len(entries), missing=len(missing))
-    assert len(missing) < len(entries) * 0.02, f"too many missing images: {len(missing)}"
-    return [i for i in range(len(entries)) if i not in set(missing)]
+            last_status = "unavailable"
+            for attempt in range(3):
+                try:
+                    facts = (
+                        image_library.materialize(entry, destination)
+                        if image_library is not None
+                        else _download_validated_image(entry, destination)
+                    )
+                    return coverage_record(entry, row, "valid", facts)
+                except Exception as error:
+                    from PIL import UnidentifiedImageError
+
+                    last_status = (
+                        "corrupt"
+                        if isinstance(error, (UnidentifiedImageError, ValueError, OSError))
+                        and not isinstance(error, urllib.error.URLError)
+                        else "unavailable"
+                    )
+                    print(
+                        f"image fetch attempt {attempt + 1}/3 failed for "
+                        f"{visual_identity(entry)} ({last_status}): {error}",
+                        flush=True,
+                    )
+                    # A pinned durable library is immutable. Retrying the same
+                    # bad/missing blob cannot repair it and only obscures the
+                    # integrity failure.
+                    if attempt < 2 and image_library is None:
+                        time.sleep(1 + attempt)
+                    if image_library is not None:
+                        break
+            return coverage_record(entry, row, last_status)
+
+    records = []
+    with cf.ThreadPoolExecutor(max_workers=workers) as executor:
+        for record in executor.map(fetch, enumerate(entries)):
+            records.append(record)
+            if len(records) % 2000 == 0:
+                status_writer(
+                    phase="caching-images",
+                    cached=len(records),
+                    total=len(entries),
+                    invalid=sum(item["status"] != "valid" for item in records),
+                )
+    report = build_coverage_report(
+        entries,
+        records,
+        allow_quarantine,
+        source_library=image_library,
+    )
+    atomic_write_json(report_path, report)
+    status_writer(
+        phase="images-ready",
+        total=report["total"],
+        valid=report["valid"],
+        missing=report["missing"],
+        unavailable=report["unavailable"],
+        corrupt=report["corrupt"],
+        coverageReport=str(report_path),
+        imageLibraryFingerprint=report["imageLibraryFingerprint"],
+    )
+    invalid = report["total"] - report["valid"]
+    if invalid and not allow_quarantine:
+        raise ImageCoverageError(
+            f"image coverage is incomplete ({report['valid']}/{report['total']} valid); "
+            f"see {report_path}. Pass --allow-image-quarantine only for an "
+            "explicit non-production run."
+        )
+    valid_indices = [
+        record["row"] for record in report["entries"] if record["status"] == "valid"
+    ]
+    if not valid_indices:
+        raise ImageCoverageError("no valid training images remain after quarantine")
+    return valid_indices, report
 
 
 def main():
@@ -179,6 +636,36 @@ def main():
         help="CardsIndexMetadata JSON; repeat once per game",
     )
     parser.add_argument(
+        "--coverage-report",
+        type=Path,
+        help="Image coverage manifest (default: <output>/image-coverage.json)",
+    )
+    parser.add_argument(
+        "--image-library-root",
+        type=Path,
+        help=(
+            "Versioned durable image-library release containing library.json, "
+            "manifest.jsonl, and shards. When set, upstream URLs are never fetched."
+        ),
+    )
+    parser.add_argument(
+        "--image-library-manifest",
+        type=Path,
+        help="Optional manifest override inside --image-library-root",
+    )
+    parser.add_argument(
+        "--image-library-revision",
+        help="Pinned Hub commit/revision recorded with checkpoints and evaluation",
+    )
+    parser.add_argument(
+        "--allow-image-quarantine",
+        action="store_true",
+        help=(
+            "Non-production escape hatch: drop missing/corrupt image rows and "
+            "compact ANN labels. The default is to fail unless coverage is 100%."
+        ),
+    )
+    parser.add_argument(
         "--hub-repo",
         help="Optional Hugging Face model repo used to resume/persist each epoch",
     )
@@ -203,6 +690,60 @@ def main():
     if training_views_per_card < 1 or args.views_per_card < 1:
         parser.error("training and evaluation views per card must be positive")
 
+    metadata_paths = args.metadata or [META_PATH]
+    entries = load_entries(metadata_paths)
+    if args.limit_per_game:
+        limited = []
+        for game in ("pokemon", "magic", "yugioh"):
+            game_entries = [entry for entry in entries if entry["game"] == game]
+            limited.extend(game_entries[:args.limit_per_game])
+        entries = limited
+        for index, entry in enumerate(entries):
+            entry["annIndex"] = index
+    requested_game_counts = {
+        game: sum(entry["game"] == game for entry in entries)
+        for game in ("pokemon", "magic", "yugioh")
+        if any(entry["game"] == game for entry in entries)
+    }
+    write_status(
+        phase="catalogs-loaded",
+        total=len(entries),
+        games=requested_game_counts,
+    )
+    if args.image_library_manifest and not args.image_library_root:
+        parser.error("--image-library-manifest requires --image-library-root")
+    durable_library = (
+        DurableImageLibrary(
+            args.image_library_root,
+            manifest_path=args.image_library_manifest,
+            pinned_revision=args.image_library_revision,
+        )
+        if args.image_library_root
+        else None
+    )
+    valid, image_coverage = materialize_images(
+        entries,
+        coverage_path=args.coverage_report or COVERAGE_REPORT,
+        allow_quarantine=args.allow_image_quarantine,
+        image_library=durable_library,
+    )
+    if len(valid) != len(entries):
+        entries = compact_entries(entries, valid)
+        print(
+            f"quarantined {image_coverage['total'] - image_coverage['valid']} rows; "
+            f"training/exporting {len(entries)} validated rows",
+            flush=True,
+        )
+    valid = list(range(len(entries)))
+    game_counts = {
+        game: sum(entry["game"] == game for entry in entries)
+        for game in ("pokemon", "magic", "yugioh")
+        if any(entry["game"] == game for entry in entries)
+    }
+
+    # Validate the complete image library before importing the training stack
+    # or requiring a GPU. A bad catalog should fail during cheap preparation,
+    # not after an accelerator has been allocated for training.
     import numpy as np
     import torch
     import torch.nn as nn
@@ -219,24 +760,6 @@ def main():
     random.seed(SEED)
     np.random.seed(SEED)
     print("GPU:", torch.cuda.get_device_name(0), flush=True)
-
-    metadata_paths = args.metadata or [META_PATH]
-    entries = load_entries(metadata_paths)
-    if args.limit_per_game:
-        limited = []
-        for game in ("pokemon", "magic", "yugioh"):
-            game_entries = [entry for entry in entries if entry["game"] == game]
-            limited.extend(game_entries[:args.limit_per_game])
-        entries = limited
-        for index, entry in enumerate(entries):
-            entry["annIndex"] = index
-    game_counts = {
-        game: sum(entry["game"] == game for entry in entries)
-        for game in ("pokemon", "magic", "yugioh")
-        if any(entry["game"] == game for entry in entries)
-    }
-    write_status(phase="catalogs-loaded", total=len(entries), games=game_counts)
-    valid = materialize_images(entries)
 
     def contract_resize(img):
         # Mirrors CardEmbeddingEncoder.swift: shortest edge >= 256 (both sides
@@ -261,7 +784,7 @@ def main():
 
         def __getitem__(self, k):
             i = self.indices[k % len(self.indices)]
-            img = Image.open(cached_path(i)).convert("RGB")
+            img = Image.open(cached_path(entries[i])).convert("RGB")
             if self.train:
                 if random.random() < 0.85:
                     img = T.RandomPerspective(distortion_scale=0.35, p=1.0,
@@ -322,12 +845,8 @@ def main():
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
     scaler = torch.amp.GradScaler()
     start_epoch = 0
-    catalog_fingerprint = hashlib.sha256(
-        "\n".join(
-            f'{entry["game"]}\t{entry["cardId"]}\t{entry.get("imageURL", "")}'
-            for entry in entries
-        ).encode()
-    ).hexdigest()
+    run_catalog_fingerprint = catalog_fingerprint(entries)
+    image_library_fingerprint = image_coverage["imageLibraryFingerprint"]
     hub_checkpoint_path = f"{args.hub_path_prefix}/arcface-checkpoint.pt"
     if args.hub_repo and not CKPT.exists():
         try:
@@ -340,8 +859,16 @@ def main():
             print(f"no resumable Hub checkpoint: {error}", flush=True)
     if CKPT.exists():
         ck = torch.load(CKPT, map_location=device)
-        if ck.get("catalogFingerprint") != catalog_fingerprint:
+        if ck.get("catalogFingerprint") != run_catalog_fingerprint:
             raise ValueError("checkpoint catalog does not match supplied metadata")
+        if ck.get("imageLibraryFingerprint") != image_library_fingerprint:
+            raise ValueError(
+                "checkpoint image library does not match the validated training bytes"
+            )
+        if ck.get("sourceImageLibrary") != image_coverage.get("sourceLibrary"):
+            raise ValueError(
+                "checkpoint durable image-library revision does not match this run"
+            )
         checkpoint_config = ck.get("config", {})
         checkpoint_training_views = checkpoint_config.get("trainingViewsPerCard")
         if (
@@ -407,12 +934,15 @@ def main():
         torch.save({"model": model.state_dict(), "head": head.state_dict(),
                     "opt": opt.state_dict(), "sched": sched.state_dict(),
                     "epoch": epoch,
-                    "catalogFingerprint": catalog_fingerprint,
+                    "catalogFingerprint": run_catalog_fingerprint,
+                    "imageLibraryFingerprint": image_library_fingerprint,
+                    "sourceImageLibrary": image_coverage.get("sourceLibrary"),
                     "config": {
                         "backbone": args.backbone,
                         "dim": EMBED_DIM,
                         "trainingViewsPerCard": training_views_per_card,
                         "evaluationViewsPerCard": args.views_per_card,
+                        "coverageSchema": image_coverage["schema"],
                     }}, CKPT)
         write_status(phase="training", epoch=epoch, epochs=args.epochs,
                      loss=round(loss_sum / seen, 4), train_acc=round(correct / seen, 4),
@@ -488,6 +1018,20 @@ def main():
         "evaluationViewsPerCard": args.views_per_card,
         "optimizerStepsPerEpoch": len(loader),
         "configuredOptimizerSteps": len(loader) * args.epochs,
+        "catalogFingerprint": run_catalog_fingerprint,
+        "imageLibraryFingerprint": image_library_fingerprint,
+        "sourceImageLibrary": image_coverage.get("sourceLibrary"),
+        "imageCoverage": {
+            key: image_coverage[key]
+            for key in (
+                "total",
+                "valid",
+                "missing",
+                "unavailable",
+                "corrupt",
+                "quarantined",
+            )
+        },
     }
 
     if args.pokemon_baseline_onnx:
@@ -637,8 +1181,12 @@ def main():
     shutil.make_archive(str(OUT_DIR / "CardEmbeddings-arcface.mlpackage"), "zip",
                         PACKAGE_DIR.parent, PACKAGE_DIR.name)
 
-    full = torch.zeros(len(entries), EMBED_DIM)
-    full[torch.tensor(valid)] = gallery
+    # Entries were fail-closed or compacted before training, so every exported
+    # metadata row has a real gallery vector. Zero-vector placeholders are not
+    # a valid scanner artifact.
+    if len(gallery) != len(entries):
+        raise RuntimeError("gallery/vector count does not match validated metadata")
+    full = gallery
 
     def write_vector_file(path, vectors):
         path.parent.mkdir(parents=True, exist_ok=True)

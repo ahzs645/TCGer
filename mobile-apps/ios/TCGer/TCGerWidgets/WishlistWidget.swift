@@ -59,6 +59,8 @@ struct WishlistWidgetView: View {
                     .foregroundStyle(.pink)
                 Text("Choose a Wishlist")
                     .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 Text("Open TCGer to sync your wishlists.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -85,29 +87,30 @@ struct WishlistWidgetView: View {
     }
 
     private func smallWishlist(_ wishlist: WidgetWishlistInfo, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            wishlistTitle(wishlist.name, tint: tint)
+        VStack(alignment: .leading, spacing: 6) {
+            wishlistTitle(wishlist.name, tint: tint, compact: true)
 
             Spacer(minLength: 0)
 
-            HStack(alignment: .bottom, spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("\(wishlist.ownedCards)/\(wishlist.totalCards)")
-                        .font(.title3.weight(.bold))
-                        .minimumScaleFactor(0.7)
-                        .lineLimit(1)
-                    Text("cards owned")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .layoutPriority(1)
+            Text("\(wishlist.ownedCards) of \(wishlist.totalCards)")
+                .font(.title2.monospacedDigit().weight(.bold))
+                .minimumScaleFactor(0.68)
+                .lineLimit(1)
+            Text("cards owned")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
 
-                Spacer(minLength: 0)
+            WidgetProgressBar(percent: wishlist.completionPercent, tint: tint)
 
-                WidgetProgressRing(percent: wishlist.completionPercent, tint: tint)
-                    .frame(width: 54, height: 54)
+            HStack {
+                Text("\(clampedPercent(wishlist.completionPercent))% complete")
+                Spacer(minLength: 4)
+                Text("\(max(wishlist.totalCards - wishlist.ownedCards, 0)) left")
             }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
     }
 
@@ -131,17 +134,27 @@ struct WishlistWidgetView: View {
         }
     }
 
-    private func wishlistTitle(_ name: String, tint: Color) -> some View {
+    private func wishlistTitle(
+        _ name: String,
+        tint: Color,
+        compact: Bool = false
+    ) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "heart.fill")
                 .foregroundStyle(tint)
                 .widgetAccentable()
             Text(name)
-                .font(.headline.weight(.bold))
+                .font(compact ? .caption.weight(.bold) : .headline.weight(.bold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(compact ? 0.65 : 0.75)
+                .allowsTightening(true)
+                .layoutPriority(1)
             Spacer(minLength: 0)
         }
+    }
+
+    private func clampedPercent(_ percent: Int) -> Int {
+        min(max(percent, 0), 100)
     }
 
     @ViewBuilder
@@ -186,6 +199,16 @@ private extension WidgetWishlistInfo {
         totalCards: 25,
         neededCardNames: ["Umbreon ex", "Pikachu VMAX", "Mox Amber"]
     )
+
+    static let compactStressPreview = WidgetWishlistInfo(
+        id: "wishlist-compact-preview",
+        name: "Darkrai Master Set",
+        colorHex: "#0A84FF",
+        completionPercent: 4,
+        ownedCards: 2,
+        totalCards: 46,
+        neededCardNames: ["Darkrai VSTAR", "Darkrai GX", "Darkrai ex"]
+    )
 }
 
 struct WishlistWidget: Widget {
@@ -208,7 +231,7 @@ struct WishlistWidget: Widget {
 #Preview("Wishlist — Small", as: .systemSmall) {
     WishlistWidget()
 } timeline: {
-    WishlistEntry(date: .now, wishlist: .preview)
+    WishlistEntry(date: .now, wishlist: .compactStressPreview)
 }
 
 #Preview("Wishlist — Medium", as: .systemMedium) {

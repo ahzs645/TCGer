@@ -157,6 +157,51 @@ actor BundleCardEmbeddingModelLoader: CardEmbeddingModelLoading {
     }
 }
 
+/// Loads a compiled Core ML model installed under Application Support. Each
+/// downloadable scanner pack supplies its own model/index/metadata trio, so a
+/// remote game's vectors can never be paired with the bundled Pokémon model.
+actor FileCardEmbeddingModelLoader: CardEmbeddingModelLoading {
+    private let modelURL: URL
+    private var cachedModel: MLModel?
+    private var loadingTask: Task<MLModel, Error>?
+    nonisolated let isAvailable: Bool
+
+    init(modelURL: URL, fileManager: FileManager = .default) {
+        self.modelURL = modelURL
+        isAvailable = fileManager.fileExists(atPath: modelURL.path)
+    }
+
+    func makeModel() async throws -> MLModel {
+        if let cachedModel { return cachedModel }
+        if let loadingTask { return try await loadingTask.value }
+        guard isAvailable else {
+            throw CardEmbeddingEncoder.EncoderError.modelUnavailable
+        }
+
+        let configuration = MLModelConfiguration()
+        #if targetEnvironment(simulator)
+        configuration.computeUnits = .cpuOnly
+        #else
+        configuration.computeUnits = .all
+        #endif
+
+        let modelURL = self.modelURL
+        let task = Task<MLModel, Error> {
+            try await MLModel.load(contentsOf: modelURL, configuration: configuration)
+        }
+        loadingTask = task
+        do {
+            let model = try await task.value
+            cachedModel = model
+            loadingTask = nil
+            return model
+        } catch {
+            loadingTask = nil
+            throw error
+        }
+    }
+}
+
 private enum DINOv2Preprocessing {
     static let resizedShortestEdge = 256
 }

@@ -2,10 +2,12 @@ package com.ahmadjalil.tcger
 
 import android.app.Application
 import com.ahmadjalil.tcger.data.local.TCGerDatabase
+import com.ahmadjalil.tcger.data.gamepackage.GamePackageStore
 import com.ahmadjalil.tcger.data.preferences.PreferencesStore
 import com.ahmadjalil.tcger.data.remote.RemoteServiceFactory
 import com.ahmadjalil.tcger.data.repository.DefaultTCGerRepository
 import com.ahmadjalil.tcger.data.scanner.OnDeviceCardTextRecognizer
+import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetStore
 import com.ahmadjalil.tcger.domain.TCGerRepository
 
 class TCGerApplication : Application() {
@@ -16,14 +18,19 @@ class TCGerApplication : Application() {
         super.onCreate()
         val database = TCGerDatabase.create(this)
         val preferences = PreferencesStore(this)
+        val scannerAssets = ScannerAssetStore(this)
+        val gamePackages = GamePackageStore(this)
         container = AppContainer(
             preferences = preferences,
+            scannerAssets = scannerAssets,
+            gamePackages = gamePackages,
             repository = DefaultTCGerRepository(
                 this,
                 database.dao(),
                 preferences,
                 RemoteServiceFactory(),
                 OnDeviceCardTextRecognizer(),
+                scannerAssets,
             ),
         )
     }
@@ -31,5 +38,7 @@ class TCGerApplication : Application() {
 
 data class AppContainer(
     val preferences: PreferencesStore,
+    val scannerAssets: ScannerAssetStore,
+    val gamePackages: GamePackageStore,
     val repository: TCGerRepository,
 )

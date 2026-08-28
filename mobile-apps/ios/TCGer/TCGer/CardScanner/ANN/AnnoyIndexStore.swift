@@ -9,6 +9,7 @@ actor AnnoyIndexStore: ANNIndexProviding {
     private let resourceName: String
     private let fileExtension: String
     private let bundle: Bundle
+    private let fileURL: URL?
     private var vectors: [[Float]] = []
     private var isLoaded = false
     nonisolated let isAvailable: Bool
@@ -30,11 +31,21 @@ actor AnnoyIndexStore: ANNIndexProviding {
         self.resourceName = resourceName
         self.fileExtension = fileExtension
         self.bundle = bundle
+        fileURL = nil
         isAvailable = Self.hasValidHeader(
             bundle: bundle,
             resourceName: resourceName,
             fileExtension: fileExtension
         )
+    }
+
+    init(fileURL: URL, fileManager: FileManager = .default) {
+        resourceName = ""
+        fileExtension = ""
+        bundle = .main
+        self.fileURL = fileURL
+        isAvailable = fileManager.fileExists(atPath: fileURL.path)
+            && Self.hasValidHeader(at: fileURL)
     }
 
     /// In-memory initializer for deterministic tests and replay tooling. It
@@ -44,6 +55,7 @@ actor AnnoyIndexStore: ANNIndexProviding {
         resourceName = ""
         fileExtension = ""
         bundle = .main
+        fileURL = nil
         self.vectors = vectors
         isLoaded = true
         isAvailable = !vectors.isEmpty
@@ -165,7 +177,8 @@ actor AnnoyIndexStore: ANNIndexProviding {
     private func loadIfNeeded() async throws {
         guard !isLoaded else { return }
         defer { isLoaded = true }
-        guard let url = bundle.url(forResource: resourceName, withExtension: fileExtension) else {
+        guard let url = fileURL
+                ?? bundle.url(forResource: resourceName, withExtension: fileExtension) else {
             throw StoreError.indexUnavailable
         }
         let data = try Data(contentsOf: url)
@@ -217,8 +230,14 @@ actor AnnoyIndexStore: ANNIndexProviding {
         resourceName: String,
         fileExtension: String
     ) -> Bool {
-        guard let url = bundle.url(forResource: resourceName, withExtension: fileExtension),
-              let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+        guard let url = bundle.url(forResource: resourceName, withExtension: fileExtension) else {
+            return false
+        }
+        return hasValidHeader(at: url)
+    }
+
+    private nonisolated static func hasValidHeader(at url: URL) -> Bool {
+        guard let fileSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
               let handle = try? FileHandle(forReadingFrom: url)
         else {
             return false

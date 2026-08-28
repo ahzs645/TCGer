@@ -10,6 +10,10 @@ https://assets.tcger.ahmadjalil.com/pack/manifest.json
 https://assets.tcger.ahmadjalil.com/pack/objects/{content-addressed asset}
 https://assets.tcger.ahmadjalil.com/scan-index/manifest.json
 https://assets.tcger.ahmadjalil.com/scan-index/objects/{content-addressed model or index}
+https://assets.tcger.ahmadjalil.com/ios/scan-assets/{game}/manifest.json
+https://assets.tcger.ahmadjalil.com/ios/scan-assets/objects/{content-addressed runtime file}
+https://assets.tcger.ahmadjalil.com/android/scan-assets/{game}/manifest.json
+https://assets.tcger.ahmadjalil.com/android/scan-assets/objects/{content-addressed runtime file}
 ```
 
 No Worker is required. R2's custom-domain integration serves the objects
@@ -116,14 +120,59 @@ The publisher validates every manifest entry, rewrites ArcFace `modelUrl` to
 the ONNX object's SHA-256 key, uploads all immutable objects, and publishes the
 mutable manifest last. A model update is therefore atomic from the browser's
 perspective and is discovered the next time scanning starts.
+Index JSON is stored with gzip content encoding; browsers decompress it during
+fetch and the scanner stores the parsed index in IndexedDB. The manifest's
+byte count and content-address hash continue to describe the decoded JSON used
+by integrity diagnostics.
 
 The iOS target contains the equivalent `TCGER_CATALOG_BASE_URL` build setting.
 Its remote source persists downloaded packs on device and falls back to bundled
 packs when the network or CDN is unavailable.
 
-Card-image storage is intentionally outside this catalog-delivery design.
-Clients continue using their existing image sources until that system is
-designed and deployed separately.
+## Publish an iOS scanner pack
+
+The iOS publisher accepts an extracted Core ML package and its exactly paired
+metadata/vector files. It validates the row count and vector dimensions,
+uploads immutable objects first, and updates the game's manifest last:
+
+```bash
+npm run assets:r2:publish-ios-scan-pack -- \
+  --game yugioh \
+  --version 1 \
+  --model-package /path/to/CardEmbeddings-arcface.mlpackage \
+  --vectors /path/to/CardsIndexVectors-arcface.bin \
+  --metadata /path/to/CardsIndexMetadata.json \
+  --evaluation /path/to/arcface-eval.json \
+  --provenance /path/to/provenance.json \
+  --wrangler
+```
+
+Add `--dry-run` before publishing to inspect hashes and sizes. The app
+downloads every file into a staging directory, verifies all SHA-256 hashes,
+compiles the Core ML package on-device, and only then activates the new
+version.
+
+Android uses the equivalent manifest-last flow with a single fp32 ONNX model:
+
+```bash
+npm run assets:r2:publish-android-scan-pack -- \
+  --game yugioh \
+  --version 1 \
+  --model /path/to/card-embeddings-arcface-fp32.onnx \
+  --vectors /path/to/CardsIndexVectors-arcface.bin \
+  --metadata /path/to/CardsIndexMetadata.json \
+  --onnx-eval /path/to/android-onnx-eval.json \
+  --wrangler
+```
+
+Downloaded per-game models remain explicit-mode runtimes until cross-game
+operating points are calibrated from held-out real-phone captures. This applies
+to Pokémon, Magic, Yu-Gi-Oh!, and future independently trained game models.
+
+Training card art is intentionally outside the public R2 delivery design. The
+versioned, content-addressed image library lives in the private Hugging Face
+dataset and is consumed by commit SHA; mobile clients only receive the trained
+runtime/index packs.
 
 ## Pack-opening wrappers
 

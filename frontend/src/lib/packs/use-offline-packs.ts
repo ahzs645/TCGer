@@ -5,10 +5,10 @@ import type { PackOpeningPull } from "@tcg/pack-core/experience";
 
 import {
   downloadOfflinePack,
+  canOpenPackSet,
   OFFLINE_PACK_DEFINITIONS,
   OFFLINE_PACK_STORAGE_KEY,
   offlinePackCacheName,
-  offlinePackDefinition,
   parseOfflinePackRecords,
   removeOfflinePack,
   serializeOfflinePackRecords,
@@ -144,10 +144,8 @@ export function useOfflinePacks() {
     [records],
   );
   const canOpen = useCallback(
-    (setID: string) =>
-      isOnline || !offlinePackDefinition(setID)
-        ? isOnline
-        : Boolean(records[setID]),
+    (setID: string, networkUsable = isOnline) =>
+      canOpenPackSet(setID, networkUsable, records),
     [isOnline, records],
   );
 

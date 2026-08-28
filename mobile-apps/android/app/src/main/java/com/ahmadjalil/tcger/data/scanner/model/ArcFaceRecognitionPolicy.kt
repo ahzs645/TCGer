@@ -12,7 +12,11 @@ sealed interface ArcFaceRecognitionDecision {
 }
 
 object ArcFaceRecognitionPolicy {
-    fun decide(matches: List<CardEmbeddingMatch>): ArcFaceRecognitionDecision {
+    fun decide(
+        matches: List<CardEmbeddingMatch>,
+        strongAcceptanceScore: Double = ArcFaceModelContract.strongAcceptanceScore,
+        ambiguityMargin: Double = ArcFaceModelContract.ambiguityMargin,
+    ): ArcFaceRecognitionDecision {
         val best = matches.firstOrNull()
             ?: return ArcFaceRecognitionDecision.Rejected(
                 ArcFaceRecognitionDecision.Rejected.Reason.NO_CANDIDATES,
@@ -21,14 +25,14 @@ object ArcFaceRecognitionPolicy {
             )
         val rival = matches.firstOrNull { it.card.cardId != best.card.cardId }
         val margin = rival?.let { best.similarity - it.similarity }
-        if (best.similarity < ArcFaceModelContract.strongAcceptanceScore) {
+        if (best.similarity < strongAcceptanceScore) {
             return ArcFaceRecognitionDecision.Rejected(
                 ArcFaceRecognitionDecision.Rejected.Reason.BELOW_THRESHOLD,
                 best,
                 margin,
             )
         }
-        if (margin != null && margin < ArcFaceModelContract.ambiguityMargin) {
+        if (margin != null && margin < ambiguityMargin) {
             return ArcFaceRecognitionDecision.Rejected(
                 ArcFaceRecognitionDecision.Rejected.Reason.AMBIGUOUS,
                 best,

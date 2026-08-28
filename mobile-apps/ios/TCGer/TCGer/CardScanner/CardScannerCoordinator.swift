@@ -67,13 +67,30 @@ final class CardScannerCoordinator: @unchecked Sendable {
     }
 
     static func makeDefault(apiService: APIService = APIService()) -> CardScannerCoordinator {
-        let strategies: [ScanStrategy] = [
+        var strategies: [ScanStrategy] = [
             ArtworkFingerprintScannerStrategy(),
             BackendHashScannerStrategy(),
-            BoardCardEmbeddingScannerStrategy(),
-            PokemonTextScannerStrategy(),
-            MagicPerceptualHashScannerStrategy()
         ]
+        let downloadableModes: [(TCGGame, ScanMode)] = [
+            (.pokemon, .pokemon),
+            (.magic, .mtg),
+            (.yugioh, .yugioh),
+        ]
+        for (game, mode) in downloadableModes {
+            guard let runtime = ScannerAssetStore.shared.runtime(for: game) else { continue }
+            strategies.append(BoardCardEmbeddingScannerStrategy(
+                variant: .arcface,
+                encoder: CardEmbeddingEncoder(
+                    modelLoader: FileCardEmbeddingModelLoader(modelURL: runtime.modelURL)
+                ),
+                indexStore: AnnoyIndexStore(fileURL: runtime.vectorsURL),
+                metadataStore: CardIndexMetadataStore(fileURL: runtime.metadataURL),
+                supportedModes: [mode]
+            ))
+        }
+        strategies.append(BoardCardEmbeddingScannerStrategy())
+        strategies.append(PokemonTextScannerStrategy())
+        strategies.append(MagicPerceptualHashScannerStrategy())
         return CardScannerCoordinator(strategies: strategies, apiService: apiService)
     }
 

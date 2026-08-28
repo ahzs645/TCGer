@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/game-package-manifest/v1",
+  "title": "TCGer GamePackageManifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "packageVersion", "publishedAt", "game", "publisher", "catalog"],
+  "properties": {
+    "schema": { "const": "https://tcger.app/schemas/game-package-manifest/v1" },
+    "packageVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "publishedAt": { "type": "string", "format": "date-time" },
+    "game": {
+      "type": "object", "additionalProperties": false, "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "shortName": { "type": "string", "minLength": 1, "maxLength": 24 }, "description": { "type": "string", "maxLength": 500 },
+        "homepage": { "type": "string", "format": "uri" }, "accentColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+      }
+    },
+    "publisher": {
+      "type": "object", "additionalProperties": false, "required": ["name"],
+      "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 100 }, "homepage": { "type": "string", "format": "uri" } }
+    },
+    "catalog": {
+      "type": "object", "additionalProperties": false, "required": ["schema", "asset", "cardCount"],
+      "properties": { "schema": { "const": "tcger-catalog-v1" }, "asset": { "$ref": "#/$defs/asset" }, "cardCount": { "type": "integer", "minimum": 0 }, "setCount": { "type": "integer", "minimum": 0 } }
+    },
+    "filters": { "type": "array", "maxItems": 24, "items": { "$ref": "#/$defs/filter" }, "default": [] },
+    "scanner": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "web": { "$ref": "#/$defs/runtimeAsset" }, "ios": { "$ref": "#/$defs/runtimeAsset" }, "android": { "$ref": "#/$defs/runtimeAsset" } }
+    },
+    "offlinePacks": {
+      "type": "object", "additionalProperties": false, "required": ["schema", "manifest"],
+      "properties": { "schema": { "const": "tcger-pack-library-v1" }, "manifest": { "$ref": "#/$defs/asset" } }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "property": { "type": "string", "pattern": "^(id|name|setCode|collectorNumber|rarity|artist|type|category|releasedAt|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$" },
+    "asset": {
+      "type": "object", "additionalProperties": false, "required": ["url", "bytes", "sha256"],
+      "properties": { "url": { "type": "string", "minLength": 1, "maxLength": 2048 }, "bytes": { "type": "integer", "minimum": 1, "maximum": 536870912 }, "sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }, "mediaType": { "type": "string", "minLength": 1, "maxLength": 100 } }
+    },
+    "option": {
+      "type": "object", "additionalProperties": false, "required": ["value", "label"],
+      "properties": { "value": { "type": ["string", "number", "boolean"] }, "label": { "type": "string", "minLength": 1, "maxLength": 80 } }
+    },
+    "filter": {
+      "type": "object", "additionalProperties": false, "required": ["id", "label", "property", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "property": { "$ref": "#/$defs/property" }, "help": { "type": "string", "maxLength": 240 },
+        "type": { "enum": ["select", "multiSelect", "numberRange", "boolean", "text"] },
+        "options": { "type": "array", "minItems": 1, "maxItems": 200, "items": { "$ref": "#/$defs/option" } },
+        "min": { "type": "number" }, "max": { "type": "number" }, "step": { "type": "number", "exclusiveMinimum": 0 },
+        "trueLabel": { "type": "string", "maxLength": 80 }, "falseLabel": { "type": "string", "maxLength": 80 },
+        "mode": { "enum": ["contains", "equals"] }, "maxLength": { "type": "integer", "minimum": 1, "maximum": 200 }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "enum": ["select", "multiSelect"] } } }, "then": { "required": ["options"] } },
+        { "if": { "properties": { "type": { "const": "numberRange" } } }, "then": { "required": ["min", "max"] } }
+      ]
+    },
+    "runtimeAsset": { "type": "object", "additionalProperties": false, "required": ["runtime", "manifest"], "properties": { "runtime": { "const": "tcger-arcface-v1" }, "manifest": { "$ref": "#/$defs/asset" } } }
+  }
+}

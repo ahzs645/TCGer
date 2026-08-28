@@ -137,10 +137,8 @@ export function PackOpeningShell({
         // with the offline-only gate after connectivity changes.
         availability: offlinePacks.isOnline ? packSetAvailability : "all",
         isDownloaded: offlinePacks.isDownloaded,
-        canOpen: offlinePacks.canOpen,
       }),
     [
-      offlinePacks.canOpen,
       offlinePacks.isDownloaded,
       offlinePacks.isOnline,
       packSetAvailability,
@@ -315,83 +313,98 @@ export function PackOpeningShell({
             ) : (
               <div className="flex min-h-11 items-center gap-2 self-end rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 text-xs font-medium text-amber-700 dark:text-amber-300">
                 <WifiOff className="h-4 w-4" aria-hidden="true" />
-                Showing downloaded sets
+                Downloaded packs are available; others are disabled
               </div>
             )}
           </div>
           <div className="-mr-1 max-h-[52dvh] space-y-5 overflow-y-auto pr-1">
-            {visiblePackSets.map((packSet) => (
-              <section key={packSet.id} className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold">{packSet.label}</h3>
-                  <PackDownloadControl
-                    packSet={packSet}
-                    offlinePacks={offlinePacks}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">
-                    {packSet.options.length}{" "}
-                    {packSet.options.length === 1
-                      ? "wrapper variant"
-                      : "wrapper variants"}
-                  </p>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold text-primary transition hover:bg-muted"
-                    onClick={() => {
-                      setPackPickerOpen(false);
-                      setPossiblePullsQuery("");
-                      setPossiblePullsRarity(null);
-                      setPossiblePullsPoolID(packSet.packPoolID);
-                    }}
-                  >
-                    <GalleryVerticalEnd
-                      className="h-4 w-4"
-                      aria-hidden="true"
+            {visiblePackSets.map((packSet) => {
+              const canOpen = offlinePacks.canOpen(packSet.id);
+              return (
+                <section
+                  key={packSet.id}
+                  className={cn("space-y-2", !canOpen && "opacity-50")}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold">{packSet.label}</h3>
+                      {!canOpen ? (
+                        <p className="text-xs text-muted-foreground">
+                          Not downloaded · unavailable offline
+                        </p>
+                      ) : null}
+                    </div>
+                    <PackDownloadControl
+                      packSet={packSet}
+                      offlinePacks={offlinePacks}
                     />
-                    View possible cards
-                  </button>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {packSet.options.map((option) => {
-                    const selected = option.id === state?.selectedPackID;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => {
-                          onCommand({ type: "selectPack", id: option.id });
-                          setPackPickerOpen(false);
-                        }}
-                        className={cn(
-                          "flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition hover:bg-muted",
-                          selected &&
-                            "border-primary bg-primary/10 ring-1 ring-primary",
-                        )}
-                      >
-                        <GalleryVerticalEnd
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">
+                      {packSet.options.length}{" "}
+                      {packSet.options.length === 1
+                        ? "wrapper variant"
+                        : "wrapper variants"}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={!canOpen}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold text-primary transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground"
+                      onClick={() => {
+                        setPackPickerOpen(false);
+                        setPossiblePullsQuery("");
+                        setPossiblePullsRarity(null);
+                        setPossiblePullsPoolID(packSet.packPoolID);
+                      }}
+                    >
+                      <GalleryVerticalEnd
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
+                      View possible cards
+                    </button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {packSet.options.map((option) => {
+                      const selected = option.id === state?.selectedPackID;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={selected}
+                          disabled={!canOpen}
+                          onClick={() => {
+                            onCommand({ type: "selectPack", id: option.id });
+                            setPackPickerOpen(false);
+                          }}
                           className={cn(
-                            "h-5 w-5 shrink-0 text-muted-foreground",
-                            selected && "text-primary",
+                            "flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition hover:bg-muted disabled:cursor-not-allowed",
+                            selected &&
+                              "border-primary bg-primary/10 ring-1 ring-primary",
                           )}
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 flex-1 truncate font-medium">
-                          {option.variationLabel}
-                        </span>
-                        {selected ? (
-                          <span className="shrink-0 text-xs font-semibold text-primary">
-                            Selected
+                        >
+                          <GalleryVerticalEnd
+                            className={cn(
+                              "h-5 w-5 shrink-0 text-muted-foreground",
+                              selected && "text-primary",
+                            )}
+                            aria-hidden="true"
+                          />
+                          <span className="min-w-0 flex-1 truncate font-medium">
+                            {option.variationLabel}
                           </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+                          {selected ? (
+                            <span className="shrink-0 text-xs font-semibold text-primary">
+                              Selected
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
             {visiblePackSets.length === 0 ? (
               <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-center">
                 {offlinePacks.isOnline ? (
@@ -405,29 +418,21 @@ export function PackOpeningShell({
                     aria-hidden="true"
                   />
                 )}
-                <p className="text-sm font-semibold">
-                  {offlinePacks.isOnline
-                    ? "No sets found"
-                    : "No packs available offline"}
-                </p>
+                <p className="text-sm font-semibold">No sets found</p>
                 <p className="text-xs text-muted-foreground">
-                  {offlinePacks.isOnline
-                    ? "Try another search or download filter."
-                    : "Reconnect and download a supported set before going offline."}
+                  Try another search or download filter.
                 </p>
-                {offlinePacks.isOnline ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setPackSetQuery("");
-                      setPackSetAvailability("all");
-                    }}
-                  >
-                    Clear filters
-                  </Button>
-                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setPackSetQuery("");
+                    setPackSetAvailability("all");
+                  }}
+                >
+                  Clear filters
+                </Button>
               </div>
             ) : null}
           </div>
@@ -491,10 +496,7 @@ function PackDownloadControl({
   if (status.kind === "downloaded") {
     return (
       <div className="flex shrink-0 items-center gap-1">
-        <CheckCircle2
-          className="h-4 w-4 text-emerald-600"
-          aria-hidden="true"
-        />
+        <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
         <span className="sr-only">{packSet.label} downloaded</span>
         <button
           type="button"

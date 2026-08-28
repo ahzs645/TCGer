@@ -89,6 +89,19 @@ export function serializeOfflinePackRecords(
   return JSON.stringify(records);
 }
 
+/**
+ * Opening availability is a capability check, not a browser reachability
+ * check. A durable download always wins even when the browser still reports an
+ * unusable network route as online.
+ */
+export function canOpenPackSet(
+  setID: string,
+  networkUsable: boolean,
+  records: OfflinePackRecords,
+): boolean {
+  return Boolean(records[setID]) || networkUsable;
+}
+
 export async function downloadOfflinePack(
   setID: string,
   cards: readonly PackOpeningPull[],

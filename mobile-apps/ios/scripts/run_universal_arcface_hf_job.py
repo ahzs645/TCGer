@@ -35,7 +35,7 @@ from pathlib import Path
 
 REPO_RAW = (
     "https://raw.githubusercontent.com/ahzs645/TCGer/"
-    "codex/universal-scanner-shards"
+    "main"
 )
 POKEMON_METADATA = (
     f"{REPO_RAW}/mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/"
@@ -46,6 +46,7 @@ TRAINER = f"{REPO_RAW}/mobile-apps/ios/scripts/train_arcface_encoder.py"
 SCRYFALL_BULK = "https://api.scryfall.com/bulk-data/default-cards"
 YGOPRODECK_CARDS = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 ALL_GAMES = ("pokemon", "magic", "yugioh")
+DEFAULT_CATALOG_REVISION = "4ae187396e03383a7a9f33816acd1531a7f390dc"
 REQUEST_HEADERS = {
     "User-Agent": "TCGer/1.0 (https://github.com/ahzs645/TCGer)",
     "Accept": "application/json;q=0.9,*/*;q=0.8",
@@ -126,13 +127,35 @@ def main() -> None:
     )
     parser.add_argument(
         "--catalog-revision",
-        default="main",
+        default=DEFAULT_CATALOG_REVISION,
         help="Revision containing catalogs prepared by prepare_universal_arcface_hub.py",
     )
     parser.add_argument(
         "--refresh-catalogs",
         action="store_true",
         help="Ignore prepared Hub catalogs and rebuild them from upstream sources",
+    )
+    parser.add_argument(
+        "--image-library-repo",
+        default="ahzs645/tcger-scanner-images",
+        help="Private Hugging Face dataset containing the validated image release",
+    )
+    parser.add_argument(
+        "--image-library-revision",
+        help="Immutable commit SHA of the validated scanner image dataset",
+    )
+    parser.add_argument(
+        "--image-library-path-in-repo",
+        default="release",
+        help="Release directory inside --image-library-repo",
+    )
+    parser.add_argument(
+        "--allow-unpinned-image-sources",
+        action="store_true",
+        help=(
+            "Legacy escape hatch for a full run that downloads mutable upstream "
+            "URLs. Production runs should pin --image-library-revision instead."
+        ),
     )
     args = parser.parse_args()
 
@@ -141,6 +164,25 @@ def main() -> None:
         parser.error("--games must not contain duplicates")
     if args.training_views_per_card is not None and args.training_views_per_card < 1:
         parser.error("--training-views-per-card must be positive")
+    if args.image_library_revision and not re.fullmatch(
+        r"[0-9a-fA-F]{40}", args.image_library_revision
+    ):
+        parser.error("--image-library-revision must be a 40-character commit SHA")
+    if (
+        args.mode == "full"
+        and not re.fullmatch(r"[0-9a-fA-F]{40}", args.catalog_revision)
+        and not args.allow_unpinned_image_sources
+    ):
+        parser.error("full runs require an immutable --catalog-revision commit SHA")
+    if (
+        args.mode == "full"
+        and not args.image_library_revision
+        and not args.allow_unpinned_image_sources
+    ):
+        parser.error(
+            "full runs require --image-library-revision; use "
+            "--allow-unpinned-image-sources only for an explicit legacy run"
+        )
     artifact_variant = args.artifact_variant
     if artifact_variant is None and args.training_views_per_card is not None:
         artifact_variant = f"train-views-{args.training_views_per_card}"
@@ -192,9 +234,34 @@ def main() -> None:
     normalized_dir = work / "normalized"
     output_dir = work / "outputs"
     cache_dir = work / "card-images"
+    image_library_hub_dir = work / "image-library-hub"
     scripts_dir = work / "scripts"
     for directory in (source_dir, normalized_dir, output_dir, cache_dir, scripts_dir):
         directory.mkdir(parents=True, exist_ok=True)
+
+    image_library_root = None
+    if args.image_library_revision:
+        library_path = args.image_library_path_in_repo.strip("/")
+        if not library_path or ".." in Path(library_path).parts:
+            parser.error("--image-library-path-in-repo must be a safe relative path")
+        downloaded_library = Path(snapshot_download(
+            repo_id=args.image_library_repo,
+            repo_type="dataset",
+            revision=args.image_library_revision,
+            allow_patterns=f"{library_path}/**",
+            local_dir=image_library_hub_dir,
+            token=token,
+        ))
+        image_library_root = downloaded_library / library_path
+        if not (image_library_root / "library.json").is_file():
+            raise FileNotFoundError(
+                f"pinned image library is incomplete: {image_library_root}"
+            )
+        print(
+            f"using image library {args.image_library_repo}@"
+            f"{args.image_library_revision}:{library_path}",
+            flush=True,
+        )
 
     converter_path = scripts_dir / "build_universal_trainer_metadata.py"
     trainer_path = scripts_dir / "train_arcface_encoder.py"
@@ -299,6 +366,15 @@ def main() -> None:
         "evaluationViewsPerCard": 3,
         "preparedCatalogs": prepared_catalogs,
         "catalogRevision": args.catalog_revision,
+        "imageLibrary": (
+            {
+                "repo": args.image_library_repo,
+                "revision": args.image_library_revision,
+                "path": args.image_library_path_in_repo.strip("/"),
+            }
+            if image_library_root
+            else None
+        ),
         "pokemonBaseline": (
             args.pokemon_baseline_path_in_repo if pokemon_baseline_path else None
         ),
@@ -364,6 +440,11 @@ def main() -> None:
     if pokemon_baseline_path:
         trainer_command.extend([
             "--pokemon-baseline-onnx", str(pokemon_baseline_path),
+        ])
+    if image_library_root:
+        trainer_command.extend([
+            "--image-library-root", str(image_library_root),
+            "--image-library-revision", args.image_library_revision,
         ])
     trainer_env = os.environ.copy()
     trainer_env["TCGER_CACHE_DIR"] = str(cache_dir)

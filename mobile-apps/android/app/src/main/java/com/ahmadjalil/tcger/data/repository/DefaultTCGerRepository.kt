@@ -37,6 +37,8 @@ import com.ahmadjalil.tcger.data.scanner.model.DinoV2RecognitionResult
 import com.ahmadjalil.tcger.data.scanner.model.LocalEmbeddingDispatch
 import com.ahmadjalil.tcger.data.scanner.model.LocalEmbeddingModel
 import com.ahmadjalil.tcger.data.scanner.model.CardEmbeddingMetadata
+import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetStore
+import com.ahmadjalil.tcger.data.scanner.model.normalizeScannerGame
 import com.ahmadjalil.tcger.domain.Binder
 import com.ahmadjalil.tcger.domain.CardScanCandidate
 import com.ahmadjalil.tcger.domain.CardScanEngine
@@ -70,8 +72,10 @@ class DefaultTCGerRepository(
     private val preferencesStore: PreferencesStore,
     private val remoteFactory: RemoteServiceFactory,
     private val textRecognizer: OnDeviceCardTextRecognizer,
+    private val scannerAssetStore: ScannerAssetStore,
 ) : TCGerRepository {
     @Volatile private var arcFaceRecognizer: ArcFaceCardRecognizer? = null
+    private val downloadedArcFaceRecognizers = mutableMapOf<String, ArcFaceCardRecognizer>()
     @Volatile private var dinoV2Recognizer: DinoV2CardRecognizer? = null
     override suspend fun getBinders(): List<Binder> = withSource(
         local = { dao.getBinders().map(BinderWithCards::toDomain) },
@@ -113,7 +117,7 @@ class DefaultTCGerRepository(
         when (LocalEmbeddingDispatch.select(tcg, options)) {
         LocalEmbeddingModel.ARCFACE -> {
             runCatching {
-                withContext(Dispatchers.Default) { getArcFaceRecognizer().recognize(imageBytes) }
+                withContext(Dispatchers.Default) { getArcFaceRecognizer(tcg).recognize(imageBytes) }
             }.onSuccess { local ->
                 if (local.decision is ArcFaceRecognitionDecision.Accepted) {
                     return CardScanResult(
@@ -249,8 +253,32 @@ class DefaultTCGerRepository(
         )
     }
 
-    private fun getArcFaceRecognizer(): ArcFaceCardRecognizer = arcFaceRecognizer ?: synchronized(this) {
-        arcFaceRecognizer ?: ArcFaceCardRecognizer.load(applicationContext).also { arcFaceRecognizer = it }
+    private fun getArcFaceRecognizer(game: String): ArcFaceCardRecognizer {
+        val normalized = normalizeScannerGame(game)
+        val runtime = scannerAssetStore.installedRuntime(normalized)
+        if (normalized == "pokemon" && runtime == null) {
+            return arcFaceRecognizer ?: synchronized(this) {
+                arcFaceRecognizer ?: ArcFaceCardRecognizer.load(applicationContext).also { arcFaceRecognizer = it }
+            }
+        }
+        requireNotNull(runtime) {
+            "Install the ${normalized.replaceFirstChar(Char::uppercase)} offline scanner model in Settings first"
+        }
+        val existing = synchronized(downloadedArcFaceRecognizers) {
+            downloadedArcFaceRecognizers[normalized]
+        }
+        if (existing?.artifactVersion == runtime.contract.version) return existing
+        return synchronized(downloadedArcFaceRecognizers) {
+            val current = downloadedArcFaceRecognizers[normalized]
+            if (current?.artifactVersion == runtime.contract.version) {
+                current
+            } else {
+                current?.close()
+                ArcFaceCardRecognizer.load(applicationContext, normalized, scannerAssetStore).also {
+                    downloadedArcFaceRecognizers[normalized] = it
+                }
+            }
+        }
     }
 
     private fun getDinoV2Recognizer(): DinoV2CardRecognizer = dinoV2Recognizer ?: synchronized(this) {

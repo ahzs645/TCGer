@@ -1,5 +1,11 @@
 # Browser Video Scan Handoff
 
+> **Historical browser handoff.** Current multi-game ArcFace delivery,
+> heterogeneous-model automatic scanning, gzip transfer, IndexedDB caching,
+> and live release sizes are documented in
+> [scanner-system/client-integration-and-distribution.md](scanner-system/client-integration-and-distribution.md)
+> and [scanner-system/release-inventory-2026-08-27.md](scanner-system/release-inventory-2026-08-27.md).
+
 ## Purpose
 
 This file is a handoff for the next AI or engineer working on the browser-side

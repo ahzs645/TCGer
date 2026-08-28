@@ -475,27 +475,18 @@ export function useVideoScanData(
         return [];
       }
 
-      // Automatic mode can embed once only when shards use the same universal
-      // model contract. Prefer the contract represented by the most games;
-      // ties follow the stable game order above.
-      const groups = new Map<string, EmbeddingIndex[]>();
-      for (const index of loaded) {
-        const key = embeddingModelKey(index);
-        groups.set(key, [...(groups.get(key) ?? []), index]);
-      }
-      const compatible = [...groups.values()].sort(
-        (left, right) => right.length - left.length,
-      )[0]!;
-      const excluded = loaded.length - compatible.length;
-      const total = compatible.reduce((sum, index) => sum + index.total, 0);
-      const gamesLabel = compatible.map((index) => index.tcg).join(", ");
+      // The runtime groups shards by model contract. Shared-model shards use
+      // one embedding; isolated per-game encoders are evaluated separately
+      // and their calibrated candidates are merged. Do not discard valid
+      // Magic/Yu-Gi-Oh shards merely because Pokémon was loaded first.
+      const modelCount = new Set(loaded.map(embeddingModelKey)).size;
+      const total = loaded.reduce((sum, index) => sum + index.total, 0);
+      const gamesLabel = loaded.map((index) => index.tcg).join(", ");
       callbacks.onHashStatus(
         `Ready: ${total.toLocaleString()} embeddings across ${gamesLabel}` +
-          (excluded > 0
-            ? ` (${excluded} incompatible model shard${excluded === 1 ? "" : "s"} skipped).`
-            : "."),
+          (modelCount > 1 ? ` using ${modelCount} game-specific encoders.` : "."),
       );
-      return compatible;
+      return loaded;
     },
     [callbacks],
   );

@@ -23,6 +23,26 @@ interface EmbeddingArtifactShape {
   gateUrl?: unknown;
 }
 
+function isBase64Payload(value: string): boolean {
+  if (value.length % 4 !== 0) return false;
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  const contentLength = value.length - padding;
+  for (let index = 0; index < contentLength; index++) {
+    const code = value.charCodeAt(index);
+    const valid =
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      (code >= 48 && code <= 57) ||
+      code === 43 ||
+      code === 47;
+    if (!valid) return false;
+  }
+  for (let index = contentLength; index < value.length; index++) {
+    if (value.charCodeAt(index) !== 61) return false;
+  }
+  return true;
+}
+
 export function validateEmbeddingArtifact(
   artifact: EmbeddingArtifactShape,
   expected: { tcg: string; dimension: number; total: number },
@@ -45,11 +65,9 @@ export function validateEmbeddingArtifact(
   if (typeof artifact.vectors !== "string") {
     errors.push("vectors payload is missing");
   } else {
-    const validBase64 =
-      artifact.vectors.length % 4 === 0 &&
-      /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
-        artifact.vectors,
-      );
+    // Avoid a whole-string regular expression here: production Magic vectors
+    // are ~57 MB of base64 and can overflow the regexp engine's call stack.
+    const validBase64 = isBase64Payload(artifact.vectors);
     if (!validBase64) {
       errors.push("vectors payload is not valid base64");
     } else {

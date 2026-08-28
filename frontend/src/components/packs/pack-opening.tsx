@@ -71,6 +71,7 @@ function downloadOpening(session: PackOpeningPullSession) {
  */
 export function PackOpening() {
   const [assetBase, setAssetBase] = useState(CONFIGURED_ASSET_BASE);
+  const [remoteAssetsUsable, setRemoteAssetsUsable] = useState(true);
   const [rendererReady, setRendererReady] = useState(false);
   const [interfaceState, setInterfaceState] =
     useState<PackOpeningNativeState | null>(null);
@@ -95,13 +96,18 @@ export function PackOpening() {
     [interfaceState?.session],
   );
 
+  const fallBackToBundledAssets = useCallback(() => {
+    setRemoteAssetsUsable(false);
+    setRendererReady(false);
+    setInterfaceState(null);
+    setAssetBase("");
+  }, []);
+
   const handleEvent = useCallback(
     (event: PackOpeningEvent) => {
       if (event.type === "error") {
         if (assetBase) {
-          setRendererReady(false);
-          setInterfaceState(null);
-          setAssetBase("");
+          fallBackToBundledAssets();
         }
         return;
       }
@@ -128,7 +134,7 @@ export function PackOpening() {
         setReviewSession(event.session);
       }
     },
-    [assetBase],
+    [assetBase, fallBackToBundledAssets],
   );
 
   const sendCommand = useCallback((command: PackOpeningNativeCommand) => {
@@ -162,10 +168,52 @@ export function PackOpening() {
     ) {
       return;
     }
-    setRendererReady(false);
-    setInterfaceState(null);
-    setAssetBase("");
-  }, [assetBase, interfaceState, offlinePacks.isOnline]);
+    fallBackToBundledAssets();
+  }, [
+    assetBase,
+    fallBackToBundledAssets,
+    interfaceState,
+    offlinePacks.isOnline,
+  ]);
+
+  // `navigator.onLine` only means that the browser has a network route. Bound
+  // the remote renderer warm-up so weak Wi-Fi/cellular cannot hide downloaded
+  // packs indefinitely; the bundled runtime then opens durable local sets.
+  useEffect(() => {
+    if (!assetBase || rendererReady) return;
+    const timeout = window.setTimeout(fallBackToBundledAssets, 3_000);
+    return () => window.clearTimeout(timeout);
+  }, [assetBase, fallBackToBundledAssets, rendererReady]);
+
+  // Renderer readiness may have come from the browser HTTP cache, so verify
+  // the remote manifest separately before treating non-downloaded sets as
+  // available. The bundled placeholder manifest never grants online access.
+  useEffect(() => {
+    if (!assetBase) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 3_000);
+    void fetch(`${assetBase}/pack/manifest.json`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("Remote pack manifest unavailable");
+        setRemoteAssetsUsable(true);
+      })
+      .catch(fallBackToBundledAssets)
+      .finally(() => window.clearTimeout(timeout));
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [assetBase, fallBackToBundledAssets]);
+
+  const onlinePackAccess = offlinePacks.isOnline && remoteAssetsUsable;
+  const canOpenOfflinePack = offlinePacks.canOpen;
+  const canOpenPack = useCallback(
+    (setID: string) => canOpenOfflinePack(setID, onlinePackAccess),
+    [canOpenOfflinePack, onlinePackAccess],
+  );
 
   return (
     <div className="relative isolate h-full w-full overflow-hidden">
@@ -185,10 +233,10 @@ export function PackOpening() {
         onCommand={sendCommand}
         onInspect={(index) => setInspect({ pulls: resultPulls, index })}
         offlinePacks={{
-          isOnline: offlinePacks.isOnline,
+          isOnline: onlinePackAccess,
           statusFor: offlinePacks.statusFor,
           isDownloaded: offlinePacks.isDownloaded,
-          canOpen: offlinePacks.canOpen,
+          canOpen: canOpenPack,
           download: downloadPackSet,
           remove: (setID) => void offlinePacks.remove(setID),
         }}

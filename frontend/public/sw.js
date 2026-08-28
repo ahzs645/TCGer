@@ -167,12 +167,22 @@ async function cacheFirst(req, cacheName) {
 async function networkFirst(req, cacheName) {
   const cache = await caches.open(cacheName);
   try {
-    const res = await fetch(req);
+    const res = await fetchWithTimeout(req, 4_000);
     if (res && res.ok) cache.put(req, res.clone());
     return res;
   } catch (err) {
     const fallback = await cache.match(req);
     if (fallback) return fallback;
     throw err;
+  }
+}
+
+async function fetchWithTimeout(req, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(req, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
   }
 }

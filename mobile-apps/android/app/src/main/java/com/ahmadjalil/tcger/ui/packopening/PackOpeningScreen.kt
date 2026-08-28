@@ -149,6 +149,7 @@ fun PackOpeningScreen(
     var state by remember { mutableStateOf(PackOpeningState.Loading) }
     var command by remember { mutableStateOf<PackOpeningCommand?>(null) }
     var rendererReady by remember { mutableStateOf(false) }
+    var remoteAssetsUsable by remember(testMode) { mutableStateOf(testMode) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var hostWarning by remember { mutableStateOf<String?>(null) }
     var reloadKey by remember { mutableIntStateOf(0) }
@@ -240,6 +241,7 @@ fun PackOpeningScreen(
             offlineDownloadManager = resolvedOfflineManager,
             interactive = !state.showsNativeResults,
             modifier = Modifier.fillMaxSize().alpha(if (state.showsNativeResults) 0f else 1f),
+            onRemoteAssetAvailabilityChanged = { remoteAssetsUsable = it },
         ) { event ->
             when (event) {
                 PackOpeningBridgeEvent.Ready -> {
@@ -297,6 +299,11 @@ fun PackOpeningScreen(
             !rendererReady -> PackOpeningLoading(contentPadding)
             else -> PackOpeningControls(
                 state = state,
+                canOpenSelected = canOpenPackSet(
+                    state.selectedPackOption?.resolvedSetID.orEmpty(),
+                    remoteAssetsUsable,
+                    offlineStatuses,
+                ),
                 hostWarning = hostWarning,
                 contentPadding = contentPadding,
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -312,6 +319,7 @@ fun PackOpeningScreen(
         PackPickerSheet(
             state = state,
             offlineStatuses = offlineStatuses,
+            remoteAssetsUsable = remoteAssetsUsable,
             onDismiss = { showingPackPicker = false },
             onSelect = {
                 send(PackOpeningCommand.selectPack(it))
@@ -440,6 +448,7 @@ private fun PackOpeningError(message: String, contentPadding: PaddingValues, onR
 @Composable
 private fun PackOpeningControls(
     state: PackOpeningState,
+    canOpenSelected: Boolean,
     hostWarning: String?,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
@@ -461,7 +470,14 @@ private fun PackOpeningControls(
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         when (state.phase) {
-            PackOpeningPhase.SELECT -> SelectControls(state, onCommand, onChoosePack, onShowCards, onShowOdds)
+            PackOpeningPhase.SELECT -> SelectControls(
+                state,
+                canOpenSelected,
+                onCommand,
+                onChoosePack,
+                onShowCards,
+                onShowOdds,
+            )
             PackOpeningPhase.TEAR -> {
                 Text(
                     if (state.packBackwards) "Back facing · swipe the seal, or open it now" else "Swipe the seal, or open it now",
@@ -533,6 +549,7 @@ private fun PackOpeningControls(
 @Composable
 private fun SelectControls(
     state: PackOpeningState,
+    canOpenSelected: Boolean,
     onCommand: (PackOpeningCommand) -> Unit,
     onChoosePack: () -> Unit,
     onShowCards: () -> Unit,
@@ -565,7 +582,11 @@ private fun SelectControls(
         ) {
             Icon(Icons.Default.Collections, contentDescription = null)
             Spacer(Modifier.width(7.dp))
-            Text(state.selectedPackDisplayLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                if (canOpenSelected) state.selectedPackDisplayLabel else "Choose an Available Pack",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (state.selectedCardPool != null) {
             IconButton(
@@ -598,6 +619,7 @@ private fun SelectControls(
         Button(
             modifier = Modifier.weight(1f).testTag(PackOpeningTestTags.OPEN),
             onClick = { onCommand(PackOpeningCommand(PackOpeningAction.OPEN_PACK)) },
+            enabled = canOpenSelected,
         ) { Text(if (state.packCount == 1) "Open Pack" else "Open ${state.packCount} Packs") }
     }
 }
@@ -641,6 +663,7 @@ private fun revealActionLabel(state: PackOpeningState): String = when {
 private fun PackPickerSheet(
     state: PackOpeningState,
     offlineStatuses: Map<String, PackOfflineSetStatus>,
+    remoteAssetsUsable: Boolean,
     onDismiss: () -> Unit,
     onSelect: (String) -> Unit,
     onDownload: (PackOfflineSetRequest) -> Unit,
@@ -649,7 +672,8 @@ private fun PackPickerSheet(
 ) {
     var searchText by remember { mutableStateOf("") }
     var availabilityFilter by remember { mutableStateOf(PackSetAvailabilityFilter.ALL) }
-    val sets = filterPackSets(state.packSets, searchText, availabilityFilter, offlineStatuses)
+    val effectiveAvailability = if (remoteAssetsUsable) availabilityFilter else PackSetAvailabilityFilter.ALL
+    val sets = filterPackSets(state.packSets, searchText, effectiveAvailability, offlineStatuses)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text("Choose a Set", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         OutlinedTextField(
@@ -660,18 +684,27 @@ private fun PackPickerSheet(
             label = { Text("Search sets or packs") },
             singleLine = true,
         )
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            PackSetAvailabilityFilter.entries.forEach { filter ->
-                FilterChip(
-                    modifier = Modifier.testTag(filter.controlID),
-                    selected = availabilityFilter == filter,
-                    onClick = { availabilityFilter = filter },
-                    label = { Text(filter.label) },
-                )
+        if (remoteAssetsUsable) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PackSetAvailabilityFilter.entries.forEach { filter ->
+                    FilterChip(
+                        modifier = Modifier.testTag(filter.controlID),
+                        selected = availabilityFilter == filter,
+                        onClick = { availabilityFilter = filter },
+                        label = { Text(filter.label) },
+                    )
+                }
             }
+        } else {
+            Text(
+                "Downloaded packs are available; others are disabled",
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         LazyColumn(
             Modifier.fillMaxWidth().fillMaxHeight(0.85f),
@@ -694,6 +727,7 @@ private fun PackPickerSheet(
                 }
             }
             sets.forEach { set ->
+                val isAccessible = canOpenPackSet(set.id, remoteAssetsUsable, offlineStatuses)
                 item(key = "set-${set.id}") {
                     val poolID = set.options.firstOrNull()?.packPoolID ?: set.id
                     val pool = state.cardPools.firstOrNull { it.id.equals(poolID, ignoreCase = true) }
@@ -706,9 +740,17 @@ private fun PackPickerSheet(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            if (!isAccessible) {
+                                Text(
+                                    "Not downloaded · unavailable offline",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                         PackOfflineDownloadControl(
                             status = offlineStatuses[set.id] ?: PackOfflineSetStatus.NotDownloaded,
+                            remoteAssetsUsable = remoteAssetsUsable,
                             onDownload = { onDownload(request) },
                             onRetry = { onRetry(request) },
                             onRemove = { onRemove(set.id) },
@@ -718,8 +760,9 @@ private fun PackPickerSheet(
                 items(set.options, key = PackOpeningPackOption::id) { option ->
                     Surface(
                         modifier = Modifier.fillMaxWidth()
+                            .alpha(if (isAccessible) 1f else 0.48f)
                             .testTag(ParityControlIDs.ACTION_PACK_OPENING_CHOOSE_VARIANT)
-                            .clickable { onSelect(option.id) },
+                            .clickable(enabled = isAccessible) { onSelect(option.id) },
                         shape = RoundedCornerShape(16.dp),
                         color = if (option.id == state.selectedPackID) {
                             MaterialTheme.colorScheme.primaryContainer
@@ -768,9 +811,16 @@ internal fun filterPackSets(
     }
 }
 
+internal fun canOpenPackSet(
+    setID: String,
+    remoteAssetsUsable: Boolean,
+    statuses: Map<String, PackOfflineSetStatus>,
+): Boolean = remoteAssetsUsable || statuses[setID] is PackOfflineSetStatus.Downloaded
+
 @Composable
 private fun PackOfflineDownloadControl(
     status: PackOfflineSetStatus,
+    remoteAssetsUsable: Boolean,
     onDownload: () -> Unit,
     onRetry: () -> Unit,
     onRemove: () -> Unit,
@@ -779,6 +829,7 @@ private fun PackOfflineDownloadControl(
         PackOfflineSetStatus.NotDownloaded -> IconButton(
             modifier = Modifier.testTag(ParityControlIDs.ACTION_PACK_OPENING_DOWNLOAD_SET),
             onClick = onDownload,
+            enabled = remoteAssetsUsable,
         ) { Icon(Icons.Default.Download, contentDescription = "Download set for offline use") }
         is PackOfflineSetStatus.Downloading -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(progress = { status.progress }, modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
@@ -796,6 +847,7 @@ private fun PackOfflineDownloadControl(
             TextButton(
                 modifier = Modifier.testTag(ParityControlIDs.ACTION_PACK_OPENING_DOWNLOAD_SET),
                 onClick = onRetry,
+                enabled = remoteAssetsUsable,
             ) { Text("Retry") }
         }
     }

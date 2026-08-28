@@ -46,7 +46,7 @@ class DinoV2ModelBundle private constructor(
         fun probe(source: ScannerModelAssetSource): ScannerModelAvailability = try {
             DinoV2ModelContract.assets.forEach { descriptor ->
                 source.open(descriptor.path).use { input ->
-                    require(input.available() == descriptor.sizeBytes) {
+                    require(input.available().toLong() == descriptor.sizeBytes) {
                         "${descriptor.path} is ${input.available()} bytes; expected ${descriptor.sizeBytes}"
                     }
                 }
@@ -68,7 +68,7 @@ class DinoV2ModelBundle private constructor(
 
         private fun verified(source: ScannerModelAssetSource, descriptor: ScannerModelAsset): ByteArray {
             val bytes = source.open(descriptor.path).use(InputStream::readBytes)
-            require(bytes.size == descriptor.sizeBytes) {
+            require(bytes.size.toLong() == descriptor.sizeBytes) {
                 "${descriptor.path} is ${bytes.size} bytes; expected ${descriptor.sizeBytes}"
             }
             val digest = MessageDigest.getInstance("SHA-256").digest(bytes)

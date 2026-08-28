@@ -82,105 +82,134 @@ struct CollectionStatsWidgetView: View {
                         .foregroundColor(.secondary)
                 }
                 .containerBackground(.fill.tertiary, for: .widget)
-            } else if family == .systemSmall {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack {
-                        Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.title3)
-                            .foregroundStyle(.tint)
-                            .widgetAccentable()
-                        Spacer()
-                        if let lastUpdated = entry.lastUpdated {
-                            Text(lastUpdated, style: .relative)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    Spacer()
-
-                    if entry.showPricing {
-                        Text(formattedValue)
-                            .font(.title2.weight(.bold))
-                            .minimumScaleFactor(0.62)
-                            .lineLimit(1)
-                        Text("Collection value")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("\(entry.uniqueCards)")
-                            .font(.title2.weight(.bold))
-                        Text("Unique cards")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text("\(entry.totalBinders) binders · \(entry.totalCopies) copies")
-                        .font(.caption2.weight(.semibold))
-                        .lineLimit(1)
-                }
-                .containerBackground(.fill.tertiary, for: .widget)
             } else {
-                HStack(spacing: 10) {
-                    if entry.showPricing {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Label("Collection Value", systemImage: "chart.line.uptrend.xyaxis")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            Text(formattedValue)
-                                .font(.title2.weight(.bold))
-                                .minimumScaleFactor(0.65)
-                                .lineLimit(1)
-                            if let lastUpdated = entry.lastUpdated {
-                                Text("Updated \(lastUpdated, style: .relative)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .layoutPriority(0)
-                    }
-
-                    HStack(spacing: 6) {
-                        StatBlock(icon: "folder.fill", value: "\(entry.totalBinders)", label: "Binders")
-                        StatBlock(icon: "rectangle.portrait.fill", value: "\(entry.uniqueCards)", label: "Unique")
-                        StatBlock(icon: "square.stack.fill", value: "\(entry.totalCopies)", label: "Copies")
-                    }
-                    .frame(maxWidth: entry.showPricing ? .infinity : nil)
-                    .layoutPriority(1)
+                switch family {
+                case .systemSmall:
+                    smallStats
+                default:
+                    mediumStats
                 }
-                .containerBackground(.fill.tertiary, for: .widget)
             }
         }
         .widgetURL(URL(string: "tcger://collections"))
     }
 
+    private var smallStats: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .widgetAccentable()
+                Spacer(minLength: 6)
+                updatedText
+            }
+
+            Spacer(minLength: 0)
+
+            if entry.showPricing {
+                Text(formattedValue)
+                    .font(.title2.monospacedDigit().weight(.bold))
+                    .minimumScaleFactor(0.58)
+                    .lineLimit(1)
+                Text("Collection value")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            } else {
+                Text(compactCount(entry.uniqueCards))
+                    .font(.title2.monospacedDigit().weight(.bold))
+                    .lineLimit(1)
+                Text("Unique cards")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Text("\(compactCount(entry.totalBinders)) binders · \(compactCount(entry.totalCopies)) copies")
+                .font(.caption2.weight(.semibold))
+                .minimumScaleFactor(0.75)
+                .lineLimit(1)
+        }
+        .containerBackground(.fill.tertiary, for: .widget)
+    }
+
+    private var mediumStats: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Label(
+                    entry.showPricing ? "Collection Value" : "Collection Overview",
+                    systemImage: "chart.line.uptrend.xyaxis"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+                Spacer(minLength: 4)
+                updatedText
+            }
+
+            if entry.showPricing {
+                Text(formattedValue)
+                    .font(.title2.monospacedDigit().weight(.bold))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 8) {
+                StatBlock(
+                    icon: "folder.fill",
+                    value: compactCount(entry.totalBinders),
+                    label: "Binders"
+                )
+                StatBlock(
+                    icon: "rectangle.portrait.fill",
+                    value: compactCount(entry.uniqueCards),
+                    label: "Unique"
+                )
+                StatBlock(
+                    icon: "square.stack.fill",
+                    value: compactCount(entry.totalCopies),
+                    label: "Copies"
+                )
+            }
+        }
+        .containerBackground(.fill.tertiary, for: .widget)
+    }
+
+    @ViewBuilder
+    private var updatedText: some View {
+        if let lastUpdated = entry.lastUpdated {
+            Text(updatedLabel(for: lastUpdated))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+    }
+
+    private func updatedLabel(for date: Date) -> String {
+        let elapsed = max(entry.date.timeIntervalSince(date), 0)
+        if elapsed < 60 {
+            return "Updated now"
+        }
+        if elapsed < 3_600 {
+            return "Updated \(Int(elapsed / 60))m ago"
+        }
+        if elapsed < 86_400 {
+            return "Updated \(Int(elapsed / 3_600))h ago"
+        }
+        return "Updated \(Int(elapsed / 86_400))d ago"
+    }
+
     private var formattedValue: String {
         entry.totalValue.formatted(.currency(code: entry.currencyCode))
     }
-}
 
-private struct StatRow: View {
-    let icon: String
-    let value: String
-    let label: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .frame(width: 14)
-            Text(value)
-                .font(.caption)
-                .fontWeight(.bold)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
+    private func compactCount(_ value: Int) -> String {
+        value.formatted(.number.notation(.compactName))
     }
 }
 
@@ -190,14 +219,17 @@ private struct StatBlock: View {
     let label: String
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(.tint)
-                .widgetAccentable()
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
+        VStack(spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(.tint)
+                    .widgetAccentable()
+                Text(value)
+                    .font(.headline.monospacedDigit().weight(.bold))
+                    .minimumScaleFactor(0.72)
+                    .lineLimit(1)
+            }
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -354,6 +386,22 @@ struct RecentCardsWidget: Widget {
     }
 }
 
+#Preview("Collection Stats — Small", as: .systemSmall) {
+    CollectionStatsWidget()
+} timeline: {
+    CollectionStatsEntry(
+        date: .now,
+        totalBinders: 128,
+        uniqueCards: 12_593,
+        totalCopies: 28_710,
+        totalValue: 128_842.35,
+        currencyCode: "USD",
+        showPricing: true,
+        lastUpdated: .now,
+        hasData: true
+    )
+}
+
 #Preview("Collection Stats — Medium", as: .systemMedium) {
     CollectionStatsWidget()
 } timeline: {
@@ -366,6 +414,35 @@ struct RecentCardsWidget: Widget {
         currencyCode: "USD",
         showPricing: true,
         lastUpdated: .now,
+        hasData: true
+    )
+}
+
+#Preview("Recent Cards — Medium", as: .systemMedium) {
+    RecentCardsWidget()
+} timeline: {
+    RecentCardsEntry(
+        date: .now,
+        cards: [
+            WidgetCardInfo(
+                name: "Charizard ex — Special Illustration Rare",
+                tcg: "pokemon",
+                setName: "Scarlet & Violet—151",
+                imageUrl: nil
+            ),
+            WidgetCardInfo(
+                name: "Dark Magician",
+                tcg: "yugioh",
+                setName: "Legend of Blue Eyes White Dragon",
+                imageUrl: nil
+            ),
+            WidgetCardInfo(
+                name: "Black Lotus",
+                tcg: "magic",
+                setName: "Limited Edition Alpha",
+                imageUrl: nil
+            ),
+        ],
         hasData: true
     )
 }

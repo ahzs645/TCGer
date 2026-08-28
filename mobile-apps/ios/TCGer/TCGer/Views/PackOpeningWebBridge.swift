@@ -7,6 +7,7 @@ import UIKit
 final class PackOpeningWebSession: ObservableObject {
     let coordinator: PackOpeningWebCoordinator
     let webView: WKWebView
+    @Published private(set) var remoteAssetsUsable = false
 
     var latestInterfaceState: PackOpeningInterfaceState? {
         coordinator.latestState
@@ -52,6 +53,12 @@ final class PackOpeningWebSession: ObservableObject {
 
         self.coordinator = coordinator
         self.webView = webView
+        coordinator.resourceBridge.setRemoteAvailabilityHandler { [weak self] isUsable in
+            Task { @MainActor [weak self] in self?.remoteAssetsUsable = isUsable }
+        }
+        coordinator.resourceHandler.setRemoteAvailabilityHandler { [weak self] isUsable in
+            self?.remoteAssetsUsable = isUsable
+        }
 
         guard PackOpeningResource.rootURL() != nil else {
             coordinator.emit(.error("PackOpening.bundle is missing. Run `bash scripts/ios-assets.sh build`."))
@@ -91,6 +98,7 @@ final class PackOpeningWebSession: ObservableObject {
     }
 
     func setPrefersBundledResources(_ prefersBundledResources: Bool) {
+        if prefersBundledResources { remoteAssetsUsable = false }
         coordinator.setPrefersBundledResources(prefersBundledResources)
     }
 }
@@ -299,6 +307,7 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
     private let assetCache: PackOpeningAssetCache
     private let resourceModeLock = NSLock()
     private var _prefersBundledResources = false
+    private var _onRemoteAvailabilityChanged: (Bool) -> Void = { _ in }
 
     private var prefersBundledResources: Bool {
         resourceModeLock.withLock { _prefersBundledResources }
@@ -318,6 +327,16 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
         resourceModeLock.withLock {
             _prefersBundledResources = prefersBundledResources
         }
+        if prefersBundledResources { reportRemoteAvailability(false) }
+    }
+
+    func setRemoteAvailabilityHandler(_ handler: @escaping (Bool) -> Void) {
+        resourceModeLock.withLock { _onRemoteAvailabilityChanged = handler }
+    }
+
+    private func reportRemoteAvailability(_ isUsable: Bool) {
+        let handler = resourceModeLock.withLock { _onRemoteAvailabilityChanged }
+        handler(isUsable)
     }
 
     func userContentController(
@@ -361,28 +380,35 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
 
         let prefersBundledResources = prefersBundledResources
         let isManifest = PackOpeningResource.isManifest(remoteURL)
-        if let cached = assetCache.data(for: remoteURL),
-           prefersBundledResources || !isManifest || !NetworkMonitor.shared.isConnected {
+        if let cached = assetCache.data(for: remoteURL) {
+            if isManifest { reportRemoteAvailability(false) }
             completion(.success(Resource(
                 data: cached,
                 mimeType: PackOpeningResource.mimeType(for: remoteURL.pathExtension)
             )))
+            if isManifest,
+               !prefersBundledResources,
+               NetworkMonitor.shared.isConnected {
+                refreshCachedResource(remoteURL)
+            }
             return
         }
 
         if prefersBundledResources {
+            if isManifest { reportRemoteAvailability(false) }
             loadBundled(requestURL, completion: completion)
             return
         }
 
         guard NetworkMonitor.shared.isConnected else {
+            if isManifest { reportRemoteAvailability(false) }
             loadBundled(requestURL, completion: completion)
             return
         }
 
         var request = URLRequest(url: remoteURL)
         request.cachePolicy = PackOpeningResource.cachePolicy(for: remoteURL)
-        request.timeoutInterval = 20
+        request.timeoutInterval = PackOpeningResource.requestTimeout(for: remoteURL)
         session.dataTask(with: request) { [weak self] data, response, error in
             if
                 error == nil,
@@ -390,6 +416,7 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
                 let response,
                 (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
             {
+                if isManifest { self?.reportRemoteAvailability(true) }
                 self?.assetCache.store(data, for: remoteURL)
                 completion(.success(Resource(
                     data: data,
@@ -398,6 +425,7 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
                 )))
                 return
             }
+            if isManifest { self?.reportRemoteAvailability(false) }
             if let cached = self?.assetCache.data(for: remoteURL) {
                 completion(.success(Resource(
                     data: cached,
@@ -406,6 +434,28 @@ final class PackOpeningFetchBridge: NSObject, WKScriptMessageHandlerWithReply {
             } else {
                 self?.loadBundled(requestURL, completion: completion)
             }
+        }.resume()
+    }
+
+    /// A cached manifest is sufficient to start the renderer. Refresh it for a
+    /// future opening without making the current opening wait for a network
+    /// route that may be technically satisfied but unusably weak.
+    private func refreshCachedResource(_ remoteURL: URL) {
+        var request = URLRequest(url: remoteURL)
+        request.cachePolicy = PackOpeningResource.cachePolicy(for: remoteURL)
+        request.timeoutInterval = PackOpeningResource.requestTimeout(for: remoteURL)
+        session.dataTask(with: request) { [weak self] data, response, error in
+            guard
+                error == nil,
+                let data,
+                let response,
+                (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
+            else {
+                self?.reportRemoteAvailability(false)
+                return
+            }
+            self?.assetCache.store(data, for: remoteURL)
+            self?.reportRemoteAvailability(true)
         }.resume()
     }
 
@@ -580,6 +630,13 @@ enum PackOpeningResource {
     static func cachePolicy(for remoteURL: URL) -> URLRequest.CachePolicy {
         isManifest(remoteURL) ? .reloadIgnoringLocalCacheData : .returnCacheDataElseLoad
     }
+
+    /// Metadata has a bundled/cached fallback and must fail over quickly. Large
+    /// immutable textures can keep the longer timeout because they never block
+    /// a cached pack opening.
+    static func requestTimeout(for remoteURL: URL) -> TimeInterval {
+        isManifest(remoteURL) ? 3 : 20
+    }
 }
 
 @MainActor
@@ -594,6 +651,7 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
     private let assetCache: PackOpeningAssetCache
     private var remoteTasks: [ObjectIdentifier: RemoteTask] = [:]
     private var prefersBundledResources = false
+    private var onRemoteAvailabilityChanged: (Bool) -> Void = { _ in }
 
     init(
         remoteBaseURL: URL? = nil,
@@ -607,6 +665,11 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
 
     func setPrefersBundledResources(_ prefersBundledResources: Bool) {
         self.prefersBundledResources = prefersBundledResources
+        if prefersBundledResources { onRemoteAvailabilityChanged(false) }
+    }
+
+    func setRemoteAvailabilityHandler(_ handler: @escaping (Bool) -> Void) {
+        onRemoteAvailabilityChanged = handler
     }
 
     func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
@@ -637,23 +700,30 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         schemeTask: any WKURLSchemeTask
     ) {
         let isManifest = PackOpeningResource.isManifest(remoteURL)
-        if let cached = assetCache.data(for: remoteURL),
-           prefersBundledResources || !isManifest || !NetworkMonitor.shared.isConnected {
+        if let cached = assetCache.data(for: remoteURL) {
+            if isManifest { onRemoteAvailabilityChanged(false) }
             deliver(
                 cached,
                 remoteURL: remoteURL,
                 requestURL: requestURL,
                 schemeTask: schemeTask
             )
+            if isManifest,
+               !prefersBundledResources,
+               NetworkMonitor.shared.isConnected {
+                refreshCachedResource(remoteURL)
+            }
             return
         }
 
         if prefersBundledResources {
+            if isManifest { onRemoteAvailabilityChanged(false) }
             loadBundled(requestURL, schemeTask: schemeTask)
             return
         }
 
         guard NetworkMonitor.shared.isConnected else {
+            if isManifest { onRemoteAvailabilityChanged(false) }
             loadBundled(requestURL, schemeTask: schemeTask)
             return
         }
@@ -661,7 +731,7 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         let key = ObjectIdentifier(schemeTask as AnyObject)
         var request = URLRequest(url: remoteURL)
         request.cachePolicy = PackOpeningResource.cachePolicy(for: remoteURL)
-        request.timeoutInterval = 20
+        request.timeoutInterval = PackOpeningResource.requestTimeout(for: remoteURL)
 
         let task = session.dataTask(with: request) { [weak self] data, response, error in
             Task { @MainActor [weak self] in
@@ -672,6 +742,7 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
                     let response,
                     (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
                 {
+                    if isManifest { self.onRemoteAvailabilityChanged(true) }
                     self.assetCache.store(data, for: remoteURL)
                     self.deliver(
                         data,
@@ -681,6 +752,7 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
                         textEncodingName: response.textEncodingName
                     )
                 } else {
+                    if isManifest { self.onRemoteAvailabilityChanged(false) }
                     if let cached = self.assetCache.data(for: remoteURL) {
                         self.deliver(
                             cached,
@@ -696,6 +768,28 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         }
         remoteTasks[key] = RemoteTask(dataTask: task, schemeTask: schemeTask)
         task.resume()
+    }
+
+    private func refreshCachedResource(_ remoteURL: URL) {
+        var request = URLRequest(url: remoteURL)
+        request.cachePolicy = PackOpeningResource.cachePolicy(for: remoteURL)
+        request.timeoutInterval = PackOpeningResource.requestTimeout(for: remoteURL)
+        session.dataTask(with: request) { [weak self] data, response, error in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard
+                    error == nil,
+                    let data,
+                    let response,
+                    (response as? HTTPURLResponse).map({ 200 ..< 300 ~= $0.statusCode }) ?? true
+                else {
+                    self.onRemoteAvailabilityChanged(false)
+                    return
+                }
+                self.assetCache.store(data, for: remoteURL)
+                self.onRemoteAvailabilityChanged(true)
+            }
+        }.resume()
     }
 
     private func deliver(
@@ -743,4 +837,3 @@ final class PackOpeningSchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 }
-

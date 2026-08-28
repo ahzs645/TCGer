@@ -9,6 +9,7 @@ import kotlin.math.sqrt
 
 class ArcFaceOnnxEncoder(
     modelBytes: ByteArray,
+    private val embeddingDimension: Int = ArcFaceModelContract.embeddingDimension,
     private val environment: OrtEnvironment = OrtEnvironment.getEnvironment(),
 ) : Closeable {
     private val sessionOptions = OrtSession.SessionOptions().apply {
@@ -55,8 +56,8 @@ class ArcFaceOnnxEncoder(
                         ?: error("ArcFace embedding has an unexpected array shape")
                     else -> error("ArcFace embedding has unexpected type ${value::class.java.name}")
                 }
-                require(embedding.size == ArcFaceModelContract.embeddingDimension) {
-                    "model returned ${embedding.size} values; expected ${ArcFaceModelContract.embeddingDimension}"
+                require(embedding.size == embeddingDimension) {
+                    "model returned ${embedding.size} values; expected $embeddingDimension"
                 }
                 return l2Normalize(embedding)
             }

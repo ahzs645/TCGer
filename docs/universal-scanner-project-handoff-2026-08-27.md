@@ -1,5 +1,12 @@
 # Universal TCG scanner project handoff
 
+> **Historical snapshot.** This handoff records the state before the isolated
+> full Pokémon, Magic, and Yu-Gi-Oh jobs completed and before their web/iOS/
+> Android R2 releases were published. Current architecture, releases,
+> operations, decisions, and known issues—including Pokémon TCG Pocket
+> contamination—are indexed in
+> [docs/scanner-system/README.md](scanner-system/README.md).
+
 **Date:** 2026-08-27
 **Repository:** `ahzs645/TCGer`
 **Pull request:** [TCGer PR #39](https://github.com/ahzs645/TCGer/pull/39)
