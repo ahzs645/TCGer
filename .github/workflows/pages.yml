@@ -91,6 +91,21 @@ jobs:
           mkdir -p marketing-site/dist/docs
           cp -R docs/dist/. marketing-site/dist/docs/
 
+      - name: Publish game-package import fixtures
+        run: |
+          FIXTURE_DIR="docs/scanner-system/examples/codex-critters"
+          MANIFEST="$FIXTURE_DIR/codex-critters.game-package.json"
+          CATALOG="$FIXTURE_DIR/codex-critters.catalog.json"
+          EXPECTED_BYTES="$(jq -r '.catalog.asset.bytes' "$MANIFEST")"
+          EXPECTED_SHA="$(jq -r '.catalog.asset.sha256' "$MANIFEST")"
+          ACTUAL_BYTES="$(wc -c < "$CATALOG" | tr -d ' ')"
+          ACTUAL_SHA="$(sha256sum "$CATALOG" | cut -d ' ' -f 1)"
+          test "$ACTUAL_BYTES" = "$EXPECTED_BYTES"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          mkdir -p marketing-site/dist/game-packages/codex-critters
+          cp "$MANIFEST" marketing-site/dist/game-packages/codex-critters/manifest.json
+          cp "$CATALOG" marketing-site/dist/game-packages/codex-critters/codex-critters.catalog.json
+
       - name: Build frontend demo (static export)
         env:
           NEXT_PUBLIC_CATALOG_BASE_URL: https://assets.tcger.ahmadjalil.com/catalogs
@@ -131,6 +146,8 @@ jobs:
           test -f marketing-site/dist/card-backs/dragonball.jpg
           test -f marketing-site/dist/card-backs/onepiece.jpg
           test -f marketing-site/dist/card-backs/lorcana.png
+          test -f marketing-site/dist/game-packages/codex-critters/manifest.json
+          test -f marketing-site/dist/game-packages/codex-critters/codex-critters.catalog.json
           test -f marketing-site/dist/demo/sets/magic/MH2/index.txt
           test -f marketing-site/dist/demo/sets/magic/STA/index.txt
           test -f marketing-site/dist/demo/sets/yugioh/LOB/index.txt

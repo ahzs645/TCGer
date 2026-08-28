@@ -10,8 +10,8 @@ const fixtureDirectory = resolve(
   "../../docs/scanner-system/examples/codex-critters",
 );
 const files = new Map([
-  ["/codex-critters.game-package.json", "codex-critters.game-package.json"],
-  ["/codex-critters.catalog.json", "codex-critters.catalog.json"],
+  ["/game-packages/codex-critters/manifest.json", "codex-critters.game-package.json"],
+  ["/game-packages/codex-critters/codex-critters.catalog.json", "codex-critters.catalog.json"],
 ]);
 
 const server = createServer(async (request, response) => {
@@ -38,6 +38,6 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Codex Critters manifest: http://${host}:${port}/codex-critters.game-package.json`);
+  console.log(`Codex Critters manifest: http://${host}:${port}/game-packages/codex-critters/manifest.json`);
   console.log("Press Ctrl-C to stop.");
 });
