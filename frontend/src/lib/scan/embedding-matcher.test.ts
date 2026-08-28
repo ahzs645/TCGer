@@ -5,9 +5,11 @@ import {
   DEFAULT_EMBEDDING_MATCH_THRESHOLDS,
   embeddingIndexesShareModel,
   matchEmbeddingShardsTopK,
+  resolveEmbeddingPrintingCandidates,
   type EmbeddingIndex,
 } from "./embedding-matcher";
 import type { SupportedTcg } from "./scan-types";
+import type { BrowserVideoScanCandidate } from "./scan-types";
 
 function shard(
   tcg: SupportedTcg,
@@ -33,6 +35,9 @@ function shard(
         setName: null,
         rarity: null,
         imageUrl: null,
+        recognitionFamilyId: null,
+        exactPrintingId: externalId,
+        releaseDate: null,
       },
     ],
     vectors,
@@ -61,6 +66,49 @@ test("automatic mode ranks compatible game shards globally", () => {
     ],
   );
 });
+
+test("quick scan promotes the newest printing in an artwork family", () => {
+  const resolved = resolveEmbeddingPrintingCandidates(
+    [printing("old", "2020-01-01"), printing("new", "2024-02-02")],
+    "quick_latest",
+  );
+
+  assert.equal(resolved[0]?.externalId, "new");
+  assert.equal(resolved[0]?.printingResolutionProvenance, "latest_fallback");
+});
+
+test("exact mode marks an artwork family as requiring user choice", () => {
+  const resolved = resolveEmbeddingPrintingCandidates(
+    [printing("old", "2020-01-01"), printing("new", "2024-02-02")],
+    "exact_printing",
+  );
+
+  assert.equal(resolved[0]?.requiresPrintingChoice, true);
+  assert.equal(resolved[1]?.requiresPrintingChoice, true);
+});
+
+function printing(id: string, releaseDate: string): BrowserVideoScanCandidate {
+  return {
+    externalId: id,
+    tcg: "pokemon",
+    name: "Pikachu",
+    setCode: id,
+    setName: id,
+    rarity: null,
+    imageUrl: null,
+    confidence: id === "old" ? 0.95 : 0.93,
+    distance: 50,
+    scoreDistance: 50,
+    passedThreshold: true,
+    fullDistance: 50,
+    titleDistance: null,
+    footerDistance: null,
+    proposalLabel: "test",
+    recognitionFamilyId: "art:pikachu-1",
+    exactPrintingId: id,
+    releaseDate,
+  };
+}
 
 test("a game-specific mode searches only its selected shard", () => {
   const magic = shard("magic", "magic-only", [127, 0]);

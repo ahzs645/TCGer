@@ -19,6 +19,9 @@ data class CardEmbeddingMetadata(
     val rarity: String? = null,
     val imageURL: String? = null,
     val price: Double? = null,
+    val exactPrintingId: String? = null,
+    val recognitionFamilyId: String? = null,
+    val releaseDate: String? = null,
 ) {
     val isPhysicalPokemonCard: Boolean
         get() = (game == null || game.equals("pokemon", ignoreCase = true)) &&

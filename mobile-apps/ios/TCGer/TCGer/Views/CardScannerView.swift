@@ -397,6 +397,7 @@ struct CardScannerView: View {
                 savesBinderPageImages: $savesBinderPageImages,
                 replacesBinderPageImages: $replacesBinderPageImages,
                 assumedLanguage: $assumedScanLanguage,
+                printingMode: $viewModel.printingMode,
                 sharedSessionCode: $sharedSessionCode,
                 availableScanEngines: availableScanEngines,
                 sharedSessionUnavailableMessage: sharedSessionUnavailableMessage,

@@ -29,6 +29,9 @@ actor ScannerStagingStore {
         let game: String
         let setCode: String?
         let setName: String?
+        let recognitionFamilyID: String?
+        let exactPrintingID: String?
+        let releaseDate: String?
         let rarity: String?
         let imageURL: URL?
         let price: Double?
@@ -47,6 +50,8 @@ actor ScannerStagingStore {
         let imageFile: String
         let primary: StagedCandidateRecord
         let alternatives: [StagedCandidateRecord]
+        let resolution: String?
+        let printingResolutionProvenance: String?
         let elapsed: TimeInterval
         let stagedAt: Date
         var addedToCollection: Bool
@@ -95,6 +100,9 @@ actor ScannerStagingStore {
                     capturedImage: image,
                     primary: Self.candidate(from: record.primary),
                     alternatives: record.alternatives.map(Self.candidate(from:)),
+                    resolution: record.resolution.flatMap(CardScanResolution.init(rawValue:)) ?? .exactPrinting,
+                    printingResolutionProvenance: record.printingResolutionProvenance
+                        .flatMap(CardPrintingResolutionProvenance.init(rawValue:)) ?? .verified,
                     elapsed: record.elapsed
                 ),
                 addedToCollection: record.addedToCollection
@@ -129,6 +137,8 @@ actor ScannerStagingStore {
             imageFile: existing.imageFile,
             primary: updated.primary,
             alternatives: updated.alternatives,
+            resolution: updated.resolution,
+            printingResolutionProvenance: updated.printingResolutionProvenance,
             elapsed: updated.elapsed,
             stagedAt: existing.stagedAt,
             addedToCollection: existing.addedToCollection
@@ -172,6 +182,8 @@ actor ScannerStagingStore {
             imageFile: imageFile,
             primary: record(from: result.primary),
             alternatives: result.alternatives.map(record(from:)),
+            resolution: result.resolution.rawValue,
+            printingResolutionProvenance: result.printingResolutionProvenance.rawValue,
             elapsed: result.elapsed,
             stagedAt: Date(),
             addedToCollection: false
@@ -186,6 +198,9 @@ actor ScannerStagingStore {
             game: candidate.details.identity.game.rawValue,
             setCode: candidate.details.identity.setCode,
             setName: candidate.details.identity.setName,
+            recognitionFamilyID: candidate.details.identity.recognitionFamilyID,
+            exactPrintingID: candidate.details.identity.exactPrintingID,
+            releaseDate: candidate.details.identity.releaseDate,
             rarity: candidate.details.rarity,
             imageURL: candidate.details.imageURL,
             price: candidate.details.price,
@@ -206,7 +221,10 @@ actor ScannerStagingStore {
                     name: record.name,
                     game: TCGGame(rawValue: record.game) ?? .all,
                     setCode: record.setCode,
-                    setName: record.setName
+                    setName: record.setName,
+                    recognitionFamilyID: record.recognitionFamilyID,
+                    exactPrintingID: record.exactPrintingID,
+                    releaseDate: record.releaseDate
                 ),
                 rarity: record.rarity,
                 imageURL: record.imageURL,

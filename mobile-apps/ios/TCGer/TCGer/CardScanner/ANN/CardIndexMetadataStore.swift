@@ -3,6 +3,8 @@ import Foundation
 struct CardIndexMetadataEntry: Codable {
     let annIndex: Int
     let cardId: String
+    let exactPrintingId: String?
+    let recognitionFamilyId: String?
     let name: String
     let game: String?
     /// `pocket` identifies digital-only Pokémon TCG Pocket artwork. Older
@@ -14,10 +16,13 @@ struct CardIndexMetadataEntry: Codable {
     let rarity: String?
     let imageURL: String?
     let price: Double?
+    let releaseDate: String?
 
     init(
         annIndex: Int,
         cardId: String,
+        exactPrintingId: String? = nil,
+        recognitionFamilyId: String? = nil,
         name: String,
         game: String?,
         format: String? = nil,
@@ -25,10 +30,13 @@ struct CardIndexMetadataEntry: Codable {
         setName: String?,
         rarity: String?,
         imageURL: String?,
-        price: Double?
+        price: Double?,
+        releaseDate: String? = nil
     ) {
         self.annIndex = annIndex
         self.cardId = cardId
+        self.exactPrintingId = exactPrintingId
+        self.recognitionFamilyId = recognitionFamilyId
         self.name = name
         self.game = game
         self.format = format
@@ -37,6 +45,7 @@ struct CardIndexMetadataEntry: Codable {
         self.rarity = rarity
         self.imageURL = imageURL
         self.price = price
+        self.releaseDate = releaseDate
     }
 
     nonisolated var resolvedGame: TCGGame {
@@ -248,7 +257,10 @@ actor CardIndexMetadataStore {
             name: entry.name,
             game: entry.resolvedGame,
             setCode: entry.setCode,
-            setName: entry.setName
+            setName: entry.setName,
+            recognitionFamilyID: entry.recognitionFamilyId,
+            exactPrintingID: entry.exactPrintingId ?? entry.cardId,
+            releaseDate: entry.releaseDate
         )
         let url = entry.imageURL.flatMap(URL.init(string:))
         return CardDetails(

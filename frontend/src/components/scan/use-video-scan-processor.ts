@@ -17,10 +17,12 @@ import {
   ensureCardFaceGate,
   ensureEmbeddingModel,
   matchEmbeddingShardsTopK,
+  resolveEmbeddingPrintingCandidates,
   scoreCardFaceGate,
   type CardFaceGate,
   type EmbeddingIndex,
 } from "@/lib/scan/embedding-matcher";
+import type { ScannerPrintingMode } from "@/lib/scan/scanner-options";
 import { rectifyCardCrop } from "@/lib/scan/card-rectify";
 import {
   assessCropSharpness,
@@ -516,6 +518,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       embeddingIndexes: EmbeddingIndex[];
       scanFilter: ScanFilter;
       analysisIntervalMs: number;
+      printingMode: ScannerPrintingMode;
     }) => {
       const {
         video,
@@ -523,6 +526,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         embeddingIndexes,
         scanFilter,
         analysisIntervalMs,
+        printingMode,
       } = params;
       const primaryIndex = embeddingIndexes[0];
       if (!primaryIndex) {
@@ -654,6 +658,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
                 ocrTracker,
                 cardFaceGate,
                 embedAverager,
+                printingMode,
               );
               if (pm.bestMatch?.proposalLabel === "yolo-blur") blurredFrames++;
               proposalMatches.push(pm);
@@ -1010,6 +1015,7 @@ async function matchDetectionEmbedding(
   ocrTracker: OcrVoteTracker | null,
   cardFaceGate: CardFaceGate | null,
   embedAverager: EmbeddingTrackAverager | null,
+  printingMode: ScannerPrintingMode,
 ): Promise<BrowserVideoProposalMatch> {
   // Crop at source resolution (detection coords are in 640px-frame space).
   // The sharpness gate downsamples to 96px internally, so its calibration is
@@ -1018,6 +1024,7 @@ async function matchDetectionEmbedding(
 
   let bestMatch: BrowserVideoScanCandidate | null = null;
   let candidates: BrowserVideoScanCandidate[] = [];
+  let verifiedExactPrintingId: string | null = null;
 
   // Quality gate: only embed sharp crops from still frames. Blurry/moving
   // frames embed poorly (the backbone's worst case), so skip them and let the
@@ -1109,12 +1116,24 @@ async function matchDetectionEmbedding(
               ocrTracker.consensus(),
               tcg,
             );
-            if (fusion.matched) candidates = fusion.candidates;
+            if (fusion.matched) {
+              candidates = fusion.candidates;
+              verifiedExactPrintingId =
+                candidates[0]?.exactPrintingId ??
+                candidates[0]?.externalId ??
+                null;
+            }
           } catch {
             // OCR is best-effort; fall back to the embedding ranking.
           }
         }
       }
+
+      candidates = resolveEmbeddingPrintingCandidates(
+        candidates,
+        printingMode,
+        verifiedExactPrintingId,
+      );
 
       if (candidates.length > 0 && candidates[0]!.passedThreshold) {
         bestMatch = candidates[0]!;

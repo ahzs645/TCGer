@@ -732,7 +732,13 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // retrieval to one catalog name; collector OCR must still confirm any
         // gate override or close printing decision.
         let initialRival = ranked.first { $0.id != primary.id }
+        let requiresTitleConfirmation = Self.requiresTitleConfirmation(
+            game: recognizedGame,
+            purpose: context.purpose,
+            source: source
+        )
         let needsTitleEvidence = source != .livePreview && (
+            requiresTitleConfirmation ||
             gateRejected ||
                 primary.confidence.score < strongAcceptanceScore ||
                 initialRival.map {
@@ -936,17 +942,51 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             return nil
         }
 
+        // A binder page multiplies every false-positive opportunity by the
+        // number of pockets. MTG's August 27 session also produced three wrong
+        // accepts from 180-degree retries and one from a landscape interior
+        // fragment rotated into a portrait crop. The standardized MTG title
+        // line lets every intentional result stay useful without accepting an
+        // unverified visual neighbor. A genuinely upside-down card becomes
+        // title-readable after the retry; a fragment or spurious retry does
+        // not. Live preview remains visual-only and cannot import a card.
+        guard !requiresTitleConfirmation || titleConstrained || ocrVerified else {
+            recordOutcome(.noCandidates)
+            return nil
+        }
+
         // A title proves the card name, not the printing. When that name has
         // multiple catalog rows, require either the printed collector number
         // or an exceptionally strong, well-separated visual printing match.
         // This prevents a modern Piplup frame, for example, from being labeled
         // as a visually similar 2007 Piplup simply because both share a title.
-        if !ocrVerified, titlePrintingCount > 1 {
+        let primaryFamilyID = primary.details.identity.recognitionFamilyID
+        let familyHasMultiplePrintings = primaryFamilyID != nil && ranked.contains { candidate in
+            candidate.id != primary.id
+                && candidate.details.identity.recognitionFamilyID == primaryFamilyID
+                && (candidate.details.identity.exactPrintingID ?? candidate.details.identity.id)
+                    != (primary.details.identity.exactPrintingID ?? primary.details.identity.id)
+        }
+        if !ocrVerified, titlePrintingCount > 1, !familyHasMultiplePrintings {
             guard primary.confidence.score >= 0.85,
                   let titleRunnerScore,
                   primary.confidence.score - titleRunnerScore >= 0.05
             else {
                 recordOutcome(.titlePrintingUnresolved)
+                if context.purpose == .binderPage, titleConstrained {
+                    let alternatives = ranked.filter { $0.id != primary.id }
+                    let resultMode = ScanMode.allCases.first {
+                        $0 != .automatic && $0.tcgGame == primary.details.identity.game
+                    } ?? context.mode
+                    return CardScanResult(
+                        mode: resultMode,
+                        capturedImage: cropped,
+                        primary: primary,
+                        alternatives: alternatives,
+                        resolution: .nameOnly,
+                        elapsed: 0
+                    )
+                }
                 return nil
             }
         }
@@ -956,24 +996,67 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // OCR confirmation, abstain and let a cleaner frame decide.
         if !ocrVerified,
            let rival = ranked.first(where: { $0.id != primary.id }),
-           primary.confidence.score - rival.confidence.score < ambiguityMargin {
+           primary.confidence.score - rival.confidence.score < ambiguityMargin,
+           (rival.details.identity.recognitionFamilyID == nil
+                || rival.details.identity.recognitionFamilyID != primary.details.identity.recognitionFamilyID) {
             recordOutcome(.printingAmbiguous)
             return nil
         }
 
-        let alternatives = ranked.filter { $0.id != primary.id }
+        let printingDecision = CardPrintingResolver.resolve(
+            primary: primary,
+            candidates: ranked.filter { $0.id != primary.id },
+            mode: context.printingMode,
+            verifiedExactPrintingID: ocrVerified
+                ? (primary.details.identity.exactPrintingID ?? primary.details.identity.id)
+                : nil
+        )
+        if printingDecision.requiresSelection {
+            recordOutcome(.titlePrintingUnresolved)
+            let resultMode = ScanMode.allCases.first {
+                $0 != .automatic && $0.tcgGame == primary.details.identity.game
+            } ?? context.mode
+            return CardScanResult(
+                mode: resultMode,
+                capturedImage: cropped,
+                primary: primary,
+                alternatives: printingDecision.candidates.filter { $0.id != primary.id },
+                resolution: .nameOnly,
+                printingResolutionProvenance: .unresolved,
+                elapsed: 0
+            )
+        }
+
+        let resolvedPrimary = printingDecision.selected ?? primary
+        let alternatives = ranked.filter { $0.id != resolvedPrimary.id }
         recordOutcome(.accepted)
 
         let resultMode = ScanMode.allCases.first {
-            $0 != .automatic && $0.tcgGame == primary.details.identity.game
+            $0 != .automatic && $0.tcgGame == resolvedPrimary.details.identity.game
         } ?? context.mode
         return CardScanResult(
             mode: resultMode,
             capturedImage: cropped,
-            primary: primary,
+            primary: resolvedPrimary,
             alternatives: alternatives,
+            printingResolutionProvenance: printingDecision.provenance,
             elapsed: 0
         )
+    }
+
+    nonisolated static func requiresTitleConfirmation(
+        game: TCGGame,
+        purpose: CardScanPurpose,
+        source: ScanInvocationKind
+    ) -> Bool {
+        let isIntentionalCapture: Bool
+        switch source {
+        case .livePreview:
+            isIntentionalCapture = false
+        case .photoCapture, .importedPhoto:
+            isIntentionalCapture = true
+        }
+        return game == .magic && (purpose == .binderPage || isIntentionalCapture)
     }
 
     /// Live-preview frames reuse the previous frame's footer reading when the

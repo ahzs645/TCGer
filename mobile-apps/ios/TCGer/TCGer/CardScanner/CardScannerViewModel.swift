@@ -63,6 +63,14 @@ final class CardScannerViewModel: ObservableObject {
             resetLiveConfirmation()
         }
     }
+    @Published var printingMode: ScannerPrintingMode = ScannerPrintingMode(
+        rawValue: UserDefaults.standard.string(forKey: ScannerPrintingMode.defaultsKey) ?? ""
+    ) ?? .quickLatest {
+        didSet {
+            UserDefaults.standard.set(printingMode.rawValue, forKey: ScannerPrintingMode.defaultsKey)
+            rebuildContext()
+        }
+    }
     @Published var latestResult: CardScanResult? {
         didSet { syncCameraOverlayState() }
     }
@@ -780,6 +788,8 @@ final class CardScannerViewModel: ObservableObject {
             capturedImage: result.capturedImage,
             primary: candidate,
             alternatives: alternatives,
+            resolution: .exactPrinting,
+            printingResolutionProvenance: .userSelected,
             elapsed: result.elapsed,
             debugCapture: result.debugCapture,
             debugCaptureError: result.debugCaptureError
@@ -814,7 +824,8 @@ final class CardScannerViewModel: ObservableObject {
             captureNotes: captureNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil
                 : captureNotes.trimmingCharacters(in: .whitespacesAndNewlines),
-            setCode: scanScope?.setCode
+            setCode: scanScope?.setCode,
+            printingMode: printingMode
         )
         lastAnalysisDate = .distantPast
         liveConsensus.reset()

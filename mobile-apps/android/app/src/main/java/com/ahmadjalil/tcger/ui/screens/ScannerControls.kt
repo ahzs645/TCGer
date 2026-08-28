@@ -46,6 +46,7 @@ import com.ahmadjalil.tcger.data.scanner.ScannerCaptureMode
 import com.ahmadjalil.tcger.data.scanner.ScannerEncoderVariant
 import com.ahmadjalil.tcger.data.scanner.ScannerPerformanceOption
 import com.ahmadjalil.tcger.data.scanner.ScannerPriceMode
+import com.ahmadjalil.tcger.data.scanner.ScannerPrintingMode
 import com.ahmadjalil.tcger.data.scanner.ScannerRecognitionEngine
 import com.ahmadjalil.tcger.data.scanner.ScannerReferenceRunSnapshot
 import com.ahmadjalil.tcger.data.scanner.ScannerRecordingBundle
@@ -141,6 +142,19 @@ internal fun ScannerOptionsSheet(
                         capability = capabilities::price,
                         testTag = { ParityControlIDs.OPTION_SCANNER_PRICE_MODE },
                     ) { onOptionsChanged(options.copy(priceMode = it)) }
+                }
+            }
+            item {
+                OptionSection("Printing") {
+                    ScannerPrintingMode.entries.forEach { mode ->
+                        RadioOption(
+                            title = mode.displayName,
+                            detail = mode.description,
+                            selected = options.printingMode == mode,
+                            enabled = !isProcessing,
+                            testTag = null,
+                        ) { onOptionsChanged(options.copy(printingMode = mode)) }
+                    }
                 }
             }
             if (options.captureMode == ScannerCaptureMode.BINDER) {

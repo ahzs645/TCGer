@@ -20,12 +20,14 @@ class TrainerMetadataTests(unittest.TestCase):
             "object": "card", "id": "printing-a", "oracle_id": "oracle-a",
             "illustration_id": "art-a", "name": "Shared Art", "digital": False,
             "games": ["paper"], "set": "one", "set_name": "One", "set_type": "expansion",
+            "released_at": "2020-01-01",
             "collector_number": "10", "layout": "normal", "lang": "en",
             "image_uris": {"normal": "https://cards.scryfall.io/normal/front/a/a/a.jpg"},
         }
         normal_b = dict(normal_a)
         normal_b.update({
             "id": "printing-b", "set": "two", "set_name": "Two",
+            "released_at": "2024-02-02",
             "image_uris": {"normal": "https://cards.scryfall.io/normal/front/b/b/b.jpg"},
         })
         art_series = {
@@ -54,6 +56,7 @@ class TrainerMetadataTests(unittest.TestCase):
         self.assertEqual({row["exactPrintingId"] for row in shared}, {"printing-a", "printing-b"})
         self.assertEqual({row["recognitionFamilyId"] for row in shared}, {"magic:illustration:art-a"})
         self.assertEqual({row["collectorNumber"] for row in shared}, {"10"})
+        self.assertEqual({row["releaseDate"] for row in shared}, {"2020-01-01", "2024-02-02"})
         art_rows = [row for row in rows if row["exactPrintingId"] == "art-card"]
         self.assertEqual(len(art_rows), 1)
         self.assertEqual(art_rows[0]["faceSide"], "front")

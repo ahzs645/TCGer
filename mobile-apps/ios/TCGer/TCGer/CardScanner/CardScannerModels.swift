@@ -127,6 +127,31 @@ struct CardIdentity: Identifiable, Hashable, Sendable {
     let game: TCGGame
     let setCode: String?
     let setName: String?
+    let recognitionFamilyID: String?
+    let exactPrintingID: String?
+    /// ISO-8601 calendar date from the scanner artifact. Lexical ordering is
+    /// deliberate and deterministic for the `YYYY-MM-DD` source contract.
+    let releaseDate: String?
+
+    nonisolated init(
+        id: String,
+        name: String,
+        game: TCGGame,
+        setCode: String?,
+        setName: String?,
+        recognitionFamilyID: String? = nil,
+        exactPrintingID: String? = nil,
+        releaseDate: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.game = game
+        self.setCode = setCode
+        self.setName = setName
+        self.recognitionFamilyID = recognitionFamilyID
+        self.exactPrintingID = exactPrintingID
+        self.releaseDate = releaseDate
+    }
 }
 
 struct CardDetails: Hashable, Sendable {
@@ -256,12 +281,111 @@ struct CardScanCandidate: Identifiable, Hashable, Sendable {
     }
 }
 
+enum CardScanResolution: String, Sendable {
+    /// The scanner has enough evidence to identify the catalog printing.
+    case exactPrinting
+    /// The printed title is verified, but the exact catalog printing still
+    /// needs a human choice. Binder review may surface this; it must never be
+    /// bulk-added as the arbitrary top visual printing.
+    case nameOnly
+}
+
+enum ScannerPrintingMode: String, CaseIterable, Identifiable, Equatable, Sendable {
+    case quickLatest = "quick_latest"
+    case exactPrinting = "exact_printing"
+
+    static let defaultsKey = "scanner.printingMode"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .quickLatest: return "Quick Scan"
+        case .exactPrinting: return "Exact Printing"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .quickLatest:
+            return "Use verified print details when available; otherwise choose the newest compatible printing in the matched artwork family."
+        case .exactPrinting:
+            return "Never guess among visually identical printings. Ask you to choose when printed details cannot decide."
+        }
+    }
+}
+
+enum CardPrintingResolutionProvenance: String, Equatable, Sendable {
+    case verified
+    case singlePrinting = "single_printing"
+    case latestFallback = "latest_fallback"
+    case userSelected = "user_selected"
+    case unresolved
+}
+
+nonisolated enum CardPrintingResolver {
+    struct Decision: Sendable {
+        let selected: CardScanCandidate?
+        let candidates: [CardScanCandidate]
+        let provenance: CardPrintingResolutionProvenance
+
+        var requiresSelection: Bool { selected == nil && candidates.count > 1 }
+    }
+
+    static func resolve(
+        primary: CardScanCandidate,
+        candidates: [CardScanCandidate],
+        mode: ScannerPrintingMode,
+        verifiedExactPrintingID: String? = nil
+    ) -> Decision {
+        let unique = ([primary] + candidates).reduce(into: [String: CardScanCandidate]()) {
+            $0[$1.details.identity.exactPrintingID ?? $1.details.identity.id] = $1
+        }
+        let familyID = primary.details.identity.recognitionFamilyID
+        let family = unique.values.filter { candidate in
+            guard let familyID else {
+                return candidate.details.identity.id == primary.details.identity.id
+            }
+            return candidate.details.identity.recognitionFamilyID == familyID
+        }
+        let ordered = family.sorted(by: newestFirst)
+
+        if let verifiedExactPrintingID,
+           let verified = ordered.first(where: {
+               ($0.details.identity.exactPrintingID ?? $0.details.identity.id) == verifiedExactPrintingID
+           }) {
+            return Decision(selected: verified, candidates: ordered, provenance: .verified)
+        }
+        guard ordered.count > 1 else {
+            return Decision(selected: ordered.first ?? primary, candidates: ordered, provenance: .singlePrinting)
+        }
+        switch mode {
+        case .quickLatest:
+            return Decision(selected: ordered.first, candidates: ordered, provenance: .latestFallback)
+        case .exactPrinting:
+            return Decision(selected: nil, candidates: ordered, provenance: .unresolved)
+        }
+    }
+
+    private static func newestFirst(_ left: CardScanCandidate, _ right: CardScanCandidate) -> Bool {
+        let leftIdentity = left.details.identity
+        let rightIdentity = right.details.identity
+        let leftDate = leftIdentity.releaseDate ?? ""
+        let rightDate = rightIdentity.releaseDate ?? ""
+        if leftDate != rightDate { return leftDate > rightDate }
+        return (leftIdentity.exactPrintingID ?? leftIdentity.id)
+            > (rightIdentity.exactPrintingID ?? rightIdentity.id)
+    }
+}
+
 struct CardScanResult: Identifiable {
     let id: UUID
     let mode: ScanMode
     let capturedImage: CGImage
     let primary: CardScanCandidate
     let alternatives: [CardScanCandidate]
+    let resolution: CardScanResolution
+    let printingResolutionProvenance: CardPrintingResolutionProvenance
     let elapsed: TimeInterval
     let debugCapture: APIService.ScanDebugCaptureResponse?
     let debugCaptureError: String?
@@ -272,6 +396,8 @@ struct CardScanResult: Identifiable {
         capturedImage: CGImage,
         primary: CardScanCandidate,
         alternatives: [CardScanCandidate],
+        resolution: CardScanResolution = .exactPrinting,
+        printingResolutionProvenance: CardPrintingResolutionProvenance = .verified,
         elapsed: TimeInterval,
         debugCapture: APIService.ScanDebugCaptureResponse? = nil,
         debugCaptureError: String? = nil
@@ -281,10 +407,17 @@ struct CardScanResult: Identifiable {
         self.capturedImage = capturedImage
         self.primary = primary
         self.alternatives = alternatives
+        self.resolution = resolution
+        self.printingResolutionProvenance = printingResolutionProvenance
         self.elapsed = elapsed
         self.debugCapture = debugCapture
         self.debugCaptureError = debugCaptureError
     }
+}
+
+enum CardScanPurpose: String, Sendable {
+    case singleCard
+    case binderPage
 }
 
 nonisolated enum ScanStrategyKind: String, Sendable {
@@ -317,7 +450,7 @@ nonisolated enum ScanStrategyKind: String, Sendable {
 }
 
 struct CardScannerContext: Sendable {
-    let mode: ScanMode
+    var mode: ScanMode
     let enginePreference: ScanEnginePreference
     let serverConfiguration: ServerConfiguration
     let authToken: String?
@@ -325,6 +458,10 @@ struct CardScannerContext: Sendable {
     let saveDebugCapture: Bool
     let captureNotes: String?
     let setCode: String?
+    var printingMode: ScannerPrintingMode = .quickLatest
+    /// Binder pages use a stricter auto-import policy and may surface a
+    /// title-confirmed, printing-unresolved suggestion for human review.
+    var purpose: CardScanPurpose = .singleCard
     /// Dev-mode evidence collector. When present, strategies append per-crop
     /// attempt evidence (gate scores, candidates, OCR readings, outcome) as
     /// they work; nil (the default) costs nothing on the normal path.

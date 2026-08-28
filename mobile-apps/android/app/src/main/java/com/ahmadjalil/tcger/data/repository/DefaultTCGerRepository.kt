@@ -37,6 +37,8 @@ import com.ahmadjalil.tcger.data.scanner.model.DinoV2RecognitionResult
 import com.ahmadjalil.tcger.data.scanner.model.LocalEmbeddingDispatch
 import com.ahmadjalil.tcger.data.scanner.model.LocalEmbeddingModel
 import com.ahmadjalil.tcger.data.scanner.model.CardEmbeddingMetadata
+import com.ahmadjalil.tcger.data.scanner.model.CardEmbeddingMatch
+import com.ahmadjalil.tcger.data.scanner.model.CardPrintingResolver
 import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetStore
 import com.ahmadjalil.tcger.data.scanner.model.normalizeScannerGame
 import com.ahmadjalil.tcger.domain.Binder
@@ -119,13 +121,16 @@ class DefaultTCGerRepository(
                 withContext(Dispatchers.Default) { getArcFaceRecognizer(tcg).recognize(imageBytes) }
             }.onSuccess { local ->
                 if (local.decision is ArcFaceRecognitionDecision.Accepted) {
+                    val printing = resolvePrintingMatches(local.matches, options.printingMode)
                     return CardScanResult(
-                        candidates = local.matches.take(5).map { match ->
+                        candidates = printing.matches.take(5).map { match ->
                             CardScanCandidate(match.card.toDomain(), match.similarity)
                         },
                         source = CardScanSource.ON_DEVICE_EMBEDDING,
                         engine = "arcface",
                         elapsedMs = local.preprocessMs + local.inferenceMs + local.searchMs,
+                        printingResolutionProvenance = printing.provenance,
+                        requiresPrintingChoice = printing.requiresChoice,
                     )
                 }
             }.onFailure { error ->
@@ -149,7 +154,10 @@ class DefaultTCGerRepository(
                 if (local != null) {
                     val accepted = local.decision as? DinoV2RecognitionDecision.Accepted
                     if (accepted != null) {
-                        return local.toCardScanResult(engine = "dinov2")
+                        return local.toCardScanResult(
+                            engine = "dinov2",
+                            printingMode = options.printingMode,
+                        )
                     }
                     if (LocalEmbeddingDispatch.permitsManualOcrRescue(options)) {
                         val evidence = runCatching { textRecognizer.recognizeDinoV2Evidence(imageBytes) }.getOrElse { error ->
@@ -164,6 +172,9 @@ class DefaultTCGerRepository(
                                     return local.copy(matches = reordered).toCardScanResult(
                                         engine = "dinov2-ocr-rescue",
                                         recognizedText = rescue.recognizedText,
+                                        printingMode = options.printingMode,
+                                        verifiedExactPrintingId = rescue.match.card.exactPrintingId
+                                            ?: rescue.match.card.cardId,
                                     )
                                 }
                                 is DinoV2OcrRescueDecision.Rejected -> Unit
@@ -540,18 +551,61 @@ private fun CardEmbeddingMetadata.toDomain() = CatalogCard(
     rarity = rarity,
     collectorNumber = cardId.substringAfter('-', "").ifBlank { null },
     imageUrl = imageURL,
+    recognitionFamilyId = recognitionFamilyId,
+    exactPrintingId = exactPrintingId ?: cardId,
+    releaseDate = releaseDate,
 )
 
 private fun DinoV2RecognitionResult.toCardScanResult(
     engine: String,
     recognizedText: String? = null,
-) = CardScanResult(
-    candidates = matches.take(5).map { match -> CardScanCandidate(match.card.toDomain(), match.similarity) },
-    source = CardScanSource.ON_DEVICE_EMBEDDING,
-    recognizedText = recognizedText,
-    engine = engine,
-    elapsedMs = preprocessMs + inferenceMs + searchMs,
+    printingMode: com.ahmadjalil.tcger.data.scanner.ScannerPrintingMode,
+    verifiedExactPrintingId: String? = null,
+): CardScanResult {
+    val printing = resolvePrintingMatches(matches, printingMode, verifiedExactPrintingId)
+    return CardScanResult(
+        candidates = printing.matches.take(5).map { match -> CardScanCandidate(match.card.toDomain(), match.similarity) },
+        source = CardScanSource.ON_DEVICE_EMBEDDING,
+        recognizedText = recognizedText,
+        engine = engine,
+        elapsedMs = preprocessMs + inferenceMs + searchMs,
+        printingResolutionProvenance = printing.provenance,
+        requiresPrintingChoice = printing.requiresChoice,
+    )
+}
+
+private data class ResolvedPrintingMatches(
+    val matches: List<CardEmbeddingMatch>,
+    val provenance: String,
+    val requiresChoice: Boolean,
 )
+
+private fun resolvePrintingMatches(
+    matches: List<CardEmbeddingMatch>,
+    mode: com.ahmadjalil.tcger.data.scanner.ScannerPrintingMode,
+    verifiedExactPrintingId: String? = null,
+): ResolvedPrintingMatches {
+    val primary = matches.firstOrNull()
+        ?: return ResolvedPrintingMatches(emptyList(), "unresolved", false)
+    val decision = CardPrintingResolver.resolve(
+        primary = primary,
+        candidates = matches.drop(1),
+        mode = mode,
+        verifiedExactPrintingId = verifiedExactPrintingId,
+    )
+    val ordered = if (decision.selected != null) {
+        listOf(decision.selected) + matches.filter { it.index != decision.selected.index }
+    } else {
+        decision.candidates + matches.filter { candidate ->
+            decision.candidates.none { it.index == candidate.index }
+        }
+    }
+    return ResolvedPrintingMatches(
+        matches = ordered,
+        provenance = decision.provenance.transportValue,
+        requiresChoice = decision.requiresSelection,
+    )
+}
 
 private fun ScanDebugCaptureSummaryDto.toDomain() = ScanDebugCapture(
     id = id,

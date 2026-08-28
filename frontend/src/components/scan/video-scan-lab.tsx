@@ -21,6 +21,11 @@ import {
 import { useAuthStore } from "@/stores/auth";
 import { useGameFilterStore } from "@/stores/game-filter";
 import { isSupportedScannerTcg } from "@/lib/scan/scan-types";
+import {
+  normalizeScannerPrintingMode,
+  SCANNER_PRINTING_MODE_STORAGE_KEY,
+  type ScannerPrintingMode,
+} from "@/lib/scan/scanner-options";
 
 import {
   MIN_TRACK_STABLE_FRAMES,
@@ -85,6 +90,8 @@ export function VideoScanLab() {
   // sign-in, and the highest-accuracy path. Users can switch to the
   // hash/artwork matcher or detection-only below.
   const [embeddingMode, setEmbeddingMode] = useState(true);
+  const [printingMode, setPrintingMode] =
+    useState<ScannerPrintingMode>("quick_latest");
   const [analysisIntervalMs, setAnalysisIntervalMs] = useState(
     DEFAULT_ANALYSIS_INTERVAL_MS,
   );
@@ -187,6 +194,14 @@ export function VideoScanLab() {
   // ---------- effects ----------
 
   useEffect(() => {
+    setPrintingMode(
+      normalizeScannerPrintingMode(
+        window.localStorage.getItem(SCANNER_PRINTING_MODE_STORAGE_KEY),
+      ),
+    );
+  }, []);
+
+  useEffect(() => {
     return () => {
       stopAndCleanup();
     };
@@ -286,6 +301,7 @@ export function VideoScanLab() {
           embeddingIndexes: indexes,
           scanFilter,
           analysisIntervalMs,
+          printingMode,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Embedding scan failed.");
@@ -351,6 +367,14 @@ export function VideoScanLab() {
             onDetectionOnlyChange={setDetectionOnly}
             embeddingMode={embeddingMode}
             onEmbeddingModeChange={setEmbeddingMode}
+            printingMode={printingMode}
+            onPrintingModeChange={(mode) => {
+              setPrintingMode(mode);
+              window.localStorage.setItem(
+                SCANNER_PRINTING_MODE_STORAGE_KEY,
+                mode,
+              );
+            }}
             analysisIntervalMs={analysisIntervalMs}
             onAnalysisIntervalChange={(value) =>
               setAnalysisIntervalMs(clampAnalysisInterval(value))

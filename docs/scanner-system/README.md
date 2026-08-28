@@ -43,6 +43,7 @@ the required encoders separately and merging calibrated candidates.
 | [System architecture](architecture.md) | Runtime boundaries, data flow, identity model, and automatic versus explicit scanning |
 | [Training data and model pipeline](training-and-data-pipeline.md) | Catalog normalization, image library, Hugging Face jobs, checkpoints, evaluation, and exports |
 | [Two-stage recognition](two-stage-recognition.md) | Recognition-family labels, exact-print verification, abstention, per-game policies, and physical Pokémon scope |
+| [Artwork-family matching](artwork-family-matching.md) | Pokémon reprint-source research, reproducible visual grouping, review workflow, and release gates |
 | [Release inventory](release-inventory-2026-08-27.md) | Exact model metrics, hashes, sizes, R2 versions, Hub revision, and job identifiers |
 | [Client integration and distribution](client-integration-and-distribution.md) | Web, iOS, Android, R2 object layout, download behavior, caching, and rollback |
 | [Implementation map and project history](implementation-map-and-history.md) | Source-file ownership, delivered components, data inventory, commit milestones, and local/remote state |

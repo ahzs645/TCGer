@@ -58,6 +58,18 @@ enum class ScannerPriceMode(val displayName: String) {
 }
 
 @Serializable
+enum class ScannerPrintingMode(val displayName: String, val description: String) {
+    QUICK_LATEST(
+        "Quick Scan",
+        "Use verified print details when available; otherwise choose the newest compatible printing in the matched artwork family.",
+    ),
+    EXACT_PRINTING(
+        "Exact Printing",
+        "Never guess among visually identical printings. Ask you to choose when printed details cannot decide.",
+    ),
+}
+
+@Serializable
 enum class ScannerPerformanceOption(
     val displayName: String,
     val defaultEnabled: Boolean,
@@ -80,6 +92,7 @@ data class ScannerSessionOptions(
     val triggerMode: ScannerTriggerMode = ScannerTriggerMode.MANUAL,
     val automaticallyShowResults: Boolean = false,
     val priceMode: ScannerPriceMode = ScannerPriceMode.OFF,
+    val printingMode: ScannerPrintingMode = ScannerPrintingMode.QUICK_LATEST,
     val savesBinderPageImages: Boolean = false,
     val replacesBinderPageImages: Boolean = true,
     val language: String = "English",

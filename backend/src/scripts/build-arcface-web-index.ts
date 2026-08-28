@@ -71,6 +71,9 @@ function main() {
       setName: row.setName ?? null,
       rarity: row.rarity ?? null,
       imageUrl: row.imageURL ?? row.imageUrl ?? null,
+      recognitionFamilyId: row.recognitionFamilyId ?? null,
+      exactPrintingId: row.exactPrintingId ?? row.cardId ?? row.externalId ?? null,
+      releaseDate: row.releaseDate ?? row.releasedAt ?? null,
     };
   });
   const bin = readFileSync(binPath);

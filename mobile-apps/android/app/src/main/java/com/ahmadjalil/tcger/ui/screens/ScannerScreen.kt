@@ -775,8 +775,14 @@ fun ScannerScreen(
                 runCatching {
                     withContext(Dispatchers.IO) { recordingSessionStore.save(bundle, activeDevSessionId) }
                 }.onSuccess { refreshSavedRecordings() }
-                    .onFailure { ioMessage = it.message }
+                .onFailure { ioMessage = it.message }
             }
+        }
+        if (result.requiresPrintingChoice) {
+            autoConsensus.reset()
+            consensusUpdate = null
+            showingResult = true
+            return@LaunchedEffect
         }
         val automaticCapture = lastCaptureSource == "automatic-camera"
         if (automaticCapture) {
@@ -1024,6 +1030,15 @@ fun ScannerScreen(
                         CardScanSource.ON_DEVICE_TEXT -> "Read on this device — confirm the title before adding"
                     }
                     Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (result.requiresPrintingChoice) {
+                    item {
+                        Text(
+                            "This artwork has multiple printings. Choose the set shown on your card; nothing was added automatically.",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
                 items(result.candidates, key = { it.card.id }) { candidate ->
                     CatalogCardRow(candidate.card) {

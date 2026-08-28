@@ -156,6 +156,8 @@ final class CardScannerCoordinator: @unchecked Sendable {
                             capturedImage: result.capturedImage,
                             primary: primary,
                             alternatives: Array(scopedCandidates.dropFirst()),
+                            resolution: result.resolution,
+                            printingResolutionProvenance: result.printingResolutionProvenance,
                             elapsed: result.elapsed,
                             debugCapture: result.debugCapture,
                             debugCaptureError: result.debugCaptureError
@@ -167,6 +169,8 @@ final class CardScannerCoordinator: @unchecked Sendable {
                         capturedImage: result.capturedImage,
                         primary: result.primary,
                         alternatives: result.alternatives,
+                        resolution: result.resolution,
+                        printingResolutionProvenance: result.printingResolutionProvenance,
                         elapsed: elapsed,
                         debugCapture: result.debugCapture,
                         debugCaptureError: result.debugCaptureError

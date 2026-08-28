@@ -432,4 +432,5 @@ private fun AndroidScannerRequest.toDomainScanOptions() = CardScanOptions(
     saveDebugCapture = options.saveServerDebugCapture,
     captureSource = debugCapture.source,
     captureNotes = debugCapture.notes,
+    printingMode = options.printingMode,
 )

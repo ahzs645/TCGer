@@ -13,6 +13,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
     @Binding var savesBinderPageImages: Bool
     @Binding var replacesBinderPageImages: Bool
     @Binding var assumedLanguage: String
+    @Binding var printingMode: ScannerPrintingMode
     @Binding var sharedSessionCode: String
     let availableScanEngines: [ScanEnginePreference]
     let sharedSessionUnavailableMessage: String?
@@ -75,6 +76,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
                     savesBinderPageImages: $savesBinderPageImages,
                     replacesBinderPageImages: $replacesBinderPageImages,
                     assumedLanguage: $assumedLanguage,
+                    printingMode: $printingMode,
                     sharedSessionCode: $sharedSessionCode,
                     availableScanEngines: availableScanEngines,
                     sharedSessionUnavailableMessage: sharedSessionUnavailableMessage,
@@ -179,6 +181,7 @@ private struct ScannerOptionsPopover: View {
     @Binding var savesBinderPageImages: Bool
     @Binding var replacesBinderPageImages: Bool
     @Binding var assumedLanguage: String
+    @Binding var printingMode: ScannerPrintingMode
     @Binding var sharedSessionCode: String
     let availableScanEngines: [ScanEnginePreference]
     let sharedSessionUnavailableMessage: String?
@@ -230,6 +233,7 @@ private struct ScannerOptionsPopover: View {
                     NavigationLink {
                         ScannerDefaultsView(
                             assumedLanguage: $assumedLanguage,
+                            printingMode: $printingMode,
                             selectedEngine: $selectedEngine,
                             availableScanEngines: availableScanEngines,
                             showsRecognitionEngine: showsTestInputs,
@@ -416,6 +420,7 @@ private struct ScannerOptionsPopover: View {
 
 private struct ScannerDefaultsView: View {
     @Binding var assumedLanguage: String
+    @Binding var printingMode: ScannerPrintingMode
     @Binding var selectedEngine: ScanEnginePreference
     let availableScanEngines: [ScanEnginePreference]
     let showsRecognitionEngine: Bool
@@ -430,6 +435,17 @@ private struct ScannerDefaultsView: View {
                     }
                 }
                 .pickerStyle(.navigationLink)
+
+                Picker("Printing", selection: $printingMode) {
+                    ForEach(ScannerPrintingMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.navigationLink)
+
+                Text(printingMode.explanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
 
                 if showsRecognitionEngine {
                     Picker("Recognition Engine", selection: $selectedEngine) {

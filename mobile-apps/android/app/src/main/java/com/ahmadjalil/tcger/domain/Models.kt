@@ -9,6 +9,9 @@ data class CatalogCard(
     val rarity: String? = null,
     val collectorNumber: String? = null,
     val imageUrl: String? = null,
+    val recognitionFamilyId: String? = null,
+    val exactPrintingId: String? = null,
+    val releaseDate: String? = null,
 )
 
 enum class CardScanSource { SERVER_IMAGE_MATCH, ON_DEVICE_EMBEDDING, ON_DEVICE_TEXT }
@@ -28,6 +31,8 @@ data class CardScanOptions(
     val saveDebugCapture: Boolean = false,
     val captureSource: String = "android-card-scanner",
     val captureNotes: String? = null,
+    val printingMode: com.ahmadjalil.tcger.data.scanner.ScannerPrintingMode =
+        com.ahmadjalil.tcger.data.scanner.ScannerPrintingMode.QUICK_LATEST,
 )
 
 data class CardScanCandidate(
@@ -43,6 +48,8 @@ data class CardScanResult(
     val elapsedMs: Double? = null,
     val debugCaptureId: String? = null,
     val debugCaptureError: String? = null,
+    val printingResolutionProvenance: String = "verified",
+    val requiresPrintingChoice: Boolean = false,
 )
 
 enum class ScanDebugFeedbackStatus(val apiValue: String, val displayName: String) {

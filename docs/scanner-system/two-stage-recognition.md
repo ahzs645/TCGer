@@ -9,6 +9,28 @@ tasks. The encoder retrieves a small candidate set by
 scanner returns the family/candidates for Review instead of inventing an exact
 printing.
 
+## User modes
+
+The setting is intentionally about ambiguity policy, not model choice:
+
+| Mode | If printed evidence verifies a printing | If one printing is possible | If the artwork family has multiple unresolved printings |
+|---|---|---|---|
+| **Quick Scan** (default) | Use the verified printing | Use it | Choose the newest compatible physical printing by `releaseDate`, with `exactPrintingId` as the deterministic tie-breaker |
+| **Exact Printing** | Use the verified printing | Use it | Require the user to choose; never add a visual top-1 automatically |
+
+Every result records one of `verified`, `single_printing`, `latest_fallback`,
+`user_selected`, or `unresolved`. A verified collector number/set symbol always
+overrides the Quick Scan fallback. “Newest” is never inferred from a set-code
+sort; it requires the artifact's ISO `releaseDate`. Language, physical/digital
+format, face, and treatment eligibility are applied before this decision.
+
+The policy and persisted setting are implemented in iOS, Android, and web.
+Android blocks automatic session insertion for an unresolved Exact Printing
+result; iOS uses its existing Choose Match review; the browser annotates the
+family as requiring selection. An older artifact without family/date fields
+continues to behave as a single-printing artifact rather than merging cards by
+name.
+
 This is a platform-neutral data contract. iOS already has the strongest
 runtime implementation (visual top-K plus title and collector-number evidence),
 and Android/web can consume the same metadata fields as their verifiers are
@@ -32,7 +54,7 @@ the ArcFace head does not receive contradictory labels for the same artwork.
 
 | Game | Visual family | Exact-print evidence | Required abstention cases |
 |---|---|---|---|
-| Pokémon | Exact physical printing until a stronger upstream artwork grouping exists | Name, set, collector number | Missing/unreadable set or number when variants collide; every TCG Pocket row is outside the physical-scanner scope |
+| Pokémon | Reviewed artwork-family map produced by the audit described in [Artwork-family matching](artwork-family-matching.md); exact printing until that map exists | Name, set, collector number | Missing/unreadable set or number when variants collide; every TCG Pocket row is outside the physical-scanner scope |
 | Magic | Scryfall `illustration_id`, falling back to visible printing face | Title, set code/symbol, collector number, face, frame and treatment | Same-art reprints, The List/original pairs, basic lands, tokens, treatments, or unreadable footer evidence |
 | Yu-Gi-Oh! | Artwork ID | Title, passcode and printed set code when the source enumerates printings | One artwork/passcode mapped to multiple products without readable set evidence |
 | Future game | Manifest/catalog-declared stable visual family | Declarative fields supported by a reviewed runtime adapter | Any unresolved candidate group or unsupported verifier evidence |

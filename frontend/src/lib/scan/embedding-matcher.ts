@@ -18,6 +18,7 @@ import { getContext2d } from "./canvas-utils";
 import { scanIndexAssetUrl } from "./scan-index-assets";
 import type { BrowserVideoScanCandidate } from "./scan-types";
 import type { TcgCode } from "@/types/card";
+import type { ScannerPrintingMode } from "./scanner-options";
 
 // ---------- types ----------
 
@@ -43,6 +44,9 @@ export interface EmbeddingIndexEntry {
   setName: string | null;
   rarity: string | null;
   imageUrl: string | null;
+  recognitionFamilyId?: string | null;
+  exactPrintingId?: string | null;
+  releaseDate?: string | null;
 }
 
 export interface EmbeddingIndex {
@@ -114,6 +118,9 @@ interface EmbeddingIndexArtifact {
     setName?: string | null;
     rarity?: string | null;
     imageUrl?: string | null;
+    recognitionFamilyId?: string | null;
+    exactPrintingId?: string | null;
+    releaseDate?: string | null;
   }>;
   vectors: string; // base64 Int8Array
   thresholds?: Partial<EmbeddingMatchThresholds>;
@@ -162,6 +169,9 @@ export function parseEmbeddingIndex(
     setName: e.setName ?? null,
     rarity: e.rarity ?? null,
     imageUrl: e.imageUrl ?? null,
+    recognitionFamilyId: e.recognitionFamilyId ?? null,
+    exactPrintingId: e.exactPrintingId ?? e.externalId,
+    releaseDate: e.releaseDate ?? null,
   }));
 
   return {
@@ -696,9 +706,98 @@ export function matchEmbeddingTopK(
       footerDistance: null,
       proposalLabel,
       artworkSimilarity: sim,
+      recognitionFamilyId: entry.recognitionFamilyId,
+      exactPrintingId: entry.exactPrintingId,
+      releaseDate: entry.releaseDate,
     };
     return candidate;
   });
+}
+
+export function resolveEmbeddingPrintingCandidates(
+  candidates: BrowserVideoScanCandidate[],
+  mode: ScannerPrintingMode,
+  verifiedExactPrintingId?: string | null,
+): BrowserVideoScanCandidate[] {
+  const primary = candidates[0];
+  if (!primary) return candidates;
+  const familyId = primary.recognitionFamilyId;
+  const family = candidates
+    .filter((candidate) =>
+      familyId
+        ? candidate.recognitionFamilyId === familyId
+        : candidate.externalId === primary.externalId,
+    )
+    .filter(
+      (candidate, index, rows) =>
+        rows.findIndex(
+          (row) =>
+            (row.exactPrintingId ?? row.externalId) ===
+            (candidate.exactPrintingId ?? candidate.externalId),
+        ) === index,
+    )
+    .sort(
+      (left, right) =>
+        (right.releaseDate ?? "").localeCompare(left.releaseDate ?? "") ||
+        (right.exactPrintingId ?? right.externalId).localeCompare(
+          left.exactPrintingId ?? left.externalId,
+        ),
+    );
+
+  const verified = verifiedExactPrintingId
+    ? family.find(
+        (candidate) =>
+          (candidate.exactPrintingId ?? candidate.externalId) ===
+          verifiedExactPrintingId,
+      )
+    : null;
+  if (verified) {
+    return promotePrinting(candidates, verified, "verified", false);
+  }
+  if (family.length <= 1) {
+    return promotePrinting(
+      candidates,
+      family[0] ?? primary,
+      "single_printing",
+      false,
+    );
+  }
+  if (mode === "exact_printing") {
+    const familyIds = new Set(family.map((candidate) => candidate.externalId));
+    return [
+      ...family.map((candidate) => ({
+        ...candidate,
+        printingResolutionProvenance: "unresolved" as const,
+        requiresPrintingChoice: true,
+      })),
+      ...candidates.filter((candidate) => !familyIds.has(candidate.externalId)),
+    ];
+  }
+  return promotePrinting(candidates, family[0]!, "latest_fallback", false);
+}
+
+function promotePrinting(
+  candidates: BrowserVideoScanCandidate[],
+  selected: BrowserVideoScanCandidate,
+  provenance: "verified" | "single_printing" | "latest_fallback",
+  requiresPrintingChoice: boolean,
+): BrowserVideoScanCandidate[] {
+  const primary = candidates[0]!;
+  const promoted = {
+    ...selected,
+    confidence: primary.confidence,
+    distance: primary.distance,
+    scoreDistance: primary.scoreDistance,
+    passedThreshold: primary.passedThreshold,
+    printingResolutionProvenance: provenance,
+    requiresPrintingChoice,
+  };
+  return [
+    promoted,
+    ...candidates.filter(
+      (candidate) => candidate.externalId !== selected.externalId,
+    ),
+  ];
 }
 
 /**

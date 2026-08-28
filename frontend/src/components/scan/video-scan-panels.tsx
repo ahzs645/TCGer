@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn, GAME_LABELS } from "@/lib/utils";
+import type { ScannerPrintingMode } from "@/lib/scan/scanner-options";
 
 import {
   formatMatchScore,
@@ -41,6 +42,8 @@ export interface ScanControlsProps {
   onDetectionOnlyChange: (value: boolean) => void;
   embeddingMode: boolean;
   onEmbeddingModeChange: (value: boolean) => void;
+  printingMode: ScannerPrintingMode;
+  onPrintingModeChange: (value: ScannerPrintingMode) => void;
   analysisIntervalMs: number;
   onAnalysisIntervalChange: (value: number) => void;
   isProcessing: boolean;
@@ -119,6 +122,29 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
         />
         Detection only (outlines, skip matching)
       </label>
+
+      <div className="space-y-2">
+        <Label htmlFor="scanner-printing-mode">Printing</Label>
+        <Select
+          value={props.printingMode}
+          onValueChange={(value) =>
+            props.onPrintingModeChange(value as ScannerPrintingMode)
+          }
+        >
+          <SelectTrigger id="scanner-printing-mode">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="quick_latest">Quick Scan</SelectItem>
+            <SelectItem value="exact_printing">Exact Printing</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {props.printingMode === "quick_latest"
+            ? "Uses verified print details when available; otherwise selects the newest printing in the artwork family."
+            : "Stops on visually identical printings so you can choose the set."}
+        </p>
+      </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 text-sm">
@@ -421,6 +447,19 @@ export function ActiveTracksPanel({
               </div>
             </div>
           </div>
+
+          {primaryCandidate.requiresPrintingChoice ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+              This artwork has multiple printings. Exact Printing mode requires
+              you to choose the set before adding it.
+            </div>
+          ) : primaryCandidate.printingResolutionProvenance ===
+            "latest_fallback" ? (
+            <p className="text-xs text-muted-foreground">
+              Exact print details were unreadable, so Quick Scan selected the
+              newest compatible printing.
+            </p>
+          ) : null}
 
           {visibleTracks.length ? (
             <div className="space-y-2">

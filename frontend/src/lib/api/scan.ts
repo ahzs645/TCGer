@@ -45,6 +45,16 @@ export interface CardScanMatch {
   imageUrl: string | null;
   confidence: number;
   distance: number;
+  recognitionFamilyId?: string | null;
+  exactPrintingId?: string | null;
+  releaseDate?: string | null;
+  printingResolutionProvenance?:
+    | "verified"
+    | "single_printing"
+    | "latest_fallback"
+    | "user_selected"
+    | "unresolved";
+  requiresPrintingChoice?: boolean;
 }
 
 export interface CardScanDiagnosticCandidate extends CardScanMatch {

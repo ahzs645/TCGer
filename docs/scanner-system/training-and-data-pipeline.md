@@ -67,6 +67,9 @@ records into the compact `CardsIndexMetadata.json` schema:
   "format": "paper",
   "setCode": "set-code",
   "setName": "Set name",
+  "recognitionFamilyId": "magic:illustration:provider-id",
+  "exactPrintingId": "provider-printing-id",
+  "releaseDate": "2026-08-28",
   "rarity": "rare",
   "imageURL": "https://provider/image",
   "price": null
@@ -79,6 +82,8 @@ the default scanner profile and excludes `series=tcgp`, `format=pocket`, and
 The normalized schema also carries `visualIdentityId`,
 `recognitionFamilyId`, `exactPrintingId`, and game-specific verification
 evidence described in [Two-stage recognition](two-stage-recognition.md).
+Pokémon's reviewed overlay workflow is specified in
+[Artwork-family matching](artwork-family-matching.md).
 
 ## Durable image library
 
