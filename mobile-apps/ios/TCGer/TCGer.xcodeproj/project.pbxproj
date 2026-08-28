@@ -537,6 +537,16 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"CardEmbeddings-arcface.mlpackage",
+					CardEmbeddings.mlpackage,
+					CardsIndexMetadata.json,
+					"CardsIndexVectors-arcface.bin",
+					CardsIndexVectors.bin,
+					CardFaceGate.json,
+					MagicCardHashes.json,
+					"artwork-fingerprints-pokemon-uint8.json",
+				);
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AppInfo.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;

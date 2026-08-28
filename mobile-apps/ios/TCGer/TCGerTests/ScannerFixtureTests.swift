@@ -27,7 +27,7 @@ private struct ScannerFixture: Decodable {
 
 @MainActor
 final class ScannerFixtureTests: XCTestCase {
-    private static let coordinator = CardScannerCoordinator.makeDefault()
+    private static let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
 
     func testFixtureManifestCoversRequiredRealWorldCategories() throws {
         let manifest = try loadManifest()

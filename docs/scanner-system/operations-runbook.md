@@ -293,6 +293,17 @@ Then verify:
   modes;
 - catalog IDs resolve every returned scanner candidate.
 
+For native first-use delivery, also verify on a clean install:
+
+1. opening each game scanner presents its package card before capture;
+2. cancelling leaves capture blocked but keeps the scanner navigable;
+3. install progress survives recomposition/view updates;
+4. successful activation enables capture without restarting the app;
+5. a newer manifest presents an update prompt while the old runtime remains usable;
+6. a failed update leaves the old version active;
+7. the Android APK/AAB and iOS Release `.app` contain no game-specific model,
+   index, metadata, fingerprint, or hash-library payloads.
+
 ## 14. Routine updates without retraining
 
 For a small new set:

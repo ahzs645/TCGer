@@ -3,7 +3,6 @@ package com.ahmadjalil.tcger.data.scanner
 import android.content.Context
 import android.content.pm.PackageManager
 import com.ahmadjalil.tcger.data.scanner.model.ArcFaceCardRecognizer
-import com.ahmadjalil.tcger.data.scanner.model.DinoV2CardRecognizer
 import com.ahmadjalil.tcger.data.scanner.model.ScannerModelAvailability
 import java.io.File
 
@@ -19,8 +18,6 @@ data class ScannerAssetDiagnosticItem(
 object AndroidScannerAssetDiagnostics {
     fun run(context: Context, serverConfigured: Boolean): List<ScannerAssetDiagnosticItem> {
         val app = context.applicationContext
-        val model = runCatching { ArcFaceCardRecognizer.load(app).use { } }
-        val dinoV2Model = runCatching { DinoV2CardRecognizer.load(app).use { } }
         val mlKitPresent = runCatching { Class.forName("com.google.mlkit.vision.text.TextRecognition") }.isSuccess
         val packageManager = app.packageManager
         val hasCamera = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
@@ -31,16 +28,15 @@ object AndroidScannerAssetDiagnostics {
         return listOf(
             ScannerAssetDiagnosticItem(
                 "arcface-runtime",
-                "ArcFace model + calibrated index",
-                if (model.isSuccess) ScannerDiagnosticStatus.PASS else ScannerDiagnosticStatus.FAIL,
-                model.exceptionOrNull()?.message ?: "ONNX session, 21,828-card index, dimensions, sizes, and SHA-256 checks passed.",
+                "ArcFace game packages",
+                ScannerDiagnosticStatus.INFO,
+                "Delivered per game on first use; installed packages are checksum-validated before activation.",
             ),
             ScannerAssetDiagnosticItem(
                 "dinov2-runtime",
-                "DINOv2 model + calibrated index",
-                if (dinoV2Model.isSuccess) ScannerDiagnosticStatus.PASS else ScannerDiagnosticStatus.FAIL,
-                dinoV2Model.exceptionOrNull()?.message
-                    ?: "ONNX session, index dimensions, model/index/gate/metadata sizes, and SHA-256 checks passed.",
+                "Historical DINOv2 evaluation runtime",
+                ScannerDiagnosticStatus.INFO,
+                "Intentionally excluded from the APK/AAB and retained outside production assets for evaluation.",
             ),
             ScannerAssetDiagnosticItem(
                 "mlkit-ocr",

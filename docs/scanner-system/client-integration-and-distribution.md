@@ -90,8 +90,10 @@ game it:
 
 If installation fails, the active version is not changed. Settings exposes an
 “Offline Scanner Models” section with install/update/remove and progress.
-Users reopen the scanner after installation so the coordinator is rebuilt with
-the new runtime.
+Opening the scanner or switching games fetches the small manifest and presents
+an install prompt when no runtime is active. It presents a non-blocking update
+prompt when the manifest advertises a newer version. After activation the
+coordinator is rebuilt in place, so the user does not need to close the scanner.
 
 ### Runtime construction
 
@@ -103,9 +105,11 @@ At scanner construction time, each installed game contributes a dedicated
 - file-backed metadata store;
 - only that game's supported scan mode.
 
-The bundled strategy remains a fallback. Model, vectors, and metadata from a
+Production Release builds contain only the shared card detector. Game-specific
+embedding models, indexes, metadata, the legacy Magic hash library, and the
+Pokémon fingerprint library are excluded. Model, vectors, and metadata from a
 downloaded release stay paired because they are resolved from the same version
-directory.
+directory. Debug/evaluation builds may opt into historical fixtures explicitly.
 
 ### Pocket defense
 
@@ -132,13 +136,17 @@ fp32 ONNX file instead of a Core ML package:
 
 Failed updates keep the installed manifest and runtime active. The Compose
 settings screen exposes install, retry/update, removal, card count, and bytes.
+The scanner also refreshes the per-game manifest on entry, prompts before first
+use, keeps download progress in the prompt, and discovers later versions without
+an app update.
 
 ### Runtime construction
 
 The repository selects the installed game runtime for explicit ArcFace scans.
-Pokémon falls back to the bundled model if no downloaded runtime exists. A
-recognizer cache is keyed by game and artifact version; replacing a release
-closes and rebuilds only the affected recognizer.
+There is no bundled Pokémon exception. A recognizer cache is keyed by game and
+artifact version; replacing a release closes and rebuilds only the affected
+recognizer. Historical ONNX fixtures live outside `app/src/main/assets`, so the
+APK/AAB cannot silently regain the old payload.
 
 ### Pocket defense
 

@@ -1308,10 +1308,10 @@ private struct ScannerAssetDiagnosticsSheet: View {
                         .padding(.vertical, 2)
                     }
                 } header: {
-                    Text("Bundled Assets")
+                    Text("Scanner Assets")
                 } footer: {
                     if failureCount > 0 {
-                        Text("Missing generated assets disable their scanner strategies. Regenerate with `bash scripts/ios-assets.sh build`, then rebuild the app.")
+                        Text("Shared bundled assets must pass. Game-specific recognition packages are installed and updated on demand from the scanner or Settings.")
                     }
                 }
             }

@@ -47,19 +47,19 @@ Use **Settings > Data source** to configure a TCGer server.
 The scanner works in both modes. A signed-in server session can use the shared
 pHash or embedding scanner and authenticated price endpoint. On-device mode
 uses an integrity-checked ArcFace ONNX model/index with ML Kit title OCR
-fallback. A DINOv2 q8 bundle is also production-selectable and preserves iOS's
-gate/threshold contract plus strict manual title/collector OCR rescue, verified
-on API 34 arm64. Camera permission is requested only for the live preview;
-choosing existing photos remains available.
+fallback. Historical DINOv2 evaluation artifacts remain available outside the
+production asset tree. Camera permission is requested only for the live
+preview; choosing existing photos remains available.
 
-Pokémon retains its bundled fallback. The current Pokémon, Magic, and Yu-Gi-Oh!
-ArcFace runtimes are also independently downloadable under **Settings >
-Offline scanner models**. Each R2 manifest, model, vectors, and metadata set is
-checksum-validated as one version before app-private atomic activation. A
-downloaded runtime is used only for its explicitly selected game; it is not
-used for cross-game automatic classification. **Check for update** safely
-replaces the active version only after the replacement validates, and
-**Remove** deletes that game's downloaded runtime.
+No game-specific recognition runtime ships in the APK/AAB. Opening the scanner
+prompts for the selected game's current package; the current Pokémon, Magic,
+and Yu-Gi-Oh! ArcFace runtimes are also independently downloadable under
+**Settings > Offline scanner models**. Each R2 manifest, model, vectors, and
+metadata set is checksum-validated as one version before app-private atomic
+activation. A downloaded runtime is used only for its explicitly selected
+game; it is not used for cross-game automatic classification. Scanner entry
+and **Check for update** safely replace the active version only after the
+replacement validates, and **Remove** deletes that game's downloaded runtime.
 
 ## Architecture
 

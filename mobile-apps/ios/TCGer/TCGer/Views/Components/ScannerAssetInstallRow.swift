@@ -64,7 +64,7 @@ struct ScannerAssetInstallRow: View {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) { store.remove(game) }
         } message: {
-            Text("Yu-Gi-Oh! on-device embedding scans will be unavailable until the model is installed again. Your cards and catalog stay on this phone.")
+            Text("\(game.displayName) on-device scans will be unavailable until the model is installed again. Your cards and catalog stay on this phone.")
         }
         .task {
             if store.manifests[game] == nil {
@@ -99,7 +99,7 @@ struct ScannerAssetInstallRow: View {
             } else {
                 Text("Model information is unavailable while offline.")
             }
-            Text("After installation, close and reopen the scanner, then select Yu-Gi-Oh! mode.")
+            Text("The scanner activates this package immediately after installation. Future versions use the same verified update pipeline.")
                 .foregroundStyle(.secondary)
         }
         .font(.subheadline)

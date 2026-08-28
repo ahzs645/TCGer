@@ -66,11 +66,11 @@ final class CardScannerCoordinator: @unchecked Sendable {
         await primary.warmUp(for: mode)
     }
 
-    static func makeDefault(apiService: APIService = APIService()) -> CardScannerCoordinator {
-        var strategies: [ScanStrategy] = [
-            ArtworkFingerprintScannerStrategy(),
-            BackendHashScannerStrategy(),
-        ]
+    static func makeDefault(
+        apiService: APIService = APIService(),
+        includeBundledTestFallbacks: Bool = false
+    ) -> CardScannerCoordinator {
+        var strategies: [ScanStrategy] = [BackendHashScannerStrategy()]
         let downloadableModes: [(TCGGame, ScanMode)] = [
             (.pokemon, .pokemon),
             (.magic, .mtg),
@@ -88,9 +88,16 @@ final class CardScannerCoordinator: @unchecked Sendable {
                 supportedModes: [mode]
             ))
         }
-        strategies.append(BoardCardEmbeddingScannerStrategy())
-        strategies.append(PokemonTextScannerStrategy())
-        strategies.append(MagicPerceptualHashScannerStrategy())
+        if includeBundledTestFallbacks {
+            // Large game-specific recognition payloads are no longer part of
+            // the production scanner path. Tests and offline evaluation tools
+            // may opt into the historical fixtures explicitly while the app
+            // requires a checksum-validated downloadable runtime.
+            strategies.append(ArtworkFingerprintScannerStrategy())
+            strategies.append(BoardCardEmbeddingScannerStrategy())
+            strategies.append(PokemonTextScannerStrategy())
+            strategies.append(MagicPerceptualHashScannerStrategy())
+        }
         return CardScannerCoordinator(strategies: strategies, apiService: apiService)
     }
 

@@ -21,7 +21,7 @@ final class ScannerCorrectionReplayTests: XCTestCase {
             FileManager.default.fileExists(atPath: $0.appendingPathComponent("results.json").path)
         }.sorted { $0.lastPathComponent < $1.lastPathComponent }
 
-        let coordinator = CardScannerCoordinator.makeDefault()
+        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
         var labeledCount = 0
         var correctCount = 0
         var abstainedCount = 0

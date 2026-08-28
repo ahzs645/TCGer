@@ -66,6 +66,28 @@ class ScannerAssetStoreTest {
     }
 
     @Test
+    fun `manifest refresh advertises first install and later update without downloading assets`() = runTest {
+        val first = fixture("release-1")
+        val responses = first.responses.toMutableMap()
+        val store = store(responses)
+
+        val advertised = store.refreshManifest("yu-gi-oh!")
+
+        assertEquals("release-1", advertised.version)
+        assertEquals("release-1", store.remoteManifests.value["yugioh"]?.version)
+        assertEquals(ScannerAssetInstallStatus.NotInstalled, store.status("yugioh"))
+        assertTrue(!store.isUpdateAvailable("yugioh"))
+
+        store.install("yugioh")
+        val second = fixture("release-2")
+        responses.putAll(second.responses)
+        store.refreshManifest("yugioh")
+
+        assertTrue(store.isUpdateAvailable("yugioh"))
+        assertEquals("release-1", store.installedRuntime("yugioh")?.contract?.version)
+    }
+
+    @Test
     fun `local dispatch enables ArcFace for each published game`() {
         val arcFace = CardScanOptions(
             engine = CardScanEngine.AUTOMATIC,

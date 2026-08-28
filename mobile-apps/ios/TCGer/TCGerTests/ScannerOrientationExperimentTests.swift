@@ -586,7 +586,7 @@ final class ScannerOrientationExperimentTests: XCTestCase {
                 result.expectedScore ?? 0
             ))
             if name == "detectorAxisBox" || name.hasPrefix("outerBorderHough") {
-                let coordinatorResult = await CardScannerCoordinator.makeDefault().scan(
+                let coordinatorResult = await CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true).scan(
                     image: image,
                     context: .test(engine: .localOnly),
                     source: .photoCapture

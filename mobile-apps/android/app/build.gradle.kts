@@ -6,20 +6,6 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-val generatedScannerModelAssets = layout.buildDirectory.dir("generated/scannerModelAssets")
-val prepareScannerModelAssets by tasks.registering(Sync::class) {
-    into(generatedScannerModelAssets)
-    from("../../ios/TCGer/TCGer/Resources/ScanIndex") {
-        include(
-            "CardsIndexVectors-arcface.bin",
-            "CardsIndexVectors.bin",
-            "CardsIndexMetadata.json",
-            "CardFaceGate.json",
-        )
-        into("scan-index")
-    }
-}
-
 android {
     namespace = "com.ahmadjalil.tcger"
     compileSdk = 35
@@ -67,11 +53,14 @@ android {
     sourceSets.getByName("main").assets.srcDir(
         "../../ios/TCGer/TCGer/Resources/PackOpening.bundle",
     )
-    sourceSets.getByName("main").assets.srcDir(generatedScannerModelAssets)
-}
-
-tasks.named("preBuild").configure {
-    dependsOn(prepareScannerModelAssets)
+    // Game-specific recognition packages are installed on first use. Keep
+    // the checked-in evaluation artifacts available to tooling without
+    // shipping them in the APK/AAB.
+    sourceSets.getByName("main").assets.exclude(
+        "scan-index/**",
+        "licenses/DINOv2-APACHE-2.0.txt",
+        "licenses/DINOv2-NOTICE.txt",
+    )
 }
 
 dependencies {

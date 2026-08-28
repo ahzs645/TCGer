@@ -29,6 +29,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,10 @@ fun SettingsScreen(
     var serverDialog by remember { mutableStateOf(false) }
     var signInDialog by remember { mutableStateOf(false) }
     val games = listOf("pokemon", "magic", "yugioh", "onepiece", "lorcana", "dragonball")
+
+    LaunchedEffect(Unit) {
+        listOf("pokemon", "magic", "yugioh").forEach(viewModel::refreshScannerAssets)
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.SETTINGS_BROWSE)),
@@ -183,8 +188,14 @@ fun SettingsScreen(
                             )
                         }
                         is ScannerAssetInstallStatus.Installed -> {
+                            val updateAvailable = state.scannerAssetManifests[game]?.version
+                                ?.let { it != status.manifest.version } == true
                             Text(
-                                "Installed · ${status.manifest.cardCount} cards · ${formatAssetBytes(status.manifest.downloadBytes)}",
+                                if (updateAvailable) {
+                                    "Installed · update available · ${status.manifest.cardCount} cards"
+                                } else {
+                                    "Installed · ${status.manifest.cardCount} cards · ${formatAssetBytes(status.manifest.downloadBytes)}"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -193,7 +204,12 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.End,
                             ) {
                                 TextButton(onClick = { viewModel.removeScannerAssets(game) }) { Text("Remove") }
-                                TextButton(onClick = { viewModel.installScannerAssets(game) }) { Text("Check for update") }
+                                TextButton(onClick = {
+                                    if (updateAvailable) viewModel.installScannerAssets(game)
+                                    else viewModel.refreshScannerAssets(game)
+                                }) {
+                                    Text(if (updateAvailable) "Update" else "Check for update")
+                                }
                             }
                         }
                         is ScannerAssetInstallStatus.Failed -> {

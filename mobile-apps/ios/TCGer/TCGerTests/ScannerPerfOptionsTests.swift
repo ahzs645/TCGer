@@ -218,14 +218,14 @@ final class ScannerPerfOptionsTests: XCTestCase {
     func testWarmUpPreloadsWithoutChangingResults() async throws {
         let image = try XCTUnwrap(UIImage(named: "BossOrders")?.cgImage)
 
-        let cold = CardScannerCoordinator.makeDefault()
+        let cold = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
         let coldStarted = Date()
         let coldResult = await cold.scan(
             image: image, context: .test(engine: .localOnly), source: .importedPhoto
         )
         let coldFirstMs = Date().timeIntervalSince(coldStarted) * 1_000
 
-        let warmed = CardScannerCoordinator.makeDefault()
+        let warmed = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
         await warmed.warmUp()
         let warmStarted = Date()
         let warmResult = await warmed.scan(
@@ -254,7 +254,7 @@ final class ScannerPerfOptionsTests: XCTestCase {
     @MainActor
     func testAllPerfOptionsPreserveFixtureScanResult() async throws {
         let image = try XCTUnwrap(UIImage(named: "BossOrders")?.cgImage)
-        let coordinator = CardScannerCoordinator.makeDefault()
+        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
 
         func scanCardID() async -> String? {
             let result = await coordinator.scan(

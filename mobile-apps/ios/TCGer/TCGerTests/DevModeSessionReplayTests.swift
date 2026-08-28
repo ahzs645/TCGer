@@ -180,7 +180,7 @@ final class DevModeSessionReplayTests: XCTestCase {
         }.sorted { $0.lastPathComponent < $1.lastPathComponent }
         XCTAssertFalse(sessions.isEmpty, "no sessions found under \(dir)")
 
-        let coordinator = CardScannerCoordinator.makeDefault()
+        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
         var lostCount = 0
         var wrongAccepts: [String] = []
         var expectedHits = 0

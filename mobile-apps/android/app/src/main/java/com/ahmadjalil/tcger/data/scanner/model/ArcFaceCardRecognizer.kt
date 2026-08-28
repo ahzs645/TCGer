@@ -65,7 +65,6 @@ class ArcFaceCardRecognizer private constructor(
         ): ScannerModelAvailability {
             val normalized = normalizeScannerGame(game)
             val runtime = assetStore.installedRuntime(normalized)
-            if (runtime == null && normalized == "pokemon") return availability(context)
             if (runtime == null) {
                 return ScannerModelAvailability.Unavailable("Install the $normalized scanner model in Settings")
             }
@@ -78,16 +77,8 @@ class ArcFaceCardRecognizer private constructor(
             assetStore: ScannerAssetStore? = null,
         ): ArcFaceCardRecognizer {
             val normalized = normalizeScannerGame(game)
-            val installed = assetStore?.installedRuntime(normalized)
-            val runtime = installed ?: if (normalized == "pokemon") {
-                InstalledScannerRuntime(
-                    ArcFaceModelContract.pokemonRuntime,
-                    AndroidScannerModelAssetSource(context),
-                )
-            } else {
-                requireNotNull(assetStore?.installedRuntime(normalized)) {
-                    "Install the ${normalized.replaceFirstChar(Char::uppercase)} offline scanner model in Settings first"
-                }
+            val runtime = requireNotNull(assetStore?.installedRuntime(normalized)) {
+                "Install the ${normalized.replaceFirstChar(Char::uppercase)} offline scanner model first"
             }
             val contract = runtime.contract
             val bundle = ArcFaceModelBundle.load(runtime.source, contract)

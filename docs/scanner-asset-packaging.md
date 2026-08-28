@@ -1,8 +1,27 @@
-# Scanner asset packaging: bundled now, R2 later
+# Scanner asset packaging: first-use R2 delivery
+
+## Current decision (2026-08-27)
+
+Game-specific scanner runtimes are not production app resources. Opening the
+scanner prompts for the selected game's versioned package, installs the model,
+index, and metadata as one checksum-validated transaction, and activates it
+without restarting the app. The same manifest check advertises later updates;
+a failed update leaves the prior version active.
+
+- iOS Release builds retain only the shared card detector. Historical embedding,
+  fingerprint, hash, and index fixtures stay checked in for explicit evaluation
+  paths but are excluded from production packaging.
+- Android keeps historical ONNX fixtures under `scanner-evaluation-assets`,
+  outside `app/src/main/assets`; APK/AAB builds receive no game runtime.
+- Catalogs, saved cards, and offline pack assets remain separate capabilities.
+  Removing a scanner package never removes any of them.
+
+The remainder of this file records the superseded bundled-first decision and
+the migration rationale that led to the current design.
 
 > **Historical decision record.** Downloadable, content-addressed iOS and
 > Android per-game scanner packs are now implemented and published. Bundled
-> Pokémon assets still provide fallback behavior, but the current delivery
+> game recognition fallback is retired; the current delivery
 > architecture is documented in
 > [scanner-system/client-integration-and-distribution.md](scanner-system/client-integration-and-distribution.md).
 
@@ -34,7 +53,7 @@ either committed (check their size first) or fetched by a
 `ci_scripts/ci_post_clone.sh`, or after the guard learns to require scanner
 assets separately from catalogs.
 
-## Current state (enforced)
+## Historical bundled state
 
 Everything the scanner needs is in the app bundle, and
 `bash scripts/ios-assets.sh check` (also run as the app target's pre-build

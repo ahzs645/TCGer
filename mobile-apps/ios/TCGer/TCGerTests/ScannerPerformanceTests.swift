@@ -20,7 +20,9 @@ final class ScannerPerformanceTests: XCTestCase {
 
     func testScannerViewModelConstructionStaysWithinPresentationBudget() {
         let started = Date()
-        let viewModel = CardScannerViewModel()
+        let viewModel = CardScannerViewModel(
+            coordinator: CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
+        )
         let elapsed = Date().timeIntervalSince(started)
 
         withExtendedLifetime(viewModel) {}
@@ -77,7 +79,7 @@ final class ScannerPerformanceTests: XCTestCase {
 
     func testFirstAndSustainedLocalScanLatencyStayWithinBudget() async throws {
         let image = try XCTUnwrap(UIImage(named: "BossOrders")?.cgImage)
-        let coordinator = CardScannerCoordinator.makeDefault()
+        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
 
         // The bundled fixture is a borderless card crop, i.e. an import — as
         // .photoCapture the detector would fire on an interior panel and the

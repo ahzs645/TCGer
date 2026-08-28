@@ -8,11 +8,15 @@ model/index/threshold contract reviewable as one unit.
 ## ArcFace bundle contract
 
 The Gradle `prepareScannerModelAssets` task stages exactly three files under
-`assets/scan-index/`:
+Production builds no longer ship game-specific recognition files under
+`assets/scan-index/`. The checked-in historical fixtures live under
+`mobile-apps/android/scanner-evaluation-assets/scan-index/`; the app installs
+the current model, vectors, and metadata together from the published scanner
+manifest when a user first opens that game's scanner.
 
 | Asset | Source | Raw size |
 | --- | --- | ---: |
-| `card-embeddings-arcface-fp32.onnx` | Android `src/main/assets/scan-index` | 15,014,526 B |
+| `card-embeddings-arcface-fp32.onnx` | Android `scanner-evaluation-assets/scan-index` | 15,014,526 B |
 | `CardsIndexVectors-arcface.bin` | iOS `Resources/ScanIndex` | 8,381,960 B |
 | `CardsIndexMetadata.json` | iOS `Resources/ScanIndex` | 4,314,177 B |
 

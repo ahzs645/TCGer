@@ -95,6 +95,8 @@ class ScannerAssetStore internal constructor(
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val mutableStatuses = MutableStateFlow<Map<String, ScannerAssetInstallStatus>>(emptyMap())
     val statuses: StateFlow<Map<String, ScannerAssetInstallStatus>> = mutableStatuses.asStateFlow()
+    private val mutableRemoteManifests = MutableStateFlow<Map<String, ScannerAssetManifest>>(emptyMap())
+    val remoteManifests: StateFlow<Map<String, ScannerAssetManifest>> = mutableRemoteManifests.asStateFlow()
 
     init {
         require(remoteBaseURL.startsWith("https://")) { "Scanner asset base URL must use HTTPS" }
@@ -117,6 +119,28 @@ class ScannerAssetStore internal constructor(
             contract = manifest.runtimeContract(),
             source = FileScannerModelAssetSource(versionDirectory),
         )
+    }
+
+    suspend fun refreshManifest(game: String): ScannerAssetManifest {
+        val normalized = normalizeScannerGame(game)
+        require(normalized in supportedDownloadGames) { "No downloadable Android scanner is published for $game" }
+        val manifestURL = "${remoteBaseURL.trimEnd('/')}/$normalized/manifest.json"
+        val temporary = File(root, ".manifest-${normalized}-${UUID.randomUUID()}.json")
+        return try {
+            fetcher.fetch(manifestURL, temporary) { }
+            val manifest = json.decodeFromString<ScannerAssetManifest>(temporary.readText())
+            validateManifest(manifest, normalized)
+            updateRemoteManifest(normalized, manifest)
+            manifest
+        } finally {
+            temporary.delete()
+        }
+    }
+
+    fun isUpdateAvailable(game: String): Boolean {
+        val normalized = normalizeScannerGame(game)
+        val installed = readInstalledManifest(normalized) ?: return false
+        return mutableRemoteManifests.value[normalized]?.version?.let { it != installed.version } == true
     }
 
     suspend fun install(game: String) {
@@ -152,6 +176,7 @@ class ScannerAssetStore internal constructor(
             fetcher.fetch(manifestURL, manifestFile) { }
             val manifest = json.decodeFromString<ScannerAssetManifest>(manifestFile.readText())
             validateManifest(manifest, game)
+            updateRemoteManifest(game, manifest)
 
             var completed = 0L
             updateStatus(game, ScannerAssetInstallStatus.Installing(completed, manifest.downloadBytes))
@@ -271,6 +296,12 @@ class ScannerAssetStore internal constructor(
 
     private fun updateStatus(game: String, status: ScannerAssetInstallStatus) {
         mutableStatuses.value = mutableStatuses.value.toMutableMap().apply { put(game, status) }
+    }
+
+    private fun updateRemoteManifest(game: String, manifest: ScannerAssetManifest) {
+        mutableRemoteManifests.value = mutableRemoteManifests.value.toMutableMap().apply {
+            put(game, manifest)
+        }
     }
 
     private fun ScannerAssetManifest.runtimeContract() = ArcFaceRuntimeContract(

@@ -141,7 +141,9 @@ struct CardScannerView: View {
     @AppStorage("scanner.sharedSessionCode") private var sharedSessionCode = ""
     @AppStorage("scanner.defaultLanguage") private var assumedScanLanguage = "English"
     @StateObject private var viewModel = CardScannerViewModel()
+    @StateObject private var scannerAssets = ScannerAssetStore.shared
     @State private var showingRecentDebugCaptures = false
+    @State private var scannerAssetPrompt: ScannerAssetPromptRequest?
     @State private var photoPickerMode: ScannerPhotoPickerMode?
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var photoImportProgress: ScannerPhotoImportProgress?
@@ -222,6 +224,10 @@ struct CardScannerView: View {
         .onChange(of: environmentStore.enabledPokemon, initial: false) { _, _ in
             syncSelectedModeWithModules()
         }
+        .onChange(of: scannerAssets.installedVersions, initial: false) { _, _ in
+            viewModel.reloadScannerAssets()
+            scannerAssetPrompt = nil
+        }
         .onChange(of: selectedPhotoItems, initial: false) { _, items in
             guard !items.isEmpty else { return }
             Task { await scanSelectedPhotos(items) }
@@ -240,12 +246,18 @@ struct CardScannerView: View {
         .task(id: priceLookupRequestID) {
             await refreshSessionPrices()
         }
+        .task(id: viewModel.selectedMode) {
+            await refreshScannerAssetPrompt()
+        }
         .photosPicker(
             isPresented: photoPickerIsPresented,
             selection: $selectedPhotoItems,
             maxSelectionCount: photoPickerSelectionLimit,
             matching: .images
         )
+        .sheet(item: $scannerAssetPrompt) { request in
+            ScannerAssetInstallPrompt(store: scannerAssets, request: request)
+        }
         .onPreferenceChange(ScannerGuideFramePreferenceKey.self) { frame in
             viewModel.updateGuideFrame(frame)
         }
@@ -513,6 +525,20 @@ struct CardScannerView: View {
                     .padding(12)
                     .background(Color.black.opacity(0.6))
                     .cornerRadius(12)
+            } else if scannerPackageRequired {
+                VStack(spacing: 8) {
+                    Text("Install the \(viewModel.selectedMode.displayName) scanner package to continue.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                    Button("Install scanner") {
+                        presentScannerAssetPrompt(force: true)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .foregroundColor(.white)
+                .padding(12)
+                .background(Color.black.opacity(0.68))
+                .cornerRadius(12)
             } else if !isModeSupported {
                 Text("\(viewModel.selectedMode.displayName) scanning is coming soon.")
                     .font(.subheadline)
@@ -711,7 +737,10 @@ struct CardScannerView: View {
     @ViewBuilder
     private var captureActionControl: some View {
         if viewModel.captureMode == .binder || viewModel.triggerMode == .manual {
-            Button(action: viewModel.capturePhoto) {
+            Button {
+                guard ensureScannerPackageIsReady() else { return }
+                viewModel.capturePhoto()
+            } label: {
                 ZStack {
                     Circle()
                         .fill(Color.white.opacity(0.16))
@@ -733,6 +762,7 @@ struct CardScannerView: View {
                 isProcessingPhoto ||
                 isUnauthorized ||
                 viewModel.latestResult != nil ||
+                scannerPackageRequired ||
                 !isModeSupported ||
                 !hasEnabledScanModes
             )
@@ -959,6 +989,7 @@ struct CardScannerView: View {
 
     private func scanDemoImage() {
         guard !isProcessingPhoto else { return }
+        guard ensureScannerPackageIsReady() else { return }
         guard let image = ScannerDemoFixture.image(for: viewModel.captureMode) else {
             viewModel.errorMessage = "The bundled scanner demo fixtures are unavailable."
             return
@@ -967,6 +998,7 @@ struct CardScannerView: View {
     }
 
     private func presentPhotoPicker(_ mode: ScannerPhotoPickerMode) {
+        guard ensureScannerPackageIsReady() else { return }
         selectedPhotoItems = []
         photoPickerMode = mode
     }
@@ -1281,6 +1313,48 @@ private extension CardScannerView {
 
     var isModeSupported: Bool {
         viewModel.isModeSupported(viewModel.selectedMode)
+    }
+
+    var selectedScannerAssetGame: TCGGame? {
+        let game = viewModel.selectedMode.tcgGame
+        return ScannerAssetStore.downloadableGames.contains(game) ? game : nil
+    }
+
+    var scannerPackageRequired: Bool {
+        guard let game = selectedScannerAssetGame else { return false }
+        if case .installed = scannerAssets.installState(for: game) {
+            return false
+        }
+        return true
+    }
+
+    func ensureScannerPackageIsReady() -> Bool {
+        guard scannerPackageRequired else { return true }
+        presentScannerAssetPrompt(force: true)
+        return false
+    }
+
+    func refreshScannerAssetPrompt() async {
+        guard let game = selectedScannerAssetGame else {
+            scannerAssetPrompt = nil
+            return
+        }
+        try? await scannerAssets.refreshManifest(for: game)
+        guard !Task.isCancelled else { return }
+        presentScannerAssetPrompt(force: false)
+    }
+
+    func presentScannerAssetPrompt(force: Bool) {
+        guard let game = selectedScannerAssetGame else { return }
+        if let recommendation = ScannerAssetPromptRequest.recommended(
+            for: game,
+            installState: scannerAssets.installState(for: game),
+            updateAvailable: scannerAssets.isUpdateAvailable(game)
+        ) {
+            scannerAssetPrompt = recommendation
+        } else if force {
+            scannerAssetPrompt = nil
+        }
     }
 
     var isProcessingPhoto: Bool {

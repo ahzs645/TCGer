@@ -78,7 +78,7 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
             Config(name: "defaults+ocrTrio", enabledKeys: Self.defaultOnKeys + Self.ocrExperimentKeys),
         ]
 
-        let coordinator = CardScannerCoordinator.makeDefault()
+        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
         var outcomesByConfig: [String: [String]] = [:]
         var baselineOutcomes: [String] = []
 
@@ -137,7 +137,7 @@ final class ScannerPerfOptionsBenchmarkTests: XCTestCase {
         let frames = try collectSingleCardFrames(from: dir, cap: cap)
         XCTAssertFalse(frames.isEmpty)
 
-        let coordinator = CardScannerCoordinator.makeDefault()
+        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
         _ = await scan(frames[0].image, with: coordinator)
 
         var totals: [String: Double] = [:]

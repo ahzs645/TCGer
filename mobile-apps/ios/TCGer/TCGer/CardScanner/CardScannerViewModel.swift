@@ -99,8 +99,8 @@ final class CardScannerViewModel: ObservableObject {
     private(set) var scanScope: CardScanScope?
 
     let cameraController = CardScannerCameraController()
-    private let coordinator: CardScannerCoordinator
-    private let binderPageScanner: BinderPageScanner
+    private var coordinator: CardScannerCoordinator
+    private var binderPageScanner: BinderPageScanner
     private var environmentStore: EnvironmentStore?
     private var context: CardScannerContext?
     private let isSimulator: Bool
@@ -230,6 +230,20 @@ final class CardScannerViewModel: ObservableObject {
     deinit {
         frameConsumerTask?.cancel()
         recognitionPreparationTasks.values.forEach { $0.cancel() }
+    }
+
+    /// Rebuilds the recognition graph after a downloadable runtime is
+    /// installed, updated, or removed. Camera/session state stays intact;
+    /// only the immutable model/index strategy graph is replaced.
+    func reloadScannerAssets() {
+        recognitionPreparationTasks.values.forEach { $0.cancel() }
+        recognitionPreparationTasks.removeAll()
+        preparedRecognitionKeys.removeAll()
+        let replacement = CardScannerCoordinator.makeDefault()
+        coordinator = replacement
+        binderPageScanner = BinderPageScanner(coordinator: replacement)
+        rebuildContext()
+        prepareRecognitionInBackgroundIfPossible()
     }
 
     /// The first delivered camera frame is the readiness signal: the preview

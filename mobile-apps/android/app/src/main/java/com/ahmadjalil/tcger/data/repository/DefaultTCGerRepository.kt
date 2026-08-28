@@ -74,7 +74,6 @@ class DefaultTCGerRepository(
     private val textRecognizer: OnDeviceCardTextRecognizer,
     private val scannerAssetStore: ScannerAssetStore,
 ) : TCGerRepository {
-    @Volatile private var arcFaceRecognizer: ArcFaceCardRecognizer? = null
     private val downloadedArcFaceRecognizers = mutableMapOf<String, ArcFaceCardRecognizer>()
     @Volatile private var dinoV2Recognizer: DinoV2CardRecognizer? = null
     override suspend fun getBinders(): List<Binder> = withSource(
@@ -256,13 +255,8 @@ class DefaultTCGerRepository(
     private fun getArcFaceRecognizer(game: String): ArcFaceCardRecognizer {
         val normalized = normalizeScannerGame(game)
         val runtime = scannerAssetStore.installedRuntime(normalized)
-        if (normalized == "pokemon" && runtime == null) {
-            return arcFaceRecognizer ?: synchronized(this) {
-                arcFaceRecognizer ?: ArcFaceCardRecognizer.load(applicationContext).also { arcFaceRecognizer = it }
-            }
-        }
         requireNotNull(runtime) {
-            "Install the ${normalized.replaceFirstChar(Char::uppercase)} offline scanner model in Settings first"
+            "Install the ${normalized.replaceFirstChar(Char::uppercase)} offline scanner model first"
         }
         val existing = synchronized(downloadedArcFaceRecognizers) {
             downloadedArcFaceRecognizers[normalized]

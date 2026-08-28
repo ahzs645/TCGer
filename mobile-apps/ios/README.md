@@ -76,6 +76,12 @@ xcodebuild \
 
 Simulator names vary by installed runtime. Use `xcrun simctl list devices available` to choose one present on the machine.
 
+Release builds do not bundle game-specific scanner models or indexes. Opening
+the scanner (or switching games) loads the small R2 manifest and prompts to
+install that game's verified offline runtime. Successful installs activate in
+the open scanner; later manifest versions use the same update prompt and atomic
+rollback-safe installation path.
+
 Some scanner diagnostic tests are intentionally opt-in and report `XCTSkip` unless their documented fixture-directory environment variables are set. The deterministic unit tests run without those external recordings.
 
 ## App Store release automation

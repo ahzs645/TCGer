@@ -46,7 +46,7 @@ final class RoboflowArchiveDiagnosticTests: XCTestCase {
         let metadataStore = CardIndexMetadataStore.shared
         let rejectionGate = CardFaceRejectionGate.loadBundled()
         let collectorOCR = CollectorNumberOCR()
-        let coordinator = CardScannerCoordinator.makeDefault()
+        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
         let context = CardScannerContext.test(mode: .pokemon, engine: .localOnly)
         var measurements: [RoboflowImageMeasurement] = []
         measurements.reserveCapacity(selectedRecords.count)
