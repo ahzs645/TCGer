@@ -1,0 +1,149 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "MTG scanner image-library audit",
+    "description": "Duplicate, reprint, visual-family, split-leakage, and released-vector analysis for the Magic scanner library.",
+    "generatedAt": "2026-08-28T12:00:00-07:00",
+    "charts": [
+      {
+        "id": "family_rates",
+        "title": "Visual-family prevalence and evaluation leakage",
+        "subtitle": "Each percentage uses the relevant released-library or reused-art population shown in the table below",
+        "type": "bar",
+        "dataset": "family_rates",
+        "sourceId": "audit_metrics_sql",
+        "encodings": {
+          "x": { "field": "metric", "type": "nominal", "label": "Metric" },
+          "y": { "field": "rate", "type": "quantitative", "label": "Share", "format": "percent" }
+        },
+        "yAxisTitle": "Share",
+        "valueFormat": "percent"
+      }
+    ],
+    "sources": [
+      {
+        "id": "audit_output",
+        "label": "TCGer MTG visual-family audit output",
+        "path": ".artifacts/mtg-visual-family-audit-2026-08-28.json"
+      },
+      {
+        "id": "byte_audit",
+        "label": "TCGer Art Series reverse-face byte audit",
+        "path": ".artifacts/mtg-art-series-back-byte-audit-2026-08-28.json"
+      },
+      {
+        "id": "scryfall_bulk",
+        "label": "Pinned Scryfall default-cards bulk snapshot",
+        "href": "https://data.scryfall.io/default-cards/default-cards-20260827210541.jsonl.gz"
+      },
+      {
+        "id": "exact_print_research",
+        "label": "MTG Card Analyzer exact-print research",
+        "href": "https://github.com/dills122/MTG-Card-Analyzer/blob/master/docs/card-detection-research-spike.md"
+      },
+      {
+        "id": "fingerprint_benchmark",
+        "label": "MTG Card Analyzer visual-fingerprint benchmark",
+        "href": "https://github.com/dills122/MTG-Card-Analyzer/blob/master/docs/image-fingerprint-benchmark.md"
+      },
+      {
+        "id": "audit_metrics_sql",
+        "label": "Reproducible MTG audit metric projection",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "description": "Reviewed numerator and denominator values projected from the audit JSON.",
+          "sql": "WITH metrics(metric, numerator, denominator) AS (VALUES ('Repeated Oracle family',95699,111131),('Reused illustration family',80420,111131),('Eval rows with train illustration twin',7735,7955),('Reused-art rows with cosine twin >= 0.95',23234,80420)) SELECT metric, numerator, denominator, CAST(numerator AS REAL) / denominator AS rate FROM metrics ORDER BY rate DESC;",
+          "tables_used": ["metrics"],
+          "filters": ["Released Magic scanner export and pinned 2026-08-27 Scryfall snapshot"]
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# MTG scanner image-library audit"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "body": "## Technical summary\n\n**There are many legitimate reprints, no duplicate runtime rows or image URLs, and one high-impact duplicate-image defect.** The released Magic index contains 111,131 visible-face rows. Of those, 95,699 (86.1%) belong to repeated Oracle/rules families and 80,420 (72.4%) reuse an illustration; those entries should remain separate collection printings. However, 1,302 Art Series reverse faces form two exact-vector groups, and all 1,300 images in the largest group are byte-identical. These generic backs cannot identify the fronts and should be excluded from recognition training and gallery retrieval.\n\nThe current split scheme also leaks illustrations: 7,735 of 7,955 validation/test rows in reused-art families (97.2%) have the same illustration in training. Current catalog-only recall therefore overstates generalization to unseen artwork and real binder captures."
+      },
+      {
+        "id": "key_findings",
+        "type": "markdown",
+        "body": "## Key findings\n\n- **Catalog structure is healthy:** zero duplicate `(cardId, imageURL)` groups and zero repeated canonical image URLs.\n- **Reprints are the norm:** 22,124 repeated Oracle groups affect 95,699 rows; Forest alone has 866 visible print rows.\n- **Same-art printings are common:** 24,104 repeated illustration groups affect 80,420 rows. Among those rows, 23,234 (28.9%) have a same-illustration nearest vector twin at cosine similarity 0.95 or higher.\n- **One real duplicate defect is proven:** the largest 1,300-row Art Series reverse-face group downloaded successfully and every JPEG was exactly 21,723 bytes with the same SHA-256.\n- **The catalog has moved:** all 111,131 released rows still match the pinned source snapshot, which contains 903 additional eligible paper faces.\n- **Eight non-Art-Series vector groups cross Oracle identities:** examples include generic `Wanted!` token backs and visually indistinguishable The List/original printings. These require ambiguity handling, not forced exact-print classification."
+      },
+      {
+        "id": "family_chart",
+        "type": "chart",
+        "chartId": "family_rates"
+      },
+      {
+        "id": "chart_context",
+        "type": "markdown",
+        "body": "The first two bars describe prevalence in the full released library. The third uses only validation/test rows in repeated-illustration families; its 97.2% value is the evidence that the current per-printing partition is not a valid unseen-art evaluation. The fourth uses only rows in reused-illustration families and describes how often the deployed embedding already sees an extremely close same-art twin."
+      },
+      {
+        "id": "scope",
+        "type": "markdown",
+        "body": "## Scope, data, and definitions\n\nThe audit joins the released `CardsIndexMetadata.json` to Scryfall by canonical normal/large image URL, preserving one row per visible face. `cardId` is Scryfall's printing identity; `oracleId` groups cards with the same rules identity; `illustrationId` groups the same artwork across printings. A runtime duplicate means the same `(cardId, imageURL)` appears more than once. An exact vector collision means the released 384-dimensional int8 rows are byte-identical. A byte duplicate means independently downloaded source JPEGs have identical SHA-256 hashes."
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "body": "## Methodology\n\n1. Parse the released metadata and the pinned Scryfall bulk snapshot, excluding digital-only rows and retaining visible paper faces.\n2. Join by canonical image URL and count runtime duplicates, printing faces, Oracle families, and illustration families.\n3. Reproduce the current hash partition and measure illustration families crossing train, validation, and test.\n4. Read the released int8 vector binary, verify its count/dimension, hash vectors for exact collisions, and calculate cosine similarity within illustration families.\n5. Download all 1,300 URLs in the largest Art Series reverse-face collision group and hash their bytes.\n6. Compare the resulting failure modes with public exact-print scanners that use candidate retrieval followed by title, set, collector-number, symbol, and treatment evidence."
+      },
+      {
+        "id": "recommendations",
+        "type": "markdown",
+        "body": "## Recommended changes\n\n1. **Exclude non-identifying reverse faces.** Drop Art Series backs and other generic shared backs from identity training and retrieval, while retaining their fronts and catalog records.\n2. **Separate recognition family from collection printing.** Keep every Scryfall printing in the database, but add `oracleId`, `illustrationId`, `layout`, `setType`, `faceSide`, set code, and collector number to training/runtime provenance.\n3. **Partition by illustration family.** Use `illustrationId` as the split group when present, with a documented fallback. Do not hash only per-printing IDs.\n4. **Use a two-stage exact-print resolver.** Visual retrieval should identify an art/Oracle family; title OCR, set code, collector number, set symbol, frame, and treatment should resolve the printing. Ambiguous cases must remain Review.\n5. **Measure two tasks separately.** Report family-level Recall@K and exact-print confirmed precision/coverage on real camera sessions. Add hard-negative cohorts for same-art reprints, The List, basic lands, tokens, treatments, old frames, and cards with unreadable footers.\n6. **Use content-addressed image storage.** Physical duplicate bytes can share one blob, while catalog records continue to reference distinct printings.\n7. **Refresh the catalog/index for the 903 new rows.** A catalog change alone should not force model retraining; retrain only when real-session evaluation shows a meaningful gap."
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "body": "## Limitations and robustness\n\nThe source-image byte test covers the complete largest 1,300-row Art Series collision group, not every one of the 2,001 exact-vector collision groups. Vector equality can arise after quantization even when JPEG bytes differ. Scryfall `illustration_id` is the strongest available grouping field but may not encode every near-identical crop, frame, language, foil, or treatment relationship. This is a catalog/index audit; it does not replace a frozen real-camera binder evaluation with exact-print labels and session-disjoint captures."
+      },
+      {
+        "id": "questions",
+        "type": "markdown",
+        "body": "## Further questions\n\n- How much does family-disjoint catalog Recall@K fall after the split is corrected?\n- Which footer fields remain readable at each binder-pocket crop size and camera distance?\n- What confirmed-precision/coverage tradeoff is acceptable when exact printing evidence is absent?\n- Should tokens, art cards, oversized cards, and memorabilia be optional catalog scopes rather than default scanner classes?"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-28T12:00:00-07:00",
+    "status": "ready",
+    "datasets": {
+      "family_rates": [
+        { "metric": "Repeated Oracle family", "numerator": 95699, "denominator": 111131, "rate": 0.8611368565 },
+        { "metric": "Reused illustration family", "numerator": 80420, "denominator": 111131, "rate": 0.7236504666 },
+        { "metric": "Eval rows with train illustration twin", "numerator": 7735, "denominator": 7955, "rate": 0.9723444375 },
+        { "metric": "Reused-art rows with cosine twin >= 0.95", "numerator": 23234, "denominator": 80420, "rate": 0.2889082318 }
+      ]
+    }
+  },
+  "sources": [
+    { "id": "audit_output", "label": "TCGer MTG visual-family audit output", "path": ".artifacts/mtg-visual-family-audit-2026-08-28.json" },
+    { "id": "byte_audit", "label": "TCGer Art Series reverse-face byte audit", "path": ".artifacts/mtg-art-series-back-byte-audit-2026-08-28.json" },
+    { "id": "scryfall_bulk", "label": "Pinned Scryfall default-cards bulk snapshot", "href": "https://data.scryfall.io/default-cards/default-cards-20260827210541.jsonl.gz" },
+    { "id": "exact_print_research", "label": "MTG Card Analyzer exact-print research", "href": "https://github.com/dills122/MTG-Card-Analyzer/blob/master/docs/card-detection-research-spike.md" },
+    { "id": "fingerprint_benchmark", "label": "MTG Card Analyzer visual-fingerprint benchmark", "href": "https://github.com/dills122/MTG-Card-Analyzer/blob/master/docs/image-fingerprint-benchmark.md" },
+    {
+      "id": "audit_metrics_sql",
+      "label": "Reproducible MTG audit metric projection",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "description": "Reviewed numerator and denominator values projected from the audit JSON.",
+        "sql": "WITH metrics(metric, numerator, denominator) AS (VALUES ('Repeated Oracle family',95699,111131),('Reused illustration family',80420,111131),('Eval rows with train illustration twin',7735,7955),('Reused-art rows with cosine twin >= 0.95',23234,80420)) SELECT metric, numerator, denominator, CAST(numerator AS REAL) / denominator AS rate FROM metrics ORDER BY rate DESC;",
+        "tables_used": ["metrics"],
+        "filters": ["Released Magic scanner export and pinned 2026-08-27 Scryfall snapshot"]
+      }
+    }
+  ]
+}

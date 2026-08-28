@@ -10,6 +10,7 @@ import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 import {
   REPO_ROOT,
+  assertPhysicalScannerEntries,
   bucketName,
   cleanPrefix,
   createR2Client,
@@ -199,6 +200,7 @@ async function buildPublicationPlan({
     ) {
       throw new Error(`${description} does not match its index artifact`);
     }
+    assertPhysicalScannerEntries(artifact.entries, `${description} browser entries`);
 
     const publishedArtifact = { ...artifact };
     if (artifact.encoder === "arcface") {

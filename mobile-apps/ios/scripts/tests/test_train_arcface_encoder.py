@@ -48,6 +48,38 @@ class ArcFaceImageLibraryTests(unittest.TestCase):
     def status_writer(self, **payload):
         self.statuses.append(payload)
 
+    def test_recognition_families_share_training_label_and_partitions_are_held_out(self):
+        rows = [
+            dict(entry("print-a", "https://images.invalid/a.png", 0), recognitionFamilyId="art-shared"),
+            dict(entry("print-b", "https://images.invalid/b.png", 1), recognitionFamilyId="art-shared"),
+            dict(entry("held-out", "https://images.invalid/c.png", 2), recognitionFamilyId="art-held"),
+        ]
+
+        class Library:
+            def record_for(self, row):
+                return {
+                    "trainingEligible": True,
+                    "evaluationEligible": True,
+                    "partition": "test" if row["cardId"] == "held-out" else "train",
+                }
+
+        training, held_out = trainer.partition_indices(rows, Library())
+        self.assertEqual(training, [0, 1])
+        self.assertEqual(held_out, [2])
+        self.assertEqual(trainer.recognition_family(rows[0]), trainer.recognition_family(rows[1]))
+
+    def test_training_rejects_pokemon_pocket_catalog(self):
+        path = self.root / "pokemon.json"
+        path.write_text(json.dumps([{
+            "annIndex": 0,
+            "cardId": "A1-001",
+            "name": "Pocket card",
+            "game": "pokemon",
+            "imageURL": "https://assets.tcgdex.net/en/tcgp/A1/001/high.webp",
+        }]))
+        with self.assertRaisesRegex(ValueError, "TCG Pocket"):
+            trainer.load_entries([path])
+
     def test_cache_mapping_survives_catalog_reordering(self):
         rows = [
             entry("red-card", "https://images.invalid/red.png", 0),

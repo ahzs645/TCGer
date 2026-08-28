@@ -142,6 +142,12 @@ Required correction:
 7. retrain and reevaluate physical-only Pokémon because Pocket occupied 10.6%
    of training classes.
 
+Items 1–4 are now implemented at catalog ingestion, image-library ingestion,
+trainer loading, and all three platform publishers. A local rebuild reproduces
+19,507 physical rows with zero Pocket entries. Items 5–7 require the corrected
+model/index build and release promotion; the contaminated 98.24% result remains
+historical only.
+
 Do not filter by A/B/P set-code regex. Physical sets may use uppercase codes and
 future codes can collide.
 
@@ -176,7 +182,12 @@ The browser uses the iOS-derived ArcFace 0.60 strong-accept and 0.05 ambiguity
 margin. Its crop, shortlist, OCR, track averaging, and WASM path differ, so it
 needs its own evidence sweep and regression gate.
 
-### No production durable image release exists yet
+### First two-stage durable image release is being prepared
+
+The MTG two-stage pipeline materializes, audits, and uploads the private image
+release in a CPU Hugging Face Job, then submits the L4 child only after an
+immutable image revision exists. Until that job completes and its report is
+reviewed, the earlier mutable-source release remains the deployed baseline.
 
 The image-library and trainer hardening are implemented and tested, but the
 first complete private dataset sync/upload/pin has not occurred. The completed

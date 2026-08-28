@@ -159,6 +159,27 @@ Full runs reject a branch name or a missing image-library revision. The
 `--allow-unpinned-image-sources` switch exists only to reproduce a clearly
 identified legacy run.
 
+### Magic reprint and visual-family audit
+
+Before publishing a Magic image library or accepting catalog-only evaluation,
+join the compact runtime metadata back to the exact Scryfall bulk snapshot and
+audit reprints, reused illustrations, partition leakage, and exported-vector
+collisions:
+
+```bash
+uv run tools/scanner-image-library/audit_mtg_visual_families.py \
+  --metadata /path/to/magic/CardsIndexMetadata.json \
+  --scryfall-bulk /path/to/default-cards.jsonl.gz \
+  --vectors /path/to/CardsIndexVectors-arcface.bin \
+  --output .artifacts/mtg-visual-family-audit.json
+```
+
+Repeated Oracle or illustration identities are legitimate reprints, not rows
+to delete blindly. The audit fails them into review when the same illustration
+crosses training/evaluation partitions, a non-identifying face such as a shared
+Art Series reverse enters the index, distinct Oracle identities quantize to the
+same vector, or the runtime catalog no longer matches the reviewed source.
+
 ## Identities, additions, and split leakage
 
 `visualIdentityId` is derived from game plus stable card/artwork identity, not

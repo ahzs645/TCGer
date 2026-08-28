@@ -73,9 +73,12 @@ records into the compact `CardsIndexMetadata.json` schema:
 }
 ```
 
-Rows are assigned contiguous indices only after filtering. The physical
-Pokémon builder still needs the source-series and format fix described in
-[Decisions and known issues](decisions-and-known-issues.md).
+Rows are assigned contiguous indices only after filtering. Physical Pokémon is
+the default scanner profile and excludes `series=tcgp`, `format=pocket`, and
+`/tcgp/` image paths; `--pokemon-profile all` is collection-catalog-only.
+The normalized schema also carries `visualIdentityId`,
+`recognitionFamilyId`, `exactPrintingId`, and game-specific verification
+evidence described in [Two-stage recognition](two-stage-recognition.md).
 
 ## Durable image library
 
@@ -95,9 +98,10 @@ catalog rows into an auditable private release. It provides:
 - private Hub upload returning an immutable commit SHA.
 
 The durable cache key binds both visual identity and stable source URL. URL
-query strings do not create new sample identities. All samples for one visual
-identity receive the same deterministic train/validation/test partition, which
-prevents near-identical leakage after a catalog reorder or incremental update.
+query strings do not create new sample identities. All samples and print rows
+for one recognition family receive the same deterministic
+train/validation/test partition, which prevents same-art leakage after a
+catalog reorder or incremental update.
 
 No production image-library dataset was uploaded during this work. The tooling
 and tests are complete locally; the first full sync, provenance review, upload,
@@ -131,6 +135,10 @@ identity-level split retention, and a new A/B evaluation.
 - checkpoint compatibility checks before resume;
 - per-epoch checkpoint upload;
 - deterministic evaluation sampling;
+- one ArcFace class per recognition family instead of per printing row;
+- family-disjoint train/evaluation partitions from the durable library;
+- separate family Recall@K and exact-row retrieval diagnostics;
+- fail-closed rejection of Pokémon TCG Pocket rows;
 - no zero-vector placeholders for missing images;
 - offline extraction and verification of pinned deterministic tar shards.
 

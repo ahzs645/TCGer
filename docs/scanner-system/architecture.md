@@ -88,6 +88,8 @@ The system needs several identifiers because “card” is ambiguous:
 | `game` | Stable lowercase namespace such as `pokemon`, `magic`, or `yugioh` |
 | `cardId` | Provider/catalog identity returned to product features |
 | `visualIdentityId` | Stable artwork/face identity used for training and split assignment |
+| `recognitionFamilyId` | Visual class and split group; several exact printings may share it |
+| `exactPrintingId` | Collection printing selected by second-stage evidence |
 | `sampleId` | One concrete image sample for a visual identity |
 | `annIndex` | Contiguous row position in one exported vector shard |
 | catalog fingerprint | Hash of the ordered class-to-metadata mapping |
@@ -97,9 +99,11 @@ The system needs several identifiers because “card” is ambiguous:
 rebuilt. Catalog and visual identities must remain stable across row reorder,
 provider URL tokens, and incremental releases.
 
-Magic may have multiple visible faces for one catalog object. Yu-Gi-Oh may have
-multiple artwork images for one passcode. Those become separate visual rows
-while still resolving to the appropriate product identity.
+Magic may have multiple visible faces for one catalog object and reprints that
+share one Scryfall illustration. Yu-Gi-Oh may have multiple artwork images for
+one passcode. Those remain separate gallery rows while shared artwork maps to
+one recognition family and exact-print evidence resolves the product identity.
+See [Two-stage recognition](two-stage-recognition.md).
 
 ## Format and eligibility
 

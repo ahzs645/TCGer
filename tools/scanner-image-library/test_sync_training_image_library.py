@@ -189,6 +189,44 @@ class ImageLibraryTests(unittest.TestCase):
         self.assertTrue(evaluate)
         self.assertEqual(partition, "camera-evaluation")
 
+    def test_reprints_keep_distinct_visual_rows_but_share_family_partition(self) -> None:
+        first = {
+            "game": "magic",
+            "cardId": "printing-a",
+            "visualIdentityId": "magic:printing:printing-a:front",
+            "recognitionFamilyId": "magic:illustration:shared-art",
+        }
+        second = {
+            "game": "magic",
+            "cardId": "printing-b",
+            "visualIdentityId": "magic:printing:printing-b:front",
+            "recognitionFamilyId": "magic:illustration:shared-art",
+        }
+        first_key, first_visual = MODULE.identity_for(first, "https://example.invalid/a.jpg")
+        second_key, second_visual = MODULE.identity_for(second, "https://example.invalid/b.jpg")
+        self.assertNotEqual(first_key, second_key)
+        self.assertNotEqual(first_visual, second_visual)
+        first_family = MODULE.recognition_family_for(first, first_visual)
+        second_family = MODULE.recognition_family_for(second, second_visual)
+        self.assertEqual(first_family, second_family)
+        self.assertEqual(MODULE.split_for(first_family), MODULE.split_for(second_family))
+
+    def test_pokemon_pocket_rows_are_rejected_before_download(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            catalog = self.write_catalog(root, [{
+                "game": "pokemon",
+                "cardId": "A1-001",
+                "imageURL": "https://assets.tcgdex.net/en/tcgp/A1/001/high.webp",
+            }])
+            result = self.run_cli(
+                "sync", "--catalog", str(catalog),
+                "--output", str(root / "release"),
+                "--blob-cache", str(root / "cache"),
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("TCG Pocket", result.stderr)
+
     def test_audit_detects_tampered_blob(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

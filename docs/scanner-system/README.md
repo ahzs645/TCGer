@@ -42,6 +42,7 @@ the required encoders separately and merging calibrated candidates.
 |---|---|
 | [System architecture](architecture.md) | Runtime boundaries, data flow, identity model, and automatic versus explicit scanning |
 | [Training data and model pipeline](training-and-data-pipeline.md) | Catalog normalization, image library, Hugging Face jobs, checkpoints, evaluation, and exports |
+| [Two-stage recognition](two-stage-recognition.md) | Recognition-family labels, exact-print verification, abstention, per-game policies, and physical Pokémon scope |
 | [Release inventory](release-inventory-2026-08-27.md) | Exact model metrics, hashes, sizes, R2 versions, Hub revision, and job identifiers |
 | [Client integration and distribution](client-integration-and-distribution.md) | Web, iOS, Android, R2 object layout, download behavior, caching, and rollback |
 | [Implementation map and project history](implementation-map-and-history.md) | Source-file ownership, delivered components, data inventory, commit milestones, and local/remote state |
@@ -83,14 +84,14 @@ Supporting implementation-specific documentation remains in:
 
 ## Immediate priorities
 
-1. Remove Pokémon TCG Pocket from physical-scanner ingestion and add a
-   fail-closed invariant.
-2. Rebuild the physical-only Pokémon index at 19,507 rows and replace the web,
+1. Rebuild the physical-only Pokémon index at 19,507 rows and replace the web,
    iOS, and Android releases so the browser cannot return Pocket entries.
-3. Build and upload the first audited private image-library release, then pin
+2. Build and upload the first audited private image-library release, then pin
    its immutable revision in future jobs.
-4. Retrain and evaluate Pokémon on physical-only data; do not treat the current
+3. Retrain and evaluate Pokémon on physical-only data; do not treat the current
    98.24% Recall@1 as a physical-only metric.
+4. Evaluate the family-disjoint MTG retrain and exact-print verifier on binder
+   captures before promotion.
 5. Establish real-phone evaluation and per-game operating points before
    enabling automatic cross-game acceptance broadly.
 6. Publish a first-party game-package registry over the implemented direct-URL

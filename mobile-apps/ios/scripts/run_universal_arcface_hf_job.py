@@ -116,6 +116,13 @@ def main() -> None:
         help="Optional local trainer script; useful for immutable/pinned job bundles",
     )
     parser.add_argument(
+        "--trainer-hub-path-in-repo",
+        help=(
+            "Trainer script stored in --hub-repo at --catalog-revision. This "
+            "is the production path for an immutable code/catalog bundle."
+        ),
+    )
+    parser.add_argument(
         "--pokemon-baseline-path-in-repo",
         default="baselines/pokemon/card-embeddings-arcface-production-fp16.onnx",
         help="Production Pokemon ONNX used for paired acceptance evaluation",
@@ -266,10 +273,21 @@ def main() -> None:
     converter_path = scripts_dir / "build_universal_trainer_metadata.py"
     trainer_path = scripts_dir / "train_arcface_encoder.py"
 
+    if args.trainer_script and args.trainer_hub_path_in_repo:
+        parser.error("choose either --trainer-script or --trainer-hub-path-in-repo")
     if args.trainer_script:
         if not args.trainer_script.is_file():
             raise FileNotFoundError(f"trainer script not found: {args.trainer_script}")
         shutil.copy2(args.trainer_script, trainer_path)
+    elif args.trainer_hub_path_in_repo:
+        pinned_trainer = hf_hub_download(
+            repo_id=args.hub_repo,
+            repo_type="model",
+            revision=args.catalog_revision,
+            filename=args.trainer_hub_path_in_repo,
+            token=token,
+        )
+        shutil.copy2(pinned_trainer, trainer_path)
     else:
         download(TRAINER, trainer_path)
 
@@ -366,6 +384,7 @@ def main() -> None:
         "evaluationViewsPerCard": 3,
         "preparedCatalogs": prepared_catalogs,
         "catalogRevision": args.catalog_revision,
+        "trainerHubPathInRepo": args.trainer_hub_path_in_repo,
         "imageLibrary": (
             {
                 "repo": args.image_library_repo,

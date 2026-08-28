@@ -134,6 +134,36 @@ def identity_for(row: dict, locator: str) -> tuple[str, str]:
     return key, "vi_" + digest_text(key)[:32]
 
 
+def recognition_family_for(row: dict, visual_identity_id: str) -> str:
+    """Return the visual class/split group without collapsing catalog printings."""
+    for key in (
+        "recognitionFamilyId",
+        "recognition_family_id",
+        "illustrationId",
+        "illustration_id",
+        "artworkId",
+        "artwork_id",
+    ):
+        value = row.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return visual_identity_id
+
+
+def is_pokemon_pocket(row: dict) -> bool:
+    if str(row.get("game") or "").strip().casefold() not in {"pokemon", "pokémon"}:
+        return False
+    series = row.get("series")
+    if isinstance(series, dict):
+        series_values = (series.get("id"), series.get("name"))
+    else:
+        series_values = (series,)
+    fields = (row.get("format"), row.get("gameFormat"), *series_values)
+    if any(str(value or "").strip().casefold() in {"pocket", "tcgp"} for value in fields):
+        return True
+    return "/tcgp/" in str(row.get("imageURL") or "").casefold()
+
+
 def sample_id_for(visual_identity_id: str, source_kind: str, locator: str) -> str:
     # Strip URL fragments and queries: CDN signing/cache-busting must not create
     # a new training sample. The content hash still reports changed bytes.
@@ -143,8 +173,8 @@ def sample_id_for(visual_identity_id: str, source_kind: str, locator: str) -> st
     return "sample_" + digest_text(visual_identity_id, source_kind, locator)[:32]
 
 
-def split_for(visual_identity_id: str) -> str:
-    bucket = int(hashlib.sha256(visual_identity_id.encode()).hexdigest()[:8], 16) % 100
+def split_for(recognition_family_id: str) -> str:
+    bucket = int(hashlib.sha256(recognition_family_id.encode()).hexdigest()[:8], 16) % 100
     if bucket < 90:
         return "train"
     if bucket < 95:
@@ -280,7 +310,7 @@ def eligibility(source_kind: str, row: dict, valid: bool) -> tuple[bool, bool, s
     if not valid:
         return False, False, "invalid-or-missing-image", "quarantine"
     if source_kind == "catalog":
-        return True, True, None, split_for(str(row["visualIdentityId"]))
+        return True, True, None, split_for(str(row["recognitionFamilyId"]))
     review = capture_review(row)
     approved = bool(review.get("consent") and review.get("labelVerified") and review.get("reviewer"))
     if not approved:
@@ -451,6 +481,11 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
     for catalog in args.catalog:
         catalog_sha = sha256_bytes(catalog.read_bytes())
         for row in load_records(catalog):
+            if is_pokemon_pocket(row):
+                raise LibraryError(
+                    "physical scanner image library contains a Pokemon TCG "
+                    f"Pocket row: {row.get('cardId') or row.get('name')}"
+                )
             records.append((row, catalog, catalog_sha))
     catalog_games = {
         str(row.get("game") or "").strip().casefold()
@@ -480,7 +515,9 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
             or revision_by_key.get("*")
         )
 
-    work: list[tuple[dict, Path, str, str, str, str, str, str, str, str, str | None]] = []
+    work: list[
+        tuple[dict, Path, str, str, str, str, str, str, str, str, str, str | None]
+    ] = []
     seen_sample_ids: set[str] = set()
     for source_row, catalog, catalog_sha in records:
         source_kind = str(source_row.get("sourceKind") or args.source_kind).casefold()
@@ -488,6 +525,7 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
             raise LibraryError(f"unsupported sourceKind: {source_kind}")
         locator_kind, locator, source_locator = normalized_locator(source_row, catalog)
         identity_key, visual_id = identity_for(source_row, source_locator)
+        recognition_family_id = recognition_family_for(source_row, visual_id)
         supplied_sample_id = source_row.get("sampleId") or source_row.get("sample_id")
         sample_id = str(supplied_sample_id) if supplied_sample_id else sample_id_for(visual_id, source_kind, source_locator)
         if sample_id in seen_sample_ids:
@@ -496,20 +534,39 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
         revision = resolve_revision(catalog, str(source_row.get("game") or "").casefold())
         work.append((
             source_row, catalog, catalog_sha, source_kind, locator_kind,
-            locator, source_locator, identity_key, visual_id, sample_id, revision,
+            locator, source_locator, identity_key, visual_id,
+            recognition_family_id, sample_id, revision,
         ))
 
-    def process(item: tuple[dict, Path, str, str, str, str, str, str, str, str, str | None]) -> tuple[dict, ValidatedBlob | None]:
-        source_row, catalog, catalog_sha, source_kind, locator_kind, locator, source_locator, identity_key, visual_id, sample_id, revision = item
+    def process(item: tuple) -> tuple[dict, ValidatedBlob | None]:
+        (
+            source_row, catalog, catalog_sha, source_kind, locator_kind,
+            locator, source_locator, identity_key, visual_id,
+            recognition_family_id, sample_id, revision,
+        ) = item
         row = {
             "schemaVersion": SCHEMA_VERSION,
             "sampleId": sample_id,
             "visualIdentityId": visual_id,
             "visualIdentityKey": identity_key,
+            "recognitionFamilyId": recognition_family_id,
             "game": str(source_row.get("game")).casefold(),
             "cardId": str(source_row.get("cardId") or source_row.get("card_id")),
+            "exactPrintingId": str(
+                source_row.get("exactPrintingId")
+                or source_row.get("exact_printing_id")
+                or source_row.get("cardId")
+                or source_row.get("card_id")
+            ),
             "name": source_row.get("name"),
             "setCode": source_row.get("setCode"),
+            "collectorNumber": source_row.get("collectorNumber"),
+            "oracleId": source_row.get("oracleId"),
+            "illustrationId": source_row.get("illustrationId"),
+            "artworkId": source_row.get("artworkId"),
+            "layout": source_row.get("layout"),
+            "setType": source_row.get("setType"),
+            "faceSide": source_row.get("faceSide"),
             "sourceURL": source_locator if locator_kind == "url" else None,
             "sourcePath": source_locator if locator_kind == "file" else None,
             "provenance": provenance_for(source_row, catalog, catalog_sha, revision, source_kind),
@@ -582,7 +639,9 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
         if blob is not None:
             blobs.setdefault(blob.sha256, blob)
 
-    output_rows.sort(key=lambda value: (value["visualIdentityId"], value["sampleId"]))
+    output_rows.sort(key=lambda value: (
+        value["recognitionFamilyId"], value["visualIdentityId"], value["sampleId"]
+    ))
     valid = sum(row["status"] == "valid" for row in output_rows)
     invalid = len(output_rows) - valid
     coverage = {

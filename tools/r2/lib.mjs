@@ -148,3 +148,29 @@ export function isNotFound(error) {
     error?.$metadata?.httpStatusCode === 404
   );
 }
+
+export function isPokemonPocketScannerEntry(entry) {
+  const game = String(entry?.game ?? entry?.tcg ?? "").trim().toLowerCase();
+  if (game !== "pokemon" && game !== "pokémon") return false;
+  const series = entry?.series;
+  const fields = [
+    entry?.format,
+    entry?.gameFormat,
+    typeof series === "object" ? series?.id : series,
+    typeof series === "object" ? series?.name : undefined,
+  ];
+  if (fields.some((value) => ["pocket", "tcgp"].includes(String(value ?? "").trim().toLowerCase()))) {
+    return true;
+  }
+  return String(entry?.imageURL ?? entry?.imageUrl ?? "").toLowerCase().includes("/tcgp/");
+}
+
+export function assertPhysicalScannerEntries(entries, description = "Scanner metadata") {
+  const contaminated = entries.filter(isPokemonPocketScannerEntry);
+  if (contaminated.length > 0) {
+    const first = contaminated[0]?.cardId ?? contaminated[0]?.name ?? "unknown";
+    throw new Error(
+      `${description} contains ${contaminated.length} Pokemon TCG Pocket row(s); first=${first}`,
+    );
+  }
+}

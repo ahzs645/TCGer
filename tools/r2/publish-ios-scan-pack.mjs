@@ -9,6 +9,7 @@ import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 import {
   REPO_ROOT,
+  assertPhysicalScannerEntries,
   bucketName,
   cleanPrefix,
   createR2Client,
@@ -87,6 +88,7 @@ async function buildPlan(options) {
   if (!Array.isArray(metadata) || metadata.length === 0) {
     throw new Error("Scanner metadata must be a non-empty array");
   }
+  assertPhysicalScannerEntries(metadata, "iOS scanner metadata");
   for (const [index, entry] of metadata.entries()) {
     if (entry.annIndex !== index) {
       throw new Error(`Scanner metadata annIndex mismatch at row ${index}`);

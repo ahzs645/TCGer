@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """ArcFace student encoder for TCGer — headless Colab CLI variant.
 
-Same recipe as train-arcface-encoder-colab.ipynb (TCG-AR: one class per
-catalog card, ArcFace s=30 m=0.5, synthetic views; FastViT-T8 student, 384-d,
-iOS preprocessing contract), but with zero Drive/browser dependencies so it
-runs under `colab exec`/`colab run`. One universal encoder is trained across
-all supplied games, while its catalogs are exported as independently
-replaceable per-game shards:
+Same deployment recipe as train-arcface-encoder-colab.ipynb, but with a
+two-stage recognition objective: ArcFace learns one class per visual
+``recognitionFamilyId`` and the exported catalog retains exact-print metadata
+for a title/number/symbol verifier. This avoids teaching the visual encoder
+that two identical reprints are contradictory classes. It runs with zero
+Drive/browser dependencies under `colab exec`/`colab run`. One universal
+encoder is trained across all supplied games, while its catalogs are exported
+as independently replaceable per-game shards:
 
 - one or more catalog metadata files are supplied with repeatable `--metadata`
   arguments (the legacy /content/CardsIndexMetadata.json remains the default)
@@ -107,7 +109,10 @@ class DurableImageLibrary:
                 raise ImageCoverageError(
                     f"durable image manifest row {line_number} is not an object"
                 )
-            if row.get("status") == "valid" and row.get("trainingEligible") is True:
+            if row.get("status") == "valid" and (
+                row.get("trainingEligible") is True
+                or row.get("evaluationEligible") is True
+            ):
                 self.rows.append(row)
         self._by_source = {}
         self._by_visual_id = {}
@@ -243,6 +248,20 @@ def normalize_game(value):
     return aliases[game]
 
 
+def is_pokemon_pocket(entry) -> bool:
+    if normalize_game(entry.get("game")) != "pokemon":
+        return False
+    series = entry.get("series")
+    if isinstance(series, dict):
+        series_values = (series.get("id"), series.get("name"))
+    else:
+        series_values = (series,)
+    fields = (entry.get("format"), entry.get("gameFormat"), *series_values)
+    if any(str(value or "").strip().casefold() in {"pocket", "tcgp"} for value in fields):
+        return True
+    return "/tcgp/" in str(entry.get("imageURL") or "").casefold()
+
+
 def load_entries(metadata_paths):
     combined = []
     for metadata_path in metadata_paths:
@@ -256,6 +275,11 @@ def load_entries(metadata_paths):
             item = dict(entry)
             item["annIndex"] = len(combined)
             item["game"] = normalize_game(item.get("game"))
+            if is_pokemon_pocket(item):
+                raise ValueError(
+                    "physical scanner training metadata contains a Pokemon "
+                    f"TCG Pocket row: {item.get('cardId')}"
+                )
             combined.append(item)
     if not combined:
         raise ValueError("at least one catalog metadata entry is required")
@@ -285,6 +309,39 @@ def visual_identity(entry) -> str:
     if explicit:
         return str(explicit)
     return f'{normalize_game(entry.get("game"))}:{entry["cardId"]}'
+
+
+def recognition_family(entry) -> str:
+    """Stable visual class used by retrieval, distinct from exact printing."""
+    explicit = entry.get("recognitionFamilyId")
+    if explicit:
+        return str(explicit)
+    return visual_identity(entry)
+
+
+def partition_indices(entries, image_library):
+    """Return family-disjoint training and held-out evaluation row indexes."""
+    all_indices = list(range(len(entries)))
+    if image_library is None:
+        return all_indices, []
+    training = []
+    held_out = []
+    for index, entry in enumerate(entries):
+        row = image_library.record_for(entry)
+        if row is None:
+            raise ImageCoverageError(
+                f"durable library has no eligible image for {visual_identity(entry)}"
+            )
+        partition = str(row.get("partition") or "")
+        if row.get("trainingEligible") is True and partition == "train":
+            training.append(index)
+        if row.get("evaluationEligible") is True and partition in {
+            "validation", "test", "camera-evaluation"
+        }:
+            held_out.append(index)
+    if not training:
+        raise ImageCoverageError("durable image library contains no train partition")
+    return training, held_out
 
 
 def image_cache_key(entry) -> str:
@@ -735,6 +792,19 @@ def main():
             flush=True,
         )
     valid = list(range(len(entries)))
+    training_indices, held_out_eval_indices = partition_indices(
+        entries, durable_library
+    )
+    training_family_ids = sorted({
+        recognition_family(entries[index]) for index in training_indices
+    })
+    training_family_labels = {
+        family_id: index for index, family_id in enumerate(training_family_ids)
+    }
+    row_training_labels = {
+        index: training_family_labels[recognition_family(entries[index])]
+        for index in training_indices
+    }
     game_counts = {
         game: sum(entry["game"] == game for entry in entries)
         for game in ("pokemon", "magic", "yugioh")
@@ -772,9 +842,10 @@ def main():
         return img.crop((left, top, left + IMG_SIZE, top + IMG_SIZE))
 
     class CardViews(Dataset):
-        def __init__(self, indices, train=True, views=None):
+        def __init__(self, indices, train=True, views=None, labels=None):
             self.indices = indices
             self.train = train
+            self.labels = labels
             self.views = (
                 views if views is not None else (args.views_per_card if train else 1)
             )
@@ -800,7 +871,8 @@ def main():
             x = TF.to_tensor(contract_resize(img))
             if self.train and random.random() < 0.5:
                 x = (x + torch.randn_like(x) * random.uniform(0.005, 0.03)).clamp(0, 1)
-            return TF.normalize(x, IMNET_MEAN, IMNET_STD), i
+            label = self.labels[i] if self.labels is not None else i
+            return TF.normalize(x, IMNET_MEAN, IMNET_STD), label
 
     class Encoder(nn.Module):
         def __init__(self):
@@ -832,7 +904,7 @@ def main():
             onehot = F.one_hot(labels, self.w.shape[0]).to(cos.dtype)
             return ARC_S * (onehot * target + (1 - onehot) * cos)
 
-    model, head = Encoder().to(device), ArcFace(len(entries)).to(device)
+    model, head = Encoder().to(device), ArcFace(len(training_family_ids)).to(device)
     # The head must organize 21.8k class vectors from scratch while the
     # pretrained backbone only fine-tunes; a memorization probe showed the
     # head organizes quickly given adequate step size. 3x LR on proj+head
@@ -887,7 +959,12 @@ def main():
         print(f"resumed after epoch {ck['epoch']}", flush=True)
 
     loader = DataLoader(
-        CardViews(valid, train=True, views=training_views_per_card),
+        CardViews(
+            training_indices,
+            train=True,
+            views=training_views_per_card,
+            labels=row_training_labels,
+        ),
         batch_size=args.batch,
         shuffle=True,
         num_workers=args.workers,
@@ -940,6 +1017,10 @@ def main():
                     "config": {
                         "backbone": args.backbone,
                         "dim": EMBED_DIM,
+                        "recognitionContract": "tcger-two-stage-recognition-v1",
+                        "trainingRecognitionFamilies": len(training_family_ids),
+                        "trainingRows": len(training_indices),
+                        "heldOutEvaluationRows": len(held_out_eval_indices),
                         "trainingViewsPerCard": training_views_per_card,
                         "evaluationViewsPerCard": args.views_per_card,
                         "coverageSchema": image_coverage["schema"],
@@ -978,7 +1059,11 @@ def main():
     rng = random.Random(SEED)
     eval_indices = []
     for game in game_counts:
-        candidates = [
+        held_out_candidates = [
+            index for index in held_out_eval_indices
+            if entries[index]["game"] == game
+        ]
+        candidates = held_out_candidates or [
             index for index in valid if entries[index]["game"] == game
         ]
         rng.shuffle(candidates)
@@ -996,7 +1081,24 @@ def main():
         top_chunks.append(sims.topk(5, dim=1).indices.cpu())
     top = torch.cat(top_chunks)
     hits = glabels[top] == qlabels[:, None]
-    student = {f"recall@{k}": hits[:, :k].any(1).float().mean().item() for k in (1, 5)}
+    all_family_ids = sorted({recognition_family(entry) for entry in entries})
+    family_number = {family: index for index, family in enumerate(all_family_ids)}
+    gallery_family_labels = torch.tensor([
+        family_number[recognition_family(entries[index])] for index in valid
+    ])
+    query_family_labels = torch.tensor([
+        family_number[recognition_family(entries[eval_indices[k % len(eval_indices)]])]
+        for k in range(len(eval_indices) * args.views_per_card)
+    ])
+    family_hits = gallery_family_labels[top] == query_family_labels[:, None]
+    student = {
+        f"recall@{k}": family_hits[:, :k].any(1).float().mean().item()
+        for k in (1, 5)
+    }
+    printing_row = {
+        f"recall@{k}": hits[:, :k].any(1).float().mean().item()
+        for k in (1, 5)
+    }
     by_game = {}
     query_labels = qlabels.tolist()
     for game in game_counts:
@@ -1006,12 +1108,25 @@ def main():
         mask = torch.tensor([label in game_indices for label in query_labels])
         if mask.any():
             by_game[game] = {
-                f"recall@{k}": hits[mask, :k].any(1).float().mean().item()
+                f"recall@{k}": family_hits[mask, :k].any(1).float().mean().item()
                 for k in (1, 5)
             }
     evaluation = {
         "student": student,
+        "printingRow": printing_row,
         "byGame": by_game,
+        "evaluationProtocol": {
+            "primaryIdentity": "recognitionFamilyId",
+            "secondaryIdentity": "exactPrintingId",
+            "queryPartition": (
+                "durable-family-disjoint-held-out"
+                if held_out_eval_indices else "legacy-random-catalog-sample"
+            ),
+            "trainingRows": len(training_indices),
+            "trainingRecognitionFamilies": len(training_family_ids),
+            "heldOutEvaluationRows": len(held_out_eval_indices),
+            "abstainWhenExactPrintingIsUnresolved": True,
+        },
         "epochs": args.epochs,
         "backbone": args.backbone,
         "trainingViewsPerCard": training_views_per_card,
