@@ -35,6 +35,7 @@
     "catalogs:download": "node tools/catalogs/download-published.mjs",
     "guides:sync": "node tools/guides/sync-system-guides.mjs",
     "guides:validate": "node tools/guides/validate-system-guides.mjs",
+    "game-packages:fixture": "node tools/game-packages/serve-codex-critters.mjs",
     "pokemon:import-rarity-vectors": "node tools/pokemon/import-rarity-vectors.mjs",
     "packs:generate-wraps": "python3 scripts/generate_pack_wraps.py",
     "parity:generate": "node tools/mobile-parity/parity.mjs generate",

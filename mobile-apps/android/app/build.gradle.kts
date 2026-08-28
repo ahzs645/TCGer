@@ -61,6 +61,9 @@ android {
         "licenses/DINOv2-APACHE-2.0.txt",
         "licenses/DINOv2-NOTICE.txt",
     )
+    sourceSets.getByName("test").resources.srcDir(
+        "../../../docs/scanner-system/examples",
+    )
 }
 
 dependencies {

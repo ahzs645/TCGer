@@ -1,0 +1,77 @@
+{
+  "schema": "https://tcger.app/schemas/game-package-manifest/v1",
+  "packageVersion": "fixture-1",
+  "publishedAt": "2026-08-27T00:00:00Z",
+  "game": {
+    "id": "codex-critters",
+    "name": "Codex Critters",
+    "shortName": "Critters",
+    "description": "A fictional card game used only to verify importing, offline browsing, search, and publisher-defined filters.",
+    "accentColor": "#7C3AED"
+  },
+  "publisher": {
+    "name": "TCGer Test Fixtures"
+  },
+  "catalog": {
+    "schema": "tcger-catalog-v1",
+    "asset": {
+      "url": "./codex-critters.catalog.json",
+      "bytes": 3318,
+      "sha256": "bfa5fdf4996ba6c48b3eb2e0c18d1b99b67a681f1b0f618076eff575526ea3ea",
+      "mediaType": "application/json"
+    },
+    "cardCount": 8,
+    "setCount": 2
+  },
+  "filters": [
+    {
+      "id": "faction",
+      "label": "Faction",
+      "property": "attributes.faction",
+      "type": "multiSelect",
+      "options": [
+        { "value": "fire", "label": "Fire" },
+        { "value": "water", "label": "Water" },
+        { "value": "nature", "label": "Nature" },
+        { "value": "sky", "label": "Sky" }
+      ]
+    },
+    {
+      "id": "rarity",
+      "label": "Rarity",
+      "property": "rarity",
+      "type": "select",
+      "options": [
+        { "value": "common", "label": "Common" },
+        { "value": "uncommon", "label": "Uncommon" },
+        { "value": "rare", "label": "Rare" },
+        { "value": "epic", "label": "Epic" }
+      ]
+    },
+    {
+      "id": "cost",
+      "label": "Cost",
+      "property": "attributes.cost",
+      "type": "numberRange",
+      "min": 0,
+      "max": 7,
+      "step": 1
+    },
+    {
+      "id": "foilable",
+      "label": "Foil version",
+      "property": "attributes.foilable",
+      "type": "boolean",
+      "trueLabel": "Available",
+      "falseLabel": "Unavailable"
+    },
+    {
+      "id": "card-name",
+      "label": "Card name contains",
+      "property": "name",
+      "type": "text",
+      "mode": "contains",
+      "maxLength": 60
+    }
+  ]
+}

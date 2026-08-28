@@ -10,7 +10,14 @@ The first release makes unknown games useful for catalog download, offline stora
 2. Put game-specific scalar or array fields under `card.attributes`. Core fields such as `rarity`, `setCode`, and `artist` may remain top-level.
 3. Record the catalog's exact byte count and SHA-256 in the package manifest.
 4. Serve the manifest and assets over HTTPS. Web hosts must also return suitable CORS headers.
-5. Test with the example in [`examples/community-demo.game-package.json`](examples/community-demo.game-package.json).
+5. Start with the two-card conformance example in
+   [`examples/community-demo.game-package.json`](examples/community-demo.game-package.json),
+   then test the full import experience with the fictional
+   [Codex Critters fixture](examples/codex-critters/README.md).
+
+The Codex Critters README includes one stable HTTPS URL that can be pasted into
+web, iOS, or Android Settings. URL fields intentionally start empty; clients do
+not silently select a publisher or example package.
 
 The normative JSON Schema is [`schemas/game-package-manifest.v1.schema.json`](schemas/game-package-manifest.v1.schema.json). TypeScript runtime validation lives in `packages/api-types/src/game-packages.ts`; iOS and Android apply the same allowlists before saving anything.
 

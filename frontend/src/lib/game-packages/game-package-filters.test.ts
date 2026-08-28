@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   gamePackageManifestSchema,
@@ -35,4 +39,42 @@ test("manifest filters reject executable or unrestricted property paths", () => 
   } as const;
   assert.equal(gamePackageManifestSchema.safeParse({ ...base, filters: [{ id: "unsafe", label: "Unsafe", property: "constructor.prototype", type: "text" }] }).success, false);
   assert.equal(gamePackageManifestSchema.safeParse({ ...base, filters: [{ id: "safe", label: "Safe", property: "attributes.faction", type: "text" }] }).success, true);
+});
+
+test("Codex Critters is a complete importable unknown-game fixture", () => {
+  const fixtureDirectory = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../../../docs/scanner-system/examples/codex-critters",
+  );
+  const manifest = gamePackageManifestSchema.parse(
+    JSON.parse(readFileSync(resolve(fixtureDirectory, "codex-critters.game-package.json"), "utf8")),
+  );
+  const catalogBytes = readFileSync(resolve(fixtureDirectory, manifest.catalog.asset.url));
+  const catalog = JSON.parse(catalogBytes.toString("utf8")) as {
+    formatVersion: number;
+    tcg: string;
+    sets: unknown[];
+    cards: GamePackageCatalogCard[];
+  };
+
+  assert.equal(manifest.game.id, "codex-critters");
+  assert.equal(manifest.scanner, undefined);
+  assert.equal(manifest.offlinePacks, undefined);
+  assert.equal(catalogBytes.byteLength, manifest.catalog.asset.bytes);
+  assert.equal(createHash("sha256").update(catalogBytes).digest("hex"), manifest.catalog.asset.sha256);
+  assert.equal(catalog.formatVersion, 1);
+  assert.equal(catalog.tcg, manifest.game.id);
+  assert.equal(catalog.cards.length, manifest.catalog.cardCount);
+  assert.equal(catalog.sets.length, manifest.catalog.setCount);
+  assert.equal(new Set(catalog.cards.map((card) => card.id)).size, catalog.cards.length);
+  assert.deepEqual(new Set(manifest.filters.map((filter) => filter.type)), new Set(["select", "multiSelect", "numberRange", "boolean", "text"]));
+
+  const filtered = catalog.cards.filter((card) => matchesGamePackageFilters(card, manifest.filters, {
+    faction: ["sky"],
+    rarity: "epic",
+    cost: { min: 7, max: 7 },
+    foilable: true,
+    "card-name": "oracle",
+  }));
+  assert.deepEqual(filtered.map((card) => card.name), ["Mooncrumb Oracle"]);
 });

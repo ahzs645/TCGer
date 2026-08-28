@@ -1,0 +1,108 @@
+{
+  "formatVersion": 1,
+  "tcg": "codex-critters",
+  "version": 1,
+  "updatedAt": "2026-08-27T00:00:00Z",
+  "sets": [
+    { "code": "NEST", "name": "The First Nest" },
+    { "code": "MOON", "name": "Mooncrumb Expedition" }
+  ],
+  "cards": [
+    {
+      "id": "cc-nest-001",
+      "name": "Emberwing Forager",
+      "setCode": "NEST",
+      "collectorNumber": "001",
+      "rarity": "common",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Companion",
+      "releasedAt": "2026-01-01",
+      "attributes": { "faction": "fire", "cost": 1, "foilable": true, "keywords": ["flight", "gather"] }
+    },
+    {
+      "id": "cc-nest-002",
+      "name": "Tideglass Tinkerer",
+      "setCode": "NEST",
+      "collectorNumber": "002",
+      "rarity": "uncommon",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Inventor",
+      "releasedAt": "2026-01-01",
+      "attributes": { "faction": "water", "cost": 2, "foilable": false, "keywords": ["repair"] }
+    },
+    {
+      "id": "cc-nest-003",
+      "name": "Mossback Archivist",
+      "setCode": "NEST",
+      "collectorNumber": "003",
+      "rarity": "rare",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Scholar",
+      "releasedAt": "2026-01-01",
+      "attributes": { "faction": "nature", "cost": 3, "foilable": true, "keywords": ["archive", "grow"] }
+    },
+    {
+      "id": "cc-nest-004",
+      "name": "Dewdrop Mimic",
+      "setCode": "NEST",
+      "collectorNumber": "004",
+      "rarity": "common",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Trickster",
+      "releasedAt": "2026-01-01",
+      "attributes": { "faction": "water", "cost": 0, "foilable": false, "keywords": ["copy"] }
+    },
+    {
+      "id": "cc-moon-001",
+      "name": "Starwhisker Navigator",
+      "setCode": "MOON",
+      "collectorNumber": "001",
+      "rarity": "rare",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Explorer",
+      "releasedAt": "2026-06-01",
+      "attributes": { "faction": "sky", "cost": 4, "foilable": false, "keywords": ["navigate", "flight"] }
+    },
+    {
+      "id": "cc-moon-002",
+      "name": "Cinderpuff Duelist",
+      "setCode": "MOON",
+      "collectorNumber": "002",
+      "rarity": "epic",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Champion",
+      "releasedAt": "2026-06-01",
+      "attributes": { "faction": "fire", "cost": 5, "foilable": true, "keywords": ["duel"] }
+    },
+    {
+      "id": "cc-moon-003",
+      "name": "Rootcoil Guardian",
+      "setCode": "MOON",
+      "collectorNumber": "003",
+      "rarity": "uncommon",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Guardian",
+      "releasedAt": "2026-06-01",
+      "attributes": { "faction": "nature", "cost": 6, "foilable": true, "keywords": ["guard", "grow"] }
+    },
+    {
+      "id": "cc-moon-004",
+      "name": "Mooncrumb Oracle",
+      "setCode": "MOON",
+      "collectorNumber": "004",
+      "rarity": "epic",
+      "artist": "Fixture Generator",
+      "type": "Critter",
+      "category": "Mystic",
+      "releasedAt": "2026-06-01",
+      "attributes": { "faction": "sky", "cost": 7, "foilable": true, "keywords": ["forecast"] }
+    }
+  ]
+}

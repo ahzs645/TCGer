@@ -52,7 +52,7 @@ export function CommunityGameLibrariesPanel() {
         <p className="text-sm text-muted-foreground">Install a publisher&apos;s HTTPS GamePackageManifest. Catalogs are checksum-verified and stored offline.</p>
       </div>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://example.com/game-package.json" aria-label="Game package URL" />
+        <Input value={url} onChange={(event) => setUrl(event.target.value)} aria-label="Game package URL" />
         <Button onClick={() => void install()} disabled={busy || !url.trim()}>
           {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Install
         </Button>

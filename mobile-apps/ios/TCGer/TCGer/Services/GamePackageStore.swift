@@ -244,7 +244,7 @@ struct CommunityGameLibrariesSection: View {
 
     var body: some View {
         Section {
-            TextField("https://example.com/game-package.json", text: $packageURL)
+            TextField("Game package URL", text: $packageURL)
                 .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
             Button { Task { await store.install(from: packageURL); if store.errorMessage == nil { packageURL = "" } } } label: {
                 if store.isInstalling { ProgressView() } else { Label("Install from URL", systemImage: "square.and.arrow.down") }
