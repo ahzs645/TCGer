@@ -28,6 +28,7 @@ import com.ahmadjalil.tcger.data.scanner.ScannerRecognitionEngine
 import com.ahmadjalil.tcger.data.scanner.ScannerEncoderVariant
 import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetInstallStatus
 import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetManifest
+import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetStore
 import com.ahmadjalil.tcger.ui.packopening.PackOpeningPull
 import com.ahmadjalil.tcger.ui.packopening.PackOpeningPullSession
 import com.ahmadjalil.tcger.ui.packopening.PackOpeningSaveCheckpoint
@@ -61,6 +62,7 @@ data class AppUiState(
     val isLoadingScanDebugCaptures: Boolean = false,
     val scannerAssets: Map<String, ScannerAssetInstallStatus> = emptyMap(),
     val scannerAssetManifests: Map<String, ScannerAssetManifest> = emptyMap(),
+    val scannerSupportedGames: List<String> = ScannerAssetStore.supportedDownloadGames,
     val gamePackages: GamePackageState = GamePackageState(),
     val message: String? = null,
 ) {

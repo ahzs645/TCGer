@@ -1,5 +1,114 @@
 import SwiftUI
 
+enum ScannerInitialGameResolution: Equatable {
+    case select(ScanMode)
+    case choose(ScannerGameChoiceRequest)
+    case unavailable
+}
+
+struct ScannerGameChoiceRequest: Identifiable, Equatable {
+    let modes: [ScanMode]
+
+    var id: String { modes.map(\.rawValue).joined(separator: "|") }
+
+    static func resolve(
+        availableModes: [ScanMode],
+        requestedMode: ScanMode? = nil
+    ) -> ScannerInitialGameResolution {
+        let gameModes = availableModes.reduce(into: [ScanMode]()) { result, mode in
+            guard mode != .automatic, !result.contains(mode) else { return }
+            result.append(mode)
+        }
+        if let requestedMode, gameModes.contains(requestedMode) {
+            return .select(requestedMode)
+        }
+        switch gameModes.count {
+        case 0:
+            return .unavailable
+        case 1:
+            return .select(gameModes[0])
+        default:
+            return .choose(ScannerGameChoiceRequest(modes: gameModes))
+        }
+    }
+}
+
+struct ScannerGameChoicePrompt: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var store: ScannerAssetStore
+
+    let request: ScannerGameChoiceRequest
+    let onSelect: (ScanMode) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List(request.modes) { mode in
+                Button {
+                    onSelect(mode)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 14) {
+                        scannerIcon(for: mode.tcgGame)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(mode.tcgGame.displayName)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                            Text(packageSummary(for: mode.tcgGame))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scan \(mode.tcgGame.displayName)")
+                .accessibilityHint(packageSummary(for: mode.tcgGame))
+            }
+            .navigationTitle("Which game are you scanning?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Not now") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func packageSummary(for game: TCGGame) -> String {
+        if case .installed = store.installState(for: game) {
+            return "Scanner installed"
+        }
+        guard let manifest = store.manifests[game] else {
+            return "Scanner available to install"
+        }
+        let size = ByteCountFormatter.string(fromByteCount: Int64(manifest.downloadBytes), countStyle: .file)
+        return "\(manifest.cardCount.formatted(.number)) cards · \(size)"
+    }
+
+    @ViewBuilder
+    private func scannerIcon(for game: TCGGame) -> some View {
+        if let assetName = game.cardBackAssetName {
+            Image(assetName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 42, height: 58)
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+        } else {
+            Image(systemName: "rectangle.portrait.on.rectangle.portrait")
+                .font(.title2)
+                .frame(width: 42, height: 58)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 enum ScannerAssetPromptKind: String, Equatable {
     case install
     case update

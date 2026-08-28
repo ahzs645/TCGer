@@ -62,6 +62,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -129,6 +130,7 @@ import com.ahmadjalil.tcger.data.scanner.ScannerReferenceSetRunner
 import com.ahmadjalil.tcger.data.scanner.SavedScannerRecording
 import com.ahmadjalil.tcger.data.scanner.ScannerPriceClient
 import com.ahmadjalil.tcger.data.scanner.ScannerPriceMode
+import com.ahmadjalil.tcger.data.scanner.resolveScannerGameChoice
 import com.ahmadjalil.tcger.data.scanner.binder.PerspectiveCardCropper
 import com.ahmadjalil.tcger.data.scanner.binder.ScannerCropQuad
 import com.ahmadjalil.tcger.generated.ParityControlIDs
@@ -160,8 +162,39 @@ fun ScannerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val result = state.scanResult
-    val supportedGames = state.preferences.enabledGames.filter { it in scannerGames }.ifEmpty { listOf("pokemon") }
-    var selectedGame by remember(supportedGames) { mutableStateOf(supportedGames.first()) }
+    val supportedGames = state.scannerSupportedGames.filter { it in state.preferences.enabledGames }
+    if (supportedGames.isEmpty()) {
+        Column(Modifier.fillMaxSize()) {
+            TopAppBar(
+                title = { Text("Scan a card") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+            Box(
+                Modifier.fillMaxSize().padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "Enable at least one game with a compatible scanner in Settings.",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        }
+        return
+    }
+    val initialGameResolution = remember(supportedGames) { resolveScannerGameChoice(supportedGames) }
+    var selectedGame by rememberSaveable(supportedGames) {
+        mutableStateOf(initialGameResolution.selectedGame ?: supportedGames.first())
+    }
+    var scannerGameSelectionResolved by rememberSaveable(supportedGames) {
+        mutableStateOf(initialGameResolution.selectedGame != null)
+    }
+    var showingScannerGameChoice by rememberSaveable(supportedGames) {
+        mutableStateOf(initialGameResolution.requiresChoice)
+    }
     val optionStore = remember(context) { ScannerOptionsStore(context) }
     val sessionStore = remember(context) { ScannerSessionStore(context) }
     val developerStore = remember(context) { ScannerDeveloperAccessStore(context) }
@@ -490,6 +523,10 @@ fun ScannerScreen(
     }
 
     fun acceptCapturedImage(bytes: ByteArray, source: String, automatic: Boolean = false) {
+        if (!scannerGameSelectionResolved) {
+            showingScannerGameChoice = true
+            return
+        }
         if (!localArcFaceAvailable) {
             scannerAssetPromptGame = normalizedScannerGame
             return
@@ -828,12 +865,22 @@ fun ScannerScreen(
         }
     }
 
-    LaunchedEffect(normalizedScannerGame) {
+    LaunchedEffect(normalizedScannerGame, scannerGameSelectionResolved) {
+        if (!scannerGameSelectionResolved) return@LaunchedEffect
         suppressedScannerPromptKey = null
         viewModel.refreshScannerAssets(normalizedScannerGame)
     }
 
-    LaunchedEffect(normalizedScannerGame, scannerAssetStatus, remoteScannerManifest?.version) {
+    LaunchedEffect(
+        normalizedScannerGame,
+        scannerGameSelectionResolved,
+        scannerAssetStatus,
+        remoteScannerManifest?.version,
+    ) {
+        if (!scannerGameSelectionResolved) {
+            scannerAssetPromptGame = null
+            return@LaunchedEffect
+        }
         val promptKey = if (scannerUpdateAvailable) {
             "$normalizedScannerGame:update:${remoteScannerManifest?.version}"
         } else {
@@ -903,13 +950,18 @@ fun ScannerScreen(
                 selectedGame = selectedGame,
                 onSelectedGame = {
                     selectedGame = it
+                    scannerGameSelectionResolved = true
+                    showingScannerGameChoice = false
+                    scannerAssetPromptGame = null
+                    suppressedScannerPromptKey = null
                     updateOptions(options)
                 },
                 onCaptured = { bytes, automatic ->
                     acceptCapturedImage(bytes, if (automatic) "automatic-camera" else "camera", automatic)
                 },
                 fastCapture = options.performance[ScannerPerformanceOption.FAST_CAPTURE] ?: true,
-                automaticCapture = options.captureMode == ScannerCaptureMode.CARD &&
+                automaticCapture = scannerGameSelectionResolved &&
+                    options.captureMode == ScannerCaptureMode.CARD &&
                     options.triggerMode == ScannerTriggerMode.AUTOMATIC,
                 automaticIntervalMillis = options.boundedAutomaticIntervalMillis(capabilities.serverConfigured)
                     .let { base ->
@@ -920,8 +972,11 @@ fun ScannerScreen(
                         }
                     },
                 onPickPhoto = {
-                    if (localArcFaceAvailable) imagePicker.launch("image/*")
-                    else scannerAssetPromptGame = normalizedScannerGame
+                    when {
+                        !scannerGameSelectionResolved -> showingScannerGameChoice = true
+                        localArcFaceAvailable -> imagePicker.launch("image/*")
+                        else -> scannerAssetPromptGame = normalizedScannerGame
+                    }
                 },
                 canAdjustCrop = options.captureMode == ScannerCaptureMode.CARD && lastSourceBitmap != null,
                 onAdjustCrop = {
@@ -1007,7 +1062,38 @@ fun ScannerScreen(
         }
     }
 
-    scannerAssetPromptGame?.let { game ->
+    if (showingScannerGameChoice) {
+        AlertDialog(
+            onDismissRequest = { showingScannerGameChoice = false },
+            title = { Text("Which game are you scanning?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Choose from the scanner modules currently enabled in Settings.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    initialGameResolution.choices.forEach { game ->
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                selectedGame = game
+                                scannerGameSelectionResolved = true
+                                showingScannerGameChoice = false
+                                scannerAssetPromptGame = null
+                                suppressedScannerPromptKey = null
+                            },
+                        ) { Text(game.displayGame()) }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showingScannerGameChoice = false }) { Text("Not now") }
+            },
+        )
+    }
+
+    scannerAssetPromptGame?.takeIf { scannerGameSelectionResolved }?.let { game ->
         val status = state.scannerAssets[game] ?: ScannerAssetInstallStatus.NotInstalled
         val remote = state.scannerAssetManifests[game]
         val installed = when (status) {
@@ -1172,13 +1258,19 @@ fun ScannerScreen(
             onOptionsChanged = ::updateOptions,
             onPickPhoto = {
                 showingOptions = false
-                if (localArcFaceAvailable) imagePicker.launch("image/*")
-                else scannerAssetPromptGame = normalizedScannerGame
+                when {
+                    !scannerGameSelectionResolved -> showingScannerGameChoice = true
+                    localArcFaceAvailable -> imagePicker.launch("image/*")
+                    else -> scannerAssetPromptGame = normalizedScannerGame
+                }
             },
             onPickPhotos = {
                 showingOptions = false
-                if (localArcFaceAvailable) bulkImagePicker.launch("image/*")
-                else scannerAssetPromptGame = normalizedScannerGame
+                when {
+                    !scannerGameSelectionResolved -> showingScannerGameChoice = true
+                    localArcFaceAvailable -> bulkImagePicker.launch("image/*")
+                    else -> scannerAssetPromptGame = normalizedScannerGame
+                }
             },
             onShowDebug = { showingDebug = true },
             developerUnlocked = developerUnlocked,
@@ -1541,7 +1633,7 @@ private fun ScannerCapturePane(
         }
         item {
             Text(
-                "Fill the frame with one Pokémon, Magic, or Yu-Gi-Oh! card. Keep the title sharp and reduce glare.",
+                "Fill the frame with one ${supportedGames.joinToString(" or ") { it.displayGame() }} card. Keep the title sharp and reduce glare.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1713,8 +1805,6 @@ private fun CameraPreview(
         }
     }
 }
-
-private val scannerGames = setOf("pokemon", "magic", "yugioh")
 
 private fun formatScannerAssetBytes(bytes: Long): String = when {
     bytes <= 0L -> "preparing…"

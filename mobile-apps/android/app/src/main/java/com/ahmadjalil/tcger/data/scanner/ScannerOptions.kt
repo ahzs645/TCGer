@@ -136,6 +136,28 @@ class ScannerOptionsStore(context: Context) {
     }
 }
 
+data class ScannerGameChoiceResolution(
+    val selectedGame: String? = null,
+    val choices: List<String> = emptyList(),
+) {
+    val requiresChoice: Boolean get() = selectedGame == null && choices.size > 1
+}
+
+fun resolveScannerGameChoice(
+    availableGames: List<String>,
+    requestedGame: String? = null,
+): ScannerGameChoiceResolution {
+    val games = availableGames.distinct()
+    if (requestedGame != null && requestedGame in games) {
+        return ScannerGameChoiceResolution(selectedGame = requestedGame)
+    }
+    return when (games.size) {
+        0 -> ScannerGameChoiceResolution()
+        1 -> ScannerGameChoiceResolution(selectedGame = games.single())
+        else -> ScannerGameChoiceResolution(choices = games)
+    }
+}
+
 enum class ScannerCapabilityStatus { AVAILABLE, UNAVAILABLE, NOT_APPLICABLE }
 
 data class ScannerCapability(

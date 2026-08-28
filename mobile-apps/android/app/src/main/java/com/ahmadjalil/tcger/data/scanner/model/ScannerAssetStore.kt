@@ -326,7 +326,8 @@ class ScannerAssetStore internal constructor(
         private const val LOCAL_METADATA_FILE = "metadata.json"
         private const val MAX_ASSET_BYTES = 512_000_000L
         private const val MAX_PACK_BYTES = 1_000_000_000L
-        val supportedDownloadGames = setOf("pokemon", "magic", "yugioh")
+        /** Ordered registry of scanner adapters this app build can safely execute. */
+        val supportedDownloadGames = listOf("pokemon", "magic", "yugioh")
     }
 }
 

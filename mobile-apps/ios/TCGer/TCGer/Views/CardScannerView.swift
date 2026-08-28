@@ -143,6 +143,9 @@ struct CardScannerView: View {
     @StateObject private var viewModel = CardScannerViewModel()
     @StateObject private var scannerAssets = ScannerAssetStore.shared
     @State private var showingRecentDebugCaptures = false
+    @State private var scannerGameChoicePrompt: ScannerGameChoiceRequest?
+    @State private var pendingScannerGameChoice: ScanMode?
+    @State private var scannerGameSelectionResolved = false
     @State private var scannerAssetPrompt: ScannerAssetPromptRequest?
     @State private var photoPickerMode: ScannerPhotoPickerMode?
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
@@ -199,15 +202,17 @@ struct CardScannerView: View {
             viewModel.setAutomaticallyPresentsResults(automaticallyShowResults)
             viewModel.updateEnvironment(environmentStore)
             viewModel.updateScope(scope)
-            if scope == nil {
-                syncSelectedModeWithModules()
-                consumePendingScanMode()
+            if let scopedMode = scope?.scanMode {
+                selectScannerMode(scopedMode)
+            } else {
+                resolveInitialScannerGame(requestedMode: consumePendingScanMode())
             }
             applyBinderStartIfNeeded()
         }
         .onReceive(environmentStore.$pendingDeepLinkTab) { tab in
             guard tab == .scan, scope == nil else { return }
-            consumePendingScanMode()
+            guard let requestedMode = consumePendingScanMode() else { return }
+            selectScannerMode(requestedMode)
         }
         .onChange(of: environmentStore.authToken, initial: false) { _, _ in
             viewModel.updateEnvironment(environmentStore)
@@ -216,13 +221,13 @@ struct CardScannerView: View {
             viewModel.setAutomaticallyPresentsResults(enabled)
         }
         .onChange(of: environmentStore.enabledYugioh, initial: false) { _, _ in
-            syncSelectedModeWithModules()
+            reconcileScannerGameSelection()
         }
         .onChange(of: environmentStore.enabledMagic, initial: false) { _, _ in
-            syncSelectedModeWithModules()
+            reconcileScannerGameSelection()
         }
         .onChange(of: environmentStore.enabledPokemon, initial: false) { _, _ in
-            syncSelectedModeWithModules()
+            reconcileScannerGameSelection()
         }
         .onChange(of: scannerAssets.installedVersions, initial: false) { _, _ in
             viewModel.reloadScannerAssets()
@@ -247,6 +252,7 @@ struct CardScannerView: View {
             await refreshSessionPrices()
         }
         .task(id: viewModel.selectedMode) {
+            guard scannerGameSelectionResolved else { return }
             await refreshScannerAssetPrompt()
         }
         .photosPicker(
@@ -257,6 +263,13 @@ struct CardScannerView: View {
         )
         .sheet(item: $scannerAssetPrompt) { request in
             ScannerAssetInstallPrompt(store: scannerAssets, request: request)
+        }
+        .sheet(item: $scannerGameChoicePrompt, onDismiss: completePendingScannerGameChoice) { request in
+            ScannerGameChoicePrompt(
+                store: scannerAssets,
+                request: request,
+                onSelect: { pendingScannerGameChoice = $0 }
+            )
         }
         .onPreferenceChange(ScannerGuideFramePreferenceKey.self) { frame in
             viewModel.updateGuideFrame(frame)
@@ -525,6 +538,20 @@ struct CardScannerView: View {
                     .padding(12)
                     .background(Color.black.opacity(0.6))
                     .cornerRadius(12)
+            } else if scannerGameChoiceRequired {
+                VStack(spacing: 8) {
+                    Text("Choose which enabled game you want to scan.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                    Button("Choose game") {
+                        presentScannerGameChoice()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .foregroundColor(.white)
+                .padding(12)
+                .background(Color.black.opacity(0.68))
+                .cornerRadius(12)
             } else if scannerPackageRequired {
                 VStack(spacing: 8) {
                     Text("Install the \(viewModel.selectedMode.displayName) scanner package to continue.")
@@ -762,6 +789,7 @@ struct CardScannerView: View {
                 isProcessingPhoto ||
                 isUnauthorized ||
                 viewModel.latestResult != nil ||
+                scannerGameChoiceRequired ||
                 scannerPackageRequired ||
                 !isModeSupported ||
                 !hasEnabledScanModes
@@ -901,7 +929,7 @@ struct CardScannerView: View {
             Menu {
                 ForEach(availableScanModes) { mode in
                     Button {
-                        viewModel.selectedMode = mode
+                        selectScannerMode(mode)
                     } label: {
                         if mode == viewModel.selectedMode {
                             Label(mode.displayName, systemImage: "checkmark")
@@ -1269,10 +1297,15 @@ private extension CardScannerView {
         #endif
     }
 
-    var availableScanModes: [ScanMode] {
-        let specificModes = ScanMode.allCases.filter {
-            $0 != .automatic && environmentStore.isGameEnabled($0.tcgGame)
+    var availableGameScanModes: [ScanMode] {
+        ScannerAssetStore.downloadableGames.compactMap { game in
+            guard environmentStore.isGameEnabled(game) else { return nil }
+            return ScanMode.allCases.first { $0 != .automatic && $0.tcgGame == game }
         }
+    }
+
+    var availableScanModes: [ScanMode] {
+        let specificModes = availableGameScanModes
         let supportsAutomatic = viewModel.isModeSupported(.automatic)
         return specificModes.count > 1 && supportsAutomatic
             ? [.automatic] + specificModes
@@ -1293,22 +1326,73 @@ private extension CardScannerView {
         !availableScanModes.isEmpty
     }
 
-    func syncSelectedModeWithModules() {
-        let modes = availableScanModes
-        guard !modes.isEmpty else { return }
-        if !modes.contains(viewModel.selectedMode) {
-            viewModel.selectedMode = modes[0]
+    var scannerGameChoiceRequired: Bool {
+        scope == nil && !scannerGameSelectionResolved && availableGameScanModes.count > 1
+    }
+
+    func resolveInitialScannerGame(requestedMode: ScanMode? = nil) {
+        switch ScannerGameChoiceRequest.resolve(
+            availableModes: availableGameScanModes,
+            requestedMode: requestedMode
+        ) {
+        case .select(let mode):
+            selectScannerMode(mode)
+        case .choose(let request):
+            scannerGameSelectionResolved = false
+            scannerAssetPrompt = nil
+            scannerGameChoicePrompt = request
+        case .unavailable:
+            scannerGameSelectionResolved = false
+            scannerAssetPrompt = nil
+            scannerGameChoicePrompt = nil
         }
+    }
+
+    func reconcileScannerGameSelection() {
+        guard scope == nil else { return }
+        if scannerGameSelectionResolved, availableScanModes.contains(viewModel.selectedMode) {
+            return
+        }
+        resolveInitialScannerGame()
+    }
+
+    func selectScannerMode(_ mode: ScanMode) {
+        guard availableScanModes.contains(mode) || scope?.scanMode == mode else { return }
+        let selectionChanged = viewModel.selectedMode != mode
+        scannerGameSelectionResolved = true
+        scannerGameChoicePrompt = nil
+        scannerAssetPrompt = nil
+        viewModel.selectedMode = mode
+        if !selectionChanged {
+            Task { await refreshScannerAssetPrompt() }
+        }
+    }
+
+    func presentScannerGameChoice() {
+        switch ScannerGameChoiceRequest.resolve(availableModes: availableGameScanModes) {
+        case .select(let mode):
+            selectScannerMode(mode)
+        case .choose(let request):
+            scannerGameChoicePrompt = request
+        case .unavailable:
+            break
+        }
+    }
+
+    func completePendingScannerGameChoice() {
+        guard let mode = pendingScannerGameChoice else { return }
+        pendingScannerGameChoice = nil
+        selectScannerMode(mode)
     }
 
     /// Deep links (tcger://scan?game=…) stash the requested game under this key
     /// because the scanner may not be on screen when the URL arrives.
-    func consumePendingScanMode() {
+    func consumePendingScanMode() -> ScanMode? {
         let defaults = UserDefaults.standard
-        guard let raw = defaults.string(forKey: "scanner.pendingMode") else { return }
+        guard let raw = defaults.string(forKey: "scanner.pendingMode") else { return nil }
         defaults.removeObject(forKey: "scanner.pendingMode")
-        guard let mode = ScanMode(rawValue: raw), availableScanModes.contains(mode) else { return }
-        viewModel.selectedMode = mode
+        guard let mode = ScanMode(rawValue: raw), availableScanModes.contains(mode) else { return nil }
+        return mode
     }
 
     var isModeSupported: Bool {
@@ -1329,12 +1413,20 @@ private extension CardScannerView {
     }
 
     func ensureScannerPackageIsReady() -> Bool {
+        guard scannerGameSelectionResolved else {
+            presentScannerGameChoice()
+            return false
+        }
         guard scannerPackageRequired else { return true }
         presentScannerAssetPrompt(force: true)
         return false
     }
 
     func refreshScannerAssetPrompt() async {
+        guard scannerGameSelectionResolved else {
+            scannerAssetPrompt = nil
+            return
+        }
         guard let game = selectedScannerAssetGame else {
             scannerAssetPrompt = nil
             return

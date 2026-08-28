@@ -10,6 +10,29 @@ import org.junit.Test
 
 class ScannerOptionsAndDebugTest {
     @Test
+    fun scannerGameChoiceUsesEveryEnabledRegisteredModule() {
+        val resolution = resolveScannerGameChoice(listOf("pokemon", "magic", "future-game"))
+
+        assertTrue(resolution.requiresChoice)
+        assertEquals(listOf("pokemon", "magic", "future-game"), resolution.choices)
+    }
+
+    @Test
+    fun oneScannerModuleOrExplicitRequestBypassesChoice() {
+        assertEquals(
+            "magic",
+            resolveScannerGameChoice(listOf("magic")).selectedGame,
+        )
+        assertEquals(
+            "future-game",
+            resolveScannerGameChoice(
+                listOf("pokemon", "future-game"),
+                requestedGame = "future-game",
+            ).selectedGame,
+        )
+    }
+
+    @Test
     fun invalidImportedLanguageFallsBackToEnglish() {
         val capabilities = AndroidScannerCapabilities(serverConfigured = false)
 

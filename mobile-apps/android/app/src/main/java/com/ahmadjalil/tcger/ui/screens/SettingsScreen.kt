@@ -59,8 +59,8 @@ fun SettingsScreen(
     var signInDialog by remember { mutableStateOf(false) }
     val games = listOf("pokemon", "magic", "yugioh", "onepiece", "lorcana", "dragonball")
 
-    LaunchedEffect(Unit) {
-        listOf("pokemon", "magic", "yugioh").forEach(viewModel::refreshScannerAssets)
+    LaunchedEffect(state.scannerSupportedGames) {
+        state.scannerSupportedGames.forEach(viewModel::refreshScannerAssets)
     }
 
     LazyColumn(
@@ -159,7 +159,7 @@ fun SettingsScreen(
         }
         item {
             SettingsSection("Offline scanner models") {
-                listOf("pokemon", "magic", "yugioh").forEachIndexed { index, game ->
+                state.scannerSupportedGames.forEachIndexed { index, game ->
                     if (index > 0) {
                         androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 10.dp))
                     }
