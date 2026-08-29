@@ -1426,7 +1426,7 @@
         "status": "implemented",
         "sources": [
           "frontend/src/lib/scan/embedding-matcher.ts",
-          "frontend/public/scan-index/manifest.json"
+          "frontend/public/scan-index/README.md"
         ]
       },
       "ios": {
@@ -1454,7 +1454,7 @@
         "status": "partial",
         "sources": [
           "frontend/src/lib/scan/embedding-matcher.ts",
-          "frontend/public/scan-index/manifest.json"
+          "frontend/public/scan-index/README.md"
         ]
       },
       "ios": {
