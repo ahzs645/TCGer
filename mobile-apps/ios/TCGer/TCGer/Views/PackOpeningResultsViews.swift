@@ -16,6 +16,10 @@ struct PackOpeningNativeResultsView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
+                if session.recap != nil || !(session.packClasses ?? []).filter(\.isEvent).isEmpty {
+                    PackOpeningEventRecap(session: session)
+                }
+
                 if session.packs.count > 1, let bestPull {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("Best Pull", systemImage: "sparkles")
@@ -37,6 +41,14 @@ struct PackOpeningNativeResultsView: View {
                         HStack {
                             Text(session.packs.count == 1 ? "Your Pulls" : "Pack \(packIndex + 1)")
                                 .font(.title3.bold())
+                            if let packClass = session.packClasses?[safe: packIndex], packClass.isEvent {
+                                Text(packClass.label)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(packClass.id == "rare-pack" ? .orange : .purple)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.thinMaterial, in: .capsule)
+                            }
                             Spacer()
                             Text("\(pack.count) cards")
                                 .font(.subheadline)
@@ -74,6 +86,136 @@ struct PackOpeningNativeResultsView: View {
         case "uncommon": 2
         default: 1
         }
+    }
+}
+
+private struct PackOpeningEventRecap: View {
+    let session: PackOpeningPullSession
+
+    private var eventPacks: [PackOpeningPackClass] {
+        (session.packClasses ?? []).filter(\.isEvent)
+    }
+
+    private var rarestEvent: PackOpeningPackClass? {
+        eventPacks.max { $0.rank < $1.rank }
+    }
+
+    private var bestPull: PackOpeningPull? {
+        session.pulls.max { tierRank($0.tier) < tierRank($1.tier) }
+    }
+
+    private var shareText: String {
+        guard let rarestEvent else { return "" }
+        var parts = ["I found a \(rarestEvent.label) opening \(session.packLabel)!"]
+        if let bestPull {
+            parts.append("Best pull: \(bestPull.name) (\(bestPull.rarity)).")
+        }
+        if let recap = session.recap {
+            parts.append("\(recap.progress.totalPacks) packs opened in the TCGer minigame.")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let rarestEvent {
+                        Text("RARE PACK EVENT")
+                            .font(.caption2.bold())
+                            .tracking(1.5)
+                            .foregroundStyle(.orange)
+                        Text(rarestEvent.label)
+                            .font(.title2.bold())
+                        Text(rarestEvent.description)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Opening Progress")
+                            .font(.title3.bold())
+                    }
+                }
+                Spacer(minLength: 8)
+                if rarestEvent != nil {
+                    ShareLink(item: shareText) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .labelStyle(.iconOnly)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("Share rare pack recap")
+                }
+            }
+
+            if let recap = session.recap {
+                HStack(spacing: 8) {
+                    progressStat("Packs", value: "\(recap.progress.totalPacks)")
+                    progressStat("Set Found", value: "\(recap.progress.uniqueCards)/\(recap.progress.possibleCards)")
+                    progressStat("New", value: "+\(recap.newCards)")
+                }
+
+                ProgressView(value: recap.progress.completionPercentage, total: 100)
+                    .tint(.purple)
+                    .accessibilityLabel("Minigame set completion")
+                    .accessibilityValue("\(recap.progress.completionPercentage.formatted()) percent")
+
+                if !recap.unlockedAchievements.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(recap.unlockedAchievements) { achievement in
+                            Label("Achievement · \(achievement.title)", systemImage: "trophy.fill")
+                                .font(.caption.bold())
+                                .foregroundStyle(.orange)
+                                .accessibilityHint(achievement.description)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: rarestEvent?.id == "rare-pack"
+                    ? [Color.orange.opacity(0.2), Color.purple.opacity(0.12)]
+                    : [Color.purple.opacity(0.14), Color.blue.opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: .rect(cornerRadius: 22)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(Color.orange.opacity(rarestEvent == nil ? 0.2 : 0.45), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func progressStat(_ label: String, value: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value).font(.headline)
+            Text(label.uppercased())
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: .rect(cornerRadius: 12))
+    }
+
+    private func tierRank(_ tier: String) -> Int {
+        switch tier.lowercased() {
+        case "chase": 5
+        case "ultra": 4
+        case "rare": 3
+        case "uncommon": 2
+        default: 1
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

@@ -69,12 +69,55 @@ data class PackOpeningPullSession(
     val packLabel: String,
     val openedAt: String,
     val packs: List<List<PackOpeningPull>>,
+    val packClasses: List<PackOpeningPackClass> = emptyList(),
+    val recap: PackOpeningRecap? = null,
 ) {
     val pulls: List<PackOpeningPull> get() = packs.flatten()
     val bestPull: PackOpeningPull? get() = pulls.maxByOrNull(PackOpeningPull::tierRank)
     val tcg: String? get() = pulls.map(PackOpeningPull::tcg).distinct().singleOrNull()
     val setCode: String? get() = pulls.map(PackOpeningPull::setCode).distinct().singleOrNull()
 }
+
+@Serializable
+data class PackOpeningPackClass(
+    val id: String,
+    val label: String,
+    val probability: Double,
+    val description: String,
+) {
+    val isEvent: Boolean get() = id != "standard"
+    val rank: Int get() = when (id) {
+        "rare-pack" -> 2
+        "hit-heavy" -> 1
+        else -> 0
+    }
+}
+
+@Serializable
+data class PackOpeningAchievement(
+    val id: String,
+    val title: String,
+    val description: String,
+)
+
+@Serializable
+data class PackOpeningProgressSnapshot(
+    val totalPacks: Int,
+    val setPacks: Int,
+    val uniqueCards: Int,
+    val possibleCards: Int,
+    val completionPercentage: Double,
+    val standardPacks: Int,
+    val hitHeavyPacks: Int,
+    val rarePacks: Int,
+)
+
+@Serializable
+data class PackOpeningRecap(
+    val newCards: Int,
+    val progress: PackOpeningProgressSnapshot,
+    val unlockedAchievements: List<PackOpeningAchievement>,
+)
 
 data class PackOpeningSaveCheckpoint(
     val savedPullCount: Int = 0,
@@ -90,11 +133,9 @@ data class PackOpeningSaveOutcome(
 
 fun SealedInventoryItem.canRecordOpening(session: PackOpeningPullSession): Boolean {
     val productType = product.productType.lowercase()
-    val sessionTcg = session.tcg ?: return false
-    val sessionSetCode = session.setCode ?: return false
     return "booster" in productType && "box" !in productType &&
-        product.tcg.equals(sessionTcg, ignoreCase = true) &&
-        product.setCode?.equals(sessionSetCode, ignoreCase = true) == true &&
+        (session.tcg == null || product.tcg.equals(session.tcg, ignoreCase = true)) &&
+        (session.setCode == null || product.setCode?.equals(session.setCode, ignoreCase = true) == true) &&
         quantity >= session.packs.size
 }
 

@@ -35,6 +35,9 @@ class PackOpeningBridgeDecoderTest {
         assertEquals("opening-1", event.session.id)
         assertEquals(2, event.session.pulls.size)
         assertEquals("Charizard", event.session.bestPull?.name)
+        assertEquals("God Pack", event.session.packClasses.single().label)
+        assertEquals(36, event.session.recap?.progress?.totalPacks)
+        assertEquals("packs-36", event.session.recap?.unlockedAchievements?.single()?.id)
     }
 
     @Test
@@ -131,7 +134,9 @@ class PackOpeningBridgeDecoderTest {
         }""".trimIndent()
         val sessionJSON = """{
           "id":"opening-1","packLabel":"Base Set · Charizard wrapper","openedAt":"2026-08-26T00:00:00Z",
-          "packs":[[$pullOne,$pullTwo]]
+          "packs":[[$pullOne,$pullTwo]],
+          "packClasses":[{"id":"rare-pack","label":"God Pack","probability":0.01,"description":"Every card is rare or better."}],
+          "recap":{"newCards":2,"progress":{"totalPacks":36,"setPacks":4,"uniqueCards":8,"possibleCards":12,"completionPercentage":66.7,"standardPacks":34,"hitHeavyPacks":1,"rarePacks":1},"unlockedAchievements":[{"id":"packs-36","title":"Booster Box","description":"Opened 36 packs."}]}
         }""".trimIndent()
         val nativeStateJSON = """{
           "type":"nativeState",

@@ -222,7 +222,31 @@ final class PackOpeningResourceTests: XCTestCase {
                     "setName": "Evolving Skies",
                     "imageUrl": "https://example.com/high.webp",
                     "imageUrlSmall": "https://example.com/low.webp"
-                ]]]
+                ]]],
+                "packClasses": [[
+                    "id": "rare-pack",
+                    "label": "God Pack",
+                    "probability": 0.01,
+                    "description": "Every card is rare or better."
+                ]],
+                "recap": [
+                    "newCards": 1,
+                    "progress": [
+                        "totalPacks": 36,
+                        "setPacks": 4,
+                        "uniqueCards": 8,
+                        "possibleCards": 24,
+                        "completionPercentage": 33.3,
+                        "standardPacks": 34,
+                        "hitHeavyPacks": 1,
+                        "rarePacks": 1
+                    ],
+                    "unlockedAchievements": [[
+                        "id": "packs-36",
+                        "title": "Booster Box",
+                        "description": "Opened 36 packs."
+                    ]]
+                ]
             ]
         ]
 
@@ -231,6 +255,9 @@ final class PackOpeningResourceTests: XCTestCase {
         XCTAssertEqual(session?.packs.count, 1)
         XCTAssertEqual(session?.pulls.first?.card.id, "swsh7-44")
         XCTAssertEqual(session?.setCode, "swsh7")
+        XCTAssertEqual(session?.packClasses?.first?.label, "God Pack")
+        XCTAssertEqual(session?.recap?.progress.totalPacks, 36)
+        XCTAssertEqual(session?.recap?.unlockedAchievements.first?.id, "packs-36")
         XCTAssertEqual(
             Set(session?.resultArtworkURLs.map(\.absoluteString) ?? []),
             ["https://example.com/low.webp", "https://example.com/high.webp"]

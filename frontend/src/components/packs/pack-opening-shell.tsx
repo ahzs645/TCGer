@@ -17,7 +17,9 @@ import {
   PackageOpen,
   RefreshCw,
   RotateCcw,
+  Share2,
   Sparkles,
+  Trophy,
   Trash2,
   WifiOff,
 } from "lucide-react";
@@ -653,6 +655,13 @@ function PackResultSummary({ session }: { session: PackOpeningPullSession }) {
     (total, pack) => total + pack.length,
     0,
   );
+  const rarestEvent = (session.packClasses ?? [])
+    .filter((packClass) => packClass.id !== "standard")
+    .sort(
+      (a, b) =>
+        ({ standard: 0, "hit-heavy": 1, "rare-pack": 2 })[b.id] -
+        { standard: 0, "hit-heavy": 1, "rare-pack": 2 }[a.id],
+    )[0];
   return (
     <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-3 rounded-2xl border bg-background/85 p-3 shadow-lg backdrop-blur-xl sm:max-w-md">
       <BadgeCheck
@@ -664,6 +673,7 @@ function PackResultSummary({ session }: { session: PackOpeningPullSession }) {
         <p className="truncate text-xs text-muted-foreground">
           {session.packs.length} {session.packs.length === 1 ? "pack" : "packs"}{" "}
           · {cardCount} cards
+          {rarestEvent ? ` · ${rarestEvent.label}` : ""}
         </p>
       </div>
     </div>
@@ -969,6 +979,12 @@ function PackResults({
       {/* The top bar carries the opening's summary, so the scroll area only
           starts below it — the same split the iOS results view uses. */}
       <div className="mx-auto w-full max-w-5xl space-y-8 px-4 pb-44 pt-24 sm:px-6 sm:pt-28">
+        {session.recap ||
+        (session.packClasses ?? []).some(
+          (packClass) => packClass.id !== "standard",
+        ) ? (
+          <OpeningEventRecap session={session} />
+        ) : null}
         {session.packs.length > 1 && bestPullIndex >= 0 ? (
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 text-lg font-bold text-amber-600 dark:text-amber-400">
@@ -996,6 +1012,10 @@ function PackResults({
                   {session.packs.length === 1
                     ? "Your Pulls"
                     : `Pack ${packIndex + 1}`}
+                  {session.packClasses?.[packIndex]?.id !== "standard" &&
+                  session.packClasses?.[packIndex]
+                    ? ` · ${session.packClasses[packIndex].label}`
+                    : ""}
                 </h3>
                 <span className="shrink-0 text-sm text-muted-foreground">
                   {pack.length} cards
@@ -1015,6 +1035,151 @@ function PackResults({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function OpeningEventRecap({ session }: { session: PackOpeningPullSession }) {
+  const [shareStatus, setShareStatus] = useState("");
+  const eventPacks = (session.packClasses ?? []).filter(
+    (packClass) => packClass.id !== "standard",
+  );
+  const rarestEvent = [...eventPacks].sort(
+    (a, b) =>
+      ({ standard: 0, "hit-heavy": 1, "rare-pack": 2 })[b.id] -
+      { standard: 0, "hit-heavy": 1, "rare-pack": 2 }[a.id],
+  )[0];
+  const recap = session.recap;
+
+  const shareRecap = async () => {
+    if (!rarestEvent) return;
+    const pulls = session.packs.flat();
+    const bestPull = pulls.reduce<PackOpeningPull | undefined>(
+      (best, pull) =>
+        !best || tierRank(pull.tier) > tierRank(best.tier) ? pull : best,
+      undefined,
+    );
+    const text = [
+      `I found a ${rarestEvent.label} opening ${session.packLabel}!`,
+      bestPull ? `Best pull: ${bestPull.name} (${bestPull.rarity}).` : "",
+      recap
+        ? `${recap.progress.totalPacks} packs opened in the TCGer minigame.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Rare pack recap", text });
+        setShareStatus("Shared");
+      } else {
+        await navigator.clipboard.writeText(text);
+        setShareStatus("Copied");
+      }
+    } catch {
+      setShareStatus("");
+    }
+  };
+
+  return (
+    <section
+      className={cn(
+        "rounded-3xl border p-4 shadow-sm sm:p-5",
+        rarestEvent?.id === "rare-pack"
+          ? "border-amber-300/70 bg-gradient-to-br from-amber-100/85 via-background to-fuchsia-100/70 dark:from-amber-950/65 dark:to-fuchsia-950/45"
+          : rarestEvent
+            ? "border-violet-300/60 bg-gradient-to-br from-violet-100/80 via-background to-sky-100/60 dark:from-violet-950/55 dark:to-sky-950/35"
+            : "bg-muted/45",
+      )}
+      aria-label="Opening minigame recap"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          {rarestEvent ? (
+            <>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+                Rare pack event
+              </p>
+              <h3 className="mt-1 text-2xl font-bold">{rarestEvent.label}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {eventPacks.length > 1
+                  ? `${eventPacks.length} special packs · `
+                  : ""}
+                {rarestEvent.description}
+              </p>
+            </>
+          ) : (
+            <h3 className="text-lg font-bold">Opening progress</h3>
+          )}
+        </div>
+        {rarestEvent ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void shareRecap()}
+          >
+            <Share2 className="mr-2 h-4 w-4" aria-hidden="true" />
+            {shareStatus || "Share"}
+          </Button>
+        ) : null}
+      </div>
+
+      {recap ? (
+        <>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <OpeningProgressStat
+              label="Packs"
+              value={recap.progress.totalPacks}
+            />
+            <OpeningProgressStat
+              label="Set found"
+              value={`${recap.progress.uniqueCards}/${recap.progress.possibleCards}`}
+            />
+            <OpeningProgressStat label="New" value={`+${recap.newCards}`} />
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-foreground/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-500 via-violet-500 to-amber-400"
+              style={{ width: `${recap.progress.completionPercentage}%` }}
+            />
+          </div>
+          <p className="mt-1 text-right text-xs text-muted-foreground">
+            {recap.progress.completionPercentage}% minigame set complete
+          </p>
+          {recap.unlockedAchievements.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {recap.unlockedAchievements.map((achievement) => (
+                <span
+                  key={achievement.id}
+                  title={achievement.description}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/45 bg-amber-300/15 px-3 py-1 text-xs font-bold text-amber-800 dark:text-amber-200"
+                >
+                  <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
+                  Achievement · {achievement.title}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function OpeningProgressStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl bg-background/70 px-2 py-2.5">
+      <p className="text-lg font-bold">{value}</p>
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+        {label}
+      </p>
     </div>
   );
 }

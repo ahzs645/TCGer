@@ -65,6 +65,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -989,6 +990,9 @@ private fun PackOpeningResults(
             .padding(top = 104.dp).padding(bottom = contentPadding.calculateBottomPadding() + 84.dp)
             .testTag(PackOpeningTestTags.RESULTS),
     ) {
+        if (session.recap != null || session.packClasses.any(PackOpeningPackClass::isEvent)) {
+            PackOpeningEventRecap(session)
+        }
         if (session.packs.size > 1) session.bestPull?.let { best ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Casino, contentDescription = null, tint = Color(0xFFE09500))
@@ -1016,13 +1020,112 @@ private fun PackOpeningResults(
                     )
                     Text(pull.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        if (session.packs.size > 1) "Pack ${pack + 1} · ${pull.rarity}" else pull.rarity,
+                        buildString {
+                            if (session.packs.size > 1) append("Pack ${pack + 1} · ")
+                            session.packClasses.getOrNull(pack)?.takeIf(PackOpeningPackClass::isEvent)?.let {
+                                append("${it.label} · ")
+                            }
+                            append(pull.rarity)
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = tierColor(pull.tier),
                         maxLines = 1,
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PackOpeningEventRecap(session: PackOpeningPullSession) {
+    val context = LocalContext.current
+    val events = session.packClasses.filter(PackOpeningPackClass::isEvent)
+    val rarestEvent = events.maxByOrNull(PackOpeningPackClass::rank)
+    val recap = session.recap
+    val shareText = remember(session, rarestEvent, recap) {
+        buildString {
+            if (rarestEvent != null) {
+                append("I found a ${rarestEvent.label} opening ${session.packLabel}!")
+                session.bestPull?.let { append(" Best pull: ${it.name} (${it.rarity}).") }
+                recap?.let { append(" ${it.progress.totalPacks} packs opened in the TCGer minigame.") }
+            }
+        }
+    }
+
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when (rarestEvent?.id) {
+                "rare-pack" -> Color(0xFFFFF2CC)
+                "hit-heavy" -> MaterialTheme.colorScheme.tertiaryContainer
+                else -> MaterialTheme.colorScheme.surfaceContainer
+            },
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    if (rarestEvent != null) {
+                        Text(
+                            "RARE PACK EVENT",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF9A5B00),
+                        )
+                        Text(rarestEvent.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(rarestEvent.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Text("Opening Progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (rarestEvent != null) {
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Rare pack recap")
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share rare pack recap"))
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share rare pack recap")
+                    }
+                }
+            }
+            if (recap != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OpeningProgressStat("Packs", recap.progress.totalPacks.toString(), Modifier.weight(1f))
+                    OpeningProgressStat(
+                        "Set Found",
+                        "${recap.progress.uniqueCards}/${recap.progress.possibleCards}",
+                        Modifier.weight(1f),
+                    )
+                    OpeningProgressStat("New", "+${recap.newCards}", Modifier.weight(1f))
+                }
+                LinearProgressIndicator(
+                    progress = { (recap.progress.completionPercentage / 100.0).toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                recap.unlockedAchievements.forEach { achievement ->
+                    Text(
+                        "🏆 Achievement · ${achievement.title}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF9A5B00),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OpeningProgressStat(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(modifier, shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.68f)) {
+        Column(Modifier.padding(vertical = 8.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
