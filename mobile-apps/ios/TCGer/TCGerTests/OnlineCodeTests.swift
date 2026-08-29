@@ -15,6 +15,8 @@ final class OnlineCodeTests: XCTestCase {
         let url = "https://pokemon.com/redeem?2d_code=\(code)"
         XCTAssertEqual(OnlineCodeParser.canonicalCode(url), code)
         XCTAssertEqual(OnlineCodeParser.parse("\(url)\n\(code)"), [code])
+        XCTAssertEqual(OnlineCodeGameDetector.detect(from: url), .pokemon)
+        XCTAssertEqual(OnlineCodeGameDetector.detect(from: code), .pokemon)
     }
 
     func testLiveTextExtractsMTGArenaCodesWithoutCapturingCardCopy() {
@@ -23,6 +25,17 @@ final class OnlineCodeTests: XCTestCase {
             OnlineCodeParser.extractCandidates(from: text),
             ["ABC12-3DE45-FG678-9HIJK-LM012"]
         )
+        XCTAssertEqual(
+            OnlineCodeGameDetector.detect(from: "ABC12-3DE45-FG678-9HIJK-LM012"),
+            .magic
+        )
+        XCTAssertEqual(
+            OnlineCodeGameDetector.detect(
+                from: "https://magic.wizards.com/en/mtgarena/redeem"
+            ),
+            .magic
+        )
+        XCTAssertNil(OnlineCodeGameDetector.detect(from: "PLAYBRO"))
         XCTAssertTrue(OnlineCodeParser.extractCandidates(from: "THANKS-FOR-COMING").isEmpty)
     }
 
