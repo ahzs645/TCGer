@@ -140,6 +140,7 @@ struct CardScannerView: View {
     @AppStorage("binderScanner.replacePageImages") private var replacesBinderPageImages = true
     @AppStorage("scanner.sharedSessionCode") private var sharedSessionCode = ""
     @AppStorage("scanner.defaultLanguage") private var assumedScanLanguage = "English"
+    @AppStorage("scanner.lastSelectedMode") private var lastSelectedScannerModeRaw = ""
     @StateObject private var viewModel = CardScannerViewModel()
     @StateObject private var scannerAssets = ScannerAssetStore.shared
     @State private var showingRecentDebugCaptures = false
@@ -1332,9 +1333,16 @@ private extension CardScannerView {
     }
 
     func resolveInitialScannerGame(requestedMode: ScanMode? = nil) {
+        let savedMode = ScanMode(rawValue: lastSelectedScannerModeRaw)
+        if let preferredMode = requestedMode ?? savedMode,
+           availableScanModes.contains(preferredMode) {
+            selectScannerMode(preferredMode)
+            return
+        }
+
         switch ScannerGameChoiceRequest.resolve(
             availableModes: availableGameScanModes,
-            requestedMode: requestedMode
+            requestedMode: nil
         ) {
         case .select(let mode):
             selectScannerMode(mode)
@@ -1364,6 +1372,7 @@ private extension CardScannerView {
         scannerGameChoicePrompt = nil
         scannerAssetPrompt = nil
         viewModel.selectedMode = mode
+        lastSelectedScannerModeRaw = mode.rawValue
         if !selectionChanged {
             Task { await refreshScannerAssetPrompt() }
         }

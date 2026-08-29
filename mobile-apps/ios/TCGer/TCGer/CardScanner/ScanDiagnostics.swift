@@ -59,6 +59,7 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         case uncertainSeparatedCandidates
         case uncertainNearTieExcluded
         case uncertainReviewRequired
+        case printingSelectionRequired
         case noCoordinatorMatch
     }
 
@@ -322,6 +323,7 @@ nonisolated struct ScanEvidenceRecord: Codable {
     let originalImageFile: String?
     let source: String
     let mode: String
+    let captureMode: String?
     let elapsedMs: Double
     let outcome: String
     let attempts: [ScanDiagnostics.Attempt]

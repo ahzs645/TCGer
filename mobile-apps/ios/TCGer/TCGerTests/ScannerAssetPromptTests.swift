@@ -21,6 +21,26 @@ final class ScannerAssetPromptTests: XCTestCase {
         )
     }
 
+    func testSavedGameRequestBypassesChoiceWhenStillEnabled() {
+        XCTAssertEqual(
+            ScannerGameChoiceRequest.resolve(
+                availableModes: [.pokemon, .mtg, .yugioh],
+                requestedMode: .mtg
+            ),
+            .select(.mtg)
+        )
+    }
+
+    func testUnavailableSavedGameStillRequestsChoice() {
+        XCTAssertEqual(
+            ScannerGameChoiceRequest.resolve(
+                availableModes: [.pokemon, .yugioh],
+                requestedMode: .mtg
+            ),
+            .choose(ScannerGameChoiceRequest(modes: [.pokemon, .yugioh]))
+        )
+    }
+
     func testSingleEnabledScannerModuleDoesNotAskRedundantQuestion() {
         XCTAssertEqual(
             ScannerGameChoiceRequest.resolve(availableModes: [.mtg]),

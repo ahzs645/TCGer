@@ -129,10 +129,13 @@ import com.ahmadjalil.tcger.data.scanner.ScannerReferenceSet
 import com.ahmadjalil.tcger.data.scanner.ScannerReferenceSetRunner
 import com.ahmadjalil.tcger.data.scanner.SavedScannerRecording
 import com.ahmadjalil.tcger.data.scanner.ScannerPriceClient
+import com.ahmadjalil.tcger.data.scanner.ScannerSharedSessionClient
+import com.ahmadjalil.tcger.data.scanner.BinderPagePhotoStore
 import com.ahmadjalil.tcger.data.scanner.ScannerPriceMode
 import com.ahmadjalil.tcger.data.scanner.resolveScannerGameChoice
 import com.ahmadjalil.tcger.data.scanner.binder.PerspectiveCardCropper
 import com.ahmadjalil.tcger.data.scanner.binder.ScannerCropQuad
+import com.ahmadjalil.tcger.data.scanner.binder.BinderPageQuadDetector
 import com.ahmadjalil.tcger.generated.ParityControlIDs
 import com.ahmadjalil.tcger.generated.ParityFeatureIDs
 import com.ahmadjalil.tcger.ui.AppUiState
@@ -185,22 +188,48 @@ fun ScannerScreen(
         }
         return
     }
-    val initialGameResolution = remember(supportedGames) { resolveScannerGameChoice(supportedGames) }
-    var selectedGame by rememberSaveable(supportedGames) {
+    val optionStore = remember(context) { ScannerOptionsStore(context) }
+    val lastSelectedScannerGame = remember(optionStore, supportedGames) {
+        optionStore.loadLastSelectedGame()?.takeIf(supportedGames::contains)
+    }
+    val initialGameResolution = remember(
+        supportedGames,
+        lastSelectedScannerGame,
+        state.preferences.defaultGame,
+    ) {
+        resolveScannerGameChoice(
+            supportedGames,
+            lastSelectedScannerGame ?: state.preferences.defaultGame,
+        )
+    }
+    var selectedGame by rememberSaveable(
+        supportedGames,
+        lastSelectedScannerGame,
+        state.preferences.defaultGame,
+    ) {
         mutableStateOf(initialGameResolution.selectedGame ?: supportedGames.first())
     }
-    var scannerGameSelectionResolved by rememberSaveable(supportedGames) {
+    var scannerGameSelectionResolved by rememberSaveable(
+        supportedGames,
+        lastSelectedScannerGame,
+        state.preferences.defaultGame,
+    ) {
         mutableStateOf(initialGameResolution.selectedGame != null)
     }
-    var showingScannerGameChoice by rememberSaveable(supportedGames) {
+    var showingScannerGameChoice by rememberSaveable(
+        supportedGames,
+        lastSelectedScannerGame,
+        state.preferences.defaultGame,
+    ) {
         mutableStateOf(initialGameResolution.requiresChoice)
     }
-    val optionStore = remember(context) { ScannerOptionsStore(context) }
     val sessionStore = remember(context) { ScannerSessionStore(context) }
     val developerStore = remember(context) { ScannerDeveloperAccessStore(context) }
     val recordingSessionStore = remember(context) { ScannerRecordingSessionStore(context) }
     val attemptImageStore = remember(context) { ScannerAttemptImageStore(context) }
+    val binderPagePhotoStore = remember(context) { BinderPagePhotoStore(context) }
     val scannerPriceClient = remember { ScannerPriceClient() }
+    val sharedSessionClient = remember { ScannerSharedSessionClient() }
     var options by remember { mutableStateOf(optionStore.load()) }
     var sessionEntries by remember { mutableStateOf(sessionStore.load()) }
     var developerUnlocked by remember { mutableStateOf(developerStore.isUnlocked()) }
@@ -258,6 +287,7 @@ fun ScannerScreen(
     var quadEditorBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var editingBinderPage by remember { mutableStateOf(false) }
     var binderPocketJpegs by remember { mutableStateOf<List<ByteArray>>(emptyList()) }
+    var pendingBinderPageJpeg by remember { mutableStateOf<ByteArray?>(null) }
     var binderPocketReviews by remember { mutableStateOf<List<BinderPocketReview>>(emptyList()) }
     var binderRecognitionRunning by remember { mutableStateOf(false) }
     var showingBinderReview by remember { mutableStateOf(false) }
@@ -315,6 +345,29 @@ fun ScannerScreen(
                         if (it.id == entry.id) it.copy(price = quote.price, currency = quote.currency, priceSource = quote.source) else it
                     },
                 )
+            }
+        }
+    }
+
+    fun syncSharedSession(entries: List<ScannerSessionEntry>) {
+        val code = options.sharedSessionCode.trim()
+        val token = state.preferences.authToken
+        if (entries.isEmpty() || code.isEmpty()) return
+        if (state.preferences.serverUrl.isBlank() || token.isNullOrBlank()) {
+            ioMessage = "Shared web sessions require a configured, signed-in server."
+            return
+        }
+        scope.launch {
+            entries.forEach { entry ->
+                runCatching {
+                    sharedSessionClient.send(
+                        serverUrl = state.preferences.serverUrl,
+                        authToken = token,
+                        code = code,
+                        entry = entry,
+                        language = options.language,
+                    )
+                }.onFailure { ioMessage = it.message ?: "Could not sync the scan to the shared session." }
             }
         }
     }
@@ -527,10 +580,6 @@ fun ScannerScreen(
             showingScannerGameChoice = true
             return
         }
-        if (!localArcFaceAvailable) {
-            scannerAssetPromptGame = normalizedScannerGame
-            return
-        }
         if (automatic || options.captureMode == ScannerCaptureMode.CARD) {
             if (!automatic) {
                 scope.launch {
@@ -548,7 +597,12 @@ fun ScannerScreen(
             runCatching { withContext(Dispatchers.Default) { decodeUprightScannerBitmap(bytes) } }
                 .onSuccess { bitmap ->
                     lastSourceBitmap = bitmap
-                    lastSourceQuad = ScannerCropQuad.centered(bitmap.width, bitmap.height)
+                    lastSourceQuad = if (options.captureMode == ScannerCaptureMode.BINDER) {
+                        BinderPageQuadDetector.detect(bitmap)?.quad
+                            ?: ScannerCropQuad.fromBounds(0.035f, 0.035f, 0.965f, 0.965f)
+                    } else {
+                        ScannerCropQuad.centered(bitmap.width, bitmap.height)
+                    }
                     editingBinderPage = true
                     quadEditorBitmap = bitmap
                 }
@@ -789,7 +843,9 @@ fun ScannerScreen(
             val update = autoConsensus.observe(top?.card?.id, top?.card?.name)
             consensusUpdate = update
             if (update.confirmed && top != null) {
-                fetchSessionPrices(addToSession(listOf(top), result.source))
+                val created = addToSession(listOf(top), result.source)
+                fetchSessionPrices(created)
+                syncSharedSession(created)
                 showingResult = options.automaticallyShowResults
             } else {
                 showingResult = false
@@ -798,7 +854,9 @@ fun ScannerScreen(
             autoConsensus.reset()
             consensusUpdate = null
             val sessionCandidates = if (lastCaptureSource == "bulk-photo-library") result.candidates else listOfNotNull(top)
-            fetchSessionPrices(addToSession(sessionCandidates, result.source))
+            val created = addToSession(sessionCandidates, result.source)
+            fetchSessionPrices(created)
+            syncSharedSession(created)
             showingResult = options.automaticallyShowResults || ParityTestMode.isEnabled
         }
     }
@@ -873,6 +931,7 @@ fun ScannerScreen(
 
     LaunchedEffect(normalizedScannerGame, scannerGameSelectionResolved) {
         if (!scannerGameSelectionResolved) return@LaunchedEffect
+        optionStore.saveLastSelectedGame(selectedGame)
         suppressedScannerPromptKey = null
         viewModel.refreshScannerAssets(normalizedScannerGame)
     }
@@ -980,8 +1039,7 @@ fun ScannerScreen(
                 onPickPhoto = {
                     when {
                         !scannerGameSelectionResolved -> showingScannerGameChoice = true
-                        localArcFaceAvailable -> imagePicker.launch("image/*")
-                        else -> scannerAssetPromptGame = normalizedScannerGame
+                        else -> imagePicker.launch("image/*")
                     }
                 },
                 canAdjustCrop = options.captureMode == ScannerCaptureMode.CARD && lastSourceBitmap != null,
@@ -1041,7 +1099,7 @@ fun ScannerScreen(
                     }
                 }
                 items(result.candidates, key = { it.card.id }) { candidate ->
-                    CatalogCardRow(candidate.card) {
+                    CatalogCardRow(candidate.card, showCardNumbers = state.preferences.showCardNumbers) {
                         Column(horizontalAlignment = Alignment.End) {
                             candidate.confidence?.let {
                                 Text("${(it * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
@@ -1126,19 +1184,19 @@ fun ScannerScreen(
                     scannerAssetPromptGame = null
                 }
             },
-            title = { Text(if (isUpdate) "Scanner update available" else "Install before scanning") },
+            title = { Text(if (isUpdate) "Scanner update available" else "Install offline scanner model") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         if (isUpdate) {
                             "A newer ${game.displayGame()} recognition package is available. You can keep using the installed version if you update later."
                         } else {
-                            "TCGer downloads the ${game.displayGame()} recognition package only when you use it, keeping the app smaller while preserving offline scanning afterward."
+                            "Download the ${game.displayGame()} artwork model for faster offline matches. Choose Not now to continue with server matching or on-device title OCR."
                         },
                     )
                     remote?.let { manifest ->
                         Text(
-                            "${manifest.cardCount} cards · ${formatScannerAssetBytes(manifest.downloadBytes)} · verified model, index, and metadata",
+                            "${manifest.displayedCardCount} cards · ${formatScannerAssetBytes(manifest.downloadBytes)} · verified model, index, and metadata",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1162,7 +1220,7 @@ fun ScannerScreen(
                 TextButton(
                     enabled = !isInstalling,
                     onClick = { viewModel.installScannerAssets(game) },
-                ) { Text(if (status is ScannerAssetInstallStatus.Failed) "Retry" else if (isUpdate) "Update" else "Install and scan") }
+                ) { Text(if (status is ScannerAssetInstallStatus.Failed) "Retry" else if (isUpdate) "Update" else "Install model") }
             },
             dismissButton = {
                 TextButton(
@@ -1203,7 +1261,7 @@ fun ScannerScreen(
 
     quadEditorBitmap?.let { bitmap ->
         val initial = if (editingBinderPage) {
-            ScannerCropQuad.fromBounds(0.035f, 0.035f, 0.965f, 0.965f)
+            lastSourceQuad ?: ScannerCropQuad.fromBounds(0.035f, 0.035f, 0.965f, 0.965f)
         } else {
             lastSourceQuad ?: ScannerCropQuad.centered(bitmap.width, bitmap.height)
         }
@@ -1220,6 +1278,7 @@ fun ScannerScreen(
                 onConfirm = { quad ->
                     quadEditorBitmap = null
                     if (editingBinderPage) {
+                        pendingBinderPageJpeg = if (options.savesBinderPageImages) bitmap.toJpeg(92) else null
                         scope.launch {
                             runCatching {
                                 withContext(Dispatchers.Default) { createBinderPocketJpegs(bitmap, quad) }
@@ -1275,16 +1334,14 @@ fun ScannerScreen(
                 showingOptions = false
                 when {
                     !scannerGameSelectionResolved -> showingScannerGameChoice = true
-                    localArcFaceAvailable -> imagePicker.launch("image/*")
-                    else -> scannerAssetPromptGame = normalizedScannerGame
+                    else -> imagePicker.launch("image/*")
                 }
             },
             onPickPhotos = {
                 showingOptions = false
                 when {
                     !scannerGameSelectionResolved -> showingScannerGameChoice = true
-                    localArcFaceAvailable -> bulkImagePicker.launch("image/*")
-                    else -> scannerAssetPromptGame = normalizedScannerGame
+                    else -> bulkImagePicker.launch("image/*")
                 }
             },
             onShowDebug = { showingDebug = true },
@@ -1356,10 +1413,26 @@ fun ScannerScreen(
                                 onClick = {
                                     onBulkAddToBinder?.invoke(binder.id, cardsToSave)
                                         ?: cardsToSave.forEach { viewModel.addCard(binder.id, it) }
+                                    pendingBinderPageJpeg?.let { pageJpeg ->
+                                        val pageNumber = options.binderPageNumber
+                                        val replace = options.replacesBinderPageImages
+                                        scope.launch {
+                                            runCatching {
+                                                withContext(Dispatchers.IO) {
+                                                    binderPagePhotoStore.save(binder.id, pageNumber, pageJpeg, replace)
+                                                }
+                                            }.onSuccess {
+                                                updateOptions(options.copy(binderPageNumber = (pageNumber + 1).coerceAtMost(999)))
+                                            }.onFailure {
+                                                ioMessage = "Cards were added, but the binder-page photo was not saved: ${it.message}"
+                                            }
+                                        }
+                                    }
                                     if (pendingBulkCards == null) {
                                         updateSession(sessionEntries.filterNot(ScannerSessionEntry::selected))
                                     }
                                     pendingBulkCards = null
+                                    pendingBinderPageJpeg = null
                                     pendingSessionBinder = false
                                 },
                             ) { Text(binder.name, modifier = Modifier.fillMaxWidth()) }
@@ -1368,7 +1441,11 @@ fun ScannerScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { pendingBulkCards = null; pendingSessionBinder = false }) { Text("Close") }
+                TextButton(onClick = {
+                    pendingBulkCards = null
+                    pendingBinderPageJpeg = null
+                    pendingSessionBinder = false
+                }) { Text("Close") }
             },
         )
     }

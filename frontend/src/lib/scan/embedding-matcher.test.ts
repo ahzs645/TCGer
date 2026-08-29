@@ -87,6 +87,38 @@ test("exact mode marks an artwork family as requiring user choice", () => {
   assert.equal(resolved[1]?.requiresPrintingChoice, true);
 });
 
+test("one visual-family vector expands its exact printings after retrieval", () => {
+  const family = printing("new", "2025-01-01");
+  family.printings = [
+    {
+      externalId: "new",
+      exactPrintingId: "new",
+      setCode: "new",
+      setName: "New Set",
+      rarity: null,
+      imageUrl: null,
+      releaseDate: "2025-01-01",
+    },
+    {
+      externalId: "old",
+      exactPrintingId: "old",
+      setCode: "old",
+      setName: "Old Set",
+      rarity: null,
+      imageUrl: null,
+      releaseDate: "2020-01-01",
+    },
+  ];
+
+  const quick = resolveEmbeddingPrintingCandidates([family], "quick_latest");
+  assert.equal(quick[0]?.externalId, "new");
+  assert.equal(quick[0]?.printingResolutionProvenance, "latest_fallback");
+
+  const exact = resolveEmbeddingPrintingCandidates([family], "exact_printing");
+  assert.deepEqual(exact.slice(0, 2).map((row) => row.externalId), ["new", "old"]);
+  assert.equal(exact[0]?.requiresPrintingChoice, true);
+});
+
 function printing(id: string, releaseDate: string): BrowserVideoScanCandidate {
   return {
     externalId: id,

@@ -17,6 +17,7 @@
 import { getContext2d } from "./canvas-utils";
 import { scanIndexAssetUrl } from "./scan-index-assets";
 import type { BrowserVideoScanCandidate } from "./scan-types";
+import type { CardScanPrinting } from "@/lib/api/scan";
 import type { TcgCode } from "@/types/card";
 import type { ScannerPrintingMode } from "./scanner-options";
 
@@ -47,6 +48,7 @@ export interface EmbeddingIndexEntry {
   recognitionFamilyId?: string | null;
   exactPrintingId?: string | null;
   releaseDate?: string | null;
+  printings?: CardScanPrinting[];
 }
 
 export interface EmbeddingIndex {
@@ -57,6 +59,7 @@ export interface EmbeddingIndex {
   tcg: TcgCode;
   scale: number;
   total: number;
+  printingTotal?: number;
   entries: EmbeddingIndexEntry[];
   /** Packed int8 vectors, row-major [total * dimension]. */
   vectors: Int8Array;
@@ -111,6 +114,7 @@ interface EmbeddingIndexArtifact {
   tcg?: string;
   scale: number;
   total: number;
+  printingTotal?: number;
   entries: Array<{
     externalId: string;
     name: string;
@@ -121,6 +125,7 @@ interface EmbeddingIndexArtifact {
     recognitionFamilyId?: string | null;
     exactPrintingId?: string | null;
     releaseDate?: string | null;
+    printings?: CardScanPrinting[];
   }>;
   vectors: string; // base64 Int8Array
   thresholds?: Partial<EmbeddingMatchThresholds>;
@@ -172,6 +177,10 @@ export function parseEmbeddingIndex(
     recognitionFamilyId: e.recognitionFamilyId ?? null,
     exactPrintingId: e.exactPrintingId ?? e.externalId,
     releaseDate: e.releaseDate ?? null,
+    printings: e.printings?.map((printing) => ({
+      ...printing,
+      externalId: printing.externalId || printing.exactPrintingId,
+    })),
   }));
 
   return {
@@ -182,6 +191,7 @@ export function parseEmbeddingIndex(
     tcg,
     scale: artifact.scale,
     total,
+    printingTotal: artifact.printingTotal,
     entries,
     vectors,
     invNorms,
@@ -709,6 +719,7 @@ export function matchEmbeddingTopK(
       recognitionFamilyId: entry.recognitionFamilyId,
       exactPrintingId: entry.exactPrintingId,
       releaseDate: entry.releaseDate,
+      printings: entry.printings,
     };
     return candidate;
   });
@@ -722,7 +733,18 @@ export function resolveEmbeddingPrintingCandidates(
   const primary = candidates[0];
   if (!primary) return candidates;
   const familyId = primary.recognitionFamilyId;
-  const family = candidates
+  const nestedFamily = (primary.printings ?? []).map((printing) => ({
+    ...primary,
+    externalId: printing.externalId,
+    exactPrintingId: printing.exactPrintingId,
+    setCode: printing.setCode,
+    setName: printing.setName,
+    rarity: printing.rarity,
+    imageUrl: printing.imageUrl,
+    releaseDate: printing.releaseDate,
+    printings: undefined,
+  }));
+  const family = [...nestedFamily, ...candidates]
     .filter((candidate) =>
       familyId
         ? candidate.recognitionFamilyId === familyId

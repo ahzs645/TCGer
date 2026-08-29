@@ -101,7 +101,17 @@ nonisolated struct BinderNormalizedQuad: Sendable {
 enum BinderCardDetectionStatus: String, Sendable {
     case matched
     case uncertain
+    case printingUnresolved
     case unmatched
+
+    var displayName: String {
+        switch self {
+        case .matched: return "Matched"
+        case .uncertain: return "Review"
+        case .printingUnresolved: return "Choose Printing"
+        case .unmatched: return "Unmatched"
+        }
+    }
 }
 
 nonisolated enum BinderCardExclusionReason: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -252,6 +262,7 @@ actor BinderPageScanner {
     private struct Identification: Sendable {
         let primary: CardScanCandidate
         let alternatives: [CardScanCandidate]
+        let resolution: CardScanResolution
     }
 
     private struct PocketRecognition: Sendable {
@@ -313,6 +324,7 @@ actor BinderPageScanner {
                 let crop = item.crop
                 group.addTask { [coordinator, context] in
                     var pocketContext = context
+                    pocketContext.purpose = .binderPage
                     let pocketDiagnostics = context.diagnostics.map { _ in ScanDiagnostics() }
                     pocketContext.diagnostics = pocketDiagnostics
                     let result = await coordinator.scan(
@@ -331,7 +343,8 @@ actor BinderPageScanner {
                         PocketRecognition(
                             identification: Identification(
                                 primary: scanResult.primary,
-                                alternatives: scanResult.alternatives
+                                alternatives: scanResult.alternatives,
+                                resolution: scanResult.resolution
                             ),
                             diagnostics: pocketDiagnostics
                         )
@@ -352,6 +365,7 @@ actor BinderPageScanner {
                     nextIndex += 1
                     group.addTask { [coordinator, context] in
                         var pocketContext = context
+                        pocketContext.purpose = .binderPage
                         let pocketDiagnostics = context.diagnostics.map { _ in ScanDiagnostics() }
                         pocketContext.diagnostics = pocketDiagnostics
                         let result = await coordinator.scan(
@@ -370,7 +384,8 @@ actor BinderPageScanner {
                             PocketRecognition(
                                 identification: Identification(
                                     primary: scanResult.primary,
-                                    alternatives: scanResult.alternatives
+                                    alternatives: scanResult.alternatives,
+                                    resolution: scanResult.resolution
                                 ),
                                 diagnostics: pocketDiagnostics
                             )
@@ -401,9 +416,14 @@ actor BinderPageScanner {
             let result = recognition?.identification
             let detection: BinderCardDetection
             if let result {
-                let status: BinderCardDetectionStatus = result.primary.confidence.score >= Configuration.matchedScore
-                    ? .matched
-                    : .uncertain
+                let status: BinderCardDetectionStatus
+                if result.resolution == .nameOnly {
+                    status = .printingUnresolved
+                } else {
+                    status = result.primary.confidence.score >= Configuration.matchedScore
+                        ? .matched
+                        : .uncertain
+                }
                 detection = BinderCardDetection(
                     quad: quad,
                     crop: item.crop,
@@ -469,7 +489,7 @@ actor BinderPageScanner {
                         footerPairNumbers: [],
                         ocrVerifiedCollectorNumber: nil,
                         outcome: detection.status == .matched ? .accepted :
-                            (detection.status == .uncertain ? .printingAmbiguous : .noCandidates),
+                            (detection.status == .unmatched ? .noCandidates : .printingAmbiguous),
                         imageIndex: imageIndex
                     ))
                 }
@@ -595,13 +615,13 @@ actor BinderPageScanner {
         return try detectRectangles(in: image)
     }
 
-    /// Every detection with a proposed match starts selected for the add batch.
-    /// Uncertain suggestions remain labeled for review, while unmatched regions
-    /// stay visible and excluded because there is no card identity to import.
+    /// Only high-confidence, exact-printing matches start selected for bulk
+    /// add. Uncertain and name-only suggestions remain visible but require a
+    /// deliberate human confirmation.
     nonisolated static func shouldIncludeByDefault(
         status: BinderCardDetectionStatus
     ) -> Bool {
-        status != .unmatched
+        status == .matched
     }
 
     nonisolated static func binderPolicyReason(
@@ -610,6 +630,7 @@ actor BinderPageScanner {
         switch status {
         case .matched: return .matchedThreshold
         case .uncertain: return .uncertainReviewRequired
+        case .printingUnresolved: return .printingSelectionRequired
         case .unmatched: return .noCoordinatorMatch
         }
     }

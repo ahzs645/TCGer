@@ -59,6 +59,26 @@ class PackedCardEmbeddingIndexTest {
     }
 
     @Test
+    fun `set filter searches nested exact printings without duplicating vectors`() {
+        val metadata = """[
+          {"annIndex":0,"cardId":"new","exactPrintingId":"new","name":"Shared","game":"magic","setCode":"new","printings":[
+            {"cardId":"new","exactPrintingId":"new","setCode":"new","releaseDate":"2025-01-01"},
+            {"cardId":"old","exactPrintingId":"old","setCode":"old","releaseDate":"2020-01-01"}
+          ]}
+        ]""".encodeToByteArray()
+        val index = PackedCardEmbeddingIndex.decode(
+            packed(rows = listOf(byteArrayOf(127, 0))), metadata,
+        )
+
+        val match = index.nearest(
+            floatArrayOf(1f, 0f), limit = 1, physicalPokemonOnly = false,
+            game = "magic", setCode = "old",
+        ).single()
+
+        assertEquals(listOf("old"), match.card.printings.map { it.exactPrintingId })
+    }
+
+    @Test
     fun `rejects metadata and vector count mismatch`() {
         assertThrows(IllegalArgumentException::class.java) {
             PackedCardEmbeddingIndex.decode(

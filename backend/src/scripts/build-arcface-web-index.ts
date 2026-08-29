@@ -66,6 +66,15 @@ function main() {
     }
     const rowGame = String(row.game ?? tcg).toLowerCase();
     if (rowGame !== tcg) throw new Error(`metadata row ${annIndex} is ${rowGame}, not ${tcg}`);
+    const mapPrinting = (printing: Record<string, unknown>) => ({
+      externalId: String(printing.cardId ?? printing.exactPrintingId ?? ""),
+      exactPrintingId: String(printing.exactPrintingId ?? printing.cardId ?? ""),
+      setCode: printing.setCode ?? null,
+      setName: printing.setName ?? null,
+      rarity: printing.rarity ?? null,
+      imageUrl: printing.imageURL ?? printing.imageUrl ?? null,
+      releaseDate: printing.releaseDate ?? null,
+    });
     return {
       externalId: String(row.cardId ?? row.externalId ?? ""),
       name: String(row.name ?? ""),
@@ -76,6 +85,9 @@ function main() {
       recognitionFamilyId: row.recognitionFamilyId ?? null,
       exactPrintingId: row.exactPrintingId ?? row.cardId ?? row.externalId ?? null,
       releaseDate: row.releaseDate ?? row.releasedAt ?? null,
+      printings: Array.isArray(row.printings)
+        ? row.printings.map((printing) => mapPrinting(printing as Record<string, unknown>))
+        : undefined,
     };
   });
   const bin = readFileSync(binPath);
@@ -112,6 +124,10 @@ function main() {
     scale: 127,
     normalized: true,
     total: count,
+    printingTotal: entries.reduce(
+      (sum: number, entry: { printings?: unknown[] }) => sum + (entry.printings?.length ?? 1),
+      0,
+    ),
     thresholds: ARCFACE_THRESHOLDS,
     modelUrl: arg("model-url", `${tcg}-card-embeddings-arcface.onnx`),
     entries,

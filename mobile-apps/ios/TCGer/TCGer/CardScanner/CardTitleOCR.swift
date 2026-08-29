@@ -35,7 +35,6 @@ nonisolated struct CardTitleOCR {
             guard !text.isEmpty else { return nil }
             return Candidate(text: text, confidence: Double(recognized.confidence))
         }
-
         // Vision occasionally splits a suffix such as "ex" into its own box.
         // Adjacent combinations let "Charizard" + "ex" match the exact
         // catalog name without fuzzy matching unrelated OCR noise.

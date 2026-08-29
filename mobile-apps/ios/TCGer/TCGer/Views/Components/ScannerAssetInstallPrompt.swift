@@ -89,7 +89,7 @@ struct ScannerGameChoicePrompt: View {
             return "Scanner available to install"
         }
         let size = ByteCountFormatter.string(fromByteCount: Int64(manifest.downloadBytes), countStyle: .file)
-        return "\(manifest.cardCount.formatted(.number)) cards · \(size)"
+        return "\(manifest.displayedCardCount.formatted(.number)) cards · \(size)"
     }
 
     @ViewBuilder
@@ -155,7 +155,7 @@ struct ScannerAssetInstallPrompt: View {
 
                 if let manifest = store.manifests[request.game] {
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("\(manifest.cardCount.formatted(.number)) cards", systemImage: "rectangle.stack")
+                        Label("\(manifest.displayedCardCount.formatted(.number)) cards", systemImage: "rectangle.stack")
                         Label(formattedBytes(manifest.downloadBytes), systemImage: "internaldrive")
                         Label("Verified model, index, and metadata", systemImage: "checkmark.shield")
                     }

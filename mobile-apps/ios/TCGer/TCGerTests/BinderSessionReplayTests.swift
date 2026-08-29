@@ -48,6 +48,16 @@ final class BinderSessionReplayTests: XCTestCase {
         "scan-session-20260810-220315/frame-0002.jpg": 7,
         "scan-session-20260810-220315/frame-0005.jpg": 4,
         "scan-session-20260810-220315/frame-0018.jpg": 3,
+        // 2026-08-27 mixed-game session, four captures of six loose Pokemon
+        // cards arranged like a partial binder page. Device candidate counts
+        // were 5 / 5 / 5 / 6; the bundled Simulator runtime reproduced
+        // 4 / 5 / 4 / 5 on two consecutive runs. The missing regions remain
+        // visible as unmatched detections, so this is a retrieval floor rather
+        // than a localization allowance.
+        "scan-session-20260827-223150/frame-0028.jpg": 4,
+        "scan-session-20260827-223150/frame-0029.jpg": 5,
+        "scan-session-20260827-223150/frame-0030.jpg": 4,
+        "scan-session-20260827-223150/frame-0031.jpg": 5,
     ]
 
     /// Labeled pockets the current baseline auto-includes with the wrong card.
@@ -63,6 +73,7 @@ final class BinderSessionReplayTests: XCTestCase {
     private struct EvidenceRecord: Decodable {
         let imageFile: String
         let outcome: String
+        let mode: String?
         let attempts: [ScanDiagnostics.Attempt]
     }
 
@@ -123,13 +134,18 @@ final class BinderSessionReplayTests: XCTestCase {
             includingPropertiesForKeys: nil
         )) ?? []).sorted { $0.lastPathComponent < $1.lastPathComponent }
 
-        let scanner = BinderPageScanner(coordinator: .makeDefault())
-        let context = CardScannerContext.test(engine: .localOnly)
+        // Downloaded scanner packages are not installed in a clean test
+        // runner. Use the same bundled reference runtimes as the other
+        // scanner replay suites so this test actually exercises retrieval.
+        let scanner = BinderPageScanner(
+            coordinator: .makeDefault(includeBundledTestFallbacks: true)
+        )
         var pages = 0
         var baselineWithCandidate = 0
         var baselineMatched = 0
         var newWithCandidate = 0
         var newMatched = 0
+        var replayElapsedMs: [Double] = []
         var candidateRegressions: [String] = []
         var labeledTotal = 0
         var labeledCorrect = 0
@@ -151,11 +167,23 @@ final class BinderSessionReplayTests: XCTestCase {
                       let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
                 else { continue }
                 pages += 1
-                let baselineCandidates = record.attempts.filter { !$0.topCandidates.isEmpty }.count
+                let baselineCandidates = Set(record.attempts.compactMap { attempt in
+                    !attempt.topCandidates.isEmpty ? attempt.pocketIndex : nil
+                }).count
                 baselineWithCandidate += baselineCandidates
-                baselineMatched += record.attempts.filter { $0.outcome == .accepted }.count
+                baselineMatched += Set(record.attempts.compactMap { attempt in
+                    attempt.binderStatus == BinderCardDetectionStatus.matched.rawValue
+                        ? attempt.pocketIndex
+                        : nil
+                }).count
 
+                let context = CardScannerContext.test(
+                    mode: record.mode.flatMap(ScanMode.init(rawValue:)) ?? .pokemon,
+                    engine: .localOnly
+                )
                 let result = try await scanner.scan(image: image, context: context)
+                let elapsedMs = result.elapsed * 1_000
+                replayElapsedMs.append(elapsedMs)
                 let withCandidate = result.detections.filter { $0.selectedCandidate != nil }.count
                 let matched = result.detections.filter { $0.status == .matched }.count
                 newWithCandidate += withCandidate
@@ -238,12 +266,23 @@ final class BinderSessionReplayTests: XCTestCase {
                 print(
                     "BINDERREPLAY \(session.lastPathComponent)/\(record.imageFile): "
                     + "\(result.detections.count) detections, \(withCandidate) with candidate, "
-                    + "\(matched) matched | \(names.joined(separator: " "))"
+                    + "\(matched) matched, \(String(format: "%.0f", elapsedMs)) ms | "
+                    + names.joined(separator: " ")
                 )
             }
         }
 
-        print("BINDERREPLAY summary: \(pages) pages | candidates \(baselineWithCandidate) -> \(newWithCandidate) | matched \(baselineMatched) -> \(newMatched)")
+        let meanReplayMs = replayElapsedMs.isEmpty
+            ? 0
+            : replayElapsedMs.reduce(0, +) / Double(replayElapsedMs.count)
+        let maxReplayMs = replayElapsedMs.max() ?? 0
+        print(
+            "BINDERREPLAY summary: \(pages) pages | candidates "
+            + "\(baselineWithCandidate) -> \(newWithCandidate) | matched "
+            + "\(baselineMatched) -> \(newMatched) | mean "
+            + "\(String(format: "%.0f", meanReplayMs)) ms, max "
+            + "\(String(format: "%.0f", maxReplayMs)) ms"
+        )
         print(
             "BINDERLABEL summary: \(labeledTotal) human-labeled pockets | "
             + "\(labeledCorrect) correct, \(wrongAutoIncludes.count) wrong auto-included, "

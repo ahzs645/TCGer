@@ -84,6 +84,31 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260809-210958/frame-0013.jpg": "dpp-DP30",
         "scan-session-20260809-210958/frame-0014.jpg": "dpp-DP30",
         "scan-session-20260809-210958/frame-0015.jpg": "dpp-DP30",
+        // August 27 MTG reference session, labeled directly from the readable
+        // card title and HOB collector number in each saved frame. Repeated
+        // captures intentionally cover distance, foil glare, and framing.
+        "scan-session-20260827-223150/frame-0000.jpg": "3685c783-d837-4466-a960-ab3098db64c3",
+        "scan-session-20260827-223150/frame-0001.jpg": "17892c93-b9b2-4720-933b-998ed0200492",
+        "scan-session-20260827-223150/frame-0002.jpg": "17892c93-b9b2-4720-933b-998ed0200492",
+        "scan-session-20260827-223150/frame-0003.jpg": "ea174cea-40e5-424e-9734-e39aae6c6b17",
+        "scan-session-20260827-223150/frame-0004.jpg": "8d4f3eb5-fedf-45d6-8bd8-aacbe0ce33b2",
+        "scan-session-20260827-223150/frame-0005.jpg": "8651958c-3b94-47a9-a751-faf8f6236a42",
+        "scan-session-20260827-223150/frame-0006.jpg": "8651958c-3b94-47a9-a751-faf8f6236a42",
+        "scan-session-20260827-223150/frame-0007.jpg": "8651958c-3b94-47a9-a751-faf8f6236a42",
+        "scan-session-20260827-223150/frame-0008.jpg": "1f8403a2-849c-4a59-b0ed-c8803995028d",
+        "scan-session-20260827-223150/frame-0009.jpg": "1f8403a2-849c-4a59-b0ed-c8803995028d",
+        "scan-session-20260827-223150/frame-0010.jpg": "e4800508-8bb9-41bb-8712-b55fba7a80a5",
+        "scan-session-20260827-223150/frame-0011.jpg": "3feca644-5f65-4477-bbc8-d505cec6f3a5",
+        "scan-session-20260827-223150/frame-0012.jpg": "3feca644-5f65-4477-bbc8-d505cec6f3a5",
+        "scan-session-20260827-223150/frame-0013.jpg": "ad0dba36-d056-4bc1-987a-391da26ad267",
+        "scan-session-20260827-223150/frame-0014.jpg": "a2e4099e-86bd-461f-87fa-7f7850ae7eec",
+        "scan-session-20260827-223150/frame-0015.jpg": "9984b9ef-e81c-48f4-aa33-0504171a2d3c",
+        "scan-session-20260827-223150/frame-0016.jpg": "9984b9ef-e81c-48f4-aa33-0504171a2d3c",
+        "scan-session-20260827-223150/frame-0017.jpg": "9984b9ef-e81c-48f4-aa33-0504171a2d3c",
+        "scan-session-20260827-223150/frame-0018.jpg": "e4ded4c1-0e3e-47c5-8fdc-e7c187f68b12",
+        "scan-session-20260827-223150/frame-0019.jpg": "e4ded4c1-0e3e-47c5-8fdc-e7c187f68b12",
+        "scan-session-20260827-223150/frame-0020.jpg": "e4ded4c1-0e3e-47c5-8fdc-e7c187f68b12",
+        "scan-session-20260827-223150/frame-0021.jpg": "1ccbf823-846f-4f09-9c67-1deebb5d1d92",
     ]
     /// Frames that must NOT match anything (accidental shutter presses).
     private static let expectedNoMatch: Set<String> = [
@@ -180,7 +205,12 @@ final class DevModeSessionReplayTests: XCTestCase {
         }.sorted { $0.lastPathComponent < $1.lastPathComponent }
         XCTAssertFalse(sessions.isEmpty, "no sessions found under \(dir)")
 
-        let coordinator = CardScannerCoordinator.makeDefault(includeBundledTestFallbacks: true)
+        let environment = ProcessInfo.processInfo.environment
+        let productionStrategiesOnly = environment["DEVMODE_PRODUCTION_STRATEGIES_ONLY"] == "1"
+        let replayMode = environment["DEVMODE_REPLAY_MODE"].flatMap(ScanMode.init(rawValue:))
+        let coordinator = CardScannerCoordinator.makeDefault(
+            includeBundledTestFallbacks: !productionStrategiesOnly
+        )
         var lostCount = 0
         var wrongAccepts: [String] = []
         var expectedHits = 0
@@ -223,6 +253,10 @@ final class DevModeSessionReplayTests: XCTestCase {
                 }
             }
             for frame in bundle.frames.sorted(by: { $0.index < $1.index }) {
+                if let replayMode,
+                   ScanMode(rawValue: frame.mode) != replayMode {
+                    continue
+                }
                 // Binder pages have their own replay harness. Treating a full
                 // 3x3 page as one card creates meaningless single-card hits.
                 guard !binderImages.contains(frame.imageFile) else { continue }
@@ -233,7 +267,10 @@ final class DevModeSessionReplayTests: XCTestCase {
 
                 let key = "\(session.lastPathComponent)/\(frame.imageFile)"
                 let diagnostics = ScanDiagnostics()
-                var context = CardScannerContext.test(engine: .localOnly)
+                var context = CardScannerContext.test(
+                    mode: ScanMode(rawValue: frame.mode) ?? .pokemon,
+                    engine: .localOnly
+                )
                 context.diagnostics = diagnostics
                 let result = await coordinator.scan(
                     image: image,
@@ -297,6 +334,7 @@ final class DevModeSessionReplayTests: XCTestCase {
                 // regression. Only accepts the human did not contradict count.
                 let baselineWasRejected = frame.expectedNoMatch == true
                     || (frame.expectedCardId.map { $0 != frame.bestMatchCardId } ?? false)
+                    || (Self.expectedCards[key].map { $0 != frame.bestMatchCardId } ?? false)
                 if frame.identified, newCardID == nil, !baselineWasRejected {
                     if Self.knownSimulatorDivergences.contains(key) {
                         verdict += " (known Simulator divergence: was \(baseline))"

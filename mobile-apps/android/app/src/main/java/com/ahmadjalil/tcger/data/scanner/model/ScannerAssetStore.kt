@@ -42,6 +42,9 @@ data class ScannerAssetManifest(
     val encoder: String,
     val modelName: String,
     val cardCount: Int,
+    val printingCount: Int? = null,
+    val metadataSchema: String? = null,
+    val recognitionContract: String? = null,
     val dimension: Int,
     val downloadBytes: Long,
     val model: ScannerAssetManifestFile,
@@ -49,7 +52,9 @@ data class ScannerAssetManifest(
     val metadata: ScannerAssetManifestFile,
     val strongAcceptanceScore: Double,
     val ambiguityMargin: Double,
-)
+) {
+    val displayedCardCount: Int get() = printingCount ?: cardCount
+}
 
 sealed interface ScannerAssetInstallStatus {
     data object NotInstalled : ScannerAssetInstallStatus
@@ -234,7 +239,7 @@ class ScannerAssetStore internal constructor(
     }
 
     private fun validateManifest(manifest: ScannerAssetManifest, requestedGame: String) {
-        require(manifest.formatVersion == SUPPORTED_FORMAT_VERSION) {
+        require(manifest.formatVersion in 1..SUPPORTED_FORMAT_VERSION) {
             "Unsupported scanner manifest format ${manifest.formatVersion}"
         }
         require(normalizeScannerGame(manifest.game) == requestedGame) { "Scanner manifest is for ${manifest.game}, not $requestedGame" }
@@ -242,6 +247,11 @@ class ScannerAssetStore internal constructor(
         require(manifest.version.matches(Regex("[A-Za-z0-9._-]{1,120}"))) { "Scanner manifest version is unsafe" }
         require(manifest.modelName.isNotBlank()) { "Scanner manifest model name is missing" }
         require(manifest.cardCount > 0 && manifest.dimension > 0) { "Scanner manifest index shape is invalid" }
+        if (manifest.formatVersion == 2) {
+            require(manifest.metadataSchema == "tcger-cards-index-metadata-v3") { "Unsupported scanner metadata schema" }
+            require(manifest.recognitionContract == "tcger-two-stage-recognition-v2") { "Unsupported recognition contract" }
+            require((manifest.printingCount ?: 0) >= manifest.cardCount) { "Scanner printing count is invalid" }
+        }
         require(manifest.strongAcceptanceScore in -1.0..1.0) { "Scanner acceptance score is invalid" }
         require(manifest.ambiguityMargin in 0.0..2.0) { "Scanner ambiguity margin is invalid" }
         val descriptors = listOf(manifest.model, manifest.vectors, manifest.metadata)
@@ -318,7 +328,7 @@ class ScannerAssetStore internal constructor(
 
     companion object {
         const val DEFAULT_SCANNER_ASSET_BASE_URL = "https://assets.tcger.ahmadjalil.com/android/scan-assets"
-        private const val SUPPORTED_FORMAT_VERSION = 1
+        private const val SUPPORTED_FORMAT_VERSION = 2
         private const val CURRENT_MANIFEST_FILE = "current.json"
         private const val LOCAL_MANIFEST_FILE = "manifest.json"
         private const val LOCAL_MODEL_FILE = "model.onnx"

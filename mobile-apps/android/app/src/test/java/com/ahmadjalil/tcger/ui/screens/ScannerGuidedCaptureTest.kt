@@ -16,13 +16,27 @@ class ScannerGuidedCaptureTest {
         val alternate = CatalogCard("alternate", "Raichu", "pokemon")
         val last = CatalogCard("last", "Mew", "pokemon")
         val pockets = listOf(
-            BinderPocketReview(8, listOf(CardScanCandidate(last))),
+            BinderPocketReview(8, listOf(CardScanCandidate(last, confidence = 0.9))),
             BinderPocketReview(0, listOf(CardScanCandidate(first), CardScanCandidate(alternate)), "alternate"),
             BinderPocketReview(1, listOf(CardScanCandidate(first)), selectedCardId = null),
         )
 
         assertEquals(listOf("alternate", "last"), selectedBinderCards(pockets).map(CatalogCard::id))
         assertNull(pockets.last().selectedCard)
+    }
+
+    @Test
+    fun binderCandidatesRequireStrongConfidenceBeforeAutoSelection() {
+        val card = CatalogCard("candidate", "Candidate", "magic")
+
+        assertNull(
+            BinderPocketReview(0, listOf(CardScanCandidate(card, confidence = 0.81))).selectedCard,
+        )
+        assertEquals(
+            "candidate",
+            BinderPocketReview(0, listOf(CardScanCandidate(card, confidence = 0.82))).selectedCard?.id,
+        )
+        assertNull(BinderPocketReview(0, listOf(CardScanCandidate(card))).selectedCard)
     }
 
     @Test

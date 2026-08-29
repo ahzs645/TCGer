@@ -2,6 +2,18 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
+nonisolated struct RecordedBinderDetection: Codable, Equatable {
+    let pocketIndex: Int
+    let status: String
+    let includedByDefault: Bool
+    let quad: [[Double]]
+    let selectedCardID: String?
+    let selectedCardName: String?
+    let selectedSetCode: String?
+    let confidence: Double?
+    let alternativeCardIDs: [String]
+}
+
 /// One analyzed frame from a device scanner recording. The original decision
 /// is retained as a baseline so future model/index builds can be compared.
 nonisolated struct RecordedScanFrame: Codable {
@@ -29,6 +41,59 @@ nonisolated struct RecordedScanFrame: Codable {
     let expectedCardId: String?
     let expectedNoMatch: Bool?
     let imageFile: String
+    /// Added after the original schema. Nil means a legacy single-card frame.
+    let captureMode: String?
+    /// Final per-pocket binder decisions. Older binder recordings keep their
+    /// lower-level attempts in evidence.json and decode this as nil.
+    let binderDetections: [RecordedBinderDetection]?
+
+    init(
+        index: Int,
+        timestampSeconds: Double,
+        mode: String,
+        pipeline: String,
+        elapsedMs: Double,
+        detectedCount: Int,
+        segmentationConfidence: Double?,
+        quad: [[Double]]?,
+        identified: Bool,
+        bestMatchName: String?,
+        bestMatchCardId: String?,
+        bestMatchSetCode: String?,
+        bestMatchSetName: String?,
+        confidence: Double?,
+        strategy: String?,
+        alternatives: [String],
+        alternativeCardIds: [String]?,
+        expectedCardId: String?,
+        expectedNoMatch: Bool?,
+        imageFile: String,
+        captureMode: String? = nil,
+        binderDetections: [RecordedBinderDetection]? = nil
+    ) {
+        self.index = index
+        self.timestampSeconds = timestampSeconds
+        self.mode = mode
+        self.pipeline = pipeline
+        self.elapsedMs = elapsedMs
+        self.detectedCount = detectedCount
+        self.segmentationConfidence = segmentationConfidence
+        self.quad = quad
+        self.identified = identified
+        self.bestMatchName = bestMatchName
+        self.bestMatchCardId = bestMatchCardId
+        self.bestMatchSetCode = bestMatchSetCode
+        self.bestMatchSetName = bestMatchSetName
+        self.confidence = confidence
+        self.strategy = strategy
+        self.alternatives = alternatives
+        self.alternativeCardIds = alternativeCardIds
+        self.expectedCardId = expectedCardId
+        self.expectedNoMatch = expectedNoMatch
+        self.imageFile = imageFile
+        self.captureMode = captureMode
+        self.binderDetections = binderDetections
+    }
 }
 
 nonisolated struct RecordedScanBundle: Codable {
@@ -38,6 +103,28 @@ nonisolated struct RecordedScanBundle: Codable {
         let mode: String
         let pipeline: String
         let app: String
+        /// Ordered distinct values represented by the frames. Optional keeps
+        /// every pre-mixed-session recording backward compatible.
+        let modes: [String]?
+        let captureModes: [String]?
+
+        init(
+            capturedAt: String,
+            frameCount: Int,
+            mode: String,
+            pipeline: String,
+            app: String,
+            modes: [String]? = nil,
+            captureModes: [String]? = nil
+        ) {
+            self.capturedAt = capturedAt
+            self.frameCount = frameCount
+            self.mode = mode
+            self.pipeline = pipeline
+            self.app = app
+            self.modes = modes
+            self.captureModes = captureModes
+        }
     }
 
     let summary: Summary
@@ -120,15 +207,17 @@ struct CardScannerReplayRunner {
         var comparisons: [ScannerReplayFrameComparison] = []
         comparisons.reserveCapacity(replay.recording.frames.count)
 
-        for frame in replay.recording.frames {
+        for frame in replay.recording.frames where frame.captureMode != ScannerCaptureMode.binder.rawValue {
             guard let image = replay.images[frame.imageFile]
                 ?? replay.images[URL(fileURLWithPath: frame.imageFile).lastPathComponent]
             else { continue }
 
             let started = ContinuousClock.now
+            var frameContext = context
+            frameContext.mode = ScanMode(rawValue: frame.mode) ?? context.mode
             let result = await coordinator.scan(
                 image: image,
-                context: context,
+                context: frameContext,
                 source: .livePreview
             )
             let elapsed = started.duration(to: .now)

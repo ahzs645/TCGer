@@ -662,11 +662,34 @@ final class CardScannerViewModel: ObservableObject {
         let label: String
         if let result {
             let matched = result.detections.filter { $0.status == .matched }.count
-            label = "binderPage: \(result.detections.count) detections, \(matched) matched"
+            let uncertain = result.detections.filter { $0.status == .uncertain }.count
+            let unresolved = result.detections.filter { $0.status == .printingUnresolved }.count
+            label = "binderPage: \(result.detections.count) detections, \(matched) matched, "
+                + "\(uncertain) uncertain, \(unresolved) printing unresolved"
         } else {
             label = "binderPage error: \(error.map(String.init(describing:)) ?? "unknown")"
         }
         let elapsedMs = (result?.elapsed ?? 0) * 1_000
+        let binderDetections = result?.detections.enumerated().map { index, detection in
+            RecordedBinderDetection(
+                pocketIndex: index,
+                status: detection.status.rawValue,
+                includedByDefault: detection.isIncluded,
+                quad: [
+                    detection.quad.topLeft,
+                    detection.quad.topRight,
+                    detection.quad.bottomRight,
+                    detection.quad.bottomLeft,
+                ].map { [Double($0.x), Double($0.y)] },
+                selectedCardID: detection.selectedCandidate?.details.identity.id,
+                selectedCardName: detection.selectedCandidate?.details.identity.name,
+                selectedSetCode: detection.selectedCandidate?.details.identity.setCode,
+                confidence: detection.selectedCandidate?.confidence.score,
+                alternativeCardIDs: detection.candidateOptions.dropFirst().prefix(5).map {
+                    $0.details.identity.id
+                }
+            )
+        }
         Task.detached(priority: .utility) {
             await ScannerDevModeStore.shared.record(
                 image: page,
@@ -677,7 +700,9 @@ final class CardScannerViewModel: ObservableObject {
                 diagnostics: diagnostics,
                 originalImage: original,
                 outcomeLabel: label,
-                captureQuality: captureQuality
+                captureQuality: captureQuality,
+                captureMode: .binder,
+                binderDetections: binderDetections
             )
         }
     }

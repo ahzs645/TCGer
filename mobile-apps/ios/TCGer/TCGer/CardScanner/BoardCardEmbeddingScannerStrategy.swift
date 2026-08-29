@@ -737,7 +737,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             purpose: context.purpose,
             source: source
         )
-        let needsTitleEvidence = source != .livePreview && (
+        let ocrEnabled = ScannerPerfOptions.isOCREnabled
+        let needsTitleEvidence = ocrEnabled && source != .livePreview && (
             requiresTitleConfirmation ||
             gateRejected ||
                 primary.confidence.score < strongAcceptanceScore ||
@@ -750,6 +751,14 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // pairs, then letter-prefixed promo codes, then slash-less digit runs
         // (the last only when every confirmed candidate agrees on ONE
         // number). Shared verbatim by both OCR orderings below.
+        func resolvedCollectorNumber(for candidate: CardScanCandidate) -> String? {
+            if let value = candidate.details.identity.collectorNumber {
+                let normalized = CollectorNumberOCR.normalize(value)
+                if !normalized.isEmpty { return normalized }
+            }
+            return CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+        }
+
         func matchCollectorNumber(
             in candidates: [CardScanCandidate],
             reading: CollectorNumberOCR.FooterReading
@@ -757,7 +766,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             let pairNumbers = Set(reading.pairNumbers)
             var matched = candidates.first { candidate in
                 guard !pairNumbers.isEmpty,
-                      let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+                      let cn = resolvedCollectorNumber(for: candidate)
                 else { return false }
                 return pairNumbers.contains(cn)
             }
@@ -767,7 +776,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             if matched == nil, !reading.promoCodes.isEmpty {
                 let promoCodes = Set(reading.promoCodes)
                 matched = candidates.first { candidate in
-                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id),
+                    guard let cn = resolvedCollectorNumber(for: candidate),
                           cn.contains(where: \.isLetter)
                     else { return false }
                     return promoCodes.contains(cn)
@@ -775,12 +784,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             }
             if matched == nil, !reading.digitRuns.isEmpty {
                 let confirmed = candidates.filter { candidate in
-                    guard let cn = CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+                    guard let cn = resolvedCollectorNumber(for: candidate)
                     else { return false }
                     return CollectorNumberOCR.runsConfirm(number: cn, in: reading.digitRuns)
                 }
                 let distinctNumbers = Set(confirmed.compactMap {
-                    CollectorNumberOCR.collectorNumber(fromCardId: $0.details.identity.id)
+                    resolvedCollectorNumber(for: $0)
                 })
                 if distinctNumbers.count == 1 {
                     matched = confirmed.first
@@ -791,7 +800,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
         var ocrVerified = false
         var footerFirstReading: CollectorNumberOCR.FooterReading?
-        let footerFirst = ScannerPerfOptions.isFooterFirstOCREnabled
+        let footerFirst = ocrEnabled && ScannerPerfOptions.isFooterFirstOCREnabled
 
         // Footer-first ordering: the collector number is both cheaper to read
         // and stronger evidence than a title (it proves the printing, not
@@ -818,9 +827,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 footerFirstReading = reading
                 evidenceFooterPairs = reading.pairNumbers
                 if let matched = matchCollectorNumber(in: eligible, reading: reading) {
-                    let collectorNumber = CollectorNumberOCR.collectorNumber(
-                        fromCardId: matched.details.identity.id
-                    )
+                    let collectorNumber = resolvedCollectorNumber(for: matched)
                     primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
                     ocrVerified = true
                     evidenceOCRNumber = collectorNumber
@@ -857,13 +864,13 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 if let titlePrimary = titleRanked.first {
                     ranked = titleRanked
                     primary = titlePrimary
-                    titlePrintingCount = titleMatch.indices.count
+                    titlePrintingCount = titleMatch.printingCount
                     titleConstrained = true
                     titleRunnerScore = titleMatches.dropFirst().first.map {
                         scoreForDistance($0.distance)
                     }
                     evidenceTitleName = titleMatch.name
-                    evidenceTitleCount = titleMatch.indices.count
+                    evidenceTitleCount = titleMatch.printingCount
                     evidenceCandidates = ranked.prefix(5).map {
                         ScanDiagnostics.Candidate(
                             cardID: $0.details.identity.id,
@@ -882,7 +889,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // footer-first mode the reading already happened above — this stage
         // re-matches it against the title-constrained shortlist instead of
         // running a second Vision pass.
-        if !ocrVerified {
+        if ocrEnabled && !ocrVerified {
             let needsOCRTiebreak = ranked.count >= 2 &&
                 (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
             let needsOCRVerification = gateRejected ||
@@ -907,7 +914,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     evidenceFooterPairs = reading.pairNumbers
                 }
                 if let matched = matchCollectorNumber(in: ocrEligibleCandidates, reading: reading) {
-                    let collectorNumber = CollectorNumberOCR.collectorNumber(fromCardId: matched.details.identity.id)
+                    let collectorNumber = resolvedCollectorNumber(for: matched)
                     primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
                     ocrVerified = true
                     evidenceOCRNumber = collectorNumber
@@ -950,7 +957,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // unverified visual neighbor. A genuinely upside-down card becomes
         // title-readable after the retry; a fragment or spurious retry does
         // not. Live preview remains visual-only and cannot import a card.
-        guard !requiresTitleConfirmation || titleConstrained || ocrVerified else {
+        guard !ocrEnabled || !requiresTitleConfirmation || titleConstrained || ocrVerified else {
             recordOutcome(.noCandidates)
             return nil
         }
@@ -1131,6 +1138,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             guard let details = await metadataStore.details(for: match.index),
                   (game == .all || details.identity.game == game)
             else { continue }
+            let printingAlternatives = await metadataStore.printingDetails(for: match.index)
             let score = scoreForDistance(match.distance)
             guard score >= Configuration.minimumEvidenceScore else { continue }
             var debugInfo = [
@@ -1149,7 +1157,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 details: details,
                 confidence: CardScanConfidence(score: score, reason: "ANN distance \(match.distance)"),
                 originatingStrategy: kind,
-                debugInfo: debugInfo
+                debugInfo: debugInfo,
+                printingAlternatives: printingAlternatives
             ))
         }
         return candidates.sorted { $0.confidence.score > $1.confidence.score }
@@ -1177,7 +1186,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             details: candidate.details,
             confidence: CardScanConfidence(score: candidate.confidence.score, reason: reason),
             originatingStrategy: candidate.originatingStrategy,
-            debugInfo: debugInfo
+            debugInfo: debugInfo,
+            printingAlternatives: candidate.printingAlternatives
         )
     }
 }

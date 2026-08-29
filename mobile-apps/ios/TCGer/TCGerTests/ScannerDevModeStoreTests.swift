@@ -47,7 +47,21 @@ final class ScannerDevModeStoreTests: XCTestCase {
             result: .failure(.noMatch),
             diagnostics: diagnostics,
             originalImage: ScannerTestImage.solid(width: 120, height: 160),
-            outcomeLabel: "binderPage: 1 detections, 1 matched"
+            outcomeLabel: "binderPage: 1 detections, 1 matched",
+            captureMode: .binder,
+            binderDetections: [
+                RecordedBinderDetection(
+                    pocketIndex: 0,
+                    status: BinderCardDetectionStatus.matched.rawValue,
+                    includedByDefault: true,
+                    quad: [[0.1, 0.9], [0.9, 0.9], [0.9, 0.1], [0.1, 0.1]],
+                    selectedCardID: "swsh9-132",
+                    selectedCardName: "Boss's Orders",
+                    selectedSetCode: "SWSH9",
+                    confidence: 0.94,
+                    alternativeCardIDs: []
+                ),
+            ]
         )
 
         let sessions = ScannerDevModeStore.listSessions()
@@ -61,6 +75,8 @@ final class ScannerDevModeStoreTests: XCTestCase {
         let frame = try XCTUnwrap(bundle.frames.last)
         XCTAssertFalse(frame.identified)
         XCTAssertEqual(frame.detectedCount, 1)
+        XCTAssertEqual(frame.captureMode, ScannerCaptureMode.binder.rawValue)
+        XCTAssertEqual(frame.binderDetections?.first?.selectedCardID, "swsh9-132")
         XCTAssertNotNil(frame.quad)
         XCTAssertTrue(
             FileManager.default.fileExists(atPath: session.url.appendingPathComponent(frame.imageFile).path),
@@ -72,6 +88,7 @@ final class ScannerDevModeStoreTests: XCTestCase {
         let record = try XCTUnwrap(evidence.last)
         XCTAssertEqual(record.imageFile, frame.imageFile)
         XCTAssertEqual(record.source, "importedPhoto")
+        XCTAssertEqual(record.captureMode, ScannerCaptureMode.binder.rawValue)
         XCTAssertEqual(record.outcome, "binderPage: 1 detections, 1 matched")
         let originalFile = try XCTUnwrap(record.originalImageFile)
         XCTAssertTrue(
@@ -96,6 +113,42 @@ final class ScannerDevModeStoreTests: XCTestCase {
             ),
             "attempt crop images are opt-in and must not be written by default"
         )
+    }
+
+    func testMixedGameSessionSummaryPreservesEveryModeAndCaptureMode() async throws {
+        let image = ScannerTestImage.solid(width: 90, height: 120)
+        await ScannerDevModeStore.shared.record(
+            image: image,
+            source: .photoCapture,
+            mode: .mtg,
+            elapsedMs: 1,
+            result: .failure(.noMatch),
+            diagnostics: nil,
+            captureMode: .card
+        )
+        await ScannerDevModeStore.shared.record(
+            image: image,
+            source: .photoCapture,
+            mode: .pokemon,
+            elapsedMs: 2,
+            result: nil,
+            diagnostics: nil,
+            outcomeLabel: "binderPage: 0 detections, 0 matched",
+            captureMode: .binder,
+            binderDetections: []
+        )
+
+        let session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        let bundle = try JSONDecoder().decode(
+            RecordedScanBundle.self,
+            from: Data(contentsOf: session.url.appendingPathComponent("results.json"))
+        )
+
+        XCTAssertEqual(bundle.summary.mode, "mixed")
+        XCTAssertEqual(bundle.summary.modes ?? [], ["mtg", "pokemon"])
+        XCTAssertEqual(bundle.summary.captureModes ?? [], ["card", "binder"])
+        XCTAssertEqual(bundle.frames.map(\.mode), ["mtg", "pokemon"])
+        XCTAssertEqual(bundle.frames.compactMap(\.captureMode), ["card", "binder"])
     }
 
     func testAttemptImageEscapeHatchRestoresAttemptCropFiles() async throws {

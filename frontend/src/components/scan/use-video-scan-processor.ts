@@ -519,6 +519,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       scanFilter: ScanFilter;
       analysisIntervalMs: number;
       printingMode: ScannerPrintingMode;
+      ocrEnabled: boolean;
     }) => {
       const {
         video,
@@ -527,6 +528,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
         scanFilter,
         analysisIntervalMs,
         printingMode,
+        ocrEnabled,
       } = params;
       const primaryIndex = embeddingIndexes[0];
       if (!primaryIndex) {
@@ -549,7 +551,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
       });
       // Warm the OCR worker in the background; it's only invoked when the
       // embedding shortlist is ambiguous (likely twins).
-      void ensureOcrWorker();
+      if (ocrEnabled) void ensureOcrWorker();
       const ocrTrackers = new Map<string, OcrVoteTracker>();
       const embedAveragers = new Map<string, EmbeddingTrackAverager>();
       // Open-set rejection gate (null = artifact missing or encoder mismatch;
@@ -659,6 +661,7 @@ export function useVideoScanProcessor(callbacks: ProcessorCallbacks) {
                 cardFaceGate,
                 embedAverager,
                 printingMode,
+                ocrEnabled,
               );
               if (pm.bestMatch?.proposalLabel === "yolo-blur") blurredFrames++;
               proposalMatches.push(pm);
@@ -1016,6 +1019,7 @@ async function matchDetectionEmbedding(
   cardFaceGate: CardFaceGate | null,
   embedAverager: EmbeddingTrackAverager | null,
   printingMode: ScannerPrintingMode,
+  ocrEnabled: boolean,
 ): Promise<BrowserVideoProposalMatch> {
   // Crop at source resolution (detection coords are in 640px-frame space).
   // The sharpness gate downsamples to 96px internally, so its calibration is
@@ -1102,6 +1106,7 @@ async function matchDetectionEmbedding(
           ? candidates[0]!.confidence - candidates[1]!.confidence
           : 1;
       if (
+        ocrEnabled &&
         ocrTracker &&
         candidates.length >= 2 &&
         margin < OCR_MARGIN_THRESHOLD

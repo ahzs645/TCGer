@@ -94,7 +94,7 @@ struct ScannerAssetInstallRow: View {
             Label("On-device recognition", systemImage: "viewfinder")
                 .font(.headline)
             if let manifest = store.manifests[game] {
-                Text("\(manifest.cardCount.formatted(.number)) cards • \(manifest.dimension)-dimension ArcFace index")
+                Text("\(manifest.displayedCardCount.formatted(.number)) cards • \(manifest.dimension)-dimension ArcFace index")
                 Text("\(formattedBytes(manifest.downloadBytes)) download. The matching model, vectors, and card metadata are integrity-checked and activated together.")
             } else {
                 Text("Model information is unavailable while offline.")

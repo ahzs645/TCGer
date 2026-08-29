@@ -26,7 +26,10 @@ object CardPrintingResolver {
         verifiedExactPrintingId: String? = null,
     ): CardPrintingDecision {
         val familyId = primary.card.recognitionFamilyId
-        val family = (listOf(primary) + candidates)
+        val expandedPrimary = primary.card.exactPrintingRows().map { printing ->
+            primary.copy(card = printing)
+        }
+        val family = (expandedPrimary + primary + candidates)
             .distinctBy { it.card.exactPrintingId ?: it.card.cardId }
             .filter { candidate ->
                 if (familyId == null) candidate.card.cardId == primary.card.cardId

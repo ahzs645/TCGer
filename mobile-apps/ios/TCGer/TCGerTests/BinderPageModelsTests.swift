@@ -3,10 +3,34 @@ import XCTest
 
 @MainActor
 final class BinderPageModelsTests: XCTestCase {
-    func testDetectionsWithMatchesAreIncludedByDefault() {
+    func testOnlyExactHighConfidenceMatchesAreIncludedByDefault() {
         XCTAssertTrue(BinderPageScanner.shouldIncludeByDefault(status: .matched))
-        XCTAssertTrue(BinderPageScanner.shouldIncludeByDefault(status: .uncertain))
+        XCTAssertFalse(BinderPageScanner.shouldIncludeByDefault(status: .uncertain))
+        XCTAssertFalse(BinderPageScanner.shouldIncludeByDefault(status: .printingUnresolved))
         XCTAssertFalse(BinderPageScanner.shouldIncludeByDefault(status: .unmatched))
+    }
+
+    func testMTGFinalCapturesRequireTitleWhileLivePreviewRemainsVisual() {
+        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.requiresTitleConfirmation(
+            game: .magic,
+            purpose: .binderPage,
+            source: .importedPhoto
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.requiresTitleConfirmation(
+            game: .magic,
+            purpose: .singleCard,
+            source: .livePreview
+        ))
+        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.requiresTitleConfirmation(
+            game: .magic,
+            purpose: .singleCard,
+            source: .photoCapture
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.requiresTitleConfirmation(
+            game: .pokemon,
+            purpose: .binderPage,
+            source: .photoCapture
+        ))
     }
 
     func testSampleBinderPageUsesACompleteThreeByThreePocketLayout() {

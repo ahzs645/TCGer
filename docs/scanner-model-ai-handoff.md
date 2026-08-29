@@ -5,7 +5,81 @@
 > three-game release inventory, operational process, and open risks, start at
 > [scanner-system/README.md](scanner-system/README.md).
 
-Last updated: 2026-08-16 (per-pocket dev-mode coordinator evidence)
+Last updated: 2026-08-28 (mixed-game telemetry and conservative binder import)
+
+## Session Results 2026-08-27 (MTG cards + loose-card binder test)
+
+Archive: `TCGer-DevMode-scan-session-20260827-223150.zip`, ingested as
+`scan-session-20260827-223150` with unchanged session bytes. It is one mixed
+session: frames 0-21 are MTG single-card captures, frames 22-27 are Pokemon
+single-card captures, and frames 28-31 are four Pokemon binder-mode captures
+of six loose cards. The old summary stored only the first mode (`mtg`), but
+the frames were routed correctly; this was a session-summary defect, not a
+cross-game scanner leak. The canonical manifest now records
+`mode: mixed`, `modes: [mtg, pokemon]`, and
+`capture_modes: [card, binder]`.
+
+The MTG review found 12 accepted frames: 7 correct and 5 wrong. Correct and
+wrong visual scores overlap; the highest wrong example was Vow to Erebor
+retrieved as The Ur-Dragon at 0.720. Raising or lowering one global threshold
+therefore does not create a useful precision/recall split. None of the five
+wrong accepts had title agreement. Three of seven correct accepts did have
+recorded title agreement (Duskwatch Hunter, Pinecone Strike, and Wargling),
+which is a conservative lower-bound because the old pipeline did not run title
+OCR on every otherwise-strong frame.
+
+Retained policy changes:
+
+- MTG binder pockets and intentional single-card captures now require exact
+  catalog-title agreement or collector OCR agreement before returning a final
+  result. Live preview remains visual-only. Three of the five wrong accepts in
+  this session came from upside-down retries of physically upright Oin the
+  Brave or Thranduil's Decree frames. A fourth, Vow to Erebor -> The Ur-Dragon,
+  used a landscape interior fragment (pixel-space quad ratio ~1.35) that was
+  rotated into a portrait crop. A genuinely upside-down card remains supported
+  because its rotated retry makes the title readable; fragments and unverified
+  rotated neighbors are now rejected.
+- A title confirms the card name, not a printing. When multiple printings
+  remain unresolved, the review shows **Choose Printing** and does not select
+  a card for bulk import.
+- Across games, only an exact-printing `.matched` result starts selected.
+  `.uncertain`, name-only, and unmatched pockets require a deliberate user
+  action. Android now applies the same 0.82 auto-selection floor instead of
+  selecting its first suggestion regardless of confidence.
+
+The four Pokemon binder captures localized 5 / 5 / 5 / 6 regions (21 of 24
+expected loose-card positions). Simulator replay with the bundled runtime
+reproduced 4 / 5 / 4 / 5 candidate-bearing regions and 1 / 0 / 2 / 0 matched
+regions, passed the replay harness, and produced no wrong auto-includes. This
+session contains no per-pocket human correction labels, so that run is a
+localization/retrieval regression test, not a full identity-accuracy score.
+The next physical evidence still needed is a real MTG sleeve-binder page;
+that will measure how often title OCR survives glare and the smaller pocket
+crop before considering any recall relaxation.
+
+Device whole-page latency for those four Pokemon binder captures was 938 / 690
+/ 741 / 960 ms (mean 832 ms); rectangle detection itself took 114-133 ms. The
+iOS path recognizes at most three pockets concurrently, so these are already
+end-to-end page timings rather than per-pocket timings. A CPU-only Simulator
+replay took 13.6 s cold and 4.3-7.2 s for the following pages and must not be
+used as a phone-performance proxy. The replay harness now prints per-page and
+summary latency so regressions remain visible.
+
+MTG binder latency still needs a physical page measurement. In the available
+single-card MTG evidence, title OCR already ran on 67 of 82 attempts (82%) and
+averaged about 80 ms when invoked. Requiring title or collector confirmation
+therefore does not add OCR to every pocket, but exact page latency depends on
+glare, candidate ambiguity, and how many orientation retries survive the
+visual gates. Android does not yet have equivalent device timing evidence and
+currently recognizes binder crops serially; profile it separately before
+treating iOS timing as a cross-platform result.
+
+New recordings preserve each frame's game, `card` versus `binder` capture
+mode, and the final per-pocket status/candidate/inclusion snapshot. Mixed
+session replay also selects the recorded game per frame. Legacy ingestion
+infers binder frames from their longstanding `binderPage:` evidence outcome,
+so old archives remain byte-for-byte immutable while gaining correct catalog
+metadata.
 
 ## Session Results 2026-08-11 (22:03 device binder export)
 

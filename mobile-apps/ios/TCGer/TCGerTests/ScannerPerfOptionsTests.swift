@@ -6,6 +6,7 @@ import XCTest
 /// optimization must produce the same answers as the legacy path it replaces.
 final class ScannerPerfOptionsTests: XCTestCase {
     private let perfKeys = [
+        ScannerPerfOptions.ocrEnabledDefaultsKey,
         ScannerPerfOptions.vectorizedANNDefaultsKey,
         ScannerPerfOptions.allowedIndexCacheDefaultsKey,
         ScannerPerfOptions.stagedHypothesesDefaultsKey,
@@ -17,6 +18,14 @@ final class ScannerPerfOptionsTests: XCTestCase {
         ScannerPerfOptions.leanOCRStripsDefaultsKey,
         ScannerPerfOptions.footerFirstOCRDefaultsKey,
     ]
+
+    func testOCREnabledDefaultsOnAndPersistsUserChoice() {
+        XCTAssertTrue(ScannerPerfOptions.isOCREnabled)
+
+        UserDefaults.standard.set(false, forKey: ScannerPerfOptions.ocrEnabledDefaultsKey)
+
+        XCTAssertFalse(ScannerPerfOptions.isOCREnabled)
+    }
 
     override func setUp() {
         super.setUp()

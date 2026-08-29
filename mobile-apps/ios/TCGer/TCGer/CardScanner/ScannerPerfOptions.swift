@@ -21,6 +21,16 @@ import Foundation
 /// between passes over the same warm coordinator and isolate that flag's
 /// effect from cold-load costs.
 nonisolated enum ScannerPerfOptions {
+    /// User-facing master switch for all on-device title and collector-number
+    /// OCR. Unlike the developer-only speed toggles below, this is a durable
+    /// product preference surfaced in Settings and Scanner Options. Visual
+    /// retrieval continues to run when disabled; it simply cannot use text
+    /// evidence to rescue or disambiguate a match.
+    static let ocrEnabledDefaultsKey = "scannerOCREnabled"
+    static var isOCREnabled: Bool {
+        flag(ocrEnabledDefaultsKey, environment: "SCANNER_OCR_ENABLED", defaultValue: true)
+    }
+
     /// ANN retrieval as one vDSP matrix-vector product over a flat,
     /// contiguous row-major buffer with precomputed row norms, followed by an
     /// exact scalar-Double re-rank of the shortlist so returned distances are

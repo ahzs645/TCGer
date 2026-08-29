@@ -11,6 +11,10 @@ actor AnnoyIndexStore: ANNIndexProviding {
     private let bundle: Bundle
     private let fileURL: URL?
     private var vectors: [[Float]] = []
+    private var packedVectorData: Data?
+    private var packedRowNorms: [Float] = []
+    private var packedCount = 0
+    private var packedDimension = 0
     private var isLoaded = false
     nonisolated let isAvailable: Bool
 
@@ -67,7 +71,18 @@ actor AnnoyIndexStore: ANNIndexProviding {
         allowedIndices: Set<Int>
     ) async throws -> [ANNVectorMatch] {
         try await loadIfNeeded()
-        guard !vectors.isEmpty, !allowedIndices.isEmpty else { return [] }
+        guard !allowedIndices.isEmpty else { return [] }
+
+        if let packedVectorData {
+            return packedNearestNeighbors(
+                for: vector,
+                limit: limit,
+                allowedIndices: allowedIndices,
+                data: packedVectorData
+            )
+        }
+
+        guard !vectors.isEmpty else { return [] }
 
         if ScannerPerfOptions.isVectorizedANNEnabled {
             return vectorizedNearestNeighbors(
@@ -149,6 +164,108 @@ actor AnnoyIndexStore: ANNIndexProviding {
         return Array(shortlist.prefix(limit))
     }
 
+    /// Searches a file-backed Int8 index without expanding it into two
+    /// `count * dimension` Float buffers. That expansion is tolerable for the
+    /// small historical fixture, but Magic's 111k-row index consumed more
+    /// than 340 MB before metadata, camera frames, and Core ML were counted.
+    ///
+    /// The Int8 quantization scale cancels during the approximate cosine pass.
+    /// Only the small surviving shortlist is dequantized for the exact Double
+    /// rerank used by the legacy implementation.
+    private func packedNearestNeighbors(
+        for vector: [Float],
+        limit: Int,
+        allowedIndices: Set<Int>,
+        data: Data
+    ) -> [ANNVectorMatch] {
+        guard limit > 0, packedCount > 0, packedDimension > 0 else { return [] }
+        let validIndices = allowedIndices.filter { $0 >= 0 && $0 < packedCount }
+        guard !validIndices.isEmpty else { return [] }
+
+        guard vector.count == packedDimension else {
+            return validIndices.sorted().prefix(limit).map {
+                ANNVectorMatch(index: $0, distance: .infinity)
+            }
+        }
+
+        var querySumOfSquares: Float = 0
+        vDSP_svesq(vector, 1, &querySumOfSquares, vDSP_Length(vector.count))
+        let queryNorm = querySumOfSquares.squareRoot()
+        guard queryNorm > 0 else {
+            return validIndices.sorted().prefix(limit).map {
+                ANNVectorMatch(index: $0, distance: .infinity)
+            }
+        }
+
+        let shortlistLimit = min(limit + 8, validIndices.count)
+        var shortlist: [ANNVectorMatch] = []
+        shortlist.reserveCapacity(shortlistLimit + 1)
+
+        data.withUnsafeBytes { raw in
+            let base = raw.baseAddress!.advanced(by: 8).assumingMemoryBound(to: Int8.self)
+            for index in validIndices {
+                let rowNorm = packedRowNorms[index]
+                guard rowNorm > 0 else { continue }
+                let offset = index * packedDimension
+                var dot: Float = 0
+                for component in 0..<packedDimension {
+                    dot += vector[component] * Float(base[offset + component])
+                }
+                let cosine = Double(dot / (queryNorm * rowNorm))
+                let match = ANNVectorMatch(
+                    index: index,
+                    distance: 1 - min(max(cosine, -1), 1)
+                )
+                if shortlist.count == shortlistLimit,
+                   let last = shortlist.last,
+                   !Self.ranksBefore(match, last) {
+                    continue
+                }
+                shortlist.append(match)
+                shortlist.sort(by: Self.ranksBefore)
+                if shortlist.count > shortlistLimit {
+                    shortlist.removeLast()
+                }
+            }
+        }
+
+        let exact = data.withUnsafeBytes { raw -> [ANNVectorMatch] in
+            let base = raw.baseAddress!.advanced(by: 8).assumingMemoryBound(to: Int8.self)
+            return shortlist.map { match in
+                let offset = match.index * packedDimension
+                var dot: Double = 0
+                var lhsNorm: Double = 0
+                var rhsNorm: Double = 0
+                for component in 0..<packedDimension {
+                    let lhs = Double(vector[component])
+                    let rhs = Double(Float(base[offset + component]) / 127)
+                    dot += lhs * rhs
+                    lhsNorm += lhs * lhs
+                    rhsNorm += rhs * rhs
+                }
+                let denominator = lhsNorm.squareRoot() * rhsNorm.squareRoot()
+                let distance: Double
+                if denominator > 0 {
+                    let cosine = dot / denominator
+                    distance = 1 - min(max(cosine, -1), 1)
+                } else {
+                    distance = .infinity
+                }
+                return ANNVectorMatch(index: match.index, distance: distance)
+            }
+        }
+        return Array(exact.sorted(by: Self.ranksBefore).prefix(limit))
+    }
+
+    private nonisolated static func ranksBefore(
+        _ lhs: ANNVectorMatch,
+        _ rhs: ANNVectorMatch
+    ) -> Bool {
+        lhs.distance == rhs.distance
+            ? lhs.index < rhs.index
+            : lhs.distance < rhs.distance
+    }
+
     private func buildFlatRepresentationIfNeeded() {
         guard rowNorms.isEmpty, let first = vectors.first else { return }
         let dimension = first.count
@@ -170,10 +287,10 @@ actor AnnoyIndexStore: ANNIndexProviding {
         }
     }
 
-    /// Loads the packed int8 index: header [Int32 count, Int32 dim] (little-endian)
-    /// followed by `count * dim` Int8 values, dequantised by `scale` (127). This
-    /// replaces the impractical ~80 MB `[[Float]]` JSON with an ~8 MB binary that
-    /// matches the web index exactly.
+    /// Loads the packed Int8 index: header [Int32 count, Int32 dim]
+    /// (little-endian), followed by `count * dim` values. File-backed indices
+    /// remain packed and memory-mapped; only their small row-norm table is
+    /// materialized. In-memory test vectors continue to use the Float path.
     private func loadIfNeeded() async throws {
         guard !isLoaded else { return }
         defer { isLoaded = true }
@@ -181,30 +298,32 @@ actor AnnoyIndexStore: ANNIndexProviding {
                 ?? bundle.url(forResource: resourceName, withExtension: fileExtension) else {
             throw StoreError.indexUnavailable
         }
-        let data = try Data(contentsOf: url)
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
         guard data.count >= 8 else { throw StoreError.indexUnavailable }
 
         let count = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 0, as: Int32.self).littleEndian })
         let dim = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4, as: Int32.self).littleEndian })
-        guard count > 0, dim > 0, data.count >= 8 + count * dim else {
+        guard count > 0, dim > 0, data.count == 8 + count * dim else {
             throw StoreError.indexUnavailable
         }
 
-        let scale: Float = 127
-        var loaded = [[Float]]()
-        loaded.reserveCapacity(count)
+        var norms = [Float](repeating: 0, count: count)
         data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
             let base = raw.baseAddress!.advanced(by: 8).assumingMemoryBound(to: Int8.self)
-            for i in 0..<count {
-                let offset = i * dim
-                var row = [Float](repeating: 0, count: dim)
-                for k in 0..<dim {
-                    row[k] = Float(base[offset + k]) / scale
+            for index in 0..<count {
+                let offset = index * dim
+                var sumOfSquares: Float = 0
+                for component in 0..<dim {
+                    let value = Float(base[offset + component])
+                    sumOfSquares += value * value
                 }
-                loaded.append(row)
+                norms[index] = sumOfSquares.squareRoot()
             }
         }
-        vectors = loaded
+        packedCount = count
+        packedDimension = dim
+        packedRowNorms = norms
+        packedVectorData = data
     }
 
     private func cosineDistance(lhs: [Float], rhs: [Float]) -> Double {
@@ -252,6 +371,6 @@ actor AnnoyIndexStore: ANNIndexProviding {
         let dimension = Int(data.withUnsafeBytes {
             $0.loadUnaligned(fromByteOffset: 4, as: Int32.self).littleEndian
         })
-        return count > 0 && dimension > 0 && fileSize >= 8 + count * dimension
+        return count > 0 && dimension > 0 && fileSize == 8 + count * dimension
     }
 }

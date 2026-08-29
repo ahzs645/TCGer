@@ -17,11 +17,36 @@ final class ScannerRecordingDiagnosticTests: XCTestCase {
         let root = URL(fileURLWithPath: dir, isDirectory: true)
         let replay = try ScannerReplayDocumentLoader.load(urls: [root])
 
-        let strategy = BoardCardEmbeddingScannerStrategy()
-        print("DIAG supports pokemon: \(strategy.supports(.pokemon))")
-        print("DIAG encoder available: \(CardEmbeddingEncoder().isAvailable)")
-        print("DIAG index available: \(AnnoyIndexStore().isAvailable)")
-        print("DIAG supported games: \(CardIndexMetadataStore.shared.supportedGames)")
+        let environment = ProcessInfo.processInfo.environment
+        let mode = environment["SCANNER_RECORDING_MODE"]
+            .flatMap(ScanMode.init(rawValue:)) ?? .pokemon
+        let runtime = ScannerAssetStore.shared.runtime(for: mode.tcgGame)
+        let encoder: CardEmbeddingEncoder
+        let indexStore: AnnoyIndexStore
+        let metadataStore: CardIndexMetadataStore
+        if let runtime {
+            encoder = CardEmbeddingEncoder(
+                modelLoader: FileCardEmbeddingModelLoader(modelURL: runtime.modelURL)
+            )
+            indexStore = AnnoyIndexStore(fileURL: runtime.vectorsURL)
+            metadataStore = CardIndexMetadataStore(fileURL: runtime.metadataURL)
+        } else {
+            encoder = CardEmbeddingEncoder()
+            indexStore = AnnoyIndexStore()
+            metadataStore = .shared
+        }
+
+        let strategy = BoardCardEmbeddingScannerStrategy(
+            variant: .arcface,
+            encoder: encoder,
+            indexStore: indexStore,
+            metadataStore: metadataStore,
+            supportedModes: [mode]
+        )
+        print("DIAG supports \(mode.rawValue): \(strategy.supports(mode))")
+        print("DIAG encoder available: \(encoder.isAvailable)")
+        print("DIAG index available: \(indexStore.isAvailable)")
+        print("DIAG supported games: \(metadataStore.supportedGames)")
         print("DIAG gate loaded: \(CardFaceRejectionGate.loadBundled() != nil)")
 
         let coordinator = CardScannerCoordinator(
@@ -31,11 +56,11 @@ final class ScannerRecordingDiagnosticTests: XCTestCase {
         _ = coordinator
 
         let cropper = CardCropper()
-        let encoder = CardEmbeddingEncoder()
-        let indexStore = AnnoyIndexStore()
-        let metadataStore = CardIndexMetadataStore.shared
         let gate = CardFaceRejectionGate.loadBundled()
-        let allowed = await metadataStore.indices(for: TCGGame.pokemon, setCode: nil)
+        let allowed = await metadataStore.physicalCardIndices(
+            for: mode.tcgGame,
+            setCode: nil
+        )
 
         let cropDir = URL(fileURLWithPath: "/tmp/scanner-diag-crops", isDirectory: true)
         try? FileManager.default.createDirectory(at: cropDir, withIntermediateDirectories: true)
@@ -62,7 +87,12 @@ final class ScannerRecordingDiagnosticTests: XCTestCase {
             return "\(label): gate=\(String(format: "%.2f", gateScore)) top3 \(tops.joined(separator: ", "))"
         }
 
-        for frame in replay.recording.frames.sorted(by: { $0.index < $1.index }).prefix(18) {
+        let acceptedOnly = environment["SCANNER_RECORDING_ACCEPTED_ONLY"] == "1"
+        let frames = replay.recording.frames
+            .filter { ScanMode(rawValue: $0.mode) == mode }
+            .filter { !acceptedOnly || $0.identified }
+            .sorted(by: { $0.index < $1.index })
+        for frame in frames {
             guard let image = replay.images[frame.imageFile] else { continue }
 
             // What does Vision detect on this saved frame, per request type?
@@ -95,6 +125,13 @@ final class ScannerRecordingDiagnosticTests: XCTestCase {
                 )
                 if let crop = cropper.makeNormalizedCrop(from: image, observation: recordedObservation) {
                     notes.append(try await analyze(crop, label: "recorded", index: frame.index))
+                    if let rotated = cropper.rotated180(crop) {
+                        notes.append(try await analyze(
+                            rotated,
+                            label: "recorded180",
+                            index: frame.index
+                        ))
+                    }
                 }
             }
             print("DIAG frame \(frame.index) \(notes.joined(separator: " | "))")

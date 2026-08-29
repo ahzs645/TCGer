@@ -166,7 +166,12 @@ export function isPokemonPocketScannerEntry(entry) {
 }
 
 export function assertPhysicalScannerEntries(entries, description = "Scanner metadata") {
-  const contaminated = entries.filter(isPokemonPocketScannerEntry);
+  const contaminated = entries.flatMap((entry) => [
+    entry,
+    ...(Array.isArray(entry.printings)
+      ? entry.printings.map((printing) => ({ ...printing, game: printing.game ?? entry.game }))
+      : []),
+  ]).filter(isPokemonPocketScannerEntry);
   if (contaminated.length > 0) {
     const first = contaminated[0]?.cardId ?? contaminated[0]?.name ?? "unknown";
     throw new Error(

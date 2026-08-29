@@ -25,5 +25,6 @@ object LocalEmbeddingDispatch {
     }
 
     fun permitsManualOcrRescue(options: CardScanOptions): Boolean =
-        !options.captureSource.equals("automatic-camera", ignoreCase = true)
+        options.ocrEnabled &&
+            !options.captureSource.equals("automatic-camera", ignoreCase = true)
 }

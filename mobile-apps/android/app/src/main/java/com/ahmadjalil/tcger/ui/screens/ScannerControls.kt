@@ -157,23 +157,45 @@ internal fun ScannerOptionsSheet(
                     }
                 }
             }
+            item {
+                OptionSection("Recognition") {
+                    SwitchRow(
+                        "Use OCR for Difficult Scans",
+                        options.ocrEnabled,
+                        enabled = !isProcessing,
+                        detail = "Read card titles and collector numbers only when visual matching cannot decide.",
+                    ) { onOptionsChanged(options.copy(ocrEnabled = it)) }
+                }
+            }
             if (options.captureMode == ScannerCaptureMode.BINDER) {
                 item {
                     OptionSection("Binder scans") {
                         SwitchRow(
                             "Save Page Photos",
                             options.savesBinderPageImages,
-                            enabled = false,
-                            detail = "No Android repository or server API currently accepts binder-page photos.",
+                            enabled = !isProcessing,
+                            detail = "Stores the aligned source page privately on this device after cards are added.",
                             testTag = ParityControlIDs.OPTION_SCANNER_SAVE_BINDER_PAGE_PHOTOS,
-                        ) { }
+                        ) { onOptionsChanged(options.copy(savesBinderPageImages = it)) }
                         SwitchRow(
                             "Replace Photos on Retake",
                             options.replacesBinderPageImages,
-                            enabled = false,
-                            detail = "Available only when page-photo persistence is supported.",
+                            enabled = options.savesBinderPageImages && !isProcessing,
+                            detail = "Replace an existing photo for the same binder and page number.",
                             testTag = ParityControlIDs.OPTION_SCANNER_REPLACE_BINDER_PAGE_PHOTOS,
                         ) { onOptionsChanged(options.copy(replacesBinderPageImages = it)) }
+                        OutlinedTextField(
+                            value = options.binderPageNumber.toString(),
+                            onValueChange = { raw ->
+                                raw.filter(Char::isDigit).toIntOrNull()?.takeIf { it in 1..999 }?.let {
+                                    onOptionsChanged(options.copy(binderPageNumber = it))
+                                }
+                            },
+                            enabled = !isProcessing,
+                            label = { Text("Page number") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
@@ -183,6 +205,24 @@ internal fun ScannerOptionsSheet(
                     if (options.language !in latinOcrLanguages) {
                         AvailabilityText("On-device Android OCR is Latin-script only; use a server engine for this language.")
                     }
+                }
+            }
+            item {
+                OptionSection("Shared Web Session") {
+                    OutlinedTextField(
+                        value = options.sharedSessionCode,
+                        onValueChange = { onOptionsChanged(options.copy(sharedSessionCode = it.uppercase())) },
+                        enabled = capabilities.serverConfigured && !isProcessing,
+                        label = { Text("Session code") },
+                        supportingText = {
+                            Text(
+                                if (capabilities.serverConfigured) "New confirmed scans are sent to this web session."
+                                else "Configure and sign in to a server first.",
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
             item {

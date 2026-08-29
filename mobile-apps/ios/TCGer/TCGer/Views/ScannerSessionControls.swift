@@ -225,6 +225,8 @@ private struct ScannerOptionsPopover: View {
     private var leanOCRStripsEnabled = true
     @AppStorage(ScannerPerfOptions.footerFirstOCRDefaultsKey)
     private var footerFirstOCREnabled = true
+    @AppStorage(ScannerPerfOptions.ocrEnabledDefaultsKey)
+    private var ocrEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -332,6 +334,17 @@ private struct ScannerOptionsPopover: View {
                             Text(priceModeAvailabilityMessage)
                         }
                     }
+                }
+
+                Section {
+                    Toggle(isOn: $ocrEnabled) {
+                        Label("Use OCR for Difficult Scans", systemImage: "text.viewfinder")
+                    }
+                    .disabled(isProcessing)
+                } header: {
+                    Text("Recognition")
+                } footer: {
+                    Text("Uses titles and collector numbers only when visual matching is uncertain. This setting is saved for future scans.")
                 }
 
                 if showsBinderOptions {

@@ -8,6 +8,20 @@ import kotlinx.serialization.json.Json
 import kotlin.math.sqrt
 
 @Serializable
+data class CardEmbeddingPrinting(
+    val cardId: String,
+    val exactPrintingId: String? = null,
+    val format: String? = null,
+    val setCode: String? = null,
+    val collectorNumber: String? = null,
+    val setName: String? = null,
+    val rarity: String? = null,
+    val imageURL: String? = null,
+    val price: Double? = null,
+    val releaseDate: String? = null,
+)
+
+@Serializable
 data class CardEmbeddingMetadata(
     val annIndex: Int,
     val cardId: String,
@@ -22,6 +36,7 @@ data class CardEmbeddingMetadata(
     val exactPrintingId: String? = null,
     val recognitionFamilyId: String? = null,
     val releaseDate: String? = null,
+    val printings: List<CardEmbeddingPrinting> = emptyList(),
 ) {
     val isPhysicalPokemonCard: Boolean
         get() = (game == null || game.equals("pokemon", ignoreCase = true)) &&
@@ -31,6 +46,29 @@ data class CardEmbeddingMetadata(
     fun isEligibleForGame(requestedGame: String): Boolean = when (normalizeScannerGame(requestedGame)) {
         "pokemon" -> isPhysicalPokemonCard
         else -> game?.let(::normalizeScannerGame) == normalizeScannerGame(requestedGame)
+    }
+
+    fun exactPrintingRows(): List<CardEmbeddingMetadata> = if (printings.isEmpty()) {
+        listOf(this)
+    } else {
+        printings.map { printing ->
+            copy(
+                cardId = printing.cardId,
+                format = printing.format ?: format,
+                setCode = printing.setCode,
+                setName = printing.setName,
+                rarity = printing.rarity,
+                imageURL = printing.imageURL,
+                price = printing.price,
+                exactPrintingId = printing.exactPrintingId ?: printing.cardId,
+                releaseDate = printing.releaseDate,
+                printings = emptyList(),
+            )
+        }
+    }
+
+    fun hasSetCode(requestedSetCode: String): Boolean = exactPrintingRows().any {
+        it.setCode.equals(requestedSetCode, ignoreCase = true)
     }
 }
 
@@ -65,7 +103,7 @@ class PackedCardEmbeddingIndex private constructor(
             val card = metadata[row]
             if (physicalPokemonOnly && !card.isPhysicalPokemonCard) continue
             if (game != null && !card.isEligibleForGame(game)) continue
-            if (setCode != null && !card.setCode.equals(setCode, ignoreCase = true)) continue
+            if (setCode != null && !card.hasSetCode(setCode)) continue
             if (normalizedCardName != null && normalizedScannerCardName(card.name) != normalizedCardName) continue
             val rowNorm = rowNorms[row]
             if (rowNorm <= 0f) continue
@@ -85,12 +123,21 @@ class PackedCardEmbeddingIndex private constructor(
         }
 
         return top.sortedByDescending { it.similarity }.map { scored ->
-            CardEmbeddingMatch(scored.index, scored.similarity, metadata[scored.index])
+            val card = metadata[scored.index]
+            CardEmbeddingMatch(
+                scored.index,
+                scored.similarity,
+                if (setCode == null) card else card.copy(
+                    printings = card.printings.filter { it.setCode.equals(setCode, ignoreCase = true) },
+                ),
+            )
         }
     }
 
-    fun physicalPokemonCardCount(normalizedCardName: String): Int = metadata.count { card ->
-        card.isPhysicalPokemonCard && normalizedScannerCardName(card.name) == normalizedCardName
+    fun physicalPokemonCardCount(normalizedCardName: String): Int = metadata.sumOf { card ->
+        if (card.isPhysicalPokemonCard && normalizedScannerCardName(card.name) == normalizedCardName) {
+            card.exactPrintingRows().size
+        } else 0
     }
 
     fun cardCountForGame(game: String): Int = metadata.count { it.isEligibleForGame(game) }

@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("developerToolsUnlocked") private var developerToolsUnlocked = false
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var scannerDevModeRecordingEnabled = false
     @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var scannerCropRescueEnabled = false
+    @AppStorage(ScannerPerfOptions.ocrEnabledDefaultsKey) private var scannerOCREnabled = true
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var catalogStore = CatalogStore.shared
     @StateObject private var scannerAssets = ScannerAssetStore.shared
@@ -326,13 +327,22 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle(isOn: $scannerOCREnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Use OCR for Difficult Scans")
+                            Text("Read card titles and collector numbers only when visual matching is uncertain")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     ForEach(ScannerAssetStore.downloadableGames) { game in
                         ScannerAssetInstallRow(game: game, store: scannerAssets)
                     }
                 } header: {
                     Text("Offline Scanner Models")
                 } footer: {
-                    Text("Optional game-specific recognition models run entirely on this phone. Install or update them over Wi-Fi, then reopen the scanner to use the new runtime.")
+                    Text("OCR is enabled by default and runs only on difficult intentional captures. Turning it off can make scans faster, but may reduce card and exact-print accuracy. Scanner models run entirely on this phone.")
                 }
 
                 CommunityGameLibrariesSection(store: gamePackages)

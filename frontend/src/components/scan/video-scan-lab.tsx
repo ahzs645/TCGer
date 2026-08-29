@@ -23,6 +23,7 @@ import { useGameFilterStore } from "@/stores/game-filter";
 import { isSupportedScannerTcg } from "@/lib/scan/scan-types";
 import {
   normalizeScannerPrintingMode,
+  readScannerOcrEnabled,
   SCANNER_PRINTING_MODE_STORAGE_KEY,
   type ScannerPrintingMode,
 } from "@/lib/scan/scanner-options";
@@ -302,6 +303,7 @@ export function VideoScanLab() {
           scanFilter,
           analysisIntervalMs,
           printingMode,
+          ocrEnabled: readScannerOcrEnabled(),
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Embedding scan failed.");

@@ -284,8 +284,8 @@ struct BinderPageReviewView: View {
                     .font(.subheadline.weight(.semibold))
                 Text(
                     ScannerDevModeStore.isEnabled
-                        ? "Matches start selected. Uncertain and unmatched cards stay visible for review. Hold to label exclusions."
-                        : "Matches start selected. Uncertain and unmatched cards stay visible until you choose them."
+                        ? "Only verified printings start selected. Review uncertain, unresolved-printing, and unmatched cards. Hold to label exclusions."
+                        : "Only verified printings start selected. Review uncertain and unresolved-printing cards before adding them."
                 )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -530,6 +530,7 @@ struct BinderPageReviewView: View {
             statusFilterButton(title: "All", status: nil)
             statusFilterButton(title: "Matched", status: .matched)
             statusFilterButton(title: "Uncertain", status: .uncertain)
+            statusFilterButton(title: "Choose Printing", status: .printingUnresolved)
             statusFilterButton(title: "Unmatched", status: .unmatched)
 
             Divider()
@@ -723,7 +724,7 @@ struct BinderPageReviewView: View {
     }
 
     private var statusFilterName: String {
-        statusFilter?.rawValue.capitalized ?? "All"
+        statusFilter?.displayName ?? "All"
     }
 
     private func matchesStatusFilter(_ detection: BinderCardDetection) -> Bool {
@@ -982,7 +983,7 @@ struct BinderPageReviewView: View {
         cardIndex: Int,
         detection: BinderCardDetection
     ) -> String {
-        let status = detection.status.rawValue.capitalized
+        let status = detection.status.displayName
         let page = pageIndex.map { "Page \($0 + 1) · " } ?? ""
         guard let candidate = detection.selectedCandidate else {
             let reason = detection.exclusionReason.map { " · \($0.displayName)" }
@@ -1000,6 +1001,7 @@ struct BinderPageReviewView: View {
         switch status {
         case .matched: return "Matched"
         case .uncertain: return "Review"
+        case .printingUnresolved: return "Choose Printing"
         case .unmatched: return "Unmatched"
         }
     }
@@ -1022,6 +1024,7 @@ struct BinderPageReviewView: View {
         switch status {
         case .matched: return .green
         case .uncertain: return .orange
+        case .printingUnresolved: return .yellow
         case .unmatched: return .red
         }
     }
@@ -1346,6 +1349,20 @@ private struct BinderCardDetectionDetailView: View {
                             style: .detail,
                             tint: statusColor
                         )
+                        if detection.status == .printingUnresolved {
+                            Label(
+                                "The card name is verified, but the exact printing is not. Choose the matching set below before adding it.",
+                                systemImage: "square.stack.3d.up.trianglebadge.exclamationmark"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                Color.orange.opacity(0.1),
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                        }
                     } else {
                         ContentUnavailableView(
                             "No Match",
@@ -1529,6 +1546,7 @@ private struct BinderCardDetectionDetailView: View {
         switch detection.status {
         case .matched: return .green
         case .uncertain: return .orange
+        case .printingUnresolved: return .yellow
         case .unmatched: return .red
         }
     }

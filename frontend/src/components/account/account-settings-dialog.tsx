@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import Image from "next/image";
 import {
   Activity,
@@ -59,6 +65,11 @@ import {
   SMART_FOLDER_STORAGE_KEY_PREFIX,
 } from "@/lib/storage/keys";
 import { gamePresentation } from "@/lib/games";
+import {
+  readScannerOcrEnabled,
+  subscribeScannerOcrEnabled,
+  writeScannerOcrEnabled,
+} from "@/lib/scan/scanner-options";
 import { ENABLED_PREFERENCE_KEY, GAME_LABELS } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useDemoStore } from "@/stores/demo-store";
@@ -135,6 +146,11 @@ export function AccountSettingsDialog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [resettingDemo, setResettingDemo] = useState(false);
   const [demoResetMessage, setDemoResetMessage] = useState<string | null>(null);
+  const scannerOcrEnabled = useSyncExternalStore(
+    subscribeScannerOcrEnabled,
+    readScannerOcrEnabled,
+    () => true,
+  );
 
   const activeCount = useMemo(
     () => Object.values(enabledGames).filter(Boolean).length,
@@ -537,6 +553,32 @@ export function AccountSettingsDialog({
 
           <CatalogManagementPanel />
           <CommunityGameLibrariesPanel />
+
+          <Separator />
+
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold">Scanner Recognition</h3>
+              <p className="text-sm text-muted-foreground">
+                Configure browser-side recognition on this device.
+              </p>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border bg-background p-3">
+              <div>
+                <p className="text-sm font-medium">Use OCR for Difficult Scans</p>
+                <p className="text-xs text-muted-foreground">
+                  Read collector numbers when visual candidates are too similar.
+                </p>
+              </div>
+              <Switch
+                checked={scannerOcrEnabled}
+                onCheckedChange={(enabled) => {
+                  writeScannerOcrEnabled(enabled);
+                }}
+                aria-label="Toggle scanner OCR"
+              />
+            </div>
+          </section>
 
           <Separator />
 

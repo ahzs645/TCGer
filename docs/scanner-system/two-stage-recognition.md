@@ -47,15 +47,19 @@ executable verification behavior.
 | `annIndex` | Ephemeral row position in one exported index |
 
 Multiple exact printings may share one recognition family. Their metadata and
-vectors remain separate so the verifier can return the correct catalog object;
-the ArcFace head does not receive contradictory labels for the same artwork.
+catalog identities remain separate so the verifier can return the correct
+catalog object. The TrainingSetPlan selects one training reference per family;
+metadata schema v3 exports one ANN vector row per family with a nested,
+newest-first `printings` list. The ArcFace head therefore never receives
+contradictory labels for visually identical reprints, and the runtime no
+longer stores the same vector once per reprint.
 
 ## Game policies
 
 | Game | Visual family | Exact-print evidence | Required abstention cases |
 |---|---|---|---|
 | Pokémon | Reviewed artwork-family map produced by the audit described in [Artwork-family matching](artwork-family-matching.md); exact printing until that map exists | Name, set, collector number | Missing/unreadable set or number when variants collide; every TCG Pocket row is outside the physical-scanner scope |
-| Magic | Scryfall `illustration_id`, falling back to visible printing face | Title, set code/symbol, collector number, face, frame and treatment | Same-art reprints, The List/original pairs, basic lands, tokens, treatments, or unreadable footer evidence |
+| Magic | Oracle/card identity + Scryfall `illustration_id` + visible-style fingerprint (face, layout, frame, border, language, full-art/frame effects, textless and watermark), falling back to visible printing face | Title, set code/symbol, collector number and face | Same-style reprints, The List/original pairs, basic lands, tokens, or unreadable footer evidence |
 | Yu-Gi-Oh! | Artwork ID | Title, passcode and printed set code when the source enumerates printings | One artwork/passcode mapped to multiple products without readable set evidence |
 | Future game | Manifest/catalog-declared stable visual family | Declarative fields supported by a reviewed runtime adapter | Any unresolved candidate group or unsupported verifier evidence |
 
@@ -64,17 +68,41 @@ gallery because they identify no front. Catalog records may still retain them.
 Content-addressed storage may deduplicate identical bytes without collapsing
 their legitimate catalog relationships.
 
+Set code, collector number, release date, finish, promo status and security
+stamp do not enter the MTG visual-family key. They remain exact-print evidence:
+the identifying marks are too small or unreliable to justify duplicate ANN
+vectors. A different illustration, frame, border, language, face, full-art or
+other visible treatment retains its own family.
+
 ## Training and evaluation
 
 The durable image library hashes `recognitionFamilyId` into a 90/5/5
 train/validation/test partition. Every printing and sample in a family stays in
-one partition. The trainer:
+one partition. Before image materialization, the small platform-neutral
+`tcger-training-set-plan-v1` dataset records the chosen references, source
+catalog hashes, validated blob locations, and missing-image count. The trainer:
 
 1. trains only rows in the train partition;
 2. maps all train rows in one family to one ArcFace class;
 3. queries held-out families for primary Recall@1/5;
 4. separately reports exact catalog-row retrieval as a diagnostic;
-5. exports every eligible gallery row and its exact-print metadata.
+5. expands the winning family's nested printings only after ANN retrieval for
+   Quick Scan policy or Exact Printing review.
+
+An ANN top-K list is not the print chooser: large families such as basic lands
+can contain far more printings than the shortlist. Exact-print candidates must
+be expanded from the catalog by `recognitionFamilyId` after visual retrieval.
+
+## User OCR control
+
+OCR is an optional verifier, not the primary recognizer. It defaults on and is
+only invoked for uncertain intentional captures. A persistent **Use OCR for
+Difficult Scans** switch is available in iOS, Android, and web settings (and in
+the native scanner controls). Turning it off skips title and footer OCR, keeps
+visual retrieval and rejection thresholds active, and may therefore abstain or
+leave an exact printing unresolved more often. The setting is device-local:
+iOS stores it in `UserDefaults`, Android in `ScannerOptionsStore`, and web in
+the registered `tcger.scanner.ocr-enabled` local-storage key.
 
 Catalog augmentation is not real-camera evaluation. Promotion additionally
 requires held-out phone captures, exact-print labels, confirmed precision,
@@ -88,6 +116,13 @@ builder, image-library builder, trainer, and iOS/Android/web publishers all
 fail closed if a Pocket row reaches a physical scanner artifact. The general
 collection catalog may use `--pokemon-profile all`; that output is not valid
 trainer or scanner input.
+
+Physical Pokémon builds also require `--pokemon-sets`, normally a pinned
+official TCGdex `cards-database` archive joined by `setCode`, so every runtime
+printing carries `releaseDate` and `collectorNumber`. Reviewed same-art
+assignments may be supplied through `--pokemon-family-overlay`.
+Unlisted printings remain singleton families; the builder never merges cards
+by name alone.
 
 The corrected snapshot contains 19,507 physical rows and excludes 2,321
 Pocket-only rows from the prior 21,828-row index.

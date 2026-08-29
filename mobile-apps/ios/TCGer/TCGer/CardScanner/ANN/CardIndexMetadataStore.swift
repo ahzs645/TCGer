@@ -1,5 +1,18 @@
 import Foundation
 
+struct CardIndexPrintingEntry: Codable, Hashable, Sendable {
+    let cardId: String
+    let exactPrintingId: String?
+    let format: String?
+    let setCode: String?
+    let collectorNumber: String?
+    let setName: String?
+    let rarity: String?
+    let imageURL: String?
+    let price: Double?
+    let releaseDate: String?
+}
+
 struct CardIndexMetadataEntry: Codable {
     let annIndex: Int
     let cardId: String
@@ -12,11 +25,13 @@ struct CardIndexMetadataEntry: Codable {
     /// recognizes the stable TCGdex `/tcgp/` asset path.
     let format: String?
     let setCode: String?
+    let collectorNumber: String?
     let setName: String?
     let rarity: String?
     let imageURL: String?
     let price: Double?
     let releaseDate: String?
+    let printings: [CardIndexPrintingEntry]?
 
     init(
         annIndex: Int,
@@ -27,11 +42,13 @@ struct CardIndexMetadataEntry: Codable {
         game: String?,
         format: String? = nil,
         setCode: String?,
+        collectorNumber: String? = nil,
         setName: String?,
         rarity: String?,
         imageURL: String?,
         price: Double?,
-        releaseDate: String? = nil
+        releaseDate: String? = nil,
+        printings: [CardIndexPrintingEntry]? = nil
     ) {
         self.annIndex = annIndex
         self.cardId = cardId
@@ -41,11 +58,13 @@ struct CardIndexMetadataEntry: Codable {
         self.game = game
         self.format = format
         self.setCode = setCode
+        self.collectorNumber = collectorNumber
         self.setName = setName
         self.rarity = rarity
         self.imageURL = imageURL
         self.price = price
         self.releaseDate = releaseDate
+        self.printings = printings
     }
 
     nonisolated var resolvedGame: TCGGame {
@@ -63,6 +82,29 @@ struct CardIndexMetadataEntry: Codable {
             return false
         }
         return imageURL?.localizedCaseInsensitiveContains("/tcgp/") != true
+    }
+
+    /// Scanner packages published before the visual-family contract omit a
+    /// family id. Falling back to normalized game + card name keeps those
+    /// packages usable: title-confirmed same-name printings are treated as one
+    /// unresolved family instead of being rejected as unrelated ambiguity.
+    /// New packages always win by supplying their artwork-derived family id.
+    nonisolated var resolvedRecognitionFamilyId: String? {
+        if let recognitionFamilyId,
+           !recognitionFamilyId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return recognitionFamilyId
+        }
+        let game = resolvedGame
+        let normalizedName = CardTitleOCR.normalizedName(name)
+        guard game != .all, !normalizedName.isEmpty else { return nil }
+        return "\(game.rawValue):legacy-name:\(normalizedName)"
+    }
+
+    nonisolated func contains(setCode requestedSetCode: String) -> Bool {
+        if setCode?.caseInsensitiveCompare(requestedSetCode) == .orderedSame { return true }
+        return printings?.contains {
+            $0.setCode?.caseInsensitiveCompare(requestedSetCode) == .orderedSame
+        } == true
     }
 }
 
@@ -135,6 +177,19 @@ actor CardIndexMetadataStore {
         return Self.makeDetails(from: entry)
     }
 
+    func printingDetails(for index: Int, setCode: String? = nil) -> [CardDetails] {
+        loadIfNeeded()
+        guard let entry = cache[index] else { return [] }
+        let rows = entry.printings ?? []
+        guard !rows.isEmpty else { return [Self.makeDetails(from: entry)] }
+        return rows
+            .filter { printing in
+                guard let setCode else { return true }
+                return printing.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+            }
+            .map { Self.makeDetails(from: entry, printing: $0) }
+    }
+
     func indices(for game: TCGGame) -> Set<Int> {
         loadIfNeeded()
         return Set(cache.values.lazy.filter { $0.resolvedGame == game }.map(\.annIndex))
@@ -145,7 +200,7 @@ actor CardIndexMetadataStore {
         guard let setCode else { return indices(for: game) }
         return Set(cache.values.lazy.filter {
             $0.resolvedGame == game &&
-                $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+                $0.contains(setCode: setCode)
         }.map(\.annIndex))
     }
 
@@ -166,7 +221,7 @@ actor CardIndexMetadataStore {
                   $0.isPhysicalScanEligible
             else { return false }
             guard let setCode else { return true }
-            return $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+            return $0.contains(setCode: setCode)
         }.map(\.annIndex))
         if ScannerPerfOptions.isAllowedIndexCacheEnabled {
             physicalIndicesMemo[memoKey] = indices
@@ -179,7 +234,7 @@ actor CardIndexMetadataStore {
         return cache.values
             .filter {
                 $0.resolvedGame == game &&
-                    $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+                    $0.contains(setCode: setCode)
             }
             .sorted { $0.annIndex < $1.annIndex }
     }
@@ -193,10 +248,10 @@ actor CardIndexMetadataStore {
         game: TCGGame,
         setCode: String?,
         physicalCardsOnly: Bool = false
-    ) -> (name: String, indices: Set<Int>)? {
+    ) -> (name: String, indices: Set<Int>, printingCount: Int)? {
         loadIfNeeded()
         let names = indicesByGameAndName[game] ?? [:]
-        let matches = candidates.compactMap { candidate -> (String, Set<Int>, Int, Double)? in
+        let matches = candidates.compactMap { candidate -> (String, Set<Int>, Int, Double, Int)? in
             guard candidate.confidence >= 0.25 else { return nil }
             let key = CardTitleOCR.normalizedName(candidate.text)
             guard key.count >= 4, var indices = names[key], !indices.isEmpty else { return nil }
@@ -204,18 +259,27 @@ actor CardIndexMetadataStore {
                 indices = indices.filter { cache[$0]?.isPhysicalScanEligible == true }
             }
             if let setCode {
-                indices = indices.filter { cache[$0]?.setCode?.caseInsensitiveCompare(setCode) == .orderedSame }
+                indices = indices.filter { cache[$0]?.contains(setCode: setCode) == true }
             }
             guard !indices.isEmpty,
                   let canonicalName = indices.compactMap({ cache[$0]?.name }).first
             else { return nil }
-            return (canonicalName, indices, key.count, candidate.confidence)
+            let printingCount = indices.reduce(0) { count, index in
+                guard let entry = cache[index] else { return count }
+                if let setCode {
+                    return count + (entry.printings?.filter {
+                        $0.setCode?.caseInsensitiveCompare(setCode) == .orderedSame
+                    }.count ?? 1)
+                }
+                return count + max(entry.printings?.count ?? 0, 1)
+            }
+            return (canonicalName, indices, key.count, candidate.confidence, printingCount)
         }
         .sorted {
             if $0.2 != $1.2 { return $0.2 > $1.2 }
             return $0.3 > $1.3
         }
-        return matches.first.map { ($0.0, $0.1) }
+        return matches.first.map { ($0.0, $0.1, $0.4) }
     }
 
     private func loadIfNeeded() {
@@ -258,7 +322,8 @@ actor CardIndexMetadataStore {
             game: entry.resolvedGame,
             setCode: entry.setCode,
             setName: entry.setName,
-            recognitionFamilyID: entry.recognitionFamilyId,
+            collectorNumber: entry.collectorNumber,
+            recognitionFamilyID: entry.resolvedRecognitionFamilyId,
             exactPrintingID: entry.exactPrintingId ?? entry.cardId,
             releaseDate: entry.releaseDate
         )
@@ -268,6 +333,30 @@ actor CardIndexMetadataStore {
             rarity: entry.rarity,
             imageURL: url,
             price: entry.price,
+            sourceCard: nil
+        )
+    }
+
+
+    private nonisolated static func makeDetails(
+        from entry: CardIndexMetadataEntry,
+        printing: CardIndexPrintingEntry
+    ) -> CardDetails {
+        CardDetails(
+            identity: CardIdentity(
+                id: printing.cardId,
+                name: entry.name,
+                game: entry.resolvedGame,
+                setCode: printing.setCode,
+                setName: printing.setName,
+                collectorNumber: printing.collectorNumber,
+                recognitionFamilyID: entry.resolvedRecognitionFamilyId,
+                exactPrintingID: printing.exactPrintingId ?? printing.cardId,
+                releaseDate: printing.releaseDate
+            ),
+            rarity: printing.rarity,
+            imageURL: printing.imageURL.flatMap(URL.init(string:)),
+            price: printing.price,
             sourceCard: nil
         )
     }

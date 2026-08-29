@@ -103,12 +103,47 @@ def captured_at(session_dir: Path) -> str:
 
 def summary_fields(session_dir: Path) -> dict:
     try:
-        summary = json.loads((session_dir / "results.json").read_text()).get("summary", {})
+        results = json.loads((session_dir / "results.json").read_text())
+        summary = results.get("summary", {})
     except (OSError, json.JSONDecodeError):
+        results = {}
         summary = {}
+    frame_modes = list(dict.fromkeys(
+        frame.get("mode") for frame in results.get("frames", []) if frame.get("mode")
+    ))
+    try:
+        evidence = json.loads((session_dir / "evidence.json").read_text())
+        evidence_by_frame = {
+            record.get("imageFile"): record
+            for record in evidence
+            if isinstance(record, dict) and record.get("imageFile")
+        }
+    except (OSError, json.JSONDecodeError, TypeError):
+        evidence_by_frame = {}
+
+    # `captureMode` was added after binder recordings already existed. For
+    # those legacy sessions, the evidence outcome is still authoritative:
+    # binder captures have always used the `binderPage:` prefix. Preserve
+    # frame order so a mixed card/binder session reads like its capture.
+    capture_modes = []
+    for frame in results.get("frames", []):
+        capture_mode = frame.get("captureMode")
+        if not capture_mode:
+            record = evidence_by_frame.get(frame.get("imageFile"), {})
+            capture_mode = record.get("captureMode")
+            if not capture_mode and record.get("outcome", "").startswith("binderPage"):
+                capture_mode = "binder"
+            elif not capture_mode:
+                capture_mode = "card"
+        if capture_mode not in capture_modes:
+            capture_modes.append(capture_mode)
+    modes = summary.get("modes") or frame_modes
+    recorded_mode = summary.get("mode", "unknown")
     return {
         "frame_count": summary.get("frameCount", 0),
-        "mode": summary.get("mode", "unknown"),
+        "mode": "mixed" if len(modes) > 1 else (modes[0] if modes else recorded_mode),
+        "modes": modes,
+        "capture_modes": summary.get("captureModes") or capture_modes,
         "pipeline": summary.get("pipeline", "unknown"),
     }
 
@@ -197,6 +232,11 @@ def main() -> None:
                     sighting = str(source)
                     if sighting not in entry.get("source_copies_found", []):
                         entry.setdefault("source_copies_found", []).append(sighting)
+                    # Refresh derived schema fields when the ingester learns
+                    # how to represent richer recordings (for example mixed
+                    # games and binder/card capture modes) without changing
+                    # canonical session bytes.
+                    entry.update(summary_fields(sessions_root / session_id))
                     print(f"DUP   {session_id}: identical to library copy ({source})")
                 else:
                     conflicts.append(session_id)

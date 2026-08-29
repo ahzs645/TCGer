@@ -465,6 +465,37 @@ final class CardScannerCoordinatorTests: XCTestCase {
         XCTAssertEqual(recorder.kinds, [.artworkFingerprint])
     }
 
+    func testDisabledOCRRemovesTextRecognitionFallback() async {
+        UserDefaults.standard.set(false, forKey: ScannerPerfOptions.ocrEnabledDefaultsKey)
+        defer {
+            UserDefaults.standard.removeObject(forKey: ScannerPerfOptions.ocrEnabledDefaultsKey)
+        }
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .textOCR,
+                    supportsLiveScanning: true,
+                    behavior: .match(cardID: "ocr"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+
+        XCTAssertFalse(coordinator.canScan(mode: .pokemon))
+        let result = await coordinator.scan(
+            image: ScannerTestImage.solid(),
+            context: .test(),
+            source: .photoCapture
+        )
+
+        guard case .failure(.ineligibleMode) = result else {
+            return XCTFail("Disabled OCR must remove the text-recognition strategy")
+        }
+        XCTAssertTrue(recorder.kinds.isEmpty)
+    }
+
     func testServerOnlyFlowIsPhotoOnly() async {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(

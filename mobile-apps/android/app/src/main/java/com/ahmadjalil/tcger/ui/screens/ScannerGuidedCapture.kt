@@ -68,10 +68,16 @@ import kotlin.math.roundToInt
 internal data class BinderPocketReview(
     val index: Int,
     val candidates: List<CardScanCandidate>,
-    val selectedCardId: String? = candidates.firstOrNull()?.card?.id,
+    // Bulk binder import is precision-first: only a strong candidate starts
+    // selected. Lower-confidence suggestions stay visible for one-tap review.
+    val selectedCardId: String? = candidates.firstOrNull {
+        (it.confidence ?: 0.0) >= BINDER_AUTO_SELECT_CONFIDENCE
+    }?.card?.id,
 ) {
     val selectedCard: CatalogCard? get() = candidates.firstOrNull { it.card.id == selectedCardId }?.card
 }
+
+internal const val BINDER_AUTO_SELECT_CONFIDENCE = 0.82
 
 internal fun selectedBinderCards(pockets: List<BinderPocketReview>): List<CatalogCard> =
     pockets.sortedBy(BinderPocketReview::index).mapNotNull(BinderPocketReview::selectedCard)

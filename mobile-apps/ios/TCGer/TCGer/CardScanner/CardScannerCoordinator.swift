@@ -206,6 +206,9 @@ final class CardScannerCoordinator: @unchecked Sendable {
             .enumerated()
             .filter { _, strategy in
                 guard strategy.supports(mode) else { return false }
+                guard ScannerPerfOptions.isOCREnabled || strategy.kind != .textOCR else {
+                    return false
+                }
                 switch source {
                 case .livePreview:
                     return strategy.supportsLiveScanning

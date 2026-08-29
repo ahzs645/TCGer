@@ -76,6 +76,9 @@ async function buildPlan(options) {
     if (row.annIndex !== index || String(row.game ?? "").toLowerCase() !== options.game) {
       throw new Error(`Scanner metadata row ${index} does not match ${options.game}`);
     }
+    if (!Array.isArray(row.printings) || row.printings.length === 0) {
+      throw new Error(`Scanner metadata family ${index} has no exact printings`);
+    }
   }
   if (vectorContents.byteLength < 8) throw new Error("Packed vectors have no header");
   const count = vectorContents.readInt32LE(0);
@@ -105,13 +108,16 @@ async function buildPlan(options) {
   const metadataAsset = asset(options.prefix, basename(options.metadata), metadataContents);
   const assets = [model, vectors, metadataAsset];
   const manifest = {
-    formatVersion: 1,
+    formatVersion: 2,
     game: options.game,
     version: options.version,
     generatedAt: new Date().toISOString(),
     encoder: "arcface",
     modelName: "card-embeddings-arcface-fp32",
     cardCount: count,
+    printingCount: metadata.reduce((sum, row) => sum + row.printings.length, 0),
+    metadataSchema: "tcger-cards-index-metadata-v3",
+    recognitionContract: "tcger-two-stage-recognition-v2",
     dimension,
     downloadBytes: assets.reduce((sum, item) => sum + item.bytes, 0),
     strongAcceptanceScore: options.strongAcceptanceScore,

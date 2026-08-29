@@ -142,7 +142,9 @@ actor ScannerDevModeStore {
         expectedNoMatch: Bool? = nil,
         manualCorrection: ScannerManualCorrection? = nil,
         binderExclusion: ScannerBinderDetectionExclusion? = nil,
-        captureQuality: ScannerCaptureQualityReport? = nil
+        captureQuality: ScannerCaptureQualityReport? = nil,
+        captureMode: ScannerCaptureMode = .card,
+        binderDetections: [RecordedBinderDetection]? = nil
     ) -> Bool {
         guard Self.isEnabled else { return false }
         let directory: URL
@@ -259,13 +261,16 @@ actor ScannerDevModeStore {
             alternativeCardIds: alternativeIDs,
             expectedCardId: expectedCardId,
             expectedNoMatch: expectedNoMatch,
-            imageFile: imageFile
+            imageFile: imageFile,
+            captureMode: captureMode.rawValue,
+            binderDetections: binderDetections
         ))
         evidence.append(ScanEvidenceRecord(
             imageFile: imageFile,
             originalImageFile: originalFile,
             source: sourceLabel(source),
             mode: mode.rawValue,
+            captureMode: captureMode.rawValue,
             elapsedMs: elapsedMs,
             outcome: outcome,
             attempts: attempts,
@@ -408,13 +413,17 @@ actor ScannerDevModeStore {
     private func persistManifests(to directory: URL) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let modes = Self.orderedDistinct(frames.map(\.mode))
+        let captureModes = Self.orderedDistinct(frames.compactMap(\.captureMode))
         let bundle = RecordedScanBundle(
             summary: RecordedScanBundle.Summary(
                 capturedAt: ISO8601DateFormatter().string(from: sessionStart),
                 frameCount: frames.count,
-                mode: sessionMode,
+                mode: modes.count == 1 ? (modes.first ?? sessionMode) : "mixed",
                 pipeline: "dev-mode full pipeline",
-                app: "TCGer iOS Scanner Dev Mode"
+                app: "TCGer iOS Scanner Dev Mode",
+                modes: modes,
+                captureModes: captureModes
             ),
             frames: frames
         )
@@ -424,6 +433,11 @@ actor ScannerDevModeStore {
         if let data = try? encoder.encode(evidence) {
             try? data.write(to: directory.appendingPathComponent("evidence.json"), options: .atomic)
         }
+    }
+
+    private nonisolated static func orderedDistinct(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
     }
 
     private func trimSessionIfNeeded(directory: URL) {

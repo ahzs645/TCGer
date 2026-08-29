@@ -23,12 +23,17 @@ nonisolated struct ScannerAssetManifest: Decodable, Sendable {
     let generatedAt: String
     let encoder: String
     let modelName: String
+    let metadataSchema: String?
+    let recognitionContract: String?
     let cardCount: Int
+    let printingCount: Int?
     let dimension: Int
     let downloadBytes: Int
     let modelPackage: [ScannerModelPackageFile]
     let vectors: ScannerAssetFile
     let metadata: ScannerAssetFile
+
+    var displayedCardCount: Int { printingCount ?? cardCount }
 }
 
 nonisolated struct ScannerRuntimeAssets: Sendable {
@@ -261,7 +266,9 @@ final class ScannerAssetStore: ObservableObject {
             throw StoreError.invalidResponse
         }
         let manifest = try JSONDecoder().decode(ScannerAssetManifest.self, from: data)
-        guard manifest.formatVersion == 1 else { throw StoreError.unsupportedManifest }
+        guard (1...3).contains(manifest.formatVersion) else {
+            throw StoreError.unsupportedManifest
+        }
         guard manifest.game == game.rawValue,
               manifest.version > 0,
               manifest.encoder == "arcface",
@@ -270,6 +277,19 @@ final class ScannerAssetStore: ObservableObject {
               manifest.downloadBytes > 0,
               !manifest.modelPackage.isEmpty else {
             throw StoreError.invalidManifest
+        }
+        if manifest.formatVersion == 2 {
+            guard manifest.metadataSchema == "tcger-cards-index-metadata-v2",
+                  manifest.recognitionContract == "tcger-two-stage-recognition-v1" else {
+                throw StoreError.invalidManifest
+            }
+        }
+        if manifest.formatVersion == 3 {
+            guard manifest.metadataSchema == "tcger-cards-index-metadata-v3",
+                  manifest.recognitionContract == "tcger-two-stage-recognition-v2",
+                  manifest.printingCount ?? 0 >= manifest.cardCount else {
+                throw StoreError.invalidManifest
+            }
         }
         let files = manifest.modelPackage.map {
             ScannerAssetFile(file: $0.file, bytes: $0.bytes, sha256: $0.sha256)
@@ -318,13 +338,79 @@ final class ScannerAssetStore: ObservableObject {
         at url: URL,
         manifest: ScannerAssetManifest
     ) throws {
-        struct Row: Decodable { let annIndex: Int; let game: String? }
-        let rows = try JSONDecoder().decode([Row].self, from: Data(contentsOf: url))
+        try validateMetadataData(Data(contentsOf: url), manifest: manifest)
+    }
+
+    nonisolated static func validateMetadataData(
+        _ data: Data,
+        manifest: ScannerAssetManifest
+    ) throws {
+        struct Row: Decodable {
+            let annIndex: Int
+            let cardId: String?
+            let exactPrintingId: String?
+            let recognitionFamilyId: String?
+            let name: String?
+            let game: String?
+            let imageURL: String?
+            let setCode: String?
+            let collectorNumber: String?
+            let releaseDate: String?
+            let printings: [Printing]?
+        }
+        struct Printing: Decodable {
+            let cardId: String?
+            let exactPrintingId: String?
+            let imageURL: String?
+            let setCode: String?
+            let collectorNumber: String?
+            let releaseDate: String?
+        }
+        let rows = try JSONDecoder().decode([Row].self, from: data)
         guard rows.count == manifest.cardCount,
               rows.enumerated().allSatisfy({ index, row in
                   row.annIndex == index && row.game?.lowercased() == manifest.game
               }) else {
             throw StoreError.invalidMetadata
+        }
+        guard manifest.formatVersion >= 2 else { return }
+
+        func isPresent(_ value: String?) -> Bool {
+            value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        }
+        for row in rows {
+            guard isPresent(row.cardId),
+                  isPresent(row.exactPrintingId),
+                  isPresent(row.recognitionFamilyId),
+                  isPresent(row.name),
+                  isPresent(row.imageURL) else {
+                throw StoreError.invalidMetadata
+            }
+            if manifest.game == TCGGame.magic.rawValue {
+                guard isPresent(row.setCode),
+                      isPresent(row.collectorNumber),
+                      isPresent(row.releaseDate) else {
+                    throw StoreError.invalidMetadata
+                }
+            }
+            if manifest.formatVersion == 3 {
+                guard let printings = row.printings, !printings.isEmpty else {
+                    throw StoreError.invalidMetadata
+                }
+                for printing in printings {
+                    guard isPresent(printing.cardId),
+                          isPresent(printing.exactPrintingId),
+                          isPresent(printing.imageURL) else {
+                        throw StoreError.invalidMetadata
+                    }
+                    if manifest.game == TCGGame.magic.rawValue,
+                       !(isPresent(printing.setCode)
+                         && isPresent(printing.collectorNumber)
+                         && isPresent(printing.releaseDate)) {
+                        throw StoreError.invalidMetadata
+                    }
+                }
+            }
         }
     }
 

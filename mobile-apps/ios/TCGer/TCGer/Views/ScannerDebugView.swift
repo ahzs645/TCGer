@@ -153,9 +153,12 @@ final class ScannerDebugViewModel: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "Scanner environment is unavailable."]
             )
         }
-        if let recordedMode = ScanMode.allCases.first(where: {
-            $0.rawValue.caseInsensitiveCompare(replay.recording.summary.mode) == .orderedSame
-                || $0.displayName.caseInsensitiveCompare(replay.recording.summary.mode) == .orderedSame
+        let initialRecordedMode = replay.recording.summary.mode == "mixed"
+            ? replay.recording.frames.first?.mode
+            : replay.recording.summary.mode
+        if let initialRecordedMode, let recordedMode = ScanMode.allCases.first(where: {
+            $0.rawValue.caseInsensitiveCompare(initialRecordedMode) == .orderedSame
+                || $0.displayName.caseInsensitiveCompare(initialRecordedMode) == .orderedSame
         }) {
             mode = recordedMode
         }

@@ -93,9 +93,12 @@ data class ScannerSessionOptions(
     val automaticallyShowResults: Boolean = false,
     val priceMode: ScannerPriceMode = ScannerPriceMode.OFF,
     val printingMode: ScannerPrintingMode = ScannerPrintingMode.QUICK_LATEST,
+    val ocrEnabled: Boolean = true,
     val savesBinderPageImages: Boolean = false,
     val replacesBinderPageImages: Boolean = true,
+    val binderPageNumber: Int = 1,
     val language: String = "English",
+    val sharedSessionCode: String = "",
     val recognitionEngine: ScannerRecognitionEngine = ScannerRecognitionEngine.AUTOMATIC,
     val encoderVariant: ScannerEncoderVariant = ScannerEncoderVariant.ARCFACE,
     val saveServerDebugCapture: Boolean = false,
@@ -143,9 +146,16 @@ class ScannerOptionsStore(context: Context) {
         preferences.edit().putString(KEY, ScannerOptionsJson.encode(options)).apply()
     }
 
+    fun loadLastSelectedGame(): String? = preferences.getString(LAST_SELECTED_GAME_KEY, null)
+
+    fun saveLastSelectedGame(game: String) {
+        preferences.edit().putString(LAST_SELECTED_GAME_KEY, game).apply()
+    }
+
     companion object {
         private const val FILE = "scanner-options"
         private const val KEY = "session-options-json"
+        private const val LAST_SELECTED_GAME_KEY = "last-selected-game"
     }
 }
 

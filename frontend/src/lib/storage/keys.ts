@@ -118,6 +118,14 @@ export const PACK_SPOTLIGHT_DISMISSED_KEY = "tcger:pack-spotlight-dismissed";
  */
 export const THEME_STORAGE_KEY = "theme";
 
+/** Browser scanner defaults. These are device-local because recognition and
+ * its downloaded models run in this browser, independent of account state. */
+export const SCANNER_DEFAULT_LANGUAGE_STORAGE_KEY =
+  "tcger.scanner.default-language";
+export const SCANNER_PRINTING_MODE_STORAGE_KEY =
+  "tcger.scanner.printing-mode";
+export const SCANNER_OCR_ENABLED_STORAGE_KEY = "tcger.scanner.ocr-enabled";
+
 /* ------------------------------------------------------------------ */
 /*  localStorage — key families (dynamic suffix)                       */
 /* ------------------------------------------------------------------ */
@@ -264,6 +272,9 @@ export const LOCAL_STORAGE_KEYS = [
   PACK_OPENED_STORAGE_KEY,
   PACK_SPOTLIGHT_DISMISSED_KEY,
   THEME_STORAGE_KEY,
+  SCANNER_DEFAULT_LANGUAGE_STORAGE_KEY,
+  SCANNER_PRINTING_MODE_STORAGE_KEY,
+  SCANNER_OCR_ENABLED_STORAGE_KEY,
 ] as const;
 
 /**

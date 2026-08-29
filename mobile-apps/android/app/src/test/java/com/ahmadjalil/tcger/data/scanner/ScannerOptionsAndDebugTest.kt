@@ -7,6 +7,8 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.ahmadjalil.tcger.data.scanner.model.LocalEmbeddingDispatch
+import com.ahmadjalil.tcger.domain.CardScanOptions
 
 class ScannerOptionsAndDebugTest {
     @Test
@@ -30,6 +32,17 @@ class ScannerOptionsAndDebugTest {
                 requestedGame = "future-game",
             ).selectedGame,
         )
+    }
+
+    @Test
+    fun unavailablePreviousScannerGameStillRequiresChoice() {
+        val resolution = resolveScannerGameChoice(
+            listOf("pokemon", "yugioh"),
+            requestedGame = "magic",
+        )
+
+        assertTrue(resolution.requiresChoice)
+        assertEquals(listOf("pokemon", "yugioh"), resolution.choices)
     }
 
     @Test
@@ -69,6 +82,7 @@ class ScannerOptionsAndDebugTest {
             language = "Japanese",
             recognitionEngine = ScannerRecognitionEngine.SERVER_EMBEDDING,
             encoderVariant = ScannerEncoderVariant.DINOV2,
+            ocrEnabled = false,
             performance = ScannerPerformanceOption.entries.associateWith { it.ordinal % 2 == 0 },
         )
 
@@ -76,6 +90,7 @@ class ScannerOptionsAndDebugTest {
 
         assertEquals(original, decoded)
         assertEquals(ScannerPerformanceOption.entries.size, decoded.performance.size)
+        assertFalse(decoded.ocrEnabled)
     }
 
     @Test
@@ -88,7 +103,18 @@ class ScannerOptionsAndDebugTest {
         assertTrue(decoded.automaticallyShowResults)
         assertEquals(ScannerCaptureMode.CARD, decoded.captureMode)
         assertEquals(ScannerRecognitionEngine.AUTOMATIC, decoded.recognitionEngine)
+        assertTrue(decoded.ocrEnabled)
         assertEquals(ScannerPerformanceOption.entries.size, decoded.performance.size)
+    }
+
+    @Test
+    fun ocrRescueHonorsPersistentMasterSwitch() {
+        assertTrue(LocalEmbeddingDispatch.permitsManualOcrRescue(CardScanOptions()))
+        assertFalse(
+            LocalEmbeddingDispatch.permitsManualOcrRescue(
+                CardScanOptions(ocrEnabled = false),
+            ),
+        )
     }
 
     @Test

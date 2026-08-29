@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -20,6 +21,8 @@ import {
 const execFileAsync = promisify(execFile);
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const MANIFEST_CACHE = "public, max-age=0, must-revalidate";
+const METADATA_SCHEMA = "tcger-cards-index-metadata-v3";
+const RECOGNITION_CONTRACT = "tcger-two-stage-recognition-v2";
 
 function usage() {
   console.log(`Usage:
@@ -83,20 +86,57 @@ function validateRelativePath(path) {
   }
 }
 
-async function buildPlan(options) {
+export function validateMetadataContract(metadata, game) {
+  const commonFields = [
+    "cardId",
+    "exactPrintingId",
+    "recognitionFamilyId",
+    "name",
+    "game",
+    "imageURL",
+  ];
+  const gameFields = game === "magic"
+    ? ["setCode", "collectorNumber", "releaseDate"]
+    : [];
+  for (const [index, entry] of metadata.entries()) {
+    if (entry.annIndex !== index) {
+      throw new Error(`Scanner metadata annIndex mismatch at row ${index}`);
+    }
+    if (String(entry.game ?? "").toLowerCase() !== game) {
+      throw new Error(`Scanner metadata row ${index} is not ${game}`);
+    }
+    const missing = [...commonFields, ...gameFields].filter((field) => (
+      typeof entry[field] !== "string" || entry[field].trim().length === 0
+    ));
+    if (missing.length > 0) {
+      throw new Error(
+        `Scanner metadata row ${index} is missing required fields: ${missing.join(", ")}`,
+      );
+    }
+    if (!Array.isArray(entry.printings) || entry.printings.length === 0) {
+      throw new Error(`Scanner metadata family ${index} has no exact printings`);
+    }
+    for (const printing of entry.printings) {
+      const printingFields = game === "magic"
+        ? ["cardId", "exactPrintingId", "imageURL", "setCode", "collectorNumber", "releaseDate"]
+        : ["cardId", "exactPrintingId", "imageURL"];
+      const missingPrinting = printingFields.filter((field) => (
+        typeof printing[field] !== "string" || printing[field].trim().length === 0
+      ));
+      if (missingPrinting.length > 0) {
+        throw new Error(`Scanner printing in family ${index} is missing: ${missingPrinting.join(", ")}`);
+      }
+    }
+  }
+}
+
+export async function buildPlan(options) {
   const metadata = await readJson(options.metadata, "Scanner metadata");
   if (!Array.isArray(metadata) || metadata.length === 0) {
     throw new Error("Scanner metadata must be a non-empty array");
   }
   assertPhysicalScannerEntries(metadata, "iOS scanner metadata");
-  for (const [index, entry] of metadata.entries()) {
-    if (entry.annIndex !== index) {
-      throw new Error(`Scanner metadata annIndex mismatch at row ${index}`);
-    }
-    if (String(entry.game ?? "").toLowerCase() !== options.game) {
-      throw new Error(`Scanner metadata row ${index} is not ${options.game}`);
-    }
-  }
+  validateMetadataContract(metadata, options.game);
 
   const vectors = await readFile(options.vectors);
   if (vectors.byteLength < 8) throw new Error("Packed vectors are missing their header");
@@ -145,13 +185,16 @@ async function buildPlan(options) {
     : null;
   const downloadBytes = assets.reduce((sum, asset) => sum + asset.bytes, 0);
   const manifest = {
-    formatVersion: 1,
+    formatVersion: 3,
     game: options.game,
     version: options.version,
     generatedAt: new Date().toISOString(),
     encoder: "arcface",
     modelName: "CardEmbeddings-arcface",
+    metadataSchema: METADATA_SCHEMA,
+    recognitionContract: RECOGNITION_CONTRACT,
     cardCount: count,
+    printingCount: metadata.reduce((sum, row) => sum + row.printings.length, 0),
     dimension,
     downloadBytes,
     modelPackage: model,
@@ -299,7 +342,9 @@ async function main() {
   await uploadWithS3(client, bucket, plan.manifestAsset);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

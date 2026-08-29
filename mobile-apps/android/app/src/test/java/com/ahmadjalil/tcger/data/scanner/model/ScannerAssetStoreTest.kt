@@ -122,6 +122,23 @@ class ScannerAssetStoreTest {
         )
     }
 
+    @Test
+    fun `compact family manifest exposes exact printing count`() {
+        val decoded = Json.decodeFromString<ScannerAssetManifest>(
+            """{
+              "formatVersion":2,"game":"magic","version":"visual-style-v2","encoder":"arcface","modelName":"fastvit_t8",
+              "cardCount":67849,"printingCount":109546,"metadataSchema":"tcger-cards-index-metadata-v3",
+              "recognitionContract":"tcger-two-stage-recognition-v2","dimension":384,"downloadBytes":3,
+              "strongAcceptanceScore":0.6,"ambiguityMargin":0.05,
+              "model":{"file":"objects/model.onnx","bytes":1,"sha256":"${"a".repeat(64)}"},
+              "vectors":{"file":"objects/vectors.bin","bytes":1,"sha256":"${"b".repeat(64)}"},
+              "metadata":{"file":"objects/metadata.json","bytes":1,"sha256":"${"c".repeat(64)}"}
+            }""",
+        )
+
+        assertEquals(109546, decoded.displayedCardCount)
+    }
+
     private fun store(responses: MutableMap<String, ByteArray> = mutableMapOf()) = ScannerAssetStore(
         root = temporaryFolder.newFolder("scanner-assets-${System.nanoTime()}"),
         remoteBaseURL = BASE,

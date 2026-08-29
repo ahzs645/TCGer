@@ -47,6 +47,27 @@ class CardPrintingResolverTest {
         assertEquals(PrintingResolutionProvenance.VERIFIED, decision.provenance)
     }
 
+    @Test
+    fun compactFamilyRowExpandsPrintingsOnlyAfterRetrieval() {
+        val family = match("new", "2025-01-01").let { match ->
+            match.copy(card = match.card.copy(printings = listOf(
+                CardEmbeddingPrinting("new", "new", releaseDate = "2025-01-01"),
+                CardEmbeddingPrinting("old", "old", releaseDate = "2020-01-01"),
+            )))
+        }
+
+        val quick = CardPrintingResolver.resolve(
+            family, emptyList(), ScannerPrintingMode.QUICK_LATEST,
+        )
+        assertEquals("new", quick.selected?.card?.exactPrintingId)
+
+        val exact = CardPrintingResolver.resolve(
+            family, emptyList(), ScannerPrintingMode.EXACT_PRINTING,
+        )
+        assertEquals(listOf("new", "old"), exact.candidates.map { it.card.exactPrintingId })
+        assertTrue(exact.requiresSelection)
+    }
+
     private fun match(id: String, releaseDate: String) = CardEmbeddingMatch(
         index = if (id == "old") 0 else 1,
         similarity = 0.9,
