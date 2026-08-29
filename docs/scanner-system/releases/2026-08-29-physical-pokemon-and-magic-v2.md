@@ -38,6 +38,11 @@ The native iOS reference gate passes, and equivalent Android and browser policy
 tests pass. Magic remains unpublished until the browser image-level replay and
 coordinated client/package compatibility checks are complete.
 
+The family-aware browser artifact is generated reproducibly with
+`npm run scanner:build-browser-index`. It contains 67,849 vectors and expands
+to all 109,546 printings as metadata. R2 gzip delivery is 31.9 MB for the index,
+plus the 14.3 MB encoder; the current live v1 index is roughly 40.0 MB compressed.
+
 ## Publication invariant
 
 Publish immutable objects first and the platform manifest last. Never expose a

@@ -48,6 +48,7 @@
     "assets:r2:publish-catalogs": "node tools/r2/publish-catalogs.mjs",
     "assets:r2:publish-pack-assets": "node tools/r2/publish-pack-assets.mjs",
     "assets:r2:publish-scan-index": "node tools/r2/publish-scan-index.mjs",
+    "scanner:build-browser-index": "node tools/r2/build-browser-scan-index.mjs",
     "assets:r2:publish-ios-scan-pack": "node tools/r2/publish-ios-scan-pack.mjs",
     "assets:r2:publish-android-scan-pack": "node tools/r2/publish-android-scan-pack.mjs",
     "lint": "turbo lint",
