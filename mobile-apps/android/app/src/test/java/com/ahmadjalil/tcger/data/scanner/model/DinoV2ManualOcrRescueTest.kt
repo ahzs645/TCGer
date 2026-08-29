@@ -71,6 +71,44 @@ class DinoV2ManualOcrRescueTest {
         assertTrue(bare is DinoV2OcrRescueDecision.Rejected)
     }
 
+    @Test fun magicPolicyRescuesUniqueExactAndVisualBoundedSingleEditTitles() {
+        val oin = match("magic-oin", "Óin the Brave", 0.56)
+        val exact = DinoV2ManualOcrRescue.decide(
+            evidence = DinoV2OcrEvidence("Oin the Brave", listOf("Oin the Brave"), ""),
+            originalMatches = listOf(oin),
+            exactTitleMatches = { normalized ->
+                if (normalized == normalizedScannerCardName(oin.card.name)) listOf(oin) to 1
+                else emptyList<CardEmbeddingMatch>() to 0
+            },
+            uniqueTitleEvidenceScore = 0.55,
+            singleEditVisualFloor = 0.75,
+        )
+        assertTrue(exact is DinoV2OcrRescueDecision.Accepted)
+
+        val map = match("magic-map", "Thrór's Map", 0.80)
+        val corrected = DinoV2ManualOcrRescue.decide(
+            evidence = DinoV2OcrEvidence("Thrór's Man", listOf("Thrór's Man"), ""),
+            originalMatches = listOf(map),
+            exactTitleMatches = { normalized ->
+                if (normalized == normalizedScannerCardName(map.card.name)) listOf(map) to 1
+                else emptyList<CardEmbeddingMatch>() to 0
+            },
+            uniqueTitleEvidenceScore = 0.55,
+            singleEditVisualFloor = 0.75,
+        )
+        assertTrue(corrected is DinoV2OcrRescueDecision.Accepted)
+
+        val weakMap = map.copy(similarity = 0.74)
+        val unbounded = DinoV2ManualOcrRescue.decide(
+            evidence = DinoV2OcrEvidence("Thrór's Man", listOf("Thrór's Man"), ""),
+            originalMatches = listOf(weakMap),
+            exactTitleMatches = { emptyList<CardEmbeddingMatch>() to 0 },
+            uniqueTitleEvidenceScore = 0.55,
+            singleEditVisualFloor = 0.75,
+        )
+        assertTrue(unbounded is DinoV2OcrRescueDecision.Rejected)
+    }
+
     @Test fun dispatchSelectsDinoAndNeverRescuesAutomaticPreview() {
         val manual = CardScanOptions(
             engine = CardScanEngine.ON_DEVICE_OCR,

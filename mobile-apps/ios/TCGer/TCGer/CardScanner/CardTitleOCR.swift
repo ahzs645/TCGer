@@ -59,6 +59,67 @@ nonisolated struct CardTitleOCR {
             .lowercased()
     }
 
+    /// Repairs a single OCR substitution only when the visual shortlist has
+    /// exactly one plausible catalog spelling. This is deliberately not a
+    /// catalog-wide fuzzy search: the embedding must first put the card in the
+    /// high-confidence visual shortlist, and short/noisy strings are excluded.
+    /// For example, Vision's `Thrór's Man` can confirm the already retrieved
+    /// `Thrór's Map`; it cannot pull an unrelated name into consideration.
+    static func singleEditCorrection(
+        for candidates: [Candidate],
+        shortlistNames: [String]
+    ) -> Candidate? {
+        let canonicalNames = Dictionary(
+            shortlistNames.map { (normalizedName($0), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var corrections: [String: Candidate] = [:]
+        for candidate in candidates where candidate.confidence >= 0.8 {
+            let observed = normalizedName(candidate.text)
+            guard observed.count >= 8 else { continue }
+            for (canonical, displayName) in canonicalNames {
+                guard canonical.count >= 8,
+                      editDistanceAtMostOne(observed, canonical),
+                      observed != canonical
+                else { continue }
+                corrections[canonical] = Candidate(
+                    text: displayName,
+                    confidence: candidate.confidence
+                )
+            }
+        }
+        guard corrections.count == 1 else { return nil }
+        return corrections.values.first
+    }
+
+    private static func editDistanceAtMostOne(_ lhs: String, _ rhs: String) -> Bool {
+        let left = Array(lhs)
+        let right = Array(rhs)
+        guard abs(left.count - right.count) <= 1 else { return false }
+        var leftIndex = 0
+        var rightIndex = 0
+        var edits = 0
+        while leftIndex < left.count, rightIndex < right.count {
+            if left[leftIndex] == right[rightIndex] {
+                leftIndex += 1
+                rightIndex += 1
+                continue
+            }
+            edits += 1
+            if edits > 1 { return false }
+            if left.count > right.count {
+                leftIndex += 1
+            } else if right.count > left.count {
+                rightIndex += 1
+            } else {
+                leftIndex += 1
+                rightIndex += 1
+            }
+        }
+        edits += (left.count - leftIndex) + (right.count - rightIndex)
+        return edits <= 1
+    }
+
     private func cropTitle(_ image: CGImage) -> CGImage? {
         let width = CGFloat(image.width)
         let height = CGFloat(image.height)

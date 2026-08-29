@@ -44,6 +44,10 @@ class OnDeviceCardTextRecognizer {
         }
     }
 
+    /** Model-neutral alias used by downloadable ArcFace runtimes. */
+    suspend fun recognizeEmbeddingEvidence(imageBytes: ByteArray): DinoV2OcrEvidence =
+        recognizeDinoV2Evidence(imageBytes)
+
     private suspend fun decode(imageBytes: ByteArray): Bitmap = withContext(Dispatchers.Default) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)

@@ -8,6 +8,7 @@ import {
   resolveEmbeddingPrintingCandidates,
   type EmbeddingIndex,
 } from "./embedding-matcher";
+import { fuseMagicTitleWithShortlist } from "./collector-ocr";
 import type { SupportedTcg } from "./scan-types";
 import type { BrowserVideoScanCandidate } from "./scan-types";
 
@@ -168,4 +169,61 @@ test("automatic mode rejects shards from different encoder contracts", () => {
     matchEmbeddingShardsTopK(new Float32Array([1, 0]), [pokemon, yugioh]),
     [],
   );
+});
+
+test("Magic title OCR rescues only unique, visually supported identities", () => {
+  const candidate = {
+    ...printing("magic-map", "2026-08-14"),
+    tcg: "magic" as const,
+    name: "Thrór's Map",
+    confidence: 0.8,
+    passedThreshold: false,
+  };
+  const catalog = [{
+    externalId: "magic-map",
+    name: "Thrór's Map",
+    setCode: "fin",
+    setName: "Final Fantasy",
+    rarity: null,
+    imageUrl: null,
+    exactPrintingId: "magic-map",
+    printings: [{
+      externalId: "magic-map",
+      exactPrintingId: "magic-map",
+      setCode: "fin",
+      setName: "Final Fantasy",
+      rarity: null,
+      imageUrl: null,
+      releaseDate: "2026-08-14",
+    }],
+  }];
+
+  const corrected = fuseMagicTitleWithShortlist(
+    [candidate],
+    catalog,
+    "Thrór's Man",
+  );
+  assert.equal(corrected.matched, true);
+  assert.equal(corrected.candidates[0]?.passedThreshold, true);
+  assert.equal(corrected.candidates[0]?.proposalLabel, "embedding+title-ocr");
+
+  assert.equal(fuseMagicTitleWithShortlist(
+    [{ ...candidate, confidence: 0.74 }],
+    catalog,
+    "Thrór's Man",
+  ).matched, false);
+  assert.equal(fuseMagicTitleWithShortlist(
+    [{ ...candidate, name: "Óin the Brave", confidence: 0.56 }],
+    [{ ...catalog[0]!, name: "Óin the Brave" }],
+    "Oin the Brave",
+  ).matched, true);
+  assert.equal(fuseMagicTitleWithShortlist(
+    [candidate],
+    [{ ...catalog[0]!, printings: [...catalog[0]!.printings, {
+      ...catalog[0]!.printings[0]!,
+      externalId: "magic-map-reprint",
+      exactPrintingId: "magic-map-reprint",
+    }] }],
+    "Thrór's Map",
+  ).matched, false);
 });

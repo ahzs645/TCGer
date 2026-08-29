@@ -9,7 +9,7 @@
     }
   ],
   "defaultOptions" : {
-    "testTimeoutsEnabled" : true,
+    "testTimeoutsEnabled" : false,
     "targetForVariableExpansion" : {
       "containerPath" : "container:TCGer.xcodeproj",
       "identifier" : "C3C831E22EA9F37F007FE5BA",

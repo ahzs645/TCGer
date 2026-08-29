@@ -46,6 +46,11 @@ jobs:
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      # GitHub's cold Android emulator can need substantially longer than
+      # Maestro's default driver startup window after the first APK install.
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+      MAESTRO_CLI_NO_ANALYTICS: "true"
     steps:
       - uses: actions/checkout@v5
         with:
@@ -92,6 +97,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install workspace dependencies
         run: npm ci
+      - name: Build shared API types
+        run: npm --prefix packages/api-types run build
       - name: Install Playwright browsers
         run: npm --prefix frontend exec -- playwright install --with-deps chromium
       - name: Run authoritative web parity suite
@@ -115,6 +122,9 @@ jobs:
     needs: contract
     runs-on: macos-26
     timeout-minutes: 45
+    env:
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+      MAESTRO_CLI_NO_ANALYTICS: "true"
     steps:
       - uses: actions/checkout@v5
         with:

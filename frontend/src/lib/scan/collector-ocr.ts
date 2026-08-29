@@ -20,6 +20,7 @@
  */
 
 import { createCanvas, getContext2d } from "./canvas-utils";
+import type { EmbeddingIndexEntry } from "./embedding-matcher";
 import type { BrowserVideoScanCandidate } from "./scan-types";
 import type { TcgCode } from "@/types/card";
 
@@ -85,9 +86,6 @@ async function getWorker(): Promise<TesseractWorker> {
       createWorker: (lang: string) => Promise<TesseractWorker>;
     };
     const worker = await tesseract.createWorker("eng");
-    await worker.setParameters({
-      tessedit_char_whitelist: "0123456789/",
-    });
     return worker;
   })();
   return workerPromise;
@@ -171,6 +169,7 @@ export async function readFooterText(
   tcg: TcgCode,
 ): Promise<OcrReading> {
   const worker = await getWorker();
+  await worker.setParameters({ tessedit_char_whitelist: "0123456789/" });
   const regions = FOOTER_REGIONS[tcg] ?? FOOTER_REGIONS.pokemon!;
 
   const pairs: Array<{ number: string; denominator: string }> = [];
@@ -198,6 +197,122 @@ export async function readFooterText(
   }
 
   return { raw: rawParts.join(" | "), pairs, numbers, runs };
+}
+
+/** Read the standardized title band of a rectified card crop. */
+export async function readTitleText(
+  cardCanvas: HTMLCanvasElement,
+): Promise<string> {
+  const worker = await getWorker();
+  await worker.setParameters({
+    tessedit_char_whitelist:
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'’,- ",
+  });
+  const title = cropFooterRegion(cardCanvas, {
+    top: 0,
+    bottom: 0.24,
+    left: 0,
+    right: 1,
+  });
+  const { data } = await worker.recognize(title);
+  return data.text.trim();
+}
+
+export function normalizeCardTitle(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^\p{L}\p{N}]/gu, "")
+    .toLowerCase();
+}
+
+function editDistanceAtMostOne(left: string, right: string): boolean {
+  if (Math.abs(left.length - right.length) > 1) return false;
+  let li = 0;
+  let ri = 0;
+  let edits = 0;
+  while (li < left.length && ri < right.length) {
+    if (left[li] === right[ri]) {
+      li++;
+      ri++;
+      continue;
+    }
+    if (++edits > 1) return false;
+    if (left.length > right.length) li++;
+    else if (right.length > left.length) ri++;
+    else {
+      li++;
+      ri++;
+    }
+  }
+  return edits + left.length - li + right.length - ri <= 1;
+}
+
+/**
+ * Magic title rescue equivalent to the native policy. Exact OCR can promote
+ * one globally unique printing at 0.55+ visual similarity. One-glyph repair
+ * is permitted only when exactly one 0.75+ visual neighbor supplies the
+ * spelling; fuzzy text never searches the catalog.
+ */
+export function fuseMagicTitleWithShortlist(
+  candidates: BrowserVideoScanCandidate[],
+  catalogEntries: readonly EmbeddingIndexEntry[],
+  rawTitleText: string,
+): { candidates: BrowserVideoScanCandidate[]; matched: boolean } {
+  const rawLines = rawTitleText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const observed = [
+    ...rawLines,
+    ...rawLines.slice(0, -1).map((line, index) => `${line} ${rawLines[index + 1]}`),
+  ]
+    .map(normalizeCardTitle)
+    .filter((title) => title.length >= 4);
+
+  const exact = new Set(observed);
+  if (![...exact].some((title) => catalogEntries.some(
+    (entry) => normalizeCardTitle(entry.name) === title,
+  ))) {
+    const strongVisualNames = candidates
+      .filter((candidate) => candidate.confidence >= 0.75)
+      .map((candidate) => normalizeCardTitle(candidate.name))
+      .filter((title) => title.length >= 8);
+    const corrections = new Set<string>();
+    for (const title of observed.filter((value) => value.length >= 8)) {
+      for (const canonical of strongVisualNames) {
+        if (title !== canonical && editDistanceAtMostOne(title, canonical)) {
+          corrections.add(canonical);
+        }
+      }
+    }
+    if (corrections.size === 1) exact.add([...corrections][0]!);
+  }
+
+  for (const title of exact) {
+    const entries = catalogEntries.filter(
+      (entry) => normalizeCardTitle(entry.name) === title,
+    );
+    const printingCount = entries.reduce(
+      (sum, entry) => sum + (entry.printings?.length ?? 1),
+      0,
+    );
+    if (printingCount !== 1) continue;
+    const matchedIndex = candidates.findIndex(
+      (candidate) =>
+        candidate.confidence >= 0.55 && normalizeCardTitle(candidate.name) === title,
+    );
+    if (matchedIndex < 0) continue;
+    const matched = candidates[matchedIndex]!;
+    return {
+      matched: true,
+      candidates: [
+        { ...matched, passedThreshold: true, proposalLabel: "embedding+title-ocr" },
+        ...candidates.filter((_, index) => index !== matchedIndex),
+      ],
+    };
+  }
+  return { candidates, matched: false };
 }
 
 // ---------- fusion ----------

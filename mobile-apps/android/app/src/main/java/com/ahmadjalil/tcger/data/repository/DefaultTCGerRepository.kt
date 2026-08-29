@@ -205,9 +205,14 @@ class DefaultTCGerRepository(
 
         when (LocalEmbeddingDispatch.select(tcg, options)) {
         LocalEmbeddingModel.ARCFACE -> {
+            var localResult: com.ahmadjalil.tcger.data.scanner.model.ArcFaceRecognitionResult? = null
+            var localRecognizer: ArcFaceCardRecognizer? = null
             runCatching {
-                withContext(Dispatchers.Default) { getArcFaceRecognizer(tcg).recognize(imageBytes) }
+                getArcFaceRecognizer(tcg).also { localRecognizer = it }.let { recognizer ->
+                    withContext(Dispatchers.Default) { recognizer.recognize(imageBytes) }
+                }
             }.onSuccess { local ->
+                localResult = local
                 if (local.decision is ArcFaceRecognitionDecision.Accepted) {
                     val printing = resolvePrintingMatches(local.matches, options.printingMode)
                     return CardScanResult(
@@ -223,6 +228,46 @@ class DefaultTCGerRepository(
                 }
             }.onFailure { error ->
                 if (options.engine == CardScanEngine.ON_DEVICE_OCR) serverFailure = error
+            }
+            if (normalizeScannerGame(tcg) == "magic" &&
+                localResult?.decision !is ArcFaceRecognitionDecision.Accepted &&
+                LocalEmbeddingDispatch.permitsManualOcrRescue(options)
+            ) {
+                val evidence = runCatching { textRecognizer.recognizeEmbeddingEvidence(imageBytes) }
+                    .getOrElse { error ->
+                        if (options.engine == CardScanEngine.ON_DEVICE_OCR) throw error
+                        serverFailure = error
+                        null
+                    }
+                if (evidence != null) {
+                    when (val rescue = localRecognizer?.rescueMagicManualCapture(
+                        checkNotNull(localResult),
+                        evidence,
+                    )) {
+                        is DinoV2OcrRescueDecision.Accepted -> {
+                            val local = checkNotNull(localResult)
+                            val reordered = listOf(rescue.match) + local.matches.filter {
+                                it.card.cardId != rescue.match.card.cardId
+                            }
+                            val printing = resolvePrintingMatches(
+                                reordered,
+                                options.printingMode,
+                                rescue.match.card.exactPrintingId ?: rescue.match.card.cardId,
+                            )
+                            return CardScanResult(
+                                candidates = printing.matches.take(5).map { match ->
+                                    CardScanCandidate(match.card.toDomain(), match.similarity)
+                                },
+                                source = CardScanSource.ON_DEVICE_EMBEDDING,
+                                engine = "arcface-ocr-rescue",
+                                recognizedText = rescue.recognizedText,
+                                printingResolutionProvenance = printing.provenance,
+                                requiresPrintingChoice = printing.requiresChoice,
+                            )
+                        }
+                        is DinoV2OcrRescueDecision.Rejected, null -> Unit
+                    }
+                }
             }
         }
         LocalEmbeddingModel.DINOV2 -> {

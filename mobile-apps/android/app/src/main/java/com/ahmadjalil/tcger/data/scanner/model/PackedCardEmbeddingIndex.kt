@@ -140,6 +140,12 @@ class PackedCardEmbeddingIndex private constructor(
         } else 0
     }
 
+    fun printingCountForGame(game: String, normalizedCardName: String): Int = metadata.sumOf { card ->
+        if (card.isEligibleForGame(game) && normalizedScannerCardName(card.name) == normalizedCardName) {
+            card.exactPrintingRows().size
+        } else 0
+    }
+
     fun cardCountForGame(game: String): Int = metadata.count { it.isEligibleForGame(game) }
 
     private data class ScoredRow(val index: Int, val similarity: Double)

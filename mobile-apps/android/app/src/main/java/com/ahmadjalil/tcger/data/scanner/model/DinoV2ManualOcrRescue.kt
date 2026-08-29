@@ -27,6 +27,10 @@ object DinoV2ManualOcrRescue {
     fun decide(
         evidence: DinoV2OcrEvidence,
         originalMatches: List<CardEmbeddingMatch>,
+        strongAcceptanceScore: Double = DinoV2ModelContract.strongAcceptanceScore,
+        ambiguityMargin: Double = DinoV2ModelContract.ambiguityMargin,
+        uniqueTitleEvidenceScore: Double = strongAcceptanceScore,
+        singleEditVisualFloor: Double? = null,
         exactTitleMatches: (String) -> Pair<List<CardEmbeddingMatch>, Int>,
     ): DinoV2OcrRescueDecision {
         collectorConfirmed(originalMatches, evidence.footerText)?.let { match ->
@@ -37,10 +41,17 @@ object DinoV2ManualOcrRescue {
             )
         }
 
-        val titleCandidates = buildList {
+        val exactTitleCandidates = buildList {
             addAll(evidence.titleLines)
             evidence.titleLines.zipWithNext { first, second -> "$first $second" }.forEach(::add)
         }.map(::normalizedScannerCardName).filter { it.length >= 4 }.distinct().sortedByDescending(String::length)
+        val correctedTitle = singleEditVisualFloor?.let { floor ->
+            singleEditCorrection(
+                observedTitles = exactTitleCandidates,
+                visualMatches = originalMatches.filter { it.similarity >= floor },
+            )
+        }
+        val titleCandidates = (exactTitleCandidates + listOfNotNull(correctedTitle)).distinct()
 
         titleCandidates.forEach { title ->
             val (ranked, printingCount) = exactTitleMatches(title)
@@ -52,7 +63,12 @@ object DinoV2ManualOcrRescue {
                     evidence.fullText,
                 )
             }
-            if (primary.similarity < DinoV2ModelContract.strongAcceptanceScore) {
+            val requiredTitleScore = if (printingCount == 1) {
+                uniqueTitleEvidenceScore
+            } else {
+                strongAcceptanceScore
+            }
+            if (primary.similarity < requiredTitleScore) {
                 return DinoV2OcrRescueDecision.Rejected(DinoV2OcrRescueDecision.Rejected.Reason.TITLE_BELOW_THRESHOLD)
             }
             val runner = ranked.firstOrNull { it.card.cardId != primary.card.cardId }
@@ -61,7 +77,7 @@ object DinoV2ManualOcrRescue {
                 )) {
                 return DinoV2OcrRescueDecision.Rejected(DinoV2OcrRescueDecision.Rejected.Reason.TITLE_PRINTING_UNRESOLVED)
             }
-            if (runner != null && primary.similarity - runner.similarity < DinoV2ModelContract.ambiguityMargin) {
+            if (runner != null && primary.similarity - runner.similarity < ambiguityMargin) {
                 return DinoV2OcrRescueDecision.Rejected(DinoV2OcrRescueDecision.Rejected.Reason.AMBIGUOUS)
             }
             return DinoV2OcrRescueDecision.Accepted(
@@ -71,6 +87,54 @@ object DinoV2ManualOcrRescue {
             )
         }
         return DinoV2OcrRescueDecision.Rejected(DinoV2OcrRescueDecision.Rejected.Reason.NO_EXACT_EVIDENCE)
+    }
+
+    /**
+     * A one-character repair is allowed only when one already-strong visual
+     * neighbor supplies one unambiguous catalog spelling. This never searches
+     * the catalog fuzzily; it only turns OCR such as `throrsman` into the
+     * retrieved `throrsmap` before the normal exact-title lookup.
+     */
+    private fun singleEditCorrection(
+        observedTitles: List<String>,
+        visualMatches: List<CardEmbeddingMatch>,
+    ): String? {
+        val visualNames = visualMatches.map { normalizedScannerCardName(it.card.name) }
+            .filter { it.length >= 8 }
+            .distinct()
+        val corrections = buildSet {
+            observedTitles.filter { it.length >= 8 }.forEach { observed ->
+                visualNames.filterTo(this) { canonical ->
+                    observed != canonical && editDistanceAtMostOne(observed, canonical)
+                }
+            }
+        }
+        return corrections.singleOrNull()
+    }
+
+    private fun editDistanceAtMostOne(left: String, right: String): Boolean {
+        if (kotlin.math.abs(left.length - right.length) > 1) return false
+        var leftIndex = 0
+        var rightIndex = 0
+        var edits = 0
+        while (leftIndex < left.length && rightIndex < right.length) {
+            if (left[leftIndex] == right[rightIndex]) {
+                leftIndex++
+                rightIndex++
+                continue
+            }
+            if (++edits > 1) return false
+            when {
+                left.length > right.length -> leftIndex++
+                right.length > left.length -> rightIndex++
+                else -> {
+                    leftIndex++
+                    rightIndex++
+                }
+            }
+        }
+        edits += (left.length - leftIndex) + (right.length - rightIndex)
+        return edits <= 1
     }
 
     private fun collectorConfirmed(matches: List<CardEmbeddingMatch>, text: String): CardEmbeddingMatch? {

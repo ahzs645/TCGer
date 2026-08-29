@@ -216,7 +216,7 @@ async function main() {
   if (!/^[a-z0-9-]+$/.test(game)) throw new Error("--game must be a lowercase key");
   const version = Number.parseInt(values.get("version"), 10);
   if (!Number.isSafeInteger(version) || version <= 0) throw new Error("--version must be positive");
-  const strongAcceptanceScore = Number(values.get("strong-acceptance-score") ?? "0.60");
+  const strongAcceptanceScore = Number(values.get("strong-acceptance-score") ?? "0.65");
   const ambiguityMargin = Number(values.get("ambiguity-margin") ?? "0.05");
   const operatingPointStatus = values.get("operating-point-status") ?? "provisional-explicit-mode-only";
   if (!(strongAcceptanceScore > 0 && strongAcceptanceScore <= 1)) throw new Error("invalid strong acceptance score");

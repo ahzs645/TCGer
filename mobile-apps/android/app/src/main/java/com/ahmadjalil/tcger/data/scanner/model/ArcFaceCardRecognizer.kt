@@ -10,6 +10,7 @@ data class ArcFaceRecognitionResult(
     val preprocessMs: Double,
     val inferenceMs: Double,
     val searchMs: Double,
+    internal val embedding: FloatArray,
 )
 
 /** Real on-device ArcFace inference and exact cosine matching against the bundled catalog index. */
@@ -49,6 +50,35 @@ class ArcFaceCardRecognizer private constructor(
             preprocessMs = preprocessNs / 1_000_000.0,
             inferenceMs = inferenceNs / 1_000_000.0,
             searchMs = searchNs / 1_000_000.0,
+            embedding = embedding,
+        )
+    }
+
+    /** Magic's intentional-capture policy: exact unique title evidence may
+     * rescue a 0.55+ visual neighbor; a one-glyph OCR repair is bounded to an
+     * already-strong 0.75+ visual shortlist. Other games retain their current
+     * calibrated acceptance behavior until they have equivalent replay data. */
+    fun rescueMagicManualCapture(
+        result: ArcFaceRecognitionResult,
+        evidence: DinoV2OcrEvidence,
+    ): DinoV2OcrRescueDecision {
+        require(contract.game == "magic") { "Magic OCR rescue requires a Magic runtime" }
+        return DinoV2ManualOcrRescue.decide(
+            evidence = evidence,
+            originalMatches = result.matches,
+            exactTitleMatches = { normalizedName ->
+                index.nearest(
+                    query = result.embedding,
+                    limit = 10,
+                    physicalPokemonOnly = false,
+                    game = contract.game,
+                    normalizedCardName = normalizedName,
+                ) to index.printingCountForGame(contract.game, normalizedName)
+            },
+            strongAcceptanceScore = contract.strongAcceptanceScore,
+            ambiguityMargin = contract.ambiguityMargin,
+            uniqueTitleEvidenceScore = 0.55,
+            singleEditVisualFloor = 0.75,
         )
     }
 

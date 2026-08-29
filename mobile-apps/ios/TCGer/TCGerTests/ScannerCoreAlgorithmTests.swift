@@ -107,6 +107,38 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertEqual(CardTitleOCR.normalizedName("Erika’s Exeggcute"), "erikasexeggcute")
     }
 
+    func testCardTitleSingleEditCorrectionIsBoundedToOneVisualName() {
+        let corrected = CardTitleOCR.singleEditCorrection(
+            for: [CardTitleOCR.Candidate(text: "Thrór's Man", confidence: 1)],
+            shortlistNames: ["Thrór's Map", "Unrelated Card"]
+        )
+        XCTAssertEqual(corrected?.text, "Thrór's Map")
+
+        XCTAssertNil(CardTitleOCR.singleEditCorrection(
+            for: [CardTitleOCR.Candidate(text: "Map", confidence: 1)],
+            shortlistNames: ["Man"]
+        ))
+        XCTAssertNil(CardTitleOCR.singleEditCorrection(
+            for: [CardTitleOCR.Candidate(text: "Long Card Nane", confidence: 1)],
+            shortlistNames: ["Long Card Name", "Long Card Cane"]
+        ))
+    }
+
+    func testUniqueTitleEvidenceRescuesOnlyOnePrintingAboveEvidenceFloor() {
+        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.acceptsUniqueTitleEvidence(
+            score: 0.55,
+            printingCount: 1
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.acceptsUniqueTitleEvidence(
+            score: 0.549,
+            printingCount: 1
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.acceptsUniqueTitleEvidence(
+            score: 0.80,
+            printingCount: 2
+        ))
+    }
+
     func testMetadataNameMatchIsExactAndReturnsEveryPrinting() async {
         let entries = [
             CardIndexMetadataEntry(

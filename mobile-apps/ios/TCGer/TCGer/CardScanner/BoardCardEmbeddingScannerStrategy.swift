@@ -842,12 +842,32 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             let titleStarted = Date()
             let titleCandidates = titleOCR.read(from: cropped)
             titleOCRMs += Date().timeIntervalSince(titleStarted) * 1_000
-            if let titleMatch = await metadataStore.exactNameMatch(
+            var titleMatch = await metadataStore.exactNameMatch(
                 for: titleCandidates,
                 game: recognizedGame,
                 setCode: context.setCode,
                 physicalCardsOnly: true
-            ) {
+            )
+            // Vision occasionally substitutes one final glyph in an otherwise
+            // perfect title (`Thrór's Man` for `Thrór's Map`). Permit that
+            // correction only against strong candidates already retrieved by
+            // the image embedding. This keeps fuzzy text out of global catalog
+            // search and therefore preserves the open-set boundary.
+            if titleMatch == nil,
+               let corrected = CardTitleOCR.singleEditCorrection(
+                    for: titleCandidates,
+                    shortlistNames: ranked
+                        .filter { $0.confidence.score >= 0.75 }
+                        .map { $0.details.identity.name }
+               ) {
+                titleMatch = await metadataStore.exactNameMatch(
+                    for: [corrected],
+                    game: recognizedGame,
+                    setCode: context.setCode,
+                    physicalCardsOnly: true
+                )
+            }
+            if let titleMatch {
                 let titleANNStarted = Date()
                 let titleMatches = try await indexStore.nearestNeighbors(
                     for: embedding,
@@ -944,7 +964,11 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let requiredScore = attempt.isBaseline
             ? strongAcceptanceScore
             : strongAcceptanceScore + Configuration.retryAttemptMargin
-        guard primary.confidence.score >= requiredScore || ocrVerified else {
+        let uniqueTitleVerified = Self.acceptsUniqueTitleEvidence(
+            score: primary.confidence.score,
+            printingCount: titleConstrained ? titlePrintingCount : 0
+        )
+        guard primary.confidence.score >= requiredScore || ocrVerified || uniqueTitleVerified else {
             recordOutcome(.belowAcceptanceThreshold)
             return nil
         }
@@ -1049,6 +1073,17 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             printingResolutionProvenance: printingDecision.provenance,
             elapsed: 0
         )
+    }
+
+    /// An exact catalog title plus minimum visual evidence can safely rescue a
+    /// truly unique card even when blur keeps the embedding below the normal
+    /// visual-only threshold. Reprinted/shared names still proceed through the
+    /// collector-number and printing-ambiguity policy below.
+    static func acceptsUniqueTitleEvidence(
+        score: Double,
+        printingCount: Int
+    ) -> Bool {
+        printingCount == 1 && score >= Configuration.minimumEvidenceScore
     }
 
     nonisolated static func requiresTitleConfirmation(

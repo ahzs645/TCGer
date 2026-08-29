@@ -31,9 +31,11 @@ import {
 } from "@/lib/scan/quality-gate";
 import {
   ensureOcrWorker,
+  fuseMagicTitleWithShortlist,
   fuseOcrWithShortlist,
   OcrVoteTracker,
   readFooterText,
+  readTitleText,
 } from "@/lib/scan/collector-ocr";
 import {
   detectCards,
@@ -1131,6 +1133,40 @@ async function matchDetectionEmbedding(
           } catch {
             // OCR is best-effort; fall back to the embedding ranking.
           }
+        }
+      }
+
+      // MTG's printed title is the independent identity evidence for an
+      // intentional browser scan. Require it when OCR is enabled, matching
+      // the native precision policy; collector-number confirmation above is
+      // an equally strong exact-printing signal. Unique exact titles may
+      // rescue a 0.55+ visual neighbor, and one-glyph repair remains bounded
+      // to a 0.75+ visual shortlist inside fuseMagicTitleWithShortlist.
+      const candidateGame =
+        scanFilter === "all" ? candidates[0]?.tcg : scanFilter;
+      if (ocrEnabled && candidateGame === "magic" && !verifiedExactPrintingId) {
+        let titleMatched = false;
+        try {
+          const rawTitle = await readTitleText(cropCanvas);
+          const magicEntries = embeddingIndexes
+            .filter((index) => index.tcg === "magic")
+            .flatMap((index) => index.entries);
+          const fusion = fuseMagicTitleWithShortlist(
+            candidates,
+            magicEntries,
+            rawTitle,
+          );
+          candidates = fusion.candidates;
+          titleMatched = fusion.matched;
+        } catch {
+          // A failed OCR pass is an abstention for Magic, never a visual-only
+          // acceptance. A later clear frame can retry.
+        }
+        if (!titleMatched) {
+          candidates = candidates.map((candidate) => ({
+            ...candidate,
+            passedThreshold: false,
+          }));
         }
       }
 

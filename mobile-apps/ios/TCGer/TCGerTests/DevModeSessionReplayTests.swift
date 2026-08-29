@@ -208,9 +208,37 @@ final class DevModeSessionReplayTests: XCTestCase {
         let environment = ProcessInfo.processInfo.environment
         let productionStrategiesOnly = environment["DEVMODE_PRODUCTION_STRATEGIES_ONLY"] == "1"
         let replayMode = environment["DEVMODE_REPLAY_MODE"].flatMap(ScanMode.init(rawValue:))
-        let coordinator = CardScannerCoordinator.makeDefault(
-            includeBundledTestFallbacks: !productionStrategiesOnly
-        )
+        let coordinator: CardScannerCoordinator
+        if let releaseDirectory = environment["DEVMODE_SCANNER_RELEASE_DIR"] {
+            let releaseURL = URL(fileURLWithPath: releaseDirectory, isDirectory: true)
+            let modelURL = releaseURL.appendingPathComponent(
+                "CardEmbeddings-arcface.mlmodelc",
+                isDirectory: true
+            )
+            let vectorsURL = releaseURL.appendingPathComponent("CardsIndexVectors-arcface.bin")
+            let metadataURL = releaseURL.appendingPathComponent("CardsIndexMetadata.json")
+            for requiredURL in [modelURL, vectorsURL, metadataURL] {
+                XCTAssertTrue(
+                    FileManager.default.fileExists(atPath: requiredURL.path),
+                    "candidate scanner release is missing \(requiredURL.lastPathComponent)"
+                )
+            }
+            coordinator = CardScannerCoordinator(
+                strategies: [BoardCardEmbeddingScannerStrategy(
+                    variant: .arcface,
+                    encoder: CardEmbeddingEncoder(
+                        modelLoader: FileCardEmbeddingModelLoader(modelURL: modelURL)
+                    ),
+                    indexStore: AnnoyIndexStore(fileURL: vectorsURL),
+                    metadataStore: CardIndexMetadataStore(fileURL: metadataURL)
+                )],
+                apiService: APIService()
+            )
+        } else {
+            coordinator = CardScannerCoordinator.makeDefault(
+                includeBundledTestFallbacks: !productionStrategiesOnly
+            )
+        }
         var lostCount = 0
         var wrongAccepts: [String] = []
         var expectedHits = 0
