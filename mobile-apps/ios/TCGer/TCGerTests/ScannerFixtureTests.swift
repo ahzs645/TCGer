@@ -66,12 +66,32 @@ final class ScannerFixtureTests: XCTestCase {
     }
 
     func testShutterDistortedCardFixturesRemainRecognizable() async throws {
-        let supportedCategories: Set<String> = [
-            "rotation", "perspective", "blur", "glare", "partialOcclusion", "multipleCards"
-        ]
-        // Categories overlap expectations: a multi-card scene is a distorted
-        // *input* but its expectation is noMatch (the single-card recognizer
-        // is supposed to abstain), which the negative test covers.
+        try await assertDistortedFixtures(categories: ["rotation"])
+    }
+
+    func testShutterPerspectiveFixtureRemainsRecognizable() async throws {
+        try await assertDistortedFixtures(categories: ["perspective"])
+    }
+
+    func testShutterBlurFixtureRemainsRecognizable() async throws {
+        try await assertDistortedFixtures(categories: ["blur"])
+    }
+
+    func testShutterGlareFixtureRemainsRecognizable() async throws {
+        try await assertDistortedFixtures(categories: ["glare"])
+    }
+
+    func testShutterOcclusionFixtureRemainsRecognizable() async throws {
+        try await assertDistortedFixtures(categories: ["partialOcclusion"])
+    }
+
+    func testShutterMultipleCardFixtureRemainsRecognizable() async throws {
+        try await assertDistortedFixtures(categories: ["multipleCards"])
+    }
+
+    private func assertDistortedFixtures(categories supportedCategories: Set<String>) async throws {
+        // Keep this helper scoped to positive fixtures so a category can gain
+        // explicit no-match variants without silently changing the contract.
         let fixtures = try loadManifest().fixtures.filter {
             supportedCategories.contains($0.category) && $0.expectation != "noMatch"
         }
@@ -90,7 +110,27 @@ final class ScannerFixtureTests: XCTestCase {
     }
 
     func testShutterNegativeFixturesDoNotProduceMatches() async throws {
-        let fixtures = try loadManifest().fixtures.filter { $0.expectation == "noMatch" }
+        try await assertNegativeFixtures(ids: ["synthetic-pack"])
+    }
+
+    func testShutterCardBackFixtureDoesNotProduceAMatch() async throws {
+        try await assertNegativeFixtures(ids: ["pokemon-back"])
+    }
+
+    func testShutterHandFixtureDoesNotProduceAMatch() async throws {
+        try await assertNegativeFixtures(ids: ["hand-only"])
+    }
+
+    func testShutterEmptySceneFixtureDoesNotProduceAMatch() async throws {
+        try await assertNegativeFixtures(ids: ["empty-scene"])
+    }
+
+    private func assertNegativeFixtures(ids: Set<String>) async throws {
+        let fixtures = try loadManifest().fixtures.filter {
+            $0.expectation == "noMatch" && ids.contains($0.id)
+        }
+        XCTAssertEqual(fixtures.count, ids.count, "Every requested negative fixture must exist")
+        var falsePositives: [String] = []
         for fixture in fixtures {
             if fixture.knownFailingEncoders?.contains(ScannerEncoderVariant.current.rawValue) == true {
                 print("FIXTURE-SKIP \(fixture.id): known open miss under encoder \(ScannerEncoderVariant.current.rawValue)")
@@ -102,9 +142,25 @@ final class ScannerFixtureTests: XCTestCase {
                 source: .photoCapture
             )
             guard case .failure(.noMatch) = result else {
-                return XCTFail("\(fixture.id) produced a card match; open-set rejection regressed")
+                if case .success(let scan) = result {
+                    let runners = scan.alternatives.prefix(3).map {
+                        "\($0.details.identity.id)=\($0.confidence.score)"
+                    }.joined(separator: ",")
+                    falsePositives.append(
+                        "\(fixture.id) produced \(scan.primary.details.identity.id) " +
+                        "at \(scan.primary.confidence.score) via \(scan.primary.originatingStrategy); " +
+                        "runners=[\(runners)]; " +
+                        "open-set rejection regressed"
+                    )
+                } else {
+                    falsePositives.append(
+                        "\(fixture.id) did not return noMatch; open-set rejection regressed"
+                    )
+                }
+                continue
             }
         }
+        XCTAssertTrue(falsePositives.isEmpty, falsePositives.joined(separator: "\n"))
     }
 
     private func assert(

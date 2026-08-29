@@ -360,7 +360,7 @@ selects one as an ATOMIC bundle of model + index + thresholds + gate:
 |---|---|---|
 | Model | `CardEmbeddings-arcface.mlpackage` (FastViT-T8, 6.9 MB) | `CardEmbeddings.mlpackage` (dinov2-small, 44 MB) |
 | Index | `CardsIndexVectors-arcface.bin` | `CardsIndexVectors.bin` |
-| Strong accept / ambiguity | 0.60 / 0.05 | 0.72 / 0.02 |
+| Strong accept / ambiguity | 0.65 / 0.05 | 0.72 / 0.02 |
 | Rejection gate | none (gate is DINOv2-trained) | `CardFaceGate.json` |
 | Replay corpus (76 labeled) | **46 correct, 0 wrong accepts** | 31 correct, 1 wrong accept |
 
@@ -453,8 +453,11 @@ Operational lessons for Colab CLI runs (`uv tool install google-colab-cli`
    approximation ran ~4 frames conservative of the real ladder.
 4. Bake the point into `ScannerEncoderVariant`.
 
-ArcFace's sweep: wrong accepts appear below S=0.59; 0.60/0.05 chosen;
-real replay 46/76, 0 wrong — sweep predicted 42/76, 0 wrong.
+ArcFace's original sweep found wrong accepts below S=0.59 and selected
+0.60/0.05. After physical-card filtering removed Pocket rows from the ANN
+ambiguity neighborhood, bundled pack/empty negatives reached 0.6285/0.6476;
+the operating point moved to 0.65/0.05 on 2026-08-29. All positive and
+negative fixtures plus the 38-session device replay remained green.
 
 ### Polish plan (to close the remaining ArcFace gaps)
 

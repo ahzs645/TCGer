@@ -80,7 +80,12 @@ nonisolated enum ScannerEncoderVariant: String, CaseIterable, Identifiable {
             return value
         }
         switch self {
-        case .arcface: return 0.60  // wrong accepts appear below 0.59 (measured 2026-08-23)
+        // The physical-card-only catalog changed the ambiguity neighborhood:
+        // bundled pack/empty negatives reached 0.6285/0.6476 once Pocket rows
+        // stopped acting as accidental rivals. 0.65 is the smallest operating
+        // point above that measured ceiling and preserves every positive
+        // scanner fixture (their weakest required score is 0.72).
+        case .arcface: return 0.65
         case .dinov2: return 0.72   // historical calibration; see Configuration notes
         }
     }
