@@ -127,6 +127,7 @@ struct CardIdentity: Identifiable, Hashable, Sendable {
     let game: TCGGame
     let setCode: String?
     let setName: String?
+    let collectorNumber: String?
     let recognitionFamilyID: String?
     let exactPrintingID: String?
     /// ISO-8601 calendar date from the scanner artifact. Lexical ordering is
@@ -139,6 +140,7 @@ struct CardIdentity: Identifiable, Hashable, Sendable {
         game: TCGGame,
         setCode: String?,
         setName: String?,
+        collectorNumber: String? = nil,
         recognitionFamilyID: String? = nil,
         exactPrintingID: String? = nil,
         releaseDate: String? = nil
@@ -148,6 +150,7 @@ struct CardIdentity: Identifiable, Hashable, Sendable {
         self.game = game
         self.setCode = setCode
         self.setName = setName
+        self.collectorNumber = collectorNumber
         self.recognitionFamilyID = recognitionFamilyID
         self.exactPrintingID = exactPrintingID
         self.releaseDate = releaseDate
@@ -265,19 +268,22 @@ struct CardScanCandidate: Identifiable, Hashable, Sendable {
     let confidence: CardScanConfidence
     let originatingStrategy: ScanStrategyKind
     let debugInfo: [String: String]
+    let printingAlternatives: [CardDetails]
 
     nonisolated init(
         id: UUID = UUID(),
         details: CardDetails,
         confidence: CardScanConfidence,
         originatingStrategy: ScanStrategyKind,
-        debugInfo: [String: String] = [:]
+        debugInfo: [String: String] = [:],
+        printingAlternatives: [CardDetails] = []
     ) {
         self.id = id
         self.details = details
         self.confidence = confidence
         self.originatingStrategy = originatingStrategy
         self.debugInfo = debugInfo
+        self.printingAlternatives = printingAlternatives
     }
 }
 
@@ -329,7 +335,10 @@ nonisolated enum CardPrintingResolver {
         let candidates: [CardScanCandidate]
         let provenance: CardPrintingResolutionProvenance
 
-        var requiresSelection: Bool { selected == nil && candidates.count > 1 }
+        var requiresSelection: Bool {
+            guard case nil = selected else { return false }
+            return candidates.count > 1
+        }
     }
 
     static func resolve(
@@ -338,7 +347,15 @@ nonisolated enum CardPrintingResolver {
         mode: ScannerPrintingMode,
         verifiedExactPrintingID: String? = nil
     ) -> Decision {
-        let unique = ([primary] + candidates).reduce(into: [String: CardScanCandidate]()) {
+        let expanded = primary.printingAlternatives.map { details in
+            CardScanCandidate(
+                details: details,
+                confidence: primary.confidence,
+                originatingStrategy: primary.originatingStrategy,
+                debugInfo: primary.debugInfo
+            )
+        }
+        let unique = (expanded + [primary] + candidates).reduce(into: [String: CardScanCandidate]()) {
             $0[$1.details.identity.exactPrintingID ?? $1.details.identity.id] = $1
         }
         let familyID = primary.details.identity.recognitionFamilyID

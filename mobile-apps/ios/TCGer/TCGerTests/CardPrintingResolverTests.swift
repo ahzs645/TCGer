@@ -48,6 +48,28 @@ final class CardPrintingResolverTests: XCTestCase {
         XCTAssertEqual(decision.provenance, .verified)
     }
 
+    func testCompactFamilyCandidateExpandsExactPrintingsAfterRetrieval() {
+        let newest = candidate(id: "new", family: "art:pikachu-1", releaseDate: "2025-01-01")
+        let older = candidate(id: "old", family: "art:pikachu-1", releaseDate: "2020-01-01")
+        let family = CardScanCandidate(
+            details: newest.details,
+            confidence: newest.confidence,
+            originatingStrategy: newest.originatingStrategy,
+            printingAlternatives: [newest.details, older.details]
+        )
+
+        let quick = CardPrintingResolver.resolve(
+            primary: family, candidates: [], mode: .quickLatest
+        )
+        XCTAssertEqual(quick.selected?.details.identity.id, "new")
+
+        let exact = CardPrintingResolver.resolve(
+            primary: family, candidates: [], mode: .exactPrinting
+        )
+        XCTAssertEqual(exact.candidates.map(\.details.identity.id), ["new", "old"])
+        XCTAssertTrue(exact.requiresSelection)
+    }
+
     private func candidate(id: String, family: String, releaseDate: String) -> CardScanCandidate {
         CardScanCandidate(
             details: CardDetails(
