@@ -266,6 +266,22 @@ nonisolated enum CatalogInstallState: Equatable {
     case installed(version: Int)
 }
 
+nonisolated enum CatalogInstallPhase: Equatable {
+    case downloading
+    case verifying
+    case decoding
+    case preparingSearch
+
+    var description: String {
+        switch self {
+        case .downloading: return "Downloading"
+        case .verifying: return "Verifying download"
+        case .decoding: return "Reading cards"
+        case .preparingSearch: return "Preparing search"
+        }
+    }
+}
+
 @MainActor
 final class CatalogStore: ObservableObject {
     static let shared = CatalogStore()
@@ -294,6 +310,7 @@ final class CatalogStore: ObservableObject {
     @Published private(set) var manifest: CatalogManifest?
     @Published private(set) var installingGames: Set<TCGGame> = []
     @Published private(set) var installProgress: [TCGGame: Double] = [:]
+    @Published private(set) var installPhases: [TCGGame: CatalogInstallPhase] = [:]
     @Published private(set) var installingSealedGames: Set<TCGGame> = []
     @Published private(set) var sealedInstallProgress: [TCGGame: Double] = [:]
 
@@ -365,7 +382,6 @@ final class CatalogStore: ObservableObject {
         let setSearchMetadata: [String: SetSearchMetadata]
         let cardSearchMetadata: [CardSearchMetadata]
         let nameTrigramPostings: [String: [Int]]
-        let fieldTrigramPostings: [String: [Int]]
         let setTrigramPostings: [String: [Int]]
         let numericPostings: [String: [Int]]
 
@@ -395,7 +411,6 @@ final class CatalogStore: ObservableObject {
             var metadata: [CardSearchMetadata] = []
             metadata.reserveCapacity(pack.cards.count)
             var namePostings: [String: [Int]] = [:]
-            var fieldPostings: [String: [Int]] = [:]
             var setPostings: [String: [Int]] = [:]
             var numberPostings: [String: [Int]] = [:]
 
@@ -472,11 +487,6 @@ final class CatalogStore: ObservableObject {
                 metadata.append(cardMetadata)
 
                 Self.add(index, for: Self.trigrams(cardMetadata.name), to: &namePostings)
-                Self.add(
-                    index,
-                    for: Set(cardMetadata.searchableFields.flatMap(Self.trigrams)),
-                    to: &fieldPostings
-                )
                 // `SetSearchMetadata` is already normalized, and normalizing
                 // again here makes that invariant explicit at the index edge.
                 let searchableSetValues = [set?.name, set?.code]
@@ -496,7 +506,6 @@ final class CatalogStore: ObservableObject {
             }
             cardSearchMetadata = metadata
             nameTrigramPostings = namePostings
-            fieldTrigramPostings = fieldPostings
             setTrigramPostings = setPostings
             numericPostings = numberPostings
         }
@@ -627,6 +636,10 @@ final class CatalogStore: ObservableObject {
 
     func isLoaded(_ game: TCGGame) -> Bool {
         loadedPacks[game] != nil
+    }
+
+    func installStatus(for game: TCGGame) -> String? {
+        installPhases[game]?.description
     }
 
     func isEnabled(_ game: TCGGame) -> Bool {
@@ -1092,15 +1105,16 @@ final class CatalogStore: ObservableObject {
         _ terms: [String],
         pack: LoadedCatalogPack
     ) -> [Int] {
+        // Extended searchable fields include artist, variants, treatments, and
+        // collection tags. Magic alone currently has more than 450,000 tags;
+        // expanding every one into trigram posting lists made installation
+        // disproportionately slow and memory-hungry. Numeric terms still give
+        // us a safe, compact narrowing index. Other terms are verified by
+        // `matchesAll` in the detached search task, preserving search results
+        // without making installation build a second catalog-sized structure.
         var candidates: [Int]?
-        for term in terms {
-            let next = term.allSatisfy(\.isNumber)
-                ? (pack.numericPostings[term] ?? [])
-                : candidateIndices(
-                    for: term,
-                    postings: pack.fieldTrigramPostings,
-                    count: pack.cards.count
-                )
+        for term in terms where term.allSatisfy(\.isNumber) {
+            let next = pack.numericPostings[term] ?? []
             if let current = candidates {
                 let allowed = Set(next)
                 candidates = current.filter(allowed.contains)
@@ -1109,7 +1123,7 @@ final class CatalogStore: ObservableObject {
             }
             if candidates?.isEmpty == true { return [] }
         }
-        return candidates ?? []
+        return candidates ?? Array(0..<pack.cards.count)
     }
 
     nonisolated private static func trigrams(_ value: String) -> Set<String> {
@@ -1312,16 +1326,19 @@ final class CatalogStore: ObservableObject {
     private func load(_ game: TCGGame, metadata: CatalogManifestGame) async throws {
         guard !installingGames.contains(game) else { return }
         installingGames.insert(game)
-        installProgress[game] = 0.05
+        installPhases[game] = .downloading
+        installProgress[game] = 0.1
         defer {
             installingGames.remove(game)
+            installPhases.removeValue(forKey: game)
             installProgress.removeValue(forKey: game)
         }
 
         let source = self.source
         let file = metadata.file
         var data = try await source.data(for: file)
-        installProgress[game] = 0.3
+        installPhases[game] = .verifying
+        installProgress[game] = 0.55
 
         var digest = await Self.digest(for: data)
         if digest != metadata.sha256 {
@@ -1335,10 +1352,12 @@ final class CatalogStore: ObservableObject {
             }
         }
 
+        installPhases[game] = .decoding
+        installProgress[game] = 0.7
         let pack = try await Task.detached(priority: .utility) {
             try JSONDecoder().decode(CatalogPack.self, from: data)
         }.value
-        installProgress[game] = 0.9
+        installProgress[game] = 0.85
 
         guard pack.formatVersion == 1 else {
             throw StoreError.unsupportedFormat(pack.formatVersion)
@@ -1350,6 +1369,7 @@ final class CatalogStore: ObservableObject {
 
         // Normalization and posting-list construction touch every catalog row;
         // keep that work off the main actor just like JSON decoding.
+        installPhases[game] = .preparingSearch
         let loadedPack = await Task.detached(priority: .utility) {
             LoadedCatalogPack(pack: pack)
         }.value

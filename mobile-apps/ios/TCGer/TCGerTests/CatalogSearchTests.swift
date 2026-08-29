@@ -109,6 +109,8 @@ final class CatalogSearchTests: XCTestCase {
             ("trainer kit", 20),
             ("Lucario 3/11", 20),
             ("DPBP#506", 20),
+            ("clay", 20),
+            ("pokemon art clay", 20),
             ("3", 20),
             ("Lucaio", 20),
             ("Lucario", 2),

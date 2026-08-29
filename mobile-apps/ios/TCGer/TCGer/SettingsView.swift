@@ -1180,7 +1180,7 @@ private extension SettingsView {
         if catalogStore.installingGames.contains(game) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Installing \(game.displayName) catalog")
+                    Text(catalogStore.installStatus(for: game) ?? "Installing \(game.displayName) catalog")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()

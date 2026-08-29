@@ -175,6 +175,12 @@ struct CatalogInstallRow: View {
         guard isAvailable else {
             return "Not available in this build"
         }
+        if let installStatus = catalogStore.installStatus(for: game) {
+            return installStatus
+        }
+        if catalogStore.installingSealedGames.contains(game) {
+            return "Preparing sealed products"
+        }
         switch catalogStore.installState(for: game) {
         case .notInstalled:
             return "Not installed"
@@ -189,6 +195,7 @@ struct CatalogInstallRow: View {
 
     private var statusColor: Color {
         guard isAvailable else { return .secondary }
+        if isInstalling { return .blue }
         if needsCatalogUpdate || needsSealedInstall { return .orange }
         if case .installed = catalogStore.installState(for: game) { return .green }
         return .secondary
@@ -196,6 +203,7 @@ struct CatalogInstallRow: View {
 
     private var statusSystemImage: String {
         guard isAvailable else { return "exclamationmark.triangle" }
+        if isInstalling { return "arrow.down.circle" }
         if needsCatalogUpdate || needsSealedInstall { return "arrow.down.circle" }
         if case .installed = catalogStore.installState(for: game) { return "checkmark.circle.fill" }
         return "circle.dashed"
