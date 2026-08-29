@@ -72,6 +72,7 @@ def main() -> None:
         f"{args.code_prefix}/run_universal_arcface_hf_job.py"
     )
     trainer_repo_path = f"{args.code_prefix}/train_arcface_encoder.py"
+    trainer_script = model_file(trainer_repo_path)
 
     run([
         sys.executable,
@@ -112,7 +113,11 @@ def main() -> None:
         "--games", args.game,
         "--artifact-variant", args.artifact_variant,
         "--catalog-revision", args.bundle_revision,
-        "--trainer-hub-path-in-repo", trainer_repo_path,
+        # Pass the downloaded pinned trainer as a real local attachment. The
+        # Jobs client treats any .py-valued script argument as a file to bundle;
+        # passing the Hub-relative name here made it reject the child before
+        # submission because that relative path did not exist in this process.
+        "--trainer-script", str(trainer_script),
         "--image-library-repo", args.image_repo,
         "--image-library-revision", image_revision,
         "--image-library-path-in-repo", args.release_path.strip("/"),

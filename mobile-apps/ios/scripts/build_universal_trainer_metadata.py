@@ -26,6 +26,23 @@ GAMES = ("pokemon", "magic", "yugioh")
 RECOGNITION_CONTRACT = "tcger-two-stage-recognition-v1"
 PHYSICAL_SCANNER_PROFILE = "physical"
 
+# TCGdex currently advertises image URLs for these physical Double Crisis
+# cards, but its CDN returns permanent 404 responses. PokemonTCG.io has the
+# corresponding stable high-resolution scans. Keep the exception explicit so
+# future catalog builds remain complete without silently changing providers
+# for the other 19,501 physical cards.
+POKEMON_IMAGE_OVERRIDES = {
+    card_id: f"https://images.pokemontcg.io/dc1/{number}_hires.png"
+    for card_id, number in (
+        ("dc1-1", "1"),
+        ("dc1-10", "10"),
+        ("dc1-11", "11"),
+        ("dc1-12", "12"),
+        ("dc1-13", "13"),
+        ("dc1-14", "14"),
+    )
+}
+
 
 def is_pokemon_pocket(entry: dict) -> bool:
     """Detect TCG Pocket rows independently of any one upstream schema."""
@@ -105,6 +122,8 @@ def normalize_entry(entry: dict, game: str) -> dict:
         "fullArt",
         "promo",
         "finishes",
+        "sourceProvider",
+        "sourceImageFallbackReason",
     )
     for key in optional_fields:
         value = entry.get(key)
@@ -120,11 +139,21 @@ def normalize_entry(entry: dict, game: str) -> dict:
 def pokemon_entries(path: Path, profile: str = PHYSICAL_SCANNER_PROFILE) -> list[dict]:
     with open(path, encoding="utf-8") as source:
         rows = json.load(source)
-    output = [
-        normalize_entry(row, "pokemon")
-        for row in rows
-        if row.get("imageURL") and (profile != PHYSICAL_SCANNER_PROFILE or not is_pokemon_pocket(row))
-    ]
+    output = []
+    for source_row in rows:
+        if not source_row.get("imageURL"):
+            continue
+        if profile == PHYSICAL_SCANNER_PROFILE and is_pokemon_pocket(source_row):
+            continue
+        row = dict(source_row)
+        override = POKEMON_IMAGE_OVERRIDES.get(str(row.get("cardId")))
+        if override:
+            row["imageURL"] = override
+            row["sourceProvider"] = "pokemontcg.io"
+            row["sourceImageFallbackReason"] = "tcgdex-cdn-404"
+        elif "assets.tcgdex.net" in str(row.get("imageURL")):
+            row.setdefault("sourceProvider", "tcgdex")
+        output.append(normalize_entry(row, "pokemon"))
     if profile == PHYSICAL_SCANNER_PROFILE:
         assert_physical_pokemon_catalog(output)
     return output

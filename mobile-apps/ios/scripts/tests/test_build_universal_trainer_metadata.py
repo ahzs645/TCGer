@@ -88,6 +88,33 @@ class TrainerMetadataTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "TCG Pocket"):
             converter.assert_physical_pokemon_catalog(collection)
 
+    def test_pokemon_known_missing_tcgdex_images_use_pinned_fallbacks(self):
+        rows = [
+            {
+                "cardId": "dc1-1",
+                "name": "Team Magma's Numel",
+                "imageURL": "https://assets.tcgdex.net/en/xy/dc1/1/high.webp",
+            },
+            {
+                "cardId": "base1-1",
+                "name": "Alakazam",
+                "imageURL": "https://assets.tcgdex.net/en/base/base1/1/high.webp",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "pokemon.json"
+            path.write_text(json.dumps(rows), encoding="utf-8")
+            output = converter.pokemon_entries(path)
+
+        self.assertEqual(
+            output[0]["imageURL"],
+            "https://images.pokemontcg.io/dc1/1_hires.png",
+        )
+        self.assertEqual(output[0]["sourceProvider"], "pokemontcg.io")
+        self.assertEqual(output[0]["sourceImageFallbackReason"], "tcgdex-cdn-404")
+        self.assertEqual(output[1]["sourceProvider"], "tcgdex")
+        self.assertEqual(output[1]["imageURL"], rows[1]["imageURL"])
+
 
 if __name__ == "__main__":
     unittest.main()
