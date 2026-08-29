@@ -23,15 +23,17 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// PROVISIONAL operating point: the iOS-swept strong-accept 0.60 / ambiguity
-// 0.05 (same model + same index vectors, so the same score scale), pending a
-// web-pipeline sweep of its own — the web accept logic (top-20 shortlist +
-// OCR tiebreaker + track averaging) differs from the iOS acceptance ladder.
-// minVerifiedSimilarity shifts the DINOv2 0.65 by the same scale offset; it
-// is inert until allowVerifiedMarginAcceptance is enabled anywhere.
+// PROVISIONAL operating point: iOS strong-accept 0.65 / ambiguity 0.05 (same
+// model + same index vectors, so the same score scale), pending a web-pipeline
+// sweep of its own. The 0.65 floor is above the measured 0.6476 bundled
+// negative ceiling after physical-card-only index filtering. The web accept
+// logic (top-20 shortlist + OCR tiebreaker + track averaging) still differs
+// from the iOS acceptance ladder. minVerifiedSimilarity shifts DINOv2's 0.65
+// verified floor down by the same 0.07 strong-threshold scale offset; it is
+// inert until allowVerifiedMarginAcceptance is enabled anywhere.
 const ARCFACE_THRESHOLDS = {
-  minSimilarity: 0.6,
-  minVerifiedSimilarity: 0.53,
+  minSimilarity: 0.65,
+  minVerifiedSimilarity: 0.58,
   minMargin: 0.05,
 };
 

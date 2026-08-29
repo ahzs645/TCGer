@@ -16,7 +16,7 @@ object ArcFaceModelContract {
     const val resizedShortestEdge = 256
     const val embeddingDimension = 384
     const val expectedCardCount = 21_828
-    const val strongAcceptanceScore = 0.60
+    const val strongAcceptanceScore = 0.65
     const val ambiguityMargin = 0.05
 
     val model = ScannerModelAsset(

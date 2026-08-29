@@ -40,7 +40,7 @@ image (see SWSH204 below) fixed once and re-embedded repairs both indices.
 |---|---|---|
 | Default encoder | **ArcFace/FastViT-T8** (46/76, 0 wrong accepts) | **ArcFace/FastViT-T8** (same weights, fp16 ONNX; manifest-preferred) |
 | Encoder switching | `ScannerEncoderVariant` atomic bundle; env > UserDefaults > default | Version-2 artifact bundles thresholds+modelUrl with the vectors; manifest `--prefer` picks the fleet's variant; DINOv2 artifact = rollback |
-| Thresholds | 0.60/0.05 (swept + replay-validated) | 0.60/0.05 **provisional** (iOS-swept; own web sweep pending — Phase 2) |
+| Thresholds | 0.65/0.05 (fixture + device-replay validated) | 0.65/0.05 **provisional** (iOS-calibrated; own web sweep pending — Phase 2) |
 | Regression gate | Replay suite (76 labeled frames), green, per-variant allowlists | **Still none automated** — but `eval-recognition.ts` now runs both encoders, so the corpus + CI gate is the remaining work |
 | Rejection gate | none for arcface (DINOv2-trained gate rollback-only) | same: gate auto-disables on model mismatch |
 | Runtime | Core ML on ANE | ONNX Runtime Web (WASM) for arcface; Transformers.js for dinov2/clip |
@@ -113,7 +113,7 @@ The original port plan, kept for reference:
    ship both artifacts and keep DINOv2 one manifest-entry away as the
    rollback (mirror of the iOS picker).
 5. **Recalibrate web thresholds with the sweep method** (below). Do NOT
-   copy iOS's 0.60/0.05 — the web accept logic differs (top-K shortlist
+   copy iOS's 0.65/0.05 — the web accept logic differs (top-K shortlist
    of 20, margin-gated OCR tiebreaker at 0.1, track-level embedding
    averaging), so the operating point is its own sweep on web evidence.
 
@@ -142,7 +142,7 @@ each item pays out on both platforms once Phase 1 lands:
    card, all `noCandidates`. UPDATE 2026-08-24: labeling-session evidence
    now points at DETECTION/CROP failure, not the index — re-cropping the
    recorded SWSH204 frame with a correct quad (webobb+sam in the labeling
-   tool) retrieves swshp-SWSH204 at 0.747, well above the 0.60 accept.
+   tool) retrieves swshp-SWSH204 at 0.747, well above the 0.65 accept.
    The encoder and index row are fine; investigate the iOS
    rectangle-detection path on those frames instead.
    2b. **Stale-row audit** (elevated by the Phase-1 find): sweep all

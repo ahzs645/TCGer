@@ -178,7 +178,7 @@ all misses as one class.
 
 ### Web operating point remains provisional
 
-The browser uses the iOS-derived ArcFace 0.60 strong-accept and 0.05 ambiguity
+The browser uses the iOS-derived ArcFace 0.65 strong-accept and 0.05 ambiguity
 margin. Its crop, shortlist, OCR, track averaging, and WASM path differ, so it
 needs its own evidence sweep and regression gate.
 
