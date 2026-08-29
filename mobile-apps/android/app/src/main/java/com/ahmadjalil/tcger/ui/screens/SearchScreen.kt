@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,8 +41,17 @@ import com.ahmadjalil.tcger.ui.AppViewModel
 @Composable
 fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: AppViewModel) {
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
+    var appliedDefaultGame by remember { mutableStateOf(false) }
     val games = listOf("pokemon", "magic", "yugioh", "onepiece", "lorcana", "dragonball")
         .filter { it in state.preferences.enabledGames }
+
+    LaunchedEffect(state.preferences.defaultGame, games) {
+        val defaultGame = state.preferences.defaultGame
+        if (!appliedDefaultGame && defaultGame != null && defaultGame in games) {
+            viewModel.setSearchGame(defaultGame)
+            appliedDefaultGame = true
+        }
+    }
 
     Column(
         Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.CARDS_SEARCH)).padding(
@@ -84,7 +94,7 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             items(state.searchResults, key = { "${it.tcg}:${it.id}" }) { card ->
-                CatalogCardRow(card) {
+                CatalogCardRow(card, showCardNumbers = state.preferences.showCardNumbers) {
                     IconButton(onClick = { selectedCard = card }) { Icon(Icons.Default.Add, "Add ${card.name}") }
                 }
             }

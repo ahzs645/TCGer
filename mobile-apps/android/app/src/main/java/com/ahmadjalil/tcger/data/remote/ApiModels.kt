@@ -145,12 +145,29 @@ data class BinderDto(
     val name: String,
     val description: String? = null,
     val colorHex: String? = null,
+    val defaultCondition: String? = null,
+    val containerType: String? = null,
+    val imageUrl: String? = null,
+    val associatedTcg: String? = null,
+    val associatedSetCode: String? = null,
+    val associatedSetName: String? = null,
     val cards: List<CollectionCardDto> = emptyList(),
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )
 
-@Serializable data class CreateBinderRequest(val name: String, val description: String? = null, val colorHex: String? = null)
+@Serializable
+data class CreateBinderRequest(
+    val name: String,
+    val description: String? = null,
+    val colorHex: String? = null,
+    val defaultCondition: String? = null,
+    val containerType: String? = null,
+    val imageUrl: String? = null,
+    val associatedTcg: String? = null,
+    val associatedSetCode: String? = null,
+    val associatedSetName: String? = null,
+)
 
 @Serializable
 data class AddCardRequest(
@@ -205,6 +222,45 @@ data class SealedInventoryItemDto(
 )
 
 @Serializable
+data class AddSealedInventoryRequest(
+    val productId: String,
+    val quantity: Int = 1,
+    val purchasePrice: Double? = null,
+    val purchaseDate: String? = null,
+    val notes: String? = null,
+)
+
+@Serializable
+data class SealedLedgerCardDto(
+    val id: String,
+    val collectionId: String? = null,
+    val externalId: String,
+    val tcg: String,
+    val cardName: String,
+    val quantity: Int,
+    val status: String,
+    val liveValue: Double = 0.0,
+    val realizedProceeds: Double = 0.0,
+    val soldAt: String? = null,
+)
+
+@Serializable
+data class SealedOpeningLedgerDto(
+    val id: String,
+    val inventoryId: String,
+    val productName: String,
+    val openedQuantity: Int,
+    val openedAt: String,
+    val invested: Double,
+    val liveValue: Double,
+    val realizedProceeds: Double,
+    val profitLoss: Double,
+    val activeCopies: Int,
+    val soldCopies: Int,
+    val cards: List<SealedLedgerCardDto> = emptyList(),
+)
+
+@Serializable
 data class CreateSealedOpeningRequest(
     val openedQuantity: Int,
     val collectionIds: List<String>,
@@ -245,10 +301,17 @@ data class WishlistDto(
     val name: String,
     val description: String? = null,
     val colorHex: String? = null,
+    val matchAnyPrinting: Boolean = false,
     val cards: List<WishlistCardDto> = emptyList(),
 )
 
-@Serializable data class CreateWishlistRequest(val name: String)
+@Serializable
+data class WishlistRequest(
+    val name: String,
+    val description: String? = null,
+    val colorHex: String? = null,
+    val matchAnyPrinting: Boolean = false,
+)
 
 @Serializable
 data class AddWishlistCardRequest(

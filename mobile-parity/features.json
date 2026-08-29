@@ -99,7 +99,20 @@
       "android": {
         "status": "implemented",
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+        ],
+        "tests": [
+          {
+            "runner": "gradle",
+            "id": "collections.create",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/domain/BinderInputTest.kt"
+          },
+          {
+            "runner": "gradle",
+            "id": "collections.create",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/BinderRemoteModelsTest.kt"
+          }
         ]
       }
     },
@@ -163,7 +176,9 @@
       "android": {
         "status": "implemented",
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistDetailScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
         ]
       }
     },
@@ -195,7 +210,20 @@
       "android": {
         "status": "implemented",
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "wishlists.create",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/domain/WishlistInputTest.kt"
+          },
+          {
+            "runner": "junit",
+            "id": "wishlists.create",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/WishlistRemoteModelsTest.kt"
+          }
         ]
       }
     },
@@ -227,7 +255,22 @@
       "android": {
         "status": "implemented",
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SettingsScreen.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SettingsScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BottomNavigationCustomizationScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BottomNavigationMoreScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/preferences/PreferencesStore.kt"
+        ],
+        "tests": [
+          {
+            "runner": "gradle",
+            "id": "settings.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/domain/BottomNavigationItemTest.kt"
+          },
+          {
+            "runner": "junit",
+            "id": "settings.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/domain/GameDisableGuardTest.kt"
+          }
         ]
       }
     },
@@ -249,9 +292,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/SetBrowserScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityDataSource.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "sets.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityModelsTest.kt"
+          }
         ]
       }
     },
@@ -273,9 +325,17 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/PokedexScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "pokedex.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityModelsTest.kt"
+          }
         ]
       }
     },
@@ -297,9 +357,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/DeckScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/SocialRepository.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "decks.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/features/social/SocialFeatureControllerTest.kt"
+          }
         ]
       }
     },
@@ -321,9 +390,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/CollectionGuidesScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityDataSource.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "guides.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityModelsTest.kt"
+          }
         ]
       }
     },
@@ -345,9 +423,24 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SealedInventoryScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/local/Entities.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "gradle",
+            "id": "sealed.inventory",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/repository/SealedRepositoryContractTest.kt"
+          },
+          {
+            "runner": "gradle",
+            "id": "sealed.inventory",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/PackLedgerApiModelsTest.kt"
+          }
         ]
       }
     },
@@ -825,9 +918,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/onlinecodes/OnlineCodeFeature.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/onlinecodes/OnlineCodesScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "codes.vault",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/onlinecodes/OnlineCodeFeatureTest.kt"
+          }
         ]
       }
     },
@@ -849,9 +951,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeature.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "prices.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeatureTest.kt"
+          }
         ]
       }
     },
@@ -873,9 +984,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeature.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "analytics.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeatureTest.kt"
+          }
         ]
       }
     },
@@ -897,9 +1017,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/TradeScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/SocialRepository.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "trades.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/features/social/SocialModelsTest.kt"
+          }
         ]
       }
     },
@@ -931,9 +1060,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-apps/android/PORTING_PLAN.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/ActivityScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/SocialRepository.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "activity.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/features/social/SocialModelsTest.kt"
+          }
         ]
       }
     },
@@ -1082,13 +1220,21 @@
         ]
       },
       "android": {
-        "status": "partial",
+        "status": "implemented",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/binder/BinderPageQuadDetector.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/binder/BinderPageGridExtractor.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/binder/PerspectiveCardCropper.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerGuidedCapture.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/androidTest/java/com/ahmadjalil/tcger/data/scanner/binder/PerspectiveCardCropperInstrumentedTest.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "scanner.capture.binderPage",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/scanner/binder/BinderPageQuadDetectorTest.kt"
+          }
         ]
       }
     },
@@ -1565,9 +1711,18 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-parity/SCANNER_PACK_MATRIX.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSharedSessionClient.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "scanner.sharedWebSession",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/scanner/ScannerSharedSessionClientTest.kt"
+          }
         ]
       }
     },
@@ -1589,9 +1744,11 @@
         ]
       },
       "android": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-parity/SCANNER_PACK_MATRIX.md"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/BinderPagePhotoStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
         ]
       }
     },

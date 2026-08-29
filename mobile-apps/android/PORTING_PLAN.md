@@ -7,8 +7,12 @@ Glass, while API payloads and offline collection behavior remain shared.
 ## Milestone 1 — collection vertical slice (implemented)
 
 - Compose app shell with adaptive bottom navigation
+- persisted bottom-navigation visibility/order with a four-item plus More overflow
 - on-device/server environment selection
 - dashboard, binders, binder detail, search, wishlists, settings
+- binder create/edit parity for description, color, default condition, container type, and cover URL
+- wishlist create/edit/detail parity for description, color, printing matching, owned/needed filtering, and card removal
+- card-number visibility, default-game selection, and safe game disabling when saved cards still depend on a game
 - Room-backed local collection data
 - Retrofit server health, sign-in, collections, card search, and wishlists
 - unit coverage for dashboard aggregation and server URL normalization
@@ -59,7 +63,8 @@ models themselves are Apple-specific and cannot be copied directly.
   orientation, custom artwork, tear/reveal, and grouped results — implemented
 - full pull inspection actions, Favorites, managed offline downloads, collection
   saves, and server-backed sealed-inventory ledger linking — implemented
-- full Android sealed-inventory browsing and offline sealed persistence — remaining
+- full Android sealed-inventory browsing, local/server CRUD, opening history,
+  and pack-opening linkage — implemented
 - online code vault and barcode scanning
 - collection guides, pricing, and analytics
 - decks, trades, notifications, and server feature gating

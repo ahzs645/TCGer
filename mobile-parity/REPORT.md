@@ -13,7 +13,7 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 |---|---|---|---|---|---|---|
 | Web | 56 | 10 | 18 | 0 | 0 | 0 |
 | iOS | 84 | 0 | 0 | 0 | 0 | 0 |
-| Android | 56 | 7 | 21 | 0 | 0 | 0 |
+| Android | 69 | 6 | 9 | 0 | 0 | 0 |
 
 ## Feature matrix
 
@@ -26,11 +26,11 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 | wishlists.browse | Browse wishlists | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | wishlists.create | Create a wishlist | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | settings.browse | Settings | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
-| sets.browse | Browse card sets | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| pokedex.browse | Pokédex progress | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| decks.browse | Decks | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| guides.browse | Collection guides | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| sealed.inventory | Sealed inventory | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
+| sets.browse | Browse card sets | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| pokedex.browse | Pokédex progress | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| decks.browse | Decks | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| guides.browse | Collection guides | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| sealed.inventory | Sealed inventory | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
 | packOpening.browse | Open the pack-opening experience | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | packOpening.selectSet | Search and filter pack sets by download availability | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
 | packOpening.selectVariant | Choose a pack-art variant within a set | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
@@ -48,17 +48,17 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 | packOpening.save.collection | Save every revealed pull to a collection | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | packOpening.save.sealedLedger | Link an opening to sealed inventory and decrement stock | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | packOpening.offline.downloads | Download, retry, remove, and open supported packs offline | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
-| codes.vault | Online code vault | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| prices.browse | Prices | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| analytics.browse | Collection analytics | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| trades.browse | Trades | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| activity.browse | Activity and notifications | track | Implemented | Not run | Implemented | — | Planned | — | Tracked gap |
+| codes.vault | Online code vault | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| prices.browse | Prices | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| analytics.browse | Collection analytics | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| trades.browse | Trades | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| activity.browse | Activity and notifications | track | Implemented | Not run | Implemented | — | Implemented | Not run | Aligned |
 | scanner.identify | Camera card scanner | track | Partial | — | Implemented | — | Partial | — | Tracked gap |
 | scanner.capture.manual | Manually capture one card from the live camera | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.capture.photo | Identify a card from an imported photo | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.capture.bulkPhoto | Bulk-import and identify multiple photos | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.capture.automatic | Automatic live capture with multi-frame consensus | track | Partial | — | Implemented | — | Implemented | — | Tracked gap |
-| scanner.capture.binderPage | Detect and identify multiple cards on binder pages | track | Partial | — | Implemented | — | Partial | — | Tracked gap |
+| scanner.capture.binderPage | Detect and identify multiple cards on binder pages | track | Partial | — | Implemented | — | Implemented | Not run | Tracked gap |
 | scanner.mode.pokemon | Pokémon card scanning mode | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.mode.yugioh | Yu-Gi-Oh! card scanning mode | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.mode.mtg | Magic: The Gathering card scanning mode | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
@@ -76,8 +76,8 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 | scanner.results.sessionReview | Select, remove, clear, and bulk-add scan-session results | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
 | scanner.results.addToBinder | Add a recognized card directly to a binder | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.results.cropCorrection | Adjust card corners and retry recognition | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
-| scanner.sharedWebSession | Sync scanner results into a shared web session | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
-| scanner.binder.savePagePhotos | Save binder-page photos and replace them on retake | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
+| scanner.sharedWebSession | Sync scanner results into a shared web session | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| scanner.binder.savePagePhotos | Save binder-page photos and replace them on retake | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
 | scanner.debug.serverCapture | Persist server-side scan images, crops, timings, and metadata | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.developerAccess | Hidden developer-tools unlock and scanner-testing toggle | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
 | scanner.debug.testingInputs | Deterministic demo card and binder-page scanner inputs | track | Partial | — | Implemented | — | Implemented | Not run | Tracked gap |

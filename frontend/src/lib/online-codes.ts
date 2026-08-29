@@ -97,6 +97,43 @@ export function normalizeOnlineCode(value: string): string {
     .toLocaleUpperCase("en-US");
 }
 
+/**
+ * Infers the game only when the QR destination or printed-code shape is
+ * distinctive. Unknown formats deliberately remain user-selectable.
+ */
+export function detectOnlineCodeGame(value: string): TcgCode | undefined {
+  const cleaned = normalizeDashes(value.trim());
+  if (!cleaned) return undefined;
+
+  try {
+    const url = new URL(cleaned);
+    const hostname = url.hostname.toLocaleLowerCase("en-US");
+    const path = url.pathname.toLocaleLowerCase("en-US");
+
+    if (hostname === "pokemon.com" || hostname.endsWith(".pokemon.com")) {
+      return "pokemon";
+    }
+    if (
+      hostname === "magic.wizards.com" ||
+      (hostname.endsWith(".wizards.com") && /(?:mtg|arena)/.test(path))
+    ) {
+      return "magic";
+    }
+  } catch {
+    // Most printed redemption codes are not URLs.
+  }
+
+  const code = normalizeOnlineCode(cleaned);
+  if (/^[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}-[A-Z0-9]{3}$/.test(code)) {
+    return "pokemon";
+  }
+  if (/^[A-Z0-9]{5}(?:-[A-Z0-9]{5}){4}$/.test(code)) {
+    return "magic";
+  }
+
+  return undefined;
+}
+
 export function parseOnlineCodeInput(value: string): string[] {
   const values = value
     .split(/[\n,;]+/)

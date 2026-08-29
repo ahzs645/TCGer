@@ -32,4 +32,21 @@ class PackLedgerApiModelsTest {
         assertEquals(3, inventory.quantity)
         assertEquals("inventory-1", opening.sealedInventoryId)
     }
+
+    @Test
+    fun `sealed opening ledger decodes cards and pnl`() {
+        val ledger = json.decodeFromString<SealedOpeningLedgerDto>(
+            """{
+              "id":"ledger-1","inventoryId":"inventory-1","productName":"Base booster",
+              "openedQuantity":1,"openedAt":"2026-08-26T00:00:00Z","invested":5.0,
+              "liveValue":12.0,"realizedProceeds":3.0,"profitLoss":10.0,
+              "activeCopies":1,"soldCopies":1,
+              "cards":[{"id":"pull-1","externalId":"base-4","tcg":"pokemon","cardName":"Charizard","quantity":1,"status":"active","liveValue":12.0}]
+            }""".trimIndent(),
+        )
+
+        assertEquals("Base booster", ledger.productName)
+        assertEquals(10.0, ledger.profitLoss, 0.0)
+        assertEquals("Charizard", ledger.cards.single().cardName)
+    }
 }

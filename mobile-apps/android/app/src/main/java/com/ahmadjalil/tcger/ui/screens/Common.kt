@@ -85,14 +85,19 @@ fun CardArtwork(card: CatalogCard, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun CatalogCardRow(card: CatalogCard, trailing: @Composable (() -> Unit)? = null) {
+fun CatalogCardRow(
+    card: CatalogCard,
+    showCardNumbers: Boolean = true,
+    trailing: @Composable (() -> Unit)? = null,
+) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CardArtwork(card, Modifier.size(width = 52.dp, height = 72.dp))
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(card.name, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
-                    listOfNotNull(card.setName, card.collectorNumber).joinToString(" · ").ifBlank { card.tcg.displayGame() },
+                    listOfNotNull(card.setName, card.collectorNumber.takeIf { showCardNumbers })
+                        .joinToString(" · ").ifBlank { card.tcg.displayGame() },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

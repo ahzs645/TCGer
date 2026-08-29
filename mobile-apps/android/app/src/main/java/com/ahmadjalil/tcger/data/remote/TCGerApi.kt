@@ -10,6 +10,7 @@ import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import kotlinx.serialization.json.JsonObject
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 
@@ -18,6 +19,11 @@ interface TCGerApi {
     @POST("auth/sign-in/username") suspend fun signIn(@Body request: SignInRequest): SignInResponse
     @GET("collections") suspend fun getBinders(@Header("Authorization") auth: String): List<BinderDto>
     @POST("collections") suspend fun createBinder(@Header("Authorization") auth: String, @Body request: CreateBinderRequest): BinderDto
+    @PATCH("collections/{id}") suspend fun updateBinder(
+        @Header("Authorization") auth: String,
+        @Path("id") id: String,
+        @Body request: JsonObject,
+    ): BinderDto
     @DELETE("collections/{id}") suspend fun deleteBinder(@Header("Authorization") auth: String, @Path("id") id: String)
     @GET("cards/search") suspend fun searchCards(
         @Header("Authorization") auth: String,
@@ -57,15 +63,53 @@ interface TCGerApi {
         @Path("cardId") cardId: String,
     )
     @GET("wishlists") suspend fun getWishlists(@Header("Authorization") auth: String): List<WishlistDto>
-    @POST("wishlists") suspend fun createWishlist(@Header("Authorization") auth: String, @Body request: CreateWishlistRequest): WishlistDto
+    @POST("wishlists") suspend fun createWishlist(@Header("Authorization") auth: String, @Body request: WishlistRequest): WishlistDto
+    @PATCH("wishlists/{id}") suspend fun updateWishlist(
+        @Header("Authorization") auth: String,
+        @Path("id") id: String,
+        @Body request: WishlistRequest,
+    ): WishlistDto
     @DELETE("wishlists/{id}") suspend fun deleteWishlist(@Header("Authorization") auth: String, @Path("id") id: String)
     @POST("wishlists/{id}/cards") suspend fun addWishlistCard(
         @Header("Authorization") auth: String,
         @Path("id") id: String,
         @Body request: AddWishlistCardRequest,
     ): WishlistCardDto
+    @DELETE("wishlists/{id}/cards/{cardId}") suspend fun removeWishlistCard(
+        @Header("Authorization") auth: String,
+        @Path("id") id: String,
+        @Path("cardId") cardId: String,
+    )
     @GET("sealed/inventory")
     suspend fun getSealedInventory(@Header("Authorization") auth: String): List<SealedInventoryItemDto>
+    @GET("sealed/products")
+    suspend fun getSealedProducts(
+        @Header("Authorization") auth: String,
+        @Query("tcg") tcg: String? = null,
+    ): List<SealedProductDto>
+    @GET("sealed/products/barcode/{barcode}")
+    suspend fun getSealedProductByBarcode(
+        @Header("Authorization") auth: String,
+        @Path("barcode") barcode: String,
+    ): SealedProductDto
+    @POST("sealed/inventory")
+    suspend fun addSealedInventory(
+        @Header("Authorization") auth: String,
+        @Body request: AddSealedInventoryRequest,
+    ): SealedInventoryItemDto
+    @PATCH("sealed/inventory/{itemId}")
+    suspend fun updateSealedInventory(
+        @Header("Authorization") auth: String,
+        @Path("itemId") itemId: String,
+        @Body request: JsonObject,
+    ): SealedInventoryItemDto
+    @DELETE("sealed/inventory/{itemId}")
+    suspend fun deleteSealedInventory(
+        @Header("Authorization") auth: String,
+        @Path("itemId") itemId: String,
+    )
+    @GET("sealed/openings")
+    suspend fun getSealedOpeningLedgers(@Header("Authorization") auth: String): List<SealedOpeningLedgerDto>
     @POST("sealed/inventory/{itemId}/open")
     suspend fun createSealedOpening(
         @Header("Authorization") auth: String,

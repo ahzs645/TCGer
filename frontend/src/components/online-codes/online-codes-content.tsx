@@ -58,6 +58,7 @@ import {
 } from "@/lib/api/online-codes";
 import {
   canonicalizeOnlineCode,
+  detectOnlineCodeGame,
   getOnlineCodeGame,
   groupOnlineCodes,
   normalizeOnlineCode,
@@ -602,6 +603,14 @@ function ManualCodeDialog({
   const [notes, setNotes] = useState("");
   const codes = parseOnlineCodeInput(value);
   const gameMeta = getOnlineCodeGame(tcg);
+  const detectedGames = new Set(
+    codes
+      .map(detectOnlineCodeGame)
+      .filter((detected): detected is TcgCode => detected !== undefined),
+  );
+  const detectedGame =
+    detectedGames.size === 1 ? [...detectedGames][0] : undefined;
+  const hasMixedGames = detectedGames.size > 1;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -636,13 +645,35 @@ function ManualCodeDialog({
               id="online-code-input"
               rows={8}
               value={value}
-              onChange={(event) => setValue(event.target.value)}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setValue(nextValue);
+                const nextDetectedGames = new Set(
+                  parseOnlineCodeInput(nextValue)
+                    .map(detectOnlineCodeGame)
+                    .filter(
+                      (detected): detected is TcgCode =>
+                        detected !== undefined,
+                    ),
+                );
+                if (nextDetectedGames.size === 1) {
+                  setTcg([...nextDetectedGames][0]!);
+                }
+              }}
               className="font-mono"
               placeholder={gameMeta.codeExample}
             />
             <p className="text-xs text-muted-foreground">
               {codes.length} unique valid code{codes.length === 1 ? "" : "s"}
+              {detectedGame
+                ? ` · ${getOnlineCodeGame(detectedGame).label} detected automatically`
+                : ""}
             </p>
+            {hasMixedGames && (
+              <p className="text-xs text-destructive">
+                Pokémon and Magic codes must be saved as separate batches.
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="online-code-product">
@@ -669,7 +700,9 @@ function ManualCodeDialog({
             Cancel
           </Button>
           <Button
-            disabled={!codes.length || codes.length > 250 || saving}
+            disabled={
+              !codes.length || codes.length > 250 || hasMixedGames || saving
+            }
             onClick={() =>
               onSave({
                 tcg,
@@ -706,6 +739,8 @@ function CodeScannerDialog({
   const [tcg, setTcg] = useState<TcgCode>(defaultGame);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScannerType | null>(null);
+  const detectedGameRef = useRef<TcgCode | null>(null);
+  const [detectedGame, setDetectedGame] = useState<TcgCode | null>(null);
   const [codes, setCodes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -719,6 +754,23 @@ function CodeScannerDialog({
         (result) => {
           const value = canonicalizeOnlineCode(result.data);
           if (!value) return;
+          const inferredGame = detectOnlineCodeGame(result.data);
+          if (
+            inferredGame &&
+            detectedGameRef.current &&
+            detectedGameRef.current !== inferredGame
+          ) {
+            setError(
+              `This batch already contains ${getOnlineCodeGame(detectedGameRef.current).label} codes. Save it before scanning ${getOnlineCodeGame(inferredGame).label} codes.`,
+            );
+            return;
+          }
+          if (inferredGame) {
+            detectedGameRef.current = inferredGame;
+            setDetectedGame(inferredGame);
+            setTcg(inferredGame);
+            setError(null);
+          }
           setCodes((current) =>
             current.some(
               (item) =>
@@ -778,6 +830,12 @@ function CodeScannerDialog({
             ))}
           </SelectContent>
         </Select>
+        {detectedGame && (
+          <p className="text-xs text-muted-foreground">
+            {getOnlineCodeGame(detectedGame).label} detected automatically. You
+            can override it above if needed.
+          </p>
+        )}
         <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
           <video
             ref={videoRef}

@@ -6,7 +6,7 @@ vertical slice:
 
 - on-device and self-hosted server environments
 - dashboard statistics and recent binders
-- binder creation, detail, and card inventory
+- binder creation/editing with presentation and default-condition options, detail, and card inventory
 - local and remote card search
 - CameraX card capture and photo-library import
 - selectable server pHash/embedding and on-device ArcFace/OCR recognition
@@ -14,12 +14,13 @@ vertical slice:
 - pack opening with shared pack-core, offline pack assets, pull review, Favorites,
   collection saves, and server-backed sealed-opening linkage
 - gated scanner developer tools, diagnostics, recordings, and authenticated prices
-- wishlists
-- persisted appearance, currency, and game preferences
+- wishlist creation/editing with description, color, printing-match behavior, detail filters, and card removal
+- sealed inventory browsing, local/server CRUD, opening history, and pack-opening linkage
+- persisted appearance, currency, card-number visibility, default/enabled games, and bottom-navigation preferences
 - Room persistence, DataStore preferences, and a Retrofit API boundary
 
-Sets/Pokédex, the full sealed-inventory browser, automatic binder-page
-detection/page-photo storage, analytics, and widgets remain tracked in
+Sets/Pokédex, automatic binder-page detection/page-photo storage, analytics,
+and widgets remain tracked in
 [`PORTING_PLAN.md`](PORTING_PLAN.md).
 
 ## Requirements

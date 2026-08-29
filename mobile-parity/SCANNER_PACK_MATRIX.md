@@ -40,7 +40,7 @@ Status meanings for this audit:
 | `packOpening.results.grouped` | Results grouped per pack, with a best-pull summary for multi-pack sessions | Implemented | Implemented |
 | `packOpening.results.inspect` | Close-up, front/back flip, pinch zoom, swipe navigation, share, favorite, and wishlist | Implemented | Implemented, including Favorites binder create/reuse and save feedback |
 | `packOpening.save.collection` | Review and save every pull to a collection | Implemented; individual copies preserve ledger identity | Implemented; individual copies preserve ledger identity |
-| `packOpening.save.sealedLedger` | Optionally link the opening to physical sealed inventory and decrement it | Implemented | Implemented for server-backed inventory, with eligible-booster selection and retry checkpoints |
+| `packOpening.save.sealedLedger` | Optionally link the opening to physical sealed inventory and decrement it | Implemented | Implemented for on-device and server-backed inventory, with eligible-booster selection and retry checkpoints |
 | `packOpening.offline.downloads` | Download/retry/remove supported set assets and open them without a network | Implemented for the same supported Base Set/Pitch Black scope with Cache Storage, progress/failure/retry/remove controls, service-worker serving, and offline-open gating | Implemented with durable set records, progress/retry/remove UI, and WebView offline asset serving |
 
 The pack simulation contract must also preserve the selected pack pool, set and
@@ -52,13 +52,13 @@ Compose renderer is valid if commands and resulting session data are equivalent.
 
 | Contract group | Required behavior | Web audit status | Android audit status |
 |---|---|---|---|
-| Capture | Manual camera, single photo, bulk photos, automatic live consensus, and binder pages | Manual camera frame, photo, and multi-file shared-session upload implemented; imported-video tracking is partial automatic capture; YOLO detects multiple cards but there is no binder-page workflow | Manual, single photo, typed sequential bulk import, and two-frame automatic consensus implemented; binder pages have a guided 3x3 workflow but no automatic page/card detector |
+| Capture | Manual camera, single photo, bulk photos, automatic live consensus, and binder pages | Manual camera frame, photo, and multi-file shared-session upload implemented; imported-video tracking is partial automatic capture; YOLO detects multiple cards but there is no binder-page workflow | Manual, single photo, typed sequential bulk import, and two-frame automatic consensus implemented; binder pages include automatic page-boundary seeding plus an editable guided 3x3 workflow |
 | Games | Pokémon, Yu-Gi-Oh!, and Magic | Implemented for classic pHash; the local embedding index is Pokémon-only | Implemented |
 | Engines | Automatic-with-fallback, on-device-only, server pHash, and server embedding | On-device and server pHash are implemented; automatic fallback is partial and selectable server embedding is planned | All four are selectable and wired; Android automatic is server-first when configured while iOS is local-first, and embedding is limited to Pokémon |
 | Encoder models | ArcFace and DINOv2 as atomic model/index/threshold/gate bundles | ArcFace is the published preferred web bundle; DINOv2 remains an alternate artifact without a user-facing selector | Both are selectable checksum-validated atomic bundles. DINOv2 preserves its calibrated gate and passes real arm64 retrieval plus manual title/footer OCR rescue tests for the two clean gate-false-negative fixtures |
-| Session options | Language, torch, automatic result opening, price mode, and shared web session | Shared sessions and a validated persisted language default applied to new sessions/uploads are implemented; torch, auto-open, and session pricing are planned | Torch, stable-consensus auto-open, and authenticated per-card prices/running totals implemented; language is persisted metadata only and shared session is planned |
+| Session options | Language, torch, automatic result opening, price mode, and shared web session | Shared sessions and a validated persisted language default applied to new sessions/uploads are implemented; torch, auto-open, and session pricing are planned | Torch, stable-consensus auto-open, authenticated per-card prices/running totals, and shared-session uploads are implemented; language is persisted and attached to debug/shared-session records, while collector-aware recognition remains partial |
 | Results | Session tray/review, correction, bulk add, and manual corner adjustment | Select all/none, row selection/removal, clear-uncommitted, selected bulk-add, and immutable committed rows are implemented; corner correction is planned | Persistent tray, select/remove/clear review, bulk binder add, four-corner adjustment, perspective crop, and production-handler retry implemented |
-| Binder pages | Multi-card detection, per-page review/destinations, saved page photos, replacement on retake | Multi-card YOLO detection exists, but binder review, destination assignment, and page-photo persistence are planned | Guided page alignment, nine-pocket extraction, sequential recognition, correction/skip, and bulk save implemented; automatic detection and page-photo persistence remain unavailable |
+| Binder pages | Multi-card detection, per-page review/destinations, saved page photos, replacement on retake | Multi-card YOLO detection exists, but binder review, destination assignment, and page-photo persistence are planned | Automatic page-boundary detection, editable alignment, nine-pocket extraction, sequential recognition, correction/skip, bulk save, and app-private page-photo replacement are implemented |
 
 The web scanner has two distinct production surfaces: authenticated still-image
 pHash capture with server diagnostics, and experimental browser-local video
@@ -71,10 +71,13 @@ Android now has calibrated ArcFace and real DINOv2 ONNX embedding paths plus ML
 Kit title/footer OCR rescue. DINOv2 retrieval and the strict iOS-equivalent
 manual rescue policy are verified on API 34 arm64 without weakening the shared
 gate; automatic-camera frames still abstain without rescue. Android now also
-performs manual four-corner correction and a guided 3x3 binder-page review/save
-workflow. It still lacks automatic binder-page/card detection, page-photo
-persistence, collector-aware language behavior, and shared web sessions;
-therefore `scanner.identify` remains deliberately `partial`.
+performs automatic binder-page boundary seeding, manual four-corner correction,
+a guided 3x3 binder-page review/save workflow, durable page-photo replacement,
+and authenticated shared-session uploads. Language is preserved across the
+Android session and its diagnostics/uploads, but collector-aware language
+filtering in the recognition engine remains partial. Camera interaction and
+image-quality behavior still require a connected-device runtime pass before
+release sign-off.
 
 ## Scanner debug and model controls
 

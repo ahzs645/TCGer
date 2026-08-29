@@ -4,9 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ahmadjalil.tcger.AppContainer
+import com.ahmadjalil.tcger.data.backup.CollectionBackupJson
+import com.ahmadjalil.tcger.data.backup.toCatalogCard
 import com.ahmadjalil.tcger.domain.AccentChoice
 import com.ahmadjalil.tcger.domain.AppPreferences
 import com.ahmadjalil.tcger.domain.Binder
+import com.ahmadjalil.tcger.domain.BinderInput
+import com.ahmadjalil.tcger.domain.BottomNavigationItem
 import com.ahmadjalil.tcger.domain.CardScanCandidate
 import com.ahmadjalil.tcger.domain.CardScanEngine
 import com.ahmadjalil.tcger.domain.CardScanEncoderVariant
@@ -21,7 +25,11 @@ import com.ahmadjalil.tcger.domain.ScanDebugCapture
 import com.ahmadjalil.tcger.domain.ScanDebugFeedbackStatus
 import com.ahmadjalil.tcger.domain.ScanDebugReviewTag
 import com.ahmadjalil.tcger.domain.SealedInventoryItem
+import com.ahmadjalil.tcger.domain.SealedOpeningLedger
+import com.ahmadjalil.tcger.domain.SealedProduct
 import com.ahmadjalil.tcger.domain.Wishlist
+import com.ahmadjalil.tcger.domain.WishlistInput
+import com.ahmadjalil.tcger.domain.gameDisableBlockReason
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerRequest
 import com.ahmadjalil.tcger.data.gamepackage.GamePackageState
 import com.ahmadjalil.tcger.data.scanner.ScannerRecognitionEngine
@@ -50,6 +58,9 @@ data class AppUiState(
     val binders: List<Binder> = emptyList(),
     val wishlists: List<Wishlist> = emptyList(),
     val sealedInventory: List<SealedInventoryItem> = emptyList(),
+    val sealedProducts: List<SealedProduct> = emptyList(),
+    val sealedOpeningLedgers: List<SealedOpeningLedger> = emptyList(),
+    val isLoadingSealed: Boolean = false,
     val sealedInventoryError: String? = null,
     val searchQuery: String = "",
     val searchGame: String? = null,
@@ -129,19 +140,146 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         }.onFailure(::showError)
     }
 
-    fun createBinder(name: String) = launchMutation {
-        if (name.isBlank()) return@launchMutation
-        repository.createBinder(name)
+    fun createBinder(input: BinderInput) = launchMutation {
+        if (input.name.isBlank()) return@launchMutation
+        repository.createBinder(input)
+    }
+
+    fun updateBinder(id: String, input: BinderInput) = launchMutation {
+        if (input.name.isBlank()) return@launchMutation
+        repository.updateBinder(id, input)
     }
 
     fun deleteBinder(id: String) = launchMutation { repository.deleteBinder(id) }
 
-    fun createWishlist(name: String) = launchMutation {
-        if (name.isBlank()) return@launchMutation
-        repository.createWishlist(name)
+    fun createWishlist(input: WishlistInput) = launchMutation {
+        if (input.name.isBlank()) return@launchMutation
+        repository.createWishlist(input)
+    }
+
+    fun updateWishlist(id: String, input: WishlistInput) = launchMutation {
+        if (input.name.isBlank()) return@launchMutation
+        repository.updateWishlist(id, input)
     }
 
     fun deleteWishlist(id: String) = launchMutation { repository.deleteWishlist(id) }
+    fun removeWishlistCard(wishlistId: String, cardId: String) = launchMutation {
+        repository.removeWishlistCard(wishlistId, cardId)
+    }
+
+    fun importPortableBackup(raw: String) = viewModelScope.launch {
+        _state.update { it.copy(isLoading = true, message = null) }
+        runCatching {
+            val backup = CollectionBackupJson.decode(raw)
+            backup.binders.forEach { portable ->
+                val binder = repository.createBinder(portable.input())
+                portable.cards.forEach { owned ->
+                    repository.addCard(binder.id, owned.card.toCatalogCard(), owned.quantity)
+                }
+            }
+            backup.wishlists.forEach { portable ->
+                val wishlist = repository.createWishlist(portable.input())
+                portable.cards.forEach { wanted ->
+                    repository.addWishlistCard(
+                        wishlist.id,
+                        wanted.card.toCatalogCard(),
+                        wanted.desiredQuantity,
+                        wanted.notes,
+                    )
+                }
+            }
+            val sealedFailures = backup.sealedInventory.count { sealed ->
+                runCatching {
+                    repository.addSealedInventory(
+                        sealed.productId,
+                        sealed.quantity,
+                        sealed.purchasePrice,
+                        sealed.purchaseDate,
+                        sealed.notes,
+                    )
+                }.isFailure
+            }
+            backup to sealedFailures
+        }.onSuccess { (backup, sealedFailures) ->
+            refresh()
+            _state.update {
+                it.copy(
+                    message = buildString {
+                        append("Imported ${backup.binders.size} binders and ${backup.wishlists.size} wishlists.")
+                        if (sealedFailures > 0) append(" $sealedFailures sealed items could not be matched to the current catalog.")
+                    },
+                )
+            }
+        }.onFailure(::showError)
+    }
+
+    fun loadSealedData() = viewModelScope.launch {
+        _state.update { it.copy(isLoadingSealed = true, sealedInventoryError = null) }
+        runCatching {
+            Triple(
+                repository.getSealedProducts(),
+                repository.getSealedInventory(),
+                runCatching { repository.getSealedOpeningLedgers() },
+            )
+        }.onSuccess { (products, inventory, ledgersResult) ->
+            _state.update {
+                it.copy(
+                    isLoadingSealed = false,
+                    sealedProducts = products,
+                    sealedInventory = inventory,
+                    sealedOpeningLedgers = ledgersResult.getOrDefault(emptyList()),
+                )
+            }
+        }.onFailure { error ->
+            _state.update {
+                it.copy(
+                    isLoadingSealed = false,
+                    sealedInventoryError = error.message ?: "Sealed inventory could not be loaded",
+                )
+            }
+        }
+    }
+
+    fun addSealedInventory(
+        productId: String,
+        quantity: Int,
+        purchasePrice: Double?,
+        notes: String? = null,
+        done: (Boolean) -> Unit = {},
+    ) = sealedMutation(done) {
+        repository.addSealedInventory(productId, quantity, purchasePrice, notes = notes)
+    }
+
+    fun updateSealedInventory(
+        itemId: String,
+        quantity: Int,
+        purchasePrice: Double?,
+        purchaseDate: String?,
+        notes: String?,
+        done: (Boolean) -> Unit = {},
+    ) = sealedMutation(done) {
+        repository.updateSealedInventory(itemId, quantity, purchasePrice, purchaseDate, notes)
+    }
+
+    fun deleteSealedInventory(itemId: String, done: (Boolean) -> Unit = {}) = sealedMutation(done) {
+        repository.deleteSealedInventory(itemId)
+    }
+
+    fun recordSealedOpening(
+        inventoryId: String,
+        quantity: Int,
+        collectionIds: List<String>,
+        notes: String?,
+        done: (Boolean) -> Unit = {},
+    ) = sealedMutation(done) {
+        repository.createSealedOpening(inventoryId, quantity, collectionIds, notes = notes)
+    }
+
+    fun findSealedProductByBarcode(barcode: String, done: (Result<SealedProduct>) -> Unit) = viewModelScope.launch {
+        val result = runCatching { repository.getSealedProductByBarcode(barcode) }
+        result.exceptionOrNull()?.let(::showError)
+        done(result)
+    }
 
     fun setSearchQuery(query: String) {
         _state.update { it.copy(searchQuery = query) }
@@ -188,6 +326,23 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
     fun removeCard(binderId: String, cardId: String) = launchMutation { repository.removeCard(binderId, cardId) }
     fun addWishlistCard(wishlistId: String, card: CatalogCard) = launchMutation { repository.addWishlistCard(wishlistId, card) }
+
+    fun createWishlistWithCards(name: String, cards: List<CatalogCard>) = launchMutation {
+        if (name.isBlank()) return@launchMutation
+        val wishlist = repository.createWishlist(
+            WishlistInput(name = name, description = "Created from an Android set or collection guide"),
+        )
+        cards.distinctBy(CatalogCard::id).forEach { repository.addWishlistCard(wishlist.id, it) }
+    }
+
+    suspend fun createGuideWishlist(name: String, cards: List<CatalogCard>): String {
+        val wishlist = repository.createWishlist(
+            WishlistInput(name = name, description = "Created from a collection guide"),
+        )
+        cards.distinctBy(CatalogCard::id).forEach { repository.addWishlistCard(wishlist.id, it) }
+        refresh()
+        return wishlist.id
+    }
 
     fun favoritePackPull(pull: PackOpeningPull) = viewModelScope.launch {
         runCatching {
@@ -384,7 +539,36 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun setAccent(accent: AccentChoice) = viewModelScope.launch { container.preferences.setAccent(accent) }
     fun setCurrency(currency: String) = viewModelScope.launch { container.preferences.setCurrency(currency) }
     fun setShowPricing(show: Boolean) = viewModelScope.launch { container.preferences.setShowPricing(show) }
-    fun setGameEnabled(game: String, enabled: Boolean) = viewModelScope.launch { container.preferences.setGameEnabled(game, enabled) }
+    fun setShowCardNumbers(show: Boolean) = viewModelScope.launch { container.preferences.setShowCardNumbers(show) }
+    fun setBiometricLockEnabled(enabled: Boolean) = viewModelScope.launch {
+        container.preferences.setBiometricLockEnabled(enabled)
+    }
+    fun setDefaultGame(game: String?) = viewModelScope.launch { container.preferences.setDefaultGame(game) }
+    fun setGameEnabled(game: String, enabled: Boolean) = viewModelScope.launch {
+        if (!enabled) {
+            gameDisableBlockReason(game, _state.value.binders, _state.value.wishlists)?.let { reason ->
+                _state.update {
+                    it.copy(message = "${game.replaceFirstChar(Char::uppercase)} cannot be hidden while it has $reason. Remove those cards first.")
+                }
+                return@launch
+            }
+        }
+        container.preferences.setGameEnabled(game, enabled)
+    }
+    fun setBottomNavigationItemVisible(item: BottomNavigationItem, visible: Boolean) = viewModelScope.launch {
+        container.preferences.setBottomNavigationItemVisible(item, visible)
+    }
+    fun moveBottomNavigationItem(item: BottomNavigationItem, offset: Int) = viewModelScope.launch {
+        val order = _state.value.preferences.bottomNavigationOrder.toMutableList()
+        val oldIndex = order.indexOf(item)
+        val newIndex = (oldIndex + offset).coerceIn(order.indices)
+        if (oldIndex >= 0 && oldIndex != newIndex) {
+            order.removeAt(oldIndex)
+            order.add(newIndex, item)
+            container.preferences.setBottomNavigationOrder(order)
+        }
+    }
+    fun resetBottomNavigation() = viewModelScope.launch { container.preferences.resetBottomNavigation() }
     fun installScannerAssets(game: String) = viewModelScope.launch { container.scannerAssets.install(game) }
     fun refreshScannerAssets(game: String) = viewModelScope.launch {
         runCatching { container.scannerAssets.refreshManifest(game) }
@@ -397,6 +581,18 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     private fun launchMutation(block: suspend () -> Unit) = viewModelScope.launch {
         runCatching { block() }.onSuccess { refresh() }.onFailure(::showError)
+    }
+
+    private fun sealedMutation(done: (Boolean) -> Unit, block: suspend () -> Unit) = viewModelScope.launch {
+        runCatching { block() }
+            .onSuccess {
+                loadSealedData()
+                done(true)
+            }
+            .onFailure { error ->
+                showError(error)
+                done(false)
+            }
     }
 
     private fun showError(error: Throwable) {
@@ -433,4 +629,5 @@ private fun AndroidScannerRequest.toDomainScanOptions() = CardScanOptions(
     captureSource = debugCapture.source,
     captureNotes = debugCapture.notes,
     printingMode = options.printingMode,
+    ocrEnabled = options.ocrEnabled,
 )

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   canonicalizeOnlineCode,
+  detectOnlineCodeGame,
   getOnlineCodeGame,
   groupOnlineCodes,
   normalizeOnlineCode,
@@ -23,6 +24,8 @@ test("extracts a redemption code from its QR URL and deduplicates printed text",
   assert.equal(canonicalizeOnlineCode(url), code);
   assert.deepEqual(parseOnlineCodeInput(`${url}\n${code}`), [code]);
   assert.equal(normalizeOnlineCode(url), normalizeOnlineCode(code));
+  assert.equal(detectOnlineCodeGame(url), "pokemon");
+  assert.equal(detectOnlineCodeGame(code), "pokemon");
 });
 
 test("accepts and identifies printed MTG Arena redemption codes", () => {
@@ -31,6 +34,12 @@ test("accepts and identifies printed MTG Arena redemption codes", () => {
     code,
   ]);
   assert.equal(getOnlineCodeGame("magic").service, "MTG Arena");
+  assert.equal(detectOnlineCodeGame(code), "magic");
+  assert.equal(
+    detectOnlineCodeGame("https://magic.wizards.com/en/mtgarena/redeem"),
+    "magic",
+  );
+  assert.equal(detectOnlineCodeGame("PLAYBRO"), undefined);
 });
 
 test("online codes are grouped into redemption blocks", () => {

@@ -13,6 +13,12 @@ data class BinderEntity(
     val name: String,
     val description: String?,
     val colorHex: String,
+    val defaultCondition: String?,
+    val containerType: String?,
+    val imageUrl: String?,
+    val associatedTcg: String?,
+    val associatedSetCode: String?,
+    val associatedSetName: String?,
     val createdAt: Long,
     val updatedAt: Long,
 )
@@ -58,6 +64,7 @@ data class WishlistEntity(
     val name: String,
     val description: String?,
     val colorHex: String,
+    val matchAnyPrinting: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
 )
@@ -94,4 +101,73 @@ data class WishlistWithCards(
     @Embedded val wishlist: WishlistEntity,
     @Relation(parentColumn = "id", entityColumn = "wishlistId")
     val cards: List<WishlistCardEntity>,
+)
+
+@Entity(tableName = "sealed_products", indices = [Index("tcg"), Index("name"), Index("upc")])
+data class SealedProductEntity(
+    @PrimaryKey val id: String,
+    val tcg: String,
+    val name: String,
+    val productType: String,
+    val setCode: String?,
+    val cardsPerPack: Int?,
+    val packsPerBox: Int?,
+    val releaseDate: String?,
+    val imageUrl: String?,
+    val msrp: Double?,
+    val upc: String?,
+    val isCustom: Boolean,
+)
+
+@Entity(
+    tableName = "sealed_inventory",
+    foreignKeys = [
+        ForeignKey(
+            entity = SealedProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["productId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+    indices = [Index("productId"), Index("createdAt")],
+)
+data class SealedInventoryEntity(
+    @PrimaryKey val id: String,
+    val productId: String,
+    val quantity: Int,
+    val purchasePrice: Double?,
+    val purchaseDate: String?,
+    val notes: String?,
+    val createdAt: String,
+)
+
+data class SealedInventoryWithProduct(
+    @Embedded val inventory: SealedInventoryEntity,
+    @Relation(parentColumn = "productId", entityColumn = "id")
+    val product: SealedProductEntity,
+)
+
+@Entity(
+    tableName = "sealed_openings",
+    foreignKeys = [
+        ForeignKey(
+            entity = SealedProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["productId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+    indices = [Index("productId"), Index("openedAt")],
+)
+data class SealedOpeningEntity(
+    @PrimaryKey val id: String,
+    val inventoryId: String,
+    val productId: String,
+    val productName: String,
+    val openedQuantity: Int,
+    val openedAt: String,
+    val notes: String?,
+    val invested: Double,
+    val linkedCollectionIds: String,
+    val createdAt: String,
 )
