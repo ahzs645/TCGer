@@ -67,7 +67,7 @@ records into the compact `CardsIndexMetadata.json` schema:
   "format": "paper",
   "setCode": "set-code",
   "setName": "Set name",
-  "recognitionFamilyId": "magic:illustration:provider-id",
+  "recognitionFamilyId": "magic:visual:oracle-id:illustration-id:style-hash",
   "exactPrintingId": "provider-printing-id",
   "releaseDate": "2026-08-28",
   "rarity": "rare",
@@ -84,6 +84,19 @@ The normalized schema also carries `visualIdentityId`,
 evidence described in [Two-stage recognition](two-stage-recognition.md).
 Pokémon's reviewed overlay workflow is specified in
 [Artwork-family matching](artwork-family-matching.md).
+The physical Pokémon release is additionally bound by the repository-managed semantic
+set registry and source/output lock described in
+[Pokémon metadata reproducibility](pokemon-metadata-reproducibility.md). Its
+normal build and verification commands are network-free and byte-for-byte
+checked; only an explicit maintainer refresh contacts the pinned TCGdex source.
+
+MTG family construction excludes set/collector/date/finish evidence and
+includes the visible style fields documented in
+[Two-stage recognition](two-stage-recognition.md). A current normalized
+109,546-printing snapshot produces 67,849 visual families and a 70,113-sample
+bounded training/evaluation plan, all materialized by the already-pinned image
+library. Hugging Face training consumes that plan and its immutable shards; it
+does not download upstream card images.
 
 ## Durable image library
 
@@ -91,13 +104,15 @@ Pokémon's reviewed overlay workflow is specified in
 catalog rows into an auditable private release. It provides:
 
 - stable `visualIdentityId` and `sampleId` values independent of row order;
-- parallel download and reuse;
+- representative selection before network access;
+- one training image per recognition family and a bounded held-out sample;
+- parallel download and reuse on operator-owned storage;
 - full image decode validation, dimensions, byte counts, and SHA-256;
 - identity-keyed content-addressed cache;
 - deterministic tar shards;
 - deterministic `manifest.jsonl`, `coverage.json`, `diff.json`,
   `distribution-plan.json`, and `library.json`;
-- fail-closed 100% coverage by default;
+- fail-closed 100% coverage of selected representatives by default;
 - network-free dry run and release audit;
 - source ledger and plan preservation;
 - private Hub upload returning an immutable commit SHA.
@@ -108,9 +123,9 @@ for one recognition family receive the same deterministic
 train/validation/test partition, which prevents same-art leakage after a
 catalog reorder or incremental update.
 
-No production image-library dataset was uploaded during this work. The tooling
-and tests are complete locally; the first full sync, provenance review, upload,
-and pin remain operational work.
+Production image-library releases are private and pinned by immutable Hub
+revision. New TrainingSetPlans may select a different subset of those validated
+shards without rebuilding or redownloading the underlying image library.
 
 ## Phone captures
 
@@ -141,6 +156,7 @@ identity-level split retention, and a new A/B evaluation.
 - per-epoch checkpoint upload;
 - deterministic evaluation sampling;
 - one ArcFace class per recognition family instead of per printing row;
+- family-vector replication across the complete exact-print export catalog;
 - family-disjoint train/evaluation partitions from the durable library;
 - separate family Recall@K and exact-row retrieval diagnostics;
 - fail-closed rejection of Pokémon TCG Pocket rows;
@@ -148,10 +164,10 @@ identity-level split retention, and a new A/B evaluation.
 - offline extraction and verification of pinned deterministic tar shards.
 
 Full-mode wrappers now require a 40-character immutable catalog revision and a
-pinned image-library dataset revision unless the explicit legacy escape hatch
-is used. The three completed 2026-08-27 full runs predate this hardening and
-downloaded mutable upstream image URLs; they are usable release evidence but
-not the reproducibility standard for the next run.
+locally prepared, audited, family-capped pack mounted read-only at submission.
+The GPU job cannot acquire upstream images or snapshot-download an image
+dataset. The three completed 2026-08-27 full runs predate this hardening and are
+usable release evidence but not the reproducibility standard for the next run.
 
 ## Training recipe
 

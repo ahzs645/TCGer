@@ -65,6 +65,27 @@ IMG_SIZE = 224
 EMBED_DIM = 384
 ARC_S, ARC_M = 16.0, 0.50  # s=16: s=30 with AdamW saturates and never lifts off (measured)
 SEED = 22
+RUNTIME_METADATA_FIELDS = (
+    "annIndex",
+    "cardId",
+    "exactPrintingId",
+    "recognitionFamilyId",
+    "name",
+    "game",
+    "format",
+    "setCode",
+    "collectorNumber",
+    "setName",
+    "rarity",
+    "imageURL",
+    "price",
+    "releaseDate",
+    "faceSide",
+)
+PRINTING_METADATA_FIELDS = tuple(
+    field for field in RUNTIME_METADATA_FIELDS
+    if field not in {"annIndex", "recognitionFamilyId", "name", "game"}
+)
 
 
 class ImageCoverageError(RuntimeError):
@@ -148,6 +169,23 @@ class DurableImageLibrary:
                 f"durable library has duplicate eligible rows for {visual_identity(entry)}"
             )
         return None
+
+    def selected_entry_indices(self, entries):
+        """Map the prepared pack back to exact catalog rows and cover every family."""
+        selected = [
+            index for index, entry in enumerate(entries)
+            if self.record_for(entry) is not None
+        ]
+        selected_families = {recognition_family(entries[index]) for index in selected}
+        catalog_families = {recognition_family(entry) for entry in entries}
+        missing = sorted(catalog_families - selected_families)
+        if missing:
+            preview = ", ".join(missing[:5])
+            raise ImageCoverageError(
+                f"prepared image pack has no representative for {len(missing)} "
+                f"catalog families: {preview}"
+            )
+        return selected
 
     def validate_facts(self, entry, facts) -> dict:
         row = self.record_for(entry)
@@ -319,14 +357,18 @@ def recognition_family(entry) -> str:
     return visual_identity(entry)
 
 
-def partition_indices(entries, image_library):
+def partition_indices(entries, image_library, candidate_indices=None):
     """Return family-disjoint training and held-out evaluation row indexes."""
-    all_indices = list(range(len(entries)))
+    all_indices = (
+        list(range(len(entries)))
+        if candidate_indices is None else list(candidate_indices)
+    )
     if image_library is None:
         return all_indices, []
     training = []
     held_out = []
-    for index, entry in enumerate(entries):
+    for index in all_indices:
+        entry = entries[index]
         row = image_library.record_for(entry)
         if row is None:
             raise ImageCoverageError(
@@ -545,6 +587,57 @@ def compact_entries(entries, valid_indices):
         item["annIndex"] = ann_index
         compacted.append(item)
     return compacted
+
+
+def runtime_metadata_entries(entries):
+    """Project training rows onto the fields decoded by the iOS runtime."""
+    return [
+        {key: entry[key] for key in RUNTIME_METADATA_FIELDS if key in entry}
+        for entry in entries
+    ]
+
+
+def family_runtime_metadata_entries(entries):
+    """Collapse exact rows into one ANN row per recognition family.
+
+    The newest exact printing is the backwards-compatible top-level row. All
+    printings remain available as lightweight metadata for exact mode and for
+    persisting the user's selected collection identity.
+    """
+    grouped = {}
+    for entry in entries:
+        key = (entry["game"], recognition_family(entry))
+        grouped.setdefault(key, []).append(entry)
+
+    output = []
+    for ann_index, key in enumerate(sorted(grouped)):
+        printings = sorted(
+            grouped[key],
+            key=lambda row: (
+                str(row.get("releaseDate") or ""),
+                str(row.get("exactPrintingId") or row.get("cardId") or ""),
+            ),
+            reverse=True,
+        )
+        canonical = dict(printings[0])
+        canonical["annIndex"] = ann_index
+        runtime = {
+            field: canonical[field]
+            for field in RUNTIME_METADATA_FIELDS
+            if field in canonical
+        }
+        runtime["indexIdentity"] = "recognition_family"
+        runtime["printingCount"] = len(printings)
+        runtime["printings"] = [
+            {
+                field: printing[field]
+                for field in PRINTING_METADATA_FIELDS
+                if field in printing
+            }
+            for printing in printings
+        ]
+        output.append(runtime)
+    return output
 
 
 def materialize_images(
@@ -778,22 +871,38 @@ def main():
         if args.image_library_root
         else None
     )
-    valid, image_coverage = materialize_images(
-        entries,
-        coverage_path=args.coverage_report or COVERAGE_REPORT,
-        allow_quarantine=args.allow_image_quarantine,
-        image_library=durable_library,
-    )
-    if len(valid) != len(entries):
-        entries = compact_entries(entries, valid)
+    if durable_library is not None:
+        selected_catalog_indices = durable_library.selected_entry_indices(entries)
+        selected_entries = [entries[index] for index in selected_catalog_indices]
+        selected_valid, image_coverage = materialize_images(
+            selected_entries,
+            coverage_path=args.coverage_report or COVERAGE_REPORT,
+            allow_quarantine=args.allow_image_quarantine,
+            image_library=durable_library,
+        )
+        valid = [selected_catalog_indices[index] for index in selected_valid]
         print(
-            f"quarantined {image_coverage['total'] - image_coverage['valid']} rows; "
-            f"training/exporting {len(entries)} validated rows",
+            f"prepared pack materialized {len(valid)} representatives for "
+            f"{len(entries)} catalog rows",
             flush=True,
         )
-    valid = list(range(len(entries)))
+    else:
+        valid, image_coverage = materialize_images(
+            entries,
+            coverage_path=args.coverage_report or COVERAGE_REPORT,
+            allow_quarantine=args.allow_image_quarantine,
+            image_library=None,
+        )
+        if len(valid) != len(entries):
+            entries = compact_entries(entries, valid)
+            print(
+                f"quarantined {image_coverage['total'] - image_coverage['valid']} rows; "
+                f"training/exporting {len(entries)} validated rows",
+                flush=True,
+            )
+        valid = list(range(len(entries)))
     training_indices, held_out_eval_indices = partition_indices(
-        entries, durable_library
+        entries, durable_library, valid
     )
     training_family_ids = sorted({
         recognition_family(entries[index]) for index in training_indices
@@ -1147,6 +1256,8 @@ def main():
                 "quarantined",
             )
         },
+        "catalogRows": len(entries),
+        "preparedRepresentativeRows": len(valid),
     }
 
     if args.pokemon_baseline_onnx:
@@ -1296,12 +1407,28 @@ def main():
     shutil.make_archive(str(OUT_DIR / "CardEmbeddings-arcface.mlpackage"), "zip",
                         PACKAGE_DIR.parent, PACKAGE_DIR.name)
 
-    # Entries were fail-closed or compacted before training, so every exported
-    # metadata row has a real gallery vector. Zero-vector placeholders are not
-    # a valid scanner artifact.
-    if len(gallery) != len(entries):
-        raise RuntimeError("gallery/vector count does not match validated metadata")
-    full = gallery
+    # The prepared pack contains bounded representatives. Export one vector
+    # per visual family and retain exact printings as lightweight nested
+    # metadata. This avoids duplicating an identical vector for every reprint.
+    family_vectors = {}
+    for gallery_index, catalog_index in enumerate(valid):
+        family_vectors.setdefault(
+            recognition_family(entries[catalog_index]), gallery[gallery_index]
+        )
+    missing_vector_families = sorted({
+        recognition_family(entry) for entry in entries
+        if recognition_family(entry) not in family_vectors
+    })
+    if missing_vector_families:
+        raise RuntimeError(
+            "prepared gallery lacks vectors for catalog families: "
+            + ", ".join(missing_vector_families[:5])
+        )
+    family_entries = family_runtime_metadata_entries(entries)
+    full = torch.stack([
+        family_vectors[entry["recognitionFamilyId"]]
+        for entry in family_entries
+    ])
 
     def write_vector_file(path, vectors):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1314,28 +1441,41 @@ def main():
     # Keep the combined output for the current iOS packaging path.
     write_vector_file(OUT_DIR / "CardsIndexVectors-arcface.bin", full)
     with open(OUT_DIR / "CardsIndexMetadata.json", "w") as output:
-        json.dump(entries, output, separators=(",", ":"))
+        json.dump(family_entries, output, separators=(",", ":"))
 
     # Game-specific modes download only their catalog. Automatic mode loads
     # compatible shards together and still runs this single encoder once.
     for game in game_counts:
         indices = [
-            index for index, entry in enumerate(entries) if entry["game"] == game
+            index for index, entry in enumerate(family_entries) if entry["game"] == game
         ]
         shard_entries = []
         for shard_index, global_index in enumerate(indices):
-            item = dict(entries[global_index])
+            item = dict(family_entries[global_index])
             item["annIndex"] = shard_index
             shard_entries.append(item)
         shard_dir = OUT_DIR / "shards" / game
         shard_dir.mkdir(parents=True, exist_ok=True)
         with open(shard_dir / "CardsIndexMetadata.json", "w") as output:
-            json.dump(shard_entries, output, separators=(",", ":"))
+            json.dump(
+                # ``shard_entries`` already came from the sanitized family
+                # runtime projection above. Running it through the legacy
+                # flat-row projector a second time drops ``printings`` and
+                # makes the per-game pack unusable by the two-stage runtime.
+                shard_entries,
+                output,
+                separators=(",", ":"),
+            )
         write_vector_file(
             shard_dir / "CardsIndexVectors-arcface.bin",
             full[torch.tensor(indices)],
         )
-    write_status(phase="done", outputs=sorted(p.name for p in OUT_DIR.iterdir()))
+    write_status(
+        phase="done",
+        vectorFamilies=len(family_entries),
+        exactPrintingRows=len(entries),
+        outputs=sorted(p.name for p in OUT_DIR.iterdir()),
+    )
 
 
 if __name__ == "__main__":

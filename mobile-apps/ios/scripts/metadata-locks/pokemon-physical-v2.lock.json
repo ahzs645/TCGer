@@ -1,0 +1,38 @@
+{
+  "builder": {
+    "path": "mobile-apps/ios/scripts/build_universal_trainer_metadata.py",
+    "sha256": "59e640d41bc224ce877a763851ecd647a9dc1e0f5b0685a594c1139ab08c534e"
+  },
+  "createdAt": "2026-08-29T21:11:07.117659+00:00",
+  "inputs": {
+    "pokemonCatalog": {
+      "path": "mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/CardsIndexMetadata.json",
+      "sha256": "e1b4ed3a64f59b0a1970f5c0d8d29dffa746f7cf02959bdb39bdeae2b3718141"
+    },
+    "pokemonFamilyOverlay": null,
+    "pokemonSetRegistry": {
+      "path": "mobile-apps/ios/scripts/metadata-locks/pokemon-set-release-dates.json",
+      "repository": "tcgdex/cards-database",
+      "revision": "d86b5107d09484994f7fa15c45b0af8ffd72e1b0",
+      "sets": 221,
+      "sha256": "2b5c76d003809c5717521fa099472c2271d92dc928e7f1414ef857473aa88f46"
+    }
+  },
+  "outputs": {
+    "pokemonCatalog": {
+      "path": "pokemon/CardsIndexMetadata.json",
+      "rows": 19507,
+      "sha256": "02774516dd5caeea904ddb542140e6a5b8e80de25bf0d2e44fb94dcf1c89ad68"
+    },
+    "provenance": {
+      "path": "provenance.json",
+      "sha256": "eb8239d439d6a29b7d08d4f84210cd4c6aa86249c330ad049fc89cc8e24657ca"
+    },
+    "universalCatalog": {
+      "path": "CardsIndexMetadata-universal.json",
+      "sha256": "02774516dd5caeea904ddb542140e6a5b8e80de25bf0d2e44fb94dcf1c89ad68"
+    }
+  },
+  "profile": "physical",
+  "schema": "tcger-pokemon-metadata-source-lock-v1"
+}

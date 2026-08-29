@@ -12,11 +12,52 @@ This tool turns normalized `CardsIndexMetadata.json` catalogs into a durable,
 auditable image-byte library. It is the CPU-only gate before scanner training:
 no production training job should fetch mutable upstream image URLs directly.
 
-The release contains a deterministic `manifest.jsonl`, coverage and incremental
-diff reports, a small `library.json` contract, and content-addressed image bytes
-inside deterministic tar shards. The separate local blob cache is disposable
-and may contain many files; only the tar-sharded release belongs in the private
-Hugging Face dataset. Keep both the release and cache out of Git.
+The release contains every exact-print catalog row in deterministic
+`manifest.jsonl`, but fetches blobs only for a bounded representative pack.
+By default it selects one image for each training recognition family and up to
+two for each held-out family. Coverage, incremental diffs, `library.json`, and
+content-addressed tar shards describe that pack. The separate local blob cache
+is disposable. Keep both the release and cache out of Git.
+
+## TrainingSetPlan: selection before storage
+
+`build_training_set_plan.py` is the small, platform-neutral authority for what
+the encoder should actually consume. It reads normalized catalogs only; it
+does not open or download card images. Its output contains:
+
+- `training-set-plan.json`: policies, source hashes, per-game readiness, and
+  counts;
+- `families.jsonl`: one row per recognition family and its single deterministic
+  train/validation/test partition;
+- `samples.jsonl`: only the selected training/evaluation references, including
+  immutable shard/blob locations when an existing validated library has them.
+
+The catalog remains one row per exact printing. The plan normally selects one
+training reference per family and up to two references per held-out family.
+Consequently, a new printing can update the collection catalog without
+silently enlarging the training run. `neededImages` is the exact bounded list
+that still requires materialization; `trainingReady` is true only when every
+selected reference resolves to validated bytes.
+
+The planner has no hard-coded supported-game list. A future game participates
+by supplying normalized `game`, `cardId`, an image reference, and preferably a
+stable `recognitionFamilyId`; without the latter it safely falls back to one
+family per visual identity. Game-specific catalog adapters remain responsible
+for exclusions such as Pokémon Pocket and non-identifying MTG backs.
+
+```bash
+python3 tools/scanner-image-library/build_training_set_plan.py \
+  --catalog /path/to/pokemon/CardsIndexMetadata.json \
+  --catalog /path/to/magic/CardsIndexMetadata.json \
+  --catalog /path/to/yugioh/CardsIndexMetadata.json \
+  --validated-manifest pokemon=/path/to/pokemon/manifest.jsonl \
+  --validated-manifest magic=/path/to/magic/manifest.jsonl \
+  --output .artifacts/training-set-plans/universal-v1
+```
+
+Image-library sync/repack is a downstream materialization operation. GPU jobs
+should consume a pinned TrainingSetPlan and fail if its file hashes, catalog
+revisions, selected counts, or validated blob contracts do not match.
 
 ## Source-release planning (no card images)
 
@@ -89,6 +130,12 @@ uv run tools/scanner-image-library/sync_training_image_library.py audit \
   --root .artifacts/scanner-image-library/2026-08-27
 ```
 
+Representative selection happens before any network fetch. Override
+`--training-samples-per-family` or `--evaluation-samples-per-family` only for a
+reviewed experiment; production training requires exactly one training image
+per family. Unselected reprints remain in the manifest and final scanner
+catalog, but do not create image downloads or extra ArcFace training rows.
+
 For later catalogs, name a new output directory and point at the prior release.
 Unchanged blobs are recovered from the cache or prior tar shards. Use `--refresh`
 periodically to detect an upstream URL whose bytes changed without its URL
@@ -127,9 +174,8 @@ only for investigation, and the upload command refuses such a release. A
 network-free `--dry-run` shows what is already recoverable locally. `audit`
 reopens every tar member, decodes every image, and verifies manifest hashes.
 
-After reviewing the diff and provenance, upload explicitly. The command uses
-the current `hf` login, forces a private dataset, audits again, and prints the
-immutable Hub commit SHA used to pin downstream jobs:
+After reviewing the diff and provenance, the release may be uploaded as a
+private recovery/archive copy:
 
 ```bash
 uv run tools/scanner-image-library/sync_training_image_library.py upload \
@@ -137,27 +183,22 @@ uv run tools/scanner-image-library/sync_training_image_library.py upload \
   --repo ahzs645/tcger-scanner-images
 ```
 
-The release is uploaded under `release/` by default, matching the training-job
-consumer. Use `--path-in-repo` only when deliberately versioning that contract.
-
-Do not launch training with `main`. Pass the returned `pinnedRevision` to every
-training/evaluation job and record it in the model's run provenance.
-
-The full-run wrapper enforces that pin and downloads `release/` without falling
-back to upstream URLs:
+Production training does not snapshot-download that dataset. Launch from the
+operator machine with the audited local pack. The CLI finishes staging the
+read-only volume before allocating the GPU:
 
 ```bash
-uv run mobile-apps/ios/scripts/run_universal_arcface_hf_job.py \
-  --mode full \
-  --games yugioh \
-  --catalog-revision 4ae187396e03383a7a9f33816acd1531a7f390dc \
-  --image-library-repo ahzs645/tcger-scanner-images \
-  --image-library-revision <pinnedRevision>
+uv run mobile-apps/ios/scripts/prepare_and_launch_two_stage_hf_job.py \
+  --game yugioh \
+  --bundle-revision 4ae187396e03383a7a9f33816acd1531a7f390dc \
+  --prepared-image-library-root .artifacts/scanner-image-library/2026-09-03 \
+  --artifact-variant bounded-family-v1
 ```
 
-Full runs reject a branch name or a missing image-library revision. The
-`--allow-unpinned-image-sources` switch exists only to reproduce a clearly
-identified legacy run.
+Full runs reject a missing mounted pack, a pack without the family-cap
+contract, incomplete coverage, mutable upstream fetching, and more than 75,000
+selected images by default. Hub dataset snapshot downloads require a separate
+legacy diagnostic flag and cannot be used by the production launcher.
 
 ### Magic reprint and visual-family audit
 

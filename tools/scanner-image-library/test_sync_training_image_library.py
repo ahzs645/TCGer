@@ -211,6 +211,112 @@ class ImageLibraryTests(unittest.TestCase):
         self.assertEqual(first_family, second_family)
         self.assertEqual(MODULE.split_for(first_family), MODULE.split_for(second_family))
 
+    def test_family_cap_selects_before_fetch_and_keeps_catalog_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            newest = root / "newest.png"
+            newest.write_bytes(image_bytes((5, 10, 15)))
+            catalog = self.write_catalog(root, [
+                {
+                    "game": "magic",
+                    "cardId": "old-print",
+                    "recognitionFamilyId": "magic:illustration:one",
+                    "releaseDate": "1999-01-01",
+                    "imagePath": "does-not-exist.png",
+                },
+                {
+                    "game": "magic",
+                    "cardId": "new-print",
+                    "recognitionFamilyId": "magic:illustration:one",
+                    "releaseDate": "2026-01-01",
+                    "imagePath": newest.name,
+                },
+            ])
+            release = root / "release"
+            result = self.run_cli(
+                "sync", "--catalog", str(catalog), "--output", str(release),
+                "--blob-cache", str(root / "cache"),
+                "--training-samples-per-family", "1",
+                "--evaluation-samples-per-family", "1",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rows = [json.loads(line) for line in (release / "manifest.jsonl").read_text().splitlines()]
+            self.assertEqual(len(rows), 2)
+            selected = [row for row in rows if row["selectedForPack"]]
+            skipped = [row for row in rows if not row["selectedForPack"]]
+            self.assertEqual([row["cardId"] for row in selected], ["new-print"])
+            self.assertEqual(skipped[0]["status"], "not-selected")
+            coverage = json.loads((release / "coverage.json").read_text())
+            self.assertEqual(coverage["counts"]["catalogRows"], 2)
+            self.assertEqual(coverage["counts"]["selected"], 1)
+            self.assertEqual(coverage["counts"]["skipped"], 1)
+            contract = json.loads((release / "library.json").read_text())
+            self.assertEqual(contract["selectionPolicy"]["mode"], "recognition-family-cap-v1")
+
+    def test_repack_streams_selected_blobs_from_validated_release(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old_image = root / "old.png"
+            new_image = root / "new.png"
+            old_image.write_bytes(image_bytes((10, 20, 30)))
+            new_image.write_bytes(image_bytes((40, 50, 60)))
+            rows = [
+                {
+                    "game": "magic",
+                    "cardId": "old-print",
+                    "visualIdentityId": "magic:printing:old-print:front",
+                    "recognitionFamilyId": "magic:illustration:shared",
+                    "releaseDate": "2000-01-01",
+                    "imagePath": old_image.name,
+                },
+                {
+                    "game": "magic",
+                    "cardId": "new-print",
+                    "visualIdentityId": "magic:printing:new-print:front",
+                    "recognitionFamilyId": "magic:illustration:shared",
+                    "releaseDate": "2026-01-01",
+                    "imagePath": new_image.name,
+                },
+            ]
+            catalog = self.write_catalog(root, rows)
+            source = root / "source-release"
+            result = self.run_cli(
+                "sync", "--catalog", str(catalog), "--output", str(source),
+                "--blob-cache", str(root / "cache"),
+                "--training-samples-per-family", "2",
+                "--evaluation-samples-per-family", "2",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            old_image.unlink()
+            new_image.unlink()
+
+            output = root / "bounded-release"
+            result = self.run_cli(
+                "repack", "--catalog", str(catalog), "--output", str(output),
+                "--source-manifest", str(source / "manifest.jsonl"),
+                "--source-root", str(source),
+                "--training-samples-per-family", "1",
+                "--evaluation-samples-per-family", "1",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            summary = json.loads(result.stdout.splitlines()[-1])
+            self.assertEqual(summary["networkImageFetches"], 0)
+            self.assertEqual(summary["selectedRows"], 1)
+            manifest = [
+                json.loads(line)
+                for line in (output / "manifest.jsonl").read_text().splitlines()
+            ]
+            selected = [row for row in manifest if row["selectedForPack"]]
+            self.assertEqual([row["cardId"] for row in selected], ["new-print"])
+            self.assertEqual(selected[0]["releaseDate"], "2026-01-01")
+            self.assertEqual(
+                json.loads((output / "library.json").read_text())
+                ["reusedValidatedRelease"]["networkImageFetches"],
+                0,
+            )
+            audit = self.run_cli("audit", "--root", str(output))
+            self.assertEqual(audit.returncode, 0, audit.stderr)
+
     def test_pokemon_pocket_rows_are_rejected_before_download(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

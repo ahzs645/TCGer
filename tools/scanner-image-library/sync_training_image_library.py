@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = [
+#   "huggingface-hub>=1.3.0",
 #   "Pillow>=10.0",
 # ]
 # ///
@@ -320,6 +321,47 @@ def eligibility(source_kind: str, row: dict, valid: bool) -> tuple[bool, bool, s
     return False, True, "camera-evaluation-only", "camera-evaluation"
 
 
+def representative_rank(row: dict, sample_id: str) -> tuple[str, str, str, str]:
+    """Prefer a recent, deterministic exact printing without reading its image."""
+    released = next((
+        str(row.get(key) or "").strip()
+        for key in ("releasedAt", "releaseDate", "released_at", "release_date")
+        if str(row.get(key) or "").strip()
+    ), "")
+    return (
+        released,
+        str(row.get("setCode") or ""),
+        str(row.get("collectorNumber") or ""),
+        sample_id,
+    )
+
+
+def select_catalog_representatives(
+    work: list[tuple],
+    training_cap: int,
+    evaluation_cap: int,
+) -> set[str]:
+    """Select a bounded family-level pack before any image fetch begins."""
+    grouped: dict[tuple[str, str], list[tuple]] = {}
+    selected: set[str] = set()
+    for item in work:
+        source_row, _, _, source_kind, *_, recognition_family_id, sample_id, _ = item
+        if source_kind == "capture":
+            selected.add(sample_id)
+            continue
+        partition = split_for(recognition_family_id)
+        grouped.setdefault((recognition_family_id, partition), []).append(item)
+    for (_, partition), candidates in sorted(grouped.items()):
+        cap = training_cap if partition == "train" else evaluation_cap
+        ranked = sorted(
+            candidates,
+            key=lambda item: representative_rank(item[0], item[-2]),
+            reverse=True,
+        )
+        selected.update(item[-2] for item in ranked[:cap])
+    return selected
+
+
 def deterministic_tar(path: Path, blobs: Iterable[ValidatedBlob]) -> None:
     with tarfile.open(path, "w", format=tarfile.PAX_FORMAT) as archive:
         for blob in sorted(blobs, key=lambda value: value.sha256):
@@ -331,6 +373,20 @@ def deterministic_tar(path: Path, blobs: Iterable[ValidatedBlob]) -> None:
             info.uname = info.gname = ""
             info.mode = 0o444
             archive.addfile(info, io.BytesIO(blob.data))
+
+
+def add_deterministic_tar_member(
+    archive: tarfile.TarFile,
+    member: str,
+    data: bytes,
+) -> None:
+    info = tarfile.TarInfo(member)
+    info.size = len(data)
+    info.mtime = 0
+    info.uid = info.gid = 0
+    info.uname = info.gname = ""
+    info.mode = 0o444
+    archive.addfile(info, io.BytesIO(data))
 
 
 def diff_report(current: list[dict], previous: dict[str, dict]) -> dict:
@@ -538,6 +594,12 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
             recognition_family_id, sample_id, revision,
         ))
 
+    selected_sample_ids = select_catalog_representatives(
+        work,
+        training_cap=args.training_samples_per_family,
+        evaluation_cap=args.evaluation_samples_per_family,
+    )
+
     def process(item: tuple) -> tuple[dict, ValidatedBlob | None]:
         (
             source_row, catalog, catalog_sha, source_kind, locator_kind,
@@ -561,6 +623,7 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
             "name": source_row.get("name"),
             "setCode": source_row.get("setCode"),
             "collectorNumber": source_row.get("collectorNumber"),
+            "releaseDate": source_row.get("releaseDate"),
             "oracleId": source_row.get("oracleId"),
             "illustrationId": source_row.get("illustrationId"),
             "artworkId": source_row.get("artworkId"),
@@ -570,7 +633,28 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
             "sourceURL": source_locator if locator_kind == "url" else None,
             "sourcePath": source_locator if locator_kind == "file" else None,
             "provenance": provenance_for(source_row, catalog, catalog_sha, revision, source_kind),
+            "selectedForPack": sample_id in selected_sample_ids,
         }
+        if sample_id not in selected_sample_ids:
+            partition = split_for(recognition_family_id)
+            row.update({
+                "status": "not-selected",
+                "blobSha256": None,
+                "bytes": None,
+                "mime": None,
+                "extension": None,
+                "width": None,
+                "height": None,
+                "shard": None,
+                "member": None,
+                "error": None,
+                "trainingEligible": False,
+                "evaluationEligible": False,
+                "quarantineReason": None,
+                "selectionReason": "family-representative-cap",
+                "partition": partition,
+            })
+            return row, None
         prior = previous.get(sample_id)
         blob: ValidatedBlob | None = None
         try:
@@ -642,25 +726,30 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
     output_rows.sort(key=lambda value: (
         value["recognitionFamilyId"], value["visualIdentityId"], value["sampleId"]
     ))
-    valid = sum(row["status"] == "valid" for row in output_rows)
-    invalid = len(output_rows) - valid
+    selected_rows = [row for row in output_rows if row["selectedForPack"]]
+    valid = sum(row["status"] == "valid" for row in selected_rows)
+    invalid = len(selected_rows) - valid
+    skipped = len(output_rows) - len(selected_rows)
     coverage = {
         "schemaVersion": SCHEMA_VERSION,
         "status": "ready" if invalid == 0 else ("incomplete-allowed" if args.allow_incomplete else "blocked"),
         "failClosed": not args.allow_incomplete,
         "counts": {
-            "input": len(output_rows),
+            "catalogRows": len(output_rows),
+            "selected": len(selected_rows),
+            "skipped": skipped,
+            "input": len(selected_rows),
             "valid": valid,
             "invalid": invalid,
             "uniqueBlobs": len(blobs),
-            "trainingEligible": sum(bool(row["trainingEligible"]) for row in output_rows),
-            "evaluationEligible": sum(bool(row["evaluationEligible"]) for row in output_rows),
+            "trainingEligible": sum(bool(row["trainingEligible"]) for row in selected_rows),
+            "evaluationEligible": sum(bool(row["evaluationEligible"]) for row in selected_rows),
             "quarantined": sum(bool(row["quarantineReason"]) for row in output_rows),
         },
-        "coverage": valid / len(output_rows) if output_rows else 0.0,
+        "coverage": valid / len(selected_rows) if selected_rows else 0.0,
         "invalidSamples": [
             {"sampleId": row["sampleId"], "error": row["error"]}
-            for row in output_rows if row["status"] != "valid"
+            for row in selected_rows if row["status"] != "valid"
         ],
     }
     diff = diff_report(output_rows, previous)
@@ -696,6 +785,13 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
         "shardPrefixLength": args.shard_prefix_length,
         "sourceRevisions": revision_by_key,
         "sourceCatalogs": catalog_descriptors,
+        "selectionPolicy": {
+            "mode": "recognition-family-cap-v1",
+            "trainingSamplesPerFamily": args.training_samples_per_family,
+            "evaluationSamplesPerFamily": args.evaluation_samples_per_family,
+            "selectedRows": len(selected_rows),
+            "catalogRows": len(output_rows),
+        },
         "sourcePlanning": {
             key: document[0] for key, document in planning_documents.items() if document is not None
         },
@@ -736,6 +832,273 @@ def build_library(args: argparse.Namespace) -> tuple[dict, int]:
         "distributionSummary": distribution_plan["summary"],
     }))
     return summary, 0 if invalid == 0 or args.allow_incomplete else 2
+
+
+def repack_source_shard(
+    shard: str,
+    *,
+    source_root: Path | None,
+    source_hf_repo: str | None,
+    source_hf_revision: str | None,
+    source_hf_path: str,
+    temporary_root: Path,
+) -> Path:
+    if source_root is not None:
+        path = source_root / shard
+        if not path.is_file():
+            raise LibraryError(f"source release is missing shard: {shard}")
+        return path
+    if not source_hf_repo or not source_hf_revision:
+        raise LibraryError("repack requires --source-root or pinned Hugging Face source arguments")
+    remote_path = "/".join(part.strip("/") for part in (source_hf_path, shard) if part.strip("/"))
+    subprocess.run([
+        "hf", "download", source_hf_repo, remote_path,
+        "--repo-type", "dataset", "--revision", source_hf_revision,
+        "--local-dir", str(temporary_root),
+    ], check=True, stdout=subprocess.DEVNULL)
+    path = temporary_root / remote_path
+    if not path.is_file():
+        raise LibraryError(f"Hugging Face download did not materialize {remote_path}")
+    return path
+
+
+def repack_library(args: argparse.Namespace) -> dict:
+    """Stream selected blobs out of a validated release without URL refetches."""
+    if args.output.exists():
+        raise LibraryError(f"output already exists; use a new versioned directory: {args.output}")
+    source_manifest_bytes = args.source_manifest.read_bytes()
+    source_rows = load_manifest(args.source_manifest)
+    if not source_rows:
+        raise LibraryError("source manifest is empty")
+
+    records: list[tuple[dict, Path, str]] = []
+    for catalog in args.catalog:
+        catalog_sha = sha256_bytes(catalog.read_bytes())
+        for row in load_records(catalog):
+            if is_pokemon_pocket(row):
+                raise LibraryError(
+                    "physical scanner image library contains a Pokemon TCG "
+                    f"Pocket row: {row.get('cardId') or row.get('name')}"
+                )
+            records.append((row, catalog, catalog_sha))
+
+    work: list[tuple] = []
+    seen_sample_ids: set[str] = set()
+    for source_row, catalog, catalog_sha in records:
+        locator_kind, locator, source_locator = normalized_locator(source_row, catalog)
+        identity_key, visual_id = identity_for(source_row, source_locator)
+        recognition_family_id = recognition_family_for(source_row, visual_id)
+        sample_id = str(
+            source_row.get("sampleId")
+            or source_row.get("sample_id")
+            or sample_id_for(visual_id, "catalog", source_locator)
+        )
+        if sample_id in seen_sample_ids:
+            raise LibraryError(f"duplicate sample identity: {sample_id}")
+        seen_sample_ids.add(sample_id)
+        work.append((
+            source_row, catalog, catalog_sha, "catalog", locator_kind,
+            locator, source_locator, identity_key, visual_id,
+            recognition_family_id, sample_id, args.catalog_revision,
+        ))
+
+    selected_sample_ids = select_catalog_representatives(
+        work,
+        training_cap=args.training_samples_per_family,
+        evaluation_cap=args.evaluation_samples_per_family,
+    )
+    output_rows: list[dict] = []
+    selected_by_shard: dict[str, list[dict]] = {}
+    missing: list[str] = []
+    for item in work:
+        (
+            source_row, catalog, catalog_sha, source_kind, locator_kind,
+            _locator, source_locator, identity_key, visual_id,
+            recognition_family_id, sample_id, revision,
+        ) = item
+        partition = split_for(recognition_family_id)
+        selected = sample_id in selected_sample_ids
+        row = {
+            "schemaVersion": SCHEMA_VERSION,
+            "sampleId": sample_id,
+            "visualIdentityId": visual_id,
+            "visualIdentityKey": identity_key,
+            "recognitionFamilyId": recognition_family_id,
+            "game": str(source_row.get("game")).casefold(),
+            "cardId": str(source_row.get("cardId") or source_row.get("card_id")),
+            "exactPrintingId": str(
+                source_row.get("exactPrintingId")
+                or source_row.get("exact_printing_id")
+                or source_row.get("cardId")
+                or source_row.get("card_id")
+            ),
+            "name": source_row.get("name"),
+            "setCode": source_row.get("setCode"),
+            "collectorNumber": source_row.get("collectorNumber"),
+            "releaseDate": source_row.get("releaseDate"),
+            "oracleId": source_row.get("oracleId"),
+            "illustrationId": source_row.get("illustrationId"),
+            "artworkId": source_row.get("artworkId"),
+            "layout": source_row.get("layout"),
+            "setType": source_row.get("setType"),
+            "faceSide": source_row.get("faceSide"),
+            "sourceURL": source_locator if locator_kind == "url" else None,
+            "sourcePath": source_locator if locator_kind == "file" else None,
+            "provenance": provenance_for(
+                source_row, catalog, catalog_sha, revision, source_kind
+            ),
+            "selectedForPack": selected,
+            "partition": partition,
+        }
+        if not selected:
+            row.update({
+                "status": "not-selected",
+                "blobSha256": None,
+                "bytes": None,
+                "mime": None,
+                "extension": None,
+                "width": None,
+                "height": None,
+                "shard": None,
+                "member": None,
+                "error": None,
+                "trainingEligible": False,
+                "evaluationEligible": False,
+                "quarantineReason": None,
+                "selectionReason": "family-representative-cap",
+            })
+            output_rows.append(row)
+            continue
+        prior = source_rows.get(sample_id)
+        required = ("blobSha256", "bytes", "mime", "extension", "width", "height", "shard", "member")
+        if prior is None or prior.get("status") != "valid" or any(prior.get(key) is None for key in required):
+            missing.append(sample_id)
+            continue
+        if prior.get("recognitionFamilyId") != recognition_family_id:
+            raise LibraryError(f"source family contract changed for {sample_id}")
+        row.update({key: prior[key] for key in required})
+        row.update({
+            "status": "valid",
+            "error": None,
+            "trainingEligible": True,
+            "evaluationEligible": True,
+            "quarantineReason": None,
+            "selectionReason": "family-representative",
+        })
+        output_rows.append(row)
+        selected_by_shard.setdefault(str(row["shard"]), []).append(row)
+    if missing:
+        raise LibraryError(
+            f"source release cannot satisfy {len(missing)} selected sample(s); first={missing[0]}"
+        )
+
+    output_rows.sort(key=lambda value: (
+        value["recognitionFamilyId"], value["visualIdentityId"], value["sampleId"]
+    ))
+    selected_rows = [row for row in output_rows if row["selectedForPack"]]
+    unique_blobs = {row["blobSha256"] for row in selected_rows}
+    coverage = {
+        "schemaVersion": SCHEMA_VERSION,
+        "status": "ready",
+        "failClosed": True,
+        "counts": {
+            "catalogRows": len(output_rows),
+            "selected": len(selected_rows),
+            "skipped": len(output_rows) - len(selected_rows),
+            "input": len(selected_rows),
+            "valid": len(selected_rows),
+            "invalid": 0,
+            "uniqueBlobs": len(unique_blobs),
+            "trainingEligible": sum(row["partition"] == "train" for row in selected_rows),
+            "evaluationEligible": sum(row["partition"] != "train" for row in selected_rows),
+            "quarantined": 0,
+        },
+        "coverage": 1.0,
+        "invalidSamples": [],
+    }
+    manifest_bytes = "".join(canonical_json(row) + "\n" for row in output_rows).encode()
+    release = {
+        "schemaVersion": SCHEMA_VERSION,
+        "manifest": "manifest.jsonl",
+        "manifestSHA256": sha256_bytes(manifest_bytes),
+        "coverage": "coverage.json",
+        "shardPrefixLength": 2,
+        "sourceRevisions": {"*": args.catalog_revision} if args.catalog_revision else {},
+        "sourceCatalogs": sorted(({
+            "path": catalog.name,
+            "sha256": sha256_bytes(catalog.read_bytes()),
+        } for catalog in args.catalog), key=lambda item: item["path"]),
+        "selectionPolicy": {
+            "mode": "recognition-family-cap-v1",
+            "trainingSamplesPerFamily": args.training_samples_per_family,
+            "evaluationSamplesPerFamily": args.evaluation_samples_per_family,
+            "selectedRows": len(selected_rows),
+            "catalogRows": len(output_rows),
+        },
+        "reusedValidatedRelease": {
+            "manifestSHA256": sha256_bytes(source_manifest_bytes),
+            "repo": args.source_hf_repo,
+            "revision": args.source_hf_revision,
+            "path": args.source_hf_path or None,
+            "networkImageFetches": 0,
+        },
+    }
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{args.output.name}.", dir=args.output.parent))
+    (staging / "shards").mkdir()
+    with tempfile.TemporaryDirectory(prefix="tcger-repack-shards-") as temporary_name:
+        temporary_root = Path(temporary_name)
+        for shard, rows in sorted(selected_by_shard.items()):
+            source_shard = repack_source_shard(
+                shard,
+                source_root=args.source_root,
+                source_hf_repo=args.source_hf_repo,
+                source_hf_revision=args.source_hf_revision,
+                source_hf_path=args.source_hf_path,
+                temporary_root=temporary_root,
+            )
+            members = {str(row["member"]): row for row in rows}
+            destination = staging / shard
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with tarfile.open(source_shard, "r") as source_archive, tarfile.open(
+                    destination, "w", format=tarfile.PAX_FORMAT
+                ) as output_archive:
+                    for member in sorted(members):
+                        extracted = source_archive.extractfile(member)
+                        if extracted is None:
+                            raise LibraryError(f"source shard {shard} is missing {member}")
+                        data = extracted.read()
+                        blob = validate_image(data)
+                        contract = members[member]
+                        if blob.sha256 != contract["blobSha256"] or blob.byte_count != contract["bytes"]:
+                            raise LibraryError(f"source blob contract mismatch: {contract['sampleId']}")
+                        add_deterministic_tar_member(output_archive, member, data)
+            except (tarfile.TarError, OSError, KeyError) as error:
+                raise LibraryError(f"cannot repack {shard}: {error}") from error
+            if args.source_root is None:
+                source_shard.unlink(missing_ok=True)
+
+    (staging / "manifest.jsonl").write_bytes(manifest_bytes)
+    write_json(staging / "coverage.json", coverage)
+    write_json(staging / "library.json", release)
+    audit = audit_library(staging)
+    if audit["status"] != "valid":
+        raise LibraryError("streamed repack failed its local audit")
+    os.replace(staging, args.output)
+    result = {
+        "status": "ready",
+        "output": str(args.output),
+        "catalogRows": len(output_rows),
+        "selectedRows": len(selected_rows),
+        "uniqueBlobs": len(unique_blobs),
+        "sourceShardsRead": len(selected_by_shard),
+        "networkImageFetches": 0,
+        "manifestSHA256": release["manifestSHA256"],
+    }
+    print(canonical_json(result))
+    return result
 
 
 def audit_library(root: Path) -> dict:
@@ -856,6 +1219,18 @@ def parser() -> argparse.ArgumentParser:
     sync.add_argument("--timeout", type=float, default=45.0)
     sync.add_argument("--max-bytes", type=int, default=64 * 1024 * 1024, help="maximum accepted bytes per image")
     sync.add_argument("--workers", type=int, default=16, help="parallel image fetch/validation workers")
+    sync.add_argument(
+        "--training-samples-per-family",
+        type=int,
+        default=1,
+        help="maximum catalog images fetched for each train recognition family",
+    )
+    sync.add_argument(
+        "--evaluation-samples-per-family",
+        type=int,
+        default=2,
+        help="maximum catalog images fetched for each validation/test family",
+    )
     sync.add_argument("--shard-prefix-length", type=int, choices=(1, 2, 3), default=2)
     audit = commands.add_parser("audit", help="verify a packaged library without network access")
     audit.add_argument("--root", type=Path, required=True)
@@ -864,6 +1239,21 @@ def parser() -> argparse.ArgumentParser:
     upload.add_argument("--repo", required=True)
     upload.add_argument("--revision", default="main")
     upload.add_argument("--path-in-repo", default="release")
+    repack = commands.add_parser(
+        "repack",
+        help="stream a bounded family pack from an existing validated release",
+    )
+    repack.add_argument("--catalog", type=Path, action="append", required=True)
+    repack.add_argument("--output", type=Path, required=True)
+    repack.add_argument("--source-manifest", type=Path, required=True)
+    source = repack.add_mutually_exclusive_group(required=True)
+    source.add_argument("--source-root", type=Path)
+    source.add_argument("--source-hf-repo")
+    repack.add_argument("--source-hf-revision")
+    repack.add_argument("--source-hf-path", default="")
+    repack.add_argument("--catalog-revision")
+    repack.add_argument("--training-samples-per-family", type=int, default=1)
+    repack.add_argument("--evaluation-samples-per-family", type=int, default=2)
     return root
 
 
@@ -878,10 +1268,21 @@ def main() -> int:
                 raise LibraryError("--workers must be at least 1")
             if args.max_bytes < 1:
                 raise LibraryError("--max-bytes must be at least 1")
+            if args.training_samples_per_family < 1:
+                raise LibraryError("--training-samples-per-family must be at least 1")
+            if args.evaluation_samples_per_family < 1:
+                raise LibraryError("--evaluation-samples-per-family must be at least 1")
             _, status = build_library(args)
             return status
         if args.command == "audit":
             return 0 if audit_library(args.root)["status"] == "valid" else 2
+        if args.command == "repack":
+            if args.source_hf_repo and not args.source_hf_revision:
+                raise LibraryError("--source-hf-revision is required with --source-hf-repo")
+            if args.training_samples_per_family < 1 or args.evaluation_samples_per_family < 1:
+                raise LibraryError("family sample caps must be at least 1")
+            repack_library(args)
+            return 0
         upload_library(args.root, args.repo, args.revision, args.path_in_repo)
         return 0
     except (LibraryError, subprocess.CalledProcessError, json.JSONDecodeError) as error:

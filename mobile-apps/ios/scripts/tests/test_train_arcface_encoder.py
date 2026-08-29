@@ -80,6 +80,62 @@ class ArcFaceImageLibraryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "TCG Pocket"):
             trainer.load_entries([path])
 
+    def test_runtime_metadata_keeps_resolution_contract_and_drops_training_fields(self):
+        rows = [{
+            "annIndex": 0,
+            "cardId": "printing-a",
+            "exactPrintingId": "printing-a",
+            "recognitionFamilyId": "magic:illustration:art-a",
+            "name": "Shared Art",
+            "game": "magic",
+            "setCode": "one",
+            "collectorNumber": "10",
+            "releaseDate": "2024-02-02",
+            "imageURL": "https://example.invalid/a.jpg",
+            "visualIdentityId": "magic:printing:printing-a:front",
+            "illustrationId": "art-a",
+            "faceSide": "front",
+        }]
+
+        runtime = trainer.runtime_metadata_entries(rows)
+
+        self.assertEqual(runtime[0]["exactPrintingId"], "printing-a")
+        self.assertEqual(runtime[0]["recognitionFamilyId"], "magic:illustration:art-a")
+        self.assertEqual(runtime[0]["collectorNumber"], "10")
+        self.assertEqual(runtime[0]["releaseDate"], "2024-02-02")
+        self.assertNotIn("visualIdentityId", runtime[0])
+        self.assertNotIn("illustrationId", runtime[0])
+        self.assertEqual(runtime[0]["faceSide"], "front")
+
+    def test_family_runtime_metadata_keeps_one_vector_row_and_all_printings(self):
+        rows = [
+            {
+                **entry("old-print", "https://images.invalid/old.png", 0),
+                "exactPrintingId": "old-print",
+                "recognitionFamilyId": "magic:visual:shared",
+                "game": "magic",
+                "setCode": "old",
+                "releaseDate": "2020-01-01",
+            },
+            {
+                **entry("new-print", "https://images.invalid/new.png", 1),
+                "exactPrintingId": "new-print",
+                "recognitionFamilyId": "magic:visual:shared",
+                "game": "magic",
+                "setCode": "new",
+                "releaseDate": "2025-01-01",
+            },
+        ]
+        runtime = trainer.family_runtime_metadata_entries(rows)
+        self.assertEqual(len(runtime), 1)
+        self.assertEqual(runtime[0]["annIndex"], 0)
+        self.assertEqual(runtime[0]["cardId"], "new-print")
+        self.assertEqual(runtime[0]["printingCount"], 2)
+        self.assertEqual(
+            [row["exactPrintingId"] for row in runtime[0]["printings"]],
+            ["new-print", "old-print"],
+        )
+
     def test_cache_mapping_survives_catalog_reordering(self):
         rows = [
             entry("red-card", "https://images.invalid/red.png", 0),
@@ -313,6 +369,48 @@ class ArcFaceImageLibraryTests(unittest.TestCase):
                 "pinnedRevision": "0123456789abcdef",
             },
         )
+
+    def test_prepared_pack_maps_one_representative_to_complete_family_catalog(self):
+        rows = [
+            dict(entry("old-print", "https://images.invalid/old.png", 0), recognitionFamilyId="art-one"),
+            dict(entry("new-print", "https://images.invalid/new.png", 1), recognitionFamilyId="art-one"),
+            dict(entry("other", "https://images.invalid/other.png", 2), recognitionFamilyId="art-two"),
+        ]
+        manifest_rows = [
+            {
+                "visualIdentityId": trainer.visual_identity(rows[1]),
+                "recognitionFamilyId": "art-one",
+                "game": "yugioh",
+                "cardId": "new-print",
+                "sourceURL": rows[1]["imageURL"],
+                "status": "valid",
+                "trainingEligible": True,
+                "evaluationEligible": False,
+                "partition": "train",
+            },
+            {
+                "visualIdentityId": trainer.visual_identity(rows[2]),
+                "recognitionFamilyId": "art-two",
+                "game": "yugioh",
+                "cardId": "other",
+                "sourceURL": rows[2]["imageURL"],
+                "status": "valid",
+                "trainingEligible": True,
+                "evaluationEligible": False,
+                "partition": "train",
+            },
+        ]
+        manifest_bytes = "".join(json.dumps(row) + "\n" for row in manifest_rows).encode()
+        (self.root / "manifest.jsonl").write_bytes(manifest_bytes)
+        (self.root / "library.json").write_text(json.dumps({
+            "manifest": "manifest.jsonl",
+            "manifestSHA256": hashlib.sha256(manifest_bytes).hexdigest(),
+        }))
+        library = trainer.DurableImageLibrary(self.root)
+        self.assertEqual(library.selected_entry_indices(rows), [1, 2])
+        training, held_out = trainer.partition_indices(rows, library, [1, 2])
+        self.assertEqual(training, [1, 2])
+        self.assertEqual(held_out, [])
 
 
 if __name__ == "__main__":

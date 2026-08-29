@@ -2,8 +2,8 @@
 
 > **Historical workflow.** The mixed-game quick job described here completed,
 > followed by isolated full Pokémon, Magic, and Yu-Gi-Oh jobs. Full jobs now
-> require pinned catalog and durable image-library revisions unless explicitly
-> reproducing a legacy run. Use
+> require a pinned catalog plus a locally prepared, family-capped image pack
+> mounted read-only at submission. Use
 > [scanner-system/training-and-data-pipeline.md](scanner-system/training-and-data-pipeline.md)
 > and [scanner-system/operations-runbook.md](scanner-system/operations-runbook.md)
 > for the current process.
@@ -85,10 +85,10 @@ Do not submit this phase until Hugging Face Jobs is enabled and a write token
 is available. Before submission, choose the dataset scope, validation plan,
 and hardware. Always run `quick` before `full`.
 
-The job first reuses the prepared `catalogs/` files, downloads the card images
-to ephemeral local storage, then persists its checkpoint after every epoch.
-If interrupted, the next job resumes only when the catalog fingerprint
-matches.
+This historical quick command downloaded images into ephemeral job storage.
+It must not be used for a new full run. Current jobs receive an audited local
+representative pack staged as a read-only volume before GPU allocation and
+persist their checkpoint after every epoch.
 
 ```bash
 hf jobs uv run mobile-apps/ios/scripts/run_universal_arcface_hf_job.py \
@@ -106,8 +106,9 @@ pipeline and export check, not the production checkpoint.
 ## Phase 4: full GPU training
 
 After the smoke test produces valid retrieval metrics, Core ML export, and all
-three shards, submit the same script with `--mode full`. Full mode uses every
-catalog row and twelve epochs by default.
+three shards, use the current launcher in the operations runbook. Full mode
+keeps every catalog row for exact-print resolution but trains from bounded
+family representatives for twelve epochs by default.
 
 The following checks are required before publishing the checkpoint to the app:
 

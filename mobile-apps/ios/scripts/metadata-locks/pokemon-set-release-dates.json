@@ -1,0 +1,894 @@
+{
+  "schema": "tcger-pokemon-set-release-registry-v1",
+  "sets": [
+    {
+      "id": "2011bw",
+      "releaseDate": "2011-06-17"
+    },
+    {
+      "id": "2012bw",
+      "releaseDate": "2012-06-15"
+    },
+    {
+      "id": "2013bw",
+      "releaseDate": "2013-11-01"
+    },
+    {
+      "id": "2014xy",
+      "releaseDate": "2014-05-23"
+    },
+    {
+      "id": "2015xy",
+      "releaseDate": "2015-11-27"
+    },
+    {
+      "id": "2016xy",
+      "releaseDate": "2016-08-20"
+    },
+    {
+      "id": "2017sm",
+      "releaseDate": "2017-08-03"
+    },
+    {
+      "id": "2018sm",
+      "releaseDate": "2018-10-19"
+    },
+    {
+      "id": "2018sm-fr",
+      "releaseDate": "2018-06-13"
+    },
+    {
+      "id": "2019sm",
+      "releaseDate": "2019-10-15"
+    },
+    {
+      "id": "2019sm-fr",
+      "releaseDate": "2019-10-30"
+    },
+    {
+      "id": "2021swsh",
+      "releaseDate": "2021-02-09"
+    },
+    {
+      "id": "2022swsh",
+      "releaseDate": "2022-08-03"
+    },
+    {
+      "id": "2023sv",
+      "releaseDate": "2023-08-01"
+    },
+    {
+      "id": "2024sv",
+      "releaseDate": "2024-12-04"
+    },
+    {
+      "id": "A1",
+      "releaseDate": "2024-10-30"
+    },
+    {
+      "id": "A1a",
+      "releaseDate": "2024-12-17"
+    },
+    {
+      "id": "A2",
+      "releaseDate": "2025-01-30"
+    },
+    {
+      "id": "A2a",
+      "releaseDate": "2025-02-28"
+    },
+    {
+      "id": "A2b",
+      "releaseDate": "2025-03-27"
+    },
+    {
+      "id": "A3",
+      "releaseDate": "2025-04-30"
+    },
+    {
+      "id": "A3a",
+      "releaseDate": "2025-05-29"
+    },
+    {
+      "id": "A3b",
+      "releaseDate": "2025-06-26"
+    },
+    {
+      "id": "A4",
+      "releaseDate": "2025-07-30"
+    },
+    {
+      "id": "A4a",
+      "releaseDate": "2025-08-28"
+    },
+    {
+      "id": "B1",
+      "releaseDate": "2025-10-30"
+    },
+    {
+      "id": "B1a",
+      "releaseDate": "2025-12-17"
+    },
+    {
+      "id": "B2",
+      "releaseDate": "2026-01-29"
+    },
+    {
+      "id": "B2a",
+      "releaseDate": "2026-02-26"
+    },
+    {
+      "id": "P-A",
+      "releaseDate": "2024-10-30"
+    },
+    {
+      "id": "base1",
+      "releaseDate": "1999-01-09"
+    },
+    {
+      "id": "base2",
+      "releaseDate": "1999-06-16"
+    },
+    {
+      "id": "base3",
+      "releaseDate": "1999-10-10"
+    },
+    {
+      "id": "base4",
+      "releaseDate": "2000-02-24"
+    },
+    {
+      "id": "base5",
+      "releaseDate": "2000-04-24"
+    },
+    {
+      "id": "basep",
+      "releaseDate": "1999-07-01"
+    },
+    {
+      "id": "bog",
+      "releaseDate": "2002-12-01"
+    },
+    {
+      "id": "bw1",
+      "releaseDate": "2011-04-25"
+    },
+    {
+      "id": "bw10",
+      "releaseDate": "2013-08-14"
+    },
+    {
+      "id": "bw11",
+      "releaseDate": "2013-11-06"
+    },
+    {
+      "id": "bw2",
+      "releaseDate": "2011-08-31"
+    },
+    {
+      "id": "bw3",
+      "releaseDate": "2011-11-16"
+    },
+    {
+      "id": "bw4",
+      "releaseDate": "2012-02-08"
+    },
+    {
+      "id": "bw5",
+      "releaseDate": "2012-05-09"
+    },
+    {
+      "id": "bw6",
+      "releaseDate": "2012-08-15"
+    },
+    {
+      "id": "bw7",
+      "releaseDate": "2012-11-07"
+    },
+    {
+      "id": "bw8",
+      "releaseDate": "2013-02-06"
+    },
+    {
+      "id": "bw9",
+      "releaseDate": "2013-05-08"
+    },
+    {
+      "id": "bwp",
+      "releaseDate": "2011-04-26"
+    },
+    {
+      "id": "cel25",
+      "releaseDate": "2021-10-08"
+    },
+    {
+      "id": "cel25cc",
+      "releaseDate": "2021-10-08"
+    },
+    {
+      "id": "col1",
+      "releaseDate": "2011-02-09"
+    },
+    {
+      "id": "dc1",
+      "releaseDate": "2015-03-25"
+    },
+    {
+      "id": "det1",
+      "releaseDate": "2019-03-29"
+    },
+    {
+      "id": "dp1",
+      "releaseDate": "2007-05-01"
+    },
+    {
+      "id": "dp2",
+      "releaseDate": "2007-08-01"
+    },
+    {
+      "id": "dp3",
+      "releaseDate": "2007-11-01"
+    },
+    {
+      "id": "dp4",
+      "releaseDate": "2008-02-01"
+    },
+    {
+      "id": "dp5",
+      "releaseDate": "2008-05-01"
+    },
+    {
+      "id": "dp6",
+      "releaseDate": "2008-08-01"
+    },
+    {
+      "id": "dp7",
+      "releaseDate": "2008-11-01"
+    },
+    {
+      "id": "dpp",
+      "releaseDate": "2007-05-01"
+    },
+    {
+      "id": "dv1",
+      "releaseDate": "2012-10-05"
+    },
+    {
+      "id": "ecard1",
+      "releaseDate": "2002-09-15"
+    },
+    {
+      "id": "ecard2",
+      "releaseDate": "2003-01-15"
+    },
+    {
+      "id": "ecard3",
+      "releaseDate": "2003-05-12"
+    },
+    {
+      "id": "ex1",
+      "releaseDate": "2003-07-01"
+    },
+    {
+      "id": "ex10",
+      "releaseDate": "2005-08-22"
+    },
+    {
+      "id": "ex11",
+      "releaseDate": "2005-10-31"
+    },
+    {
+      "id": "ex12",
+      "releaseDate": "2006-02-13"
+    },
+    {
+      "id": "ex13",
+      "releaseDate": "2006-05-03"
+    },
+    {
+      "id": "ex14",
+      "releaseDate": "2006-08-30"
+    },
+    {
+      "id": "ex15",
+      "releaseDate": "2006-11-08"
+    },
+    {
+      "id": "ex16",
+      "releaseDate": "2007-02-17"
+    },
+    {
+      "id": "ex2",
+      "releaseDate": "2003-09-18"
+    },
+    {
+      "id": "ex3",
+      "releaseDate": "2003-11-24"
+    },
+    {
+      "id": "ex4",
+      "releaseDate": "2004-03-01"
+    },
+    {
+      "id": "ex5",
+      "releaseDate": "2004-06-01"
+    },
+    {
+      "id": "ex5.5",
+      "releaseDate": "2004-07-01"
+    },
+    {
+      "id": "ex6",
+      "releaseDate": "2004-09-01"
+    },
+    {
+      "id": "ex7",
+      "releaseDate": "2004-11-01"
+    },
+    {
+      "id": "ex8",
+      "releaseDate": "2005-02-01"
+    },
+    {
+      "id": "ex9",
+      "releaseDate": "2005-05-09"
+    },
+    {
+      "id": "exu",
+      "releaseDate": "2005-08-22"
+    },
+    {
+      "id": "fut2020",
+      "releaseDate": "2020-09-11"
+    },
+    {
+      "id": "g1",
+      "releaseDate": "2016-02-22"
+    },
+    {
+      "id": "gym1",
+      "releaseDate": "2000-08-14"
+    },
+    {
+      "id": "gym2",
+      "releaseDate": "2000-10-16"
+    },
+    {
+      "id": "hgss1",
+      "releaseDate": "2010-02-10"
+    },
+    {
+      "id": "hgss2",
+      "releaseDate": "2010-05-12"
+    },
+    {
+      "id": "hgss3",
+      "releaseDate": "2010-08-18"
+    },
+    {
+      "id": "hgss4",
+      "releaseDate": "2010-11-03"
+    },
+    {
+      "id": "hgssp",
+      "releaseDate": "2010-02-11"
+    },
+    {
+      "id": "jumbo",
+      "releaseDate": "2000-02-01"
+    },
+    {
+      "id": "lc",
+      "releaseDate": "2002-05-24"
+    },
+    {
+      "id": "me01",
+      "releaseDate": "2025-09-26"
+    },
+    {
+      "id": "me02",
+      "releaseDate": "2025-11-14"
+    },
+    {
+      "id": "me02.5",
+      "releaseDate": "2026-01-30"
+    },
+    {
+      "id": "me03",
+      "releaseDate": "2026-03-27"
+    },
+    {
+      "id": "me04",
+      "releaseDate": "2026-05-22"
+    },
+    {
+      "id": "me05",
+      "releaseDate": "2026-07-17"
+    },
+    {
+      "id": "mee",
+      "releaseDate": "2025-09-25"
+    },
+    {
+      "id": "mep",
+      "releaseDate": "2025-09-26"
+    },
+    {
+      "id": "mfb",
+      "releaseDate": "2023-09-29"
+    },
+    {
+      "id": "miscp",
+      "releaseDate": "1996-01-01"
+    },
+    {
+      "id": "neo1",
+      "releaseDate": "2000-12-16"
+    },
+    {
+      "id": "neo2",
+      "releaseDate": "2001-06-01"
+    },
+    {
+      "id": "neo3",
+      "releaseDate": "2001-09-21"
+    },
+    {
+      "id": "neo4",
+      "releaseDate": "2002-02-28"
+    },
+    {
+      "id": "np",
+      "releaseDate": "2003-10-01"
+    },
+    {
+      "id": "pl1",
+      "releaseDate": "2009-02-11"
+    },
+    {
+      "id": "pl2",
+      "releaseDate": "2009-05-16"
+    },
+    {
+      "id": "pl3",
+      "releaseDate": "2009-08-19"
+    },
+    {
+      "id": "pl4",
+      "releaseDate": "2009-11-04"
+    },
+    {
+      "id": "pop1",
+      "releaseDate": "2004-09-01"
+    },
+    {
+      "id": "pop2",
+      "releaseDate": "2005-08-01"
+    },
+    {
+      "id": "pop3",
+      "releaseDate": "2006-04-01"
+    },
+    {
+      "id": "pop4",
+      "releaseDate": "2006-08-01"
+    },
+    {
+      "id": "pop5",
+      "releaseDate": "2007-03-01"
+    },
+    {
+      "id": "pop6",
+      "releaseDate": "2007-09-01"
+    },
+    {
+      "id": "pop7",
+      "releaseDate": "2008-03-01"
+    },
+    {
+      "id": "pop8",
+      "releaseDate": "2008-09-01"
+    },
+    {
+      "id": "pop9",
+      "releaseDate": "2009-03-01"
+    },
+    {
+      "id": "rc",
+      "releaseDate": "2013-11-06"
+    },
+    {
+      "id": "ru1",
+      "releaseDate": "2009-12-02"
+    },
+    {
+      "id": "si1",
+      "releaseDate": "2001-07-31"
+    },
+    {
+      "id": "sm1",
+      "releaseDate": "2017-02-03"
+    },
+    {
+      "id": "sm10",
+      "releaseDate": "2019-05-03"
+    },
+    {
+      "id": "sm11",
+      "releaseDate": "2019-08-02"
+    },
+    {
+      "id": "sm115",
+      "releaseDate": "2019-08-23"
+    },
+    {
+      "id": "sm12",
+      "releaseDate": "2019-11-01"
+    },
+    {
+      "id": "sm2",
+      "releaseDate": "2017-05-05"
+    },
+    {
+      "id": "sm3",
+      "releaseDate": "2017-08-04"
+    },
+    {
+      "id": "sm3.5",
+      "releaseDate": "2017-10-06"
+    },
+    {
+      "id": "sm4",
+      "releaseDate": "2017-11-03"
+    },
+    {
+      "id": "sm5",
+      "releaseDate": "2018-02-02"
+    },
+    {
+      "id": "sm6",
+      "releaseDate": "2018-05-04"
+    },
+    {
+      "id": "sm7",
+      "releaseDate": "2018-08-03"
+    },
+    {
+      "id": "sm7.5",
+      "releaseDate": "2018-09-07"
+    },
+    {
+      "id": "sm8",
+      "releaseDate": "2018-11-02"
+    },
+    {
+      "id": "sm9",
+      "releaseDate": "2019-01-31"
+    },
+    {
+      "id": "sma",
+      "releaseDate": "2019-08-23"
+    },
+    {
+      "id": "smp",
+      "releaseDate": "2017-02-03"
+    },
+    {
+      "id": "sp",
+      "releaseDate": "2002-08-01"
+    },
+    {
+      "id": "sv01",
+      "releaseDate": "2023-03-31"
+    },
+    {
+      "id": "sv02",
+      "releaseDate": "2023-06-09"
+    },
+    {
+      "id": "sv03",
+      "releaseDate": "2023-08-11"
+    },
+    {
+      "id": "sv03.5",
+      "releaseDate": "2023-09-22"
+    },
+    {
+      "id": "sv04",
+      "releaseDate": "2023-11-03"
+    },
+    {
+      "id": "sv04.5",
+      "releaseDate": "2024-01-26"
+    },
+    {
+      "id": "sv05",
+      "releaseDate": "2024-03-22"
+    },
+    {
+      "id": "sv06",
+      "releaseDate": "2024-05-24"
+    },
+    {
+      "id": "sv06.5",
+      "releaseDate": "2024-08-02"
+    },
+    {
+      "id": "sv07",
+      "releaseDate": "2024-09-13"
+    },
+    {
+      "id": "sv08",
+      "releaseDate": "2024-11-08"
+    },
+    {
+      "id": "sv08.5",
+      "releaseDate": "2025-01-17"
+    },
+    {
+      "id": "sv09",
+      "releaseDate": "2025-03-28"
+    },
+    {
+      "id": "sv10",
+      "releaseDate": "2025-05-30"
+    },
+    {
+      "id": "sv10.5b",
+      "releaseDate": "2025-07-17"
+    },
+    {
+      "id": "sv10.5w",
+      "releaseDate": "2025-07-17"
+    },
+    {
+      "id": "sve",
+      "releaseDate": "2023-03-31"
+    },
+    {
+      "id": "svp",
+      "releaseDate": "2023-03-31"
+    },
+    {
+      "id": "swsh1",
+      "releaseDate": "2020-02-07"
+    },
+    {
+      "id": "swsh10",
+      "releaseDate": "2022-05-27"
+    },
+    {
+      "id": "swsh10.5",
+      "releaseDate": "2022-07-01"
+    },
+    {
+      "id": "swsh10tg",
+      "releaseDate": "2022-05-27"
+    },
+    {
+      "id": "swsh11",
+      "releaseDate": "2022-09-09"
+    },
+    {
+      "id": "swsh11tg",
+      "releaseDate": "2022-09-09"
+    },
+    {
+      "id": "swsh12",
+      "releaseDate": "2022-11-11"
+    },
+    {
+      "id": "swsh12.5",
+      "releaseDate": "2023-01-20"
+    },
+    {
+      "id": "swsh12.5gg",
+      "releaseDate": "2023-01-20"
+    },
+    {
+      "id": "swsh12tg",
+      "releaseDate": "2022-11-11"
+    },
+    {
+      "id": "swsh2",
+      "releaseDate": "2020-05-01"
+    },
+    {
+      "id": "swsh3",
+      "releaseDate": "2020-08-14"
+    },
+    {
+      "id": "swsh3.5",
+      "releaseDate": "2020-09-25"
+    },
+    {
+      "id": "swsh4",
+      "releaseDate": "2020-11-13"
+    },
+    {
+      "id": "swsh4.5",
+      "releaseDate": "2021-02-19"
+    },
+    {
+      "id": "swsh4.5sv",
+      "releaseDate": "2021-02-19"
+    },
+    {
+      "id": "swsh5",
+      "releaseDate": "2021-03-19"
+    },
+    {
+      "id": "swsh6",
+      "releaseDate": "2021-06-18"
+    },
+    {
+      "id": "swsh7",
+      "releaseDate": "2021-08-27"
+    },
+    {
+      "id": "swsh8",
+      "releaseDate": "2021-11-12"
+    },
+    {
+      "id": "swsh9",
+      "releaseDate": "2022-02-25"
+    },
+    {
+      "id": "swsh9tg",
+      "releaseDate": "2022-02-25"
+    },
+    {
+      "id": "swshp",
+      "releaseDate": "2019-11-15"
+    },
+    {
+      "id": "tk-bw-e",
+      "releaseDate": "2011-09-01"
+    },
+    {
+      "id": "tk-bw-z",
+      "releaseDate": "2011-09-01"
+    },
+    {
+      "id": "tk-dp-l",
+      "releaseDate": "2007-09-01"
+    },
+    {
+      "id": "tk-dp-m",
+      "releaseDate": "2007-09-01"
+    },
+    {
+      "id": "tk-ex-latia",
+      "releaseDate": "2004-07-01"
+    },
+    {
+      "id": "tk-ex-latio",
+      "releaseDate": "2004-07-01"
+    },
+    {
+      "id": "tk-ex-m",
+      "releaseDate": "2006-03-01"
+    },
+    {
+      "id": "tk-ex-p",
+      "releaseDate": "2006-03-01"
+    },
+    {
+      "id": "tk-hs-g",
+      "releaseDate": "2010-05-01"
+    },
+    {
+      "id": "tk-hs-r",
+      "releaseDate": "2010-05-01"
+    },
+    {
+      "id": "tk-sm-l",
+      "releaseDate": "2017-04-21"
+    },
+    {
+      "id": "tk-sm-r",
+      "releaseDate": "2017-04-21"
+    },
+    {
+      "id": "tk-xy-b",
+      "releaseDate": "2014-11-01"
+    },
+    {
+      "id": "tk-xy-latia",
+      "releaseDate": "2015-04-29"
+    },
+    {
+      "id": "tk-xy-latio",
+      "releaseDate": "2015-04-29"
+    },
+    {
+      "id": "tk-xy-n",
+      "releaseDate": "2014-03-12"
+    },
+    {
+      "id": "tk-xy-p",
+      "releaseDate": "2016-04-27"
+    },
+    {
+      "id": "tk-xy-su",
+      "releaseDate": "2016-04-27"
+    },
+    {
+      "id": "tk-xy-sy",
+      "releaseDate": "2014-03-12"
+    },
+    {
+      "id": "tk-xy-w",
+      "releaseDate": "2014-11-01"
+    },
+    {
+      "id": "wp",
+      "releaseDate": "1999-09-01"
+    },
+    {
+      "id": "xy0",
+      "releaseDate": "2013-11-08"
+    },
+    {
+      "id": "xy1",
+      "releaseDate": "2014-02-05"
+    },
+    {
+      "id": "xy10",
+      "releaseDate": "2016-05-02"
+    },
+    {
+      "id": "xy11",
+      "releaseDate": "2016-08-03"
+    },
+    {
+      "id": "xy12",
+      "releaseDate": "2016-11-02"
+    },
+    {
+      "id": "xy2",
+      "releaseDate": "2014-05-07"
+    },
+    {
+      "id": "xy3",
+      "releaseDate": "2014-08-13"
+    },
+    {
+      "id": "xy4",
+      "releaseDate": "2014-11-05"
+    },
+    {
+      "id": "xy5",
+      "releaseDate": "2015-02-04"
+    },
+    {
+      "id": "xy6",
+      "releaseDate": "2015-05-06"
+    },
+    {
+      "id": "xy7",
+      "releaseDate": "2015-08-12"
+    },
+    {
+      "id": "xy8",
+      "releaseDate": "2015-11-04"
+    },
+    {
+      "id": "xy9",
+      "releaseDate": "2016-02-03"
+    },
+    {
+      "id": "xya",
+      "releaseDate": "2014-02-05"
+    },
+    {
+      "id": "xyp",
+      "releaseDate": "2013-10-12"
+    }
+  ],
+  "source": {
+    "archiveURL": "https://api.github.com/repos/tcgdex/cards-database/tarball/d86b5107d09484994f7fa15c45b0af8ffd72e1b0",
+    "repository": "tcgdex/cards-database",
+    "revision": "d86b5107d09484994f7fa15c45b0af8ffd72e1b0"
+  }
+}

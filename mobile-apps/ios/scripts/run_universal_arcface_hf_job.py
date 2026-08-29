@@ -24,6 +24,7 @@ model repository.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -40,6 +41,11 @@ REPO_RAW = (
 POKEMON_METADATA = (
     f"{REPO_RAW}/mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/"
     "CardsIndexMetadata.json"
+)
+TCGDEX_CARDS_DATABASE_REVISION = "d86b5107d09484994f7fa15c45b0af8ffd72e1b0"
+POKEMON_SETS = (
+    "https://api.github.com/repos/tcgdex/cards-database/tarball/"
+    f"{TCGDEX_CARDS_DATABASE_REVISION}"
 )
 CONVERTER = f"{REPO_RAW}/mobile-apps/ios/scripts/build_universal_trainer_metadata.py"
 TRAINER = f"{REPO_RAW}/mobile-apps/ios/scripts/train_arcface_encoder.py"
@@ -75,6 +81,67 @@ def download(url: str, destination: Path) -> None:
 def run(command: list[str], env: dict[str, str] | None = None) -> None:
     print("+", " ".join(command), flush=True)
     subprocess.run(command, check=True, env=env)
+
+
+def validate_prepared_runtime_catalog(path: Path, game: str) -> int:
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(rows, list) or not rows:
+        raise ValueError(f"prepared {game} catalog is empty")
+    if any(row.get("annIndex") != index for index, row in enumerate(rows)):
+        raise ValueError(f"prepared {game} catalog has non-contiguous annIndex values")
+    if game == "pokemon":
+        required = ("format", "setCode", "collectorNumber", "releaseDate", "recognitionFamilyId")
+        for index, row in enumerate(rows):
+            missing = [
+                field for field in required
+                if not isinstance(row.get(field), str) or not row[field].strip()
+            ]
+            image_url = str(row.get("imageURL") or "").casefold()
+            if missing:
+                raise ValueError(
+                    f"prepared Pokemon catalog row {index} lacks runtime metadata: "
+                    + ", ".join(missing)
+                )
+            if row["format"].casefold() != "paper" or "/tcgp/" in image_url:
+                raise ValueError(f"prepared Pokemon catalog row {index} is not physical")
+    return len(rows)
+
+
+def validate_prepared_image_pack(root: Path, max_images: int) -> dict:
+    """Fail before GPU work unless a mounted pack is bounded and immutable."""
+    root = root.resolve()
+    contract_path = root / "library.json"
+    coverage_path = root / "coverage.json"
+    if not contract_path.is_file() or not coverage_path.is_file():
+        raise RuntimeError(f"prepared image pack is incomplete: {root}")
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
+    policy = contract.get("selectionPolicy") or {}
+    if policy.get("mode") != "recognition-family-cap-v1":
+        raise RuntimeError(
+            "full runs require a recognition-family-capped prepared image pack"
+        )
+    if policy.get("trainingSamplesPerFamily") != 1:
+        raise RuntimeError("production packs must select exactly one training image per family")
+    selected = int(policy.get("selectedRows") or 0)
+    if selected < 1 or selected > max_images:
+        raise RuntimeError(
+            f"prepared image pack selects {selected} images; allowed range is 1..{max_images}"
+        )
+    if coverage.get("status") != "ready" or coverage.get("counts", {}).get("valid") != selected:
+        raise RuntimeError("prepared image pack does not have complete selected-image coverage")
+    manifest_path = root / str(contract.get("manifest") or "manifest.jsonl")
+    manifest_sha = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    if manifest_sha != contract.get("manifestSHA256"):
+        raise RuntimeError("prepared image pack manifest SHA-256 mismatch")
+    return {
+        "source": "mounted-prepared-pack",
+        "root": str(root),
+        "manifestSHA256": manifest_sha,
+        "selectedRows": selected,
+        "catalogRows": int(policy.get("catalogRows") or selected),
+        "selectionPolicy": policy,
+    }
 
 
 def main() -> None:
@@ -144,12 +211,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--image-library-repo",
-        default="ahzs645/tcger-scanner-images",
-        help="Private Hugging Face dataset containing the validated image release",
+        help="Legacy Hub dataset source; disabled unless --allow-job-image-download is set",
     )
     parser.add_argument(
         "--image-library-revision",
-        help="Immutable commit SHA of the validated scanner image dataset",
+        help="Legacy immutable dataset commit; requires --allow-job-image-download",
     )
     parser.add_argument(
         "--image-library-path-in-repo",
@@ -157,11 +223,30 @@ def main() -> None:
         help="Release directory inside --image-library-repo",
     )
     parser.add_argument(
+        "--prepared-image-library-root",
+        type=Path,
+        help=(
+            "Read-only family-capped image pack mounted into the job. Full runs "
+            "require this path and never fetch upstream image URLs."
+        ),
+    )
+    parser.add_argument(
+        "--max-prepared-images",
+        type=int,
+        default=75_000,
+        help="fail closed when a prepared pack exceeds this selected-image count",
+    )
+    parser.add_argument(
+        "--allow-job-image-download",
+        action="store_true",
+        help="legacy diagnostic escape hatch allowing a Hub image snapshot download",
+    )
+    parser.add_argument(
         "--allow-unpinned-image-sources",
         action="store_true",
         help=(
-            "Legacy escape hatch for a full run that downloads mutable upstream "
-            "URLs. Production runs should pin --image-library-revision instead."
+            "Quick-mode diagnostic escape hatch for mutable upstream URLs. "
+            "Full production runs always reject it."
         ),
     )
     args = parser.parse_args()
@@ -181,14 +266,19 @@ def main() -> None:
         and not args.allow_unpinned_image_sources
     ):
         parser.error("full runs require an immutable --catalog-revision commit SHA")
-    if (
-        args.mode == "full"
-        and not args.image_library_revision
-        and not args.allow_unpinned_image_sources
-    ):
+    if args.max_prepared_images < 1:
+        parser.error("--max-prepared-images must be positive")
+    if args.mode == "full" and not args.prepared_image_library_root:
         parser.error(
-            "full runs require --image-library-revision; use "
-            "--allow-unpinned-image-sources only for an explicit legacy run"
+            "full runs require --prepared-image-library-root; image acquisition "
+            "must finish before the GPU job is submitted"
+        )
+    if args.mode == "full" and args.allow_unpinned_image_sources:
+        parser.error("full runs cannot download mutable upstream image URLs")
+    if args.image_library_revision and not args.allow_job_image_download:
+        parser.error(
+            "Hub image-library downloads are disabled; mount a prepared pack with "
+            "--prepared-image-library-root"
         )
     artifact_variant = args.artifact_variant
     if artifact_variant is None and args.training_views_per_card is not None:
@@ -247,7 +337,22 @@ def main() -> None:
         directory.mkdir(parents=True, exist_ok=True)
 
     image_library_root = None
-    if args.image_library_revision:
+    image_library_descriptor = None
+    image_library_id = None
+    if args.prepared_image_library_root:
+        image_library_root = args.prepared_image_library_root.resolve()
+        image_library_descriptor = validate_prepared_image_pack(
+            image_library_root, args.max_prepared_images
+        )
+        image_library_id = image_library_descriptor["manifestSHA256"]
+        print(
+            f"using mounted prepared pack {image_library_root} "
+            f"({image_library_descriptor['selectedRows']} selected images)",
+            flush=True,
+        )
+    elif args.image_library_revision:
+        if not args.image_library_repo:
+            parser.error("--image-library-repo is required with --image-library-revision")
         library_path = args.image_library_path_in_repo.strip("/")
         if not library_path or ".." in Path(library_path).parts:
             parser.error("--image-library-path-in-repo must be a safe relative path")
@@ -269,6 +374,13 @@ def main() -> None:
             f"{args.image_library_revision}:{library_path}",
             flush=True,
         )
+        image_library_descriptor = {
+            "source": "legacy-hub-snapshot-download",
+            "repo": args.image_library_repo,
+            "revision": args.image_library_revision,
+            "path": library_path,
+        }
+        image_library_id = args.image_library_revision
 
     converter_path = scripts_dir / "build_universal_trainer_metadata.py"
     trainer_path = scripts_dir / "train_arcface_encoder.py"
@@ -319,6 +431,16 @@ def main() -> None:
             ]
             if not all(path.is_file() for path in required):
                 raise FileNotFoundError("prepared Hub catalogs are incomplete")
+            for game, path in zip(selected_games, required):
+                validate_prepared_runtime_catalog(path, game)
+            if "pokemon" in selected_games:
+                provenance_path = hub_dir / "provenance.json"
+                if not provenance_path.is_file():
+                    raise FileNotFoundError("prepared Pokemon catalog has no provenance.json")
+                provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+                lock = provenance.get("pokemonSourceLock")
+                if not isinstance(lock, dict) or lock.get("schema") != "tcger-pokemon-metadata-source-lock-v1":
+                    raise ValueError("prepared Pokemon catalog is not source-lock reproducible")
             shutil.copytree(hub_dir, normalized_dir, dirs_exist_ok=True)
             prepared_catalogs = True
             print(
@@ -326,17 +448,25 @@ def main() -> None:
                 flush=True,
             )
         except Exception as error:
+            if args.mode == "full":
+                raise RuntimeError(
+                    "full runs require a valid source-locked catalog at the pinned "
+                    "--catalog-revision; run the CPU metadata preflight and pin its "
+                    "result before allocating a GPU"
+                ) from error
             print(f"prepared catalogs unavailable; rebuilding: {error}", flush=True)
 
     bulk_metadata = None
     if not prepared_catalogs:
         source_paths = {
             "pokemon": source_dir / "pokemon.json",
+            "pokemon_sets": source_dir / "tcgdex-cards-database.tar.gz",
             "magic": source_dir / "magic-default-cards.json",
             "yugioh": source_dir / "yugioh.json",
         }
         if "pokemon" in selected_games:
             download(POKEMON_METADATA, source_paths["pokemon"])
+            download(POKEMON_SETS, source_paths["pokemon_sets"])
         if "magic" in selected_games:
             bulk = requests.get(
                 SCRYFALL_BULK,
@@ -366,6 +496,8 @@ def main() -> None:
         }
         for game in selected_games:
             converter_command.extend([converter_flags[game], str(source_paths[game])])
+        if "pokemon" in selected_games:
+            converter_command.extend(["--pokemon-sets", str(source_paths["pokemon_sets"])])
         converter_command.extend(["--output", str(normalized_dir)])
         run(converter_command)
 
@@ -385,15 +517,7 @@ def main() -> None:
         "preparedCatalogs": prepared_catalogs,
         "catalogRevision": args.catalog_revision,
         "trainerHubPathInRepo": args.trainer_hub_path_in_repo,
-        "imageLibrary": (
-            {
-                "repo": args.image_library_repo,
-                "revision": args.image_library_revision,
-                "path": args.image_library_path_in_repo.strip("/"),
-            }
-            if image_library_root
-            else None
-        ),
+        "imageLibrary": image_library_descriptor,
         "pokemonBaseline": (
             args.pokemon_baseline_path_in_repo if pokemon_baseline_path else None
         ),
@@ -463,7 +587,7 @@ def main() -> None:
     if image_library_root:
         trainer_command.extend([
             "--image-library-root", str(image_library_root),
-            "--image-library-revision", args.image_library_revision,
+            "--image-library-revision", image_library_id,
         ])
     trainer_env = os.environ.copy()
     trainer_env["TCGER_CACHE_DIR"] = str(cache_dir)

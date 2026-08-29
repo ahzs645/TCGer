@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -27,14 +28,10 @@ from pathlib import Path
 from huggingface_hub import HfApi, get_token
 
 
-REPO_RAW = (
-    "https://raw.githubusercontent.com/ahzs645/TCGer/"
-    "codex/universal-scanner-shards"
-)
-POKEMON_METADATA = (
-    f"{REPO_RAW}/mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/"
-    "CardsIndexMetadata.json"
-)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+POKEMON_METADATA = REPO_ROOT / "mobile-apps/ios/TCGer/TCGer/Resources/ScanIndex/CardsIndexMetadata.json"
+POKEMON_SETS = REPO_ROOT / "mobile-apps/ios/scripts/metadata-locks/pokemon-set-release-dates.json"
+POKEMON_SOURCE_LOCK = REPO_ROOT / "mobile-apps/ios/scripts/metadata-locks/pokemon-physical-v2.lock.json"
 SCRYFALL_BULK = "https://api.scryfall.com/bulk-data/default-cards"
 YGOPRODECK_CARDS = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 REQUEST_HEADERS = {
@@ -83,6 +80,26 @@ def validate_catalogs(output: Path) -> dict[str, int]:
             raise ValueError(f"{game} catalog contains a mismatched game value")
         if any(not row.get("imageURL") for row in rows):
             raise ValueError(f"{game} catalog contains a row without imageURL")
+        if game == "pokemon":
+            runtime_fields = (
+                "format", "setCode", "collectorNumber", "releaseDate",
+                "recognitionFamilyId",
+            )
+            for index, row in enumerate(rows):
+                missing = [
+                    field for field in runtime_fields
+                    if not isinstance(row.get(field), str) or not row[field].strip()
+                ]
+                if missing:
+                    raise ValueError(
+                        f"pokemon row {index} lacks runtime metadata: "
+                        + ", ".join(missing)
+                    )
+                if (
+                    row["format"].casefold() != "paper"
+                    or "/tcgp/" in str(row.get("imageURL") or "").casefold()
+                ):
+                    raise ValueError(f"pokemon row {index} is not a physical card")
         counts[game] = len(rows)
         combined_count += len(rows)
 
@@ -117,10 +134,20 @@ def main() -> None:
 
     source_dir = args.output.parent / "source"
     pokemon_path = source_dir / "pokemon.json"
+    pokemon_sets_path = source_dir / "pokemon-set-release-dates.json"
+    pokemon_source_lock_path = source_dir / "pokemon-physical-v2.lock.json"
     magic_path = source_dir / "magic-default-cards.json"
     yugioh_path = source_dir / "yugioh.json"
 
-    download(POKEMON_METADATA, pokemon_path)
+    for source, destination in (
+        (POKEMON_METADATA, pokemon_path),
+        (POKEMON_SETS, pokemon_sets_path),
+        (POKEMON_SOURCE_LOCK, pokemon_source_lock_path),
+    ):
+        if not source.is_file():
+            raise FileNotFoundError(f"locked Pokemon metadata input is missing: {source}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
     bulk_metadata = load_json(SCRYFALL_BULK)
     magic_download_uri = (
         bulk_metadata.get("download_uri")
@@ -135,6 +162,8 @@ def main() -> None:
         sys.executable,
         str(converter),
         "--pokemon", str(pokemon_path),
+        "--pokemon-sets", str(pokemon_sets_path),
+        "--pokemon-source-lock", str(pokemon_source_lock_path),
         "--mtg", str(magic_path),
         "--yugioh", str(yugioh_path),
         "--output", str(args.output),
@@ -148,7 +177,9 @@ def main() -> None:
         "games": counts,
         "combinedRows": sum(counts.values()),
         "sources": {
-            "pokemon": POKEMON_METADATA,
+            "pokemon": str(POKEMON_METADATA.relative_to(REPO_ROOT)),
+            "pokemonSets": str(POKEMON_SETS.relative_to(REPO_ROOT)),
+            "pokemonSourceLock": str(POKEMON_SOURCE_LOCK.relative_to(REPO_ROOT)),
             "magic": {
                 "endpoint": SCRYFALL_BULK,
                 "updatedAt": bulk_metadata.get("updated_at"),

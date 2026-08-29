@@ -44,6 +44,7 @@
     "parity:web": "bash mobile-parity/run.sh web",
     "parity:android": "bash mobile-parity/run.sh android",
     "parity:ios": "bash mobile-parity/run.sh ios",
+    "scanner:metadata:pokemon:verify": "python3 mobile-apps/ios/scripts/maintain_pokemon_metadata_release.py verify",
     "assets:r2:publish-catalogs": "node tools/r2/publish-catalogs.mjs",
     "assets:r2:publish-pack-assets": "node tools/r2/publish-pack-assets.mjs",
     "assets:r2:publish-scan-index": "node tools/r2/publish-scan-index.mjs",

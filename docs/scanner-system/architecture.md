@@ -182,7 +182,7 @@ Every scanner release should declare or transitively bind:
 
 - game and format scope;
 - catalog identity/fingerprint;
-- image-library revision used to train or embed;
+- prepared image-pack manifest SHA used to train or embed;
 - encoder name, weights hash, input contract, dimension, and output norm;
 - index count and vector header;
 - threshold set and calibration evidence;

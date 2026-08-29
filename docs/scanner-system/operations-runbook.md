@@ -76,13 +76,34 @@ and hash to the dry-run plan.
 
 Prepare game-specific trainer metadata from pinned raw sources:
 
+For the production physical Pokémon catalog, use the repository source lock:
+
+```bash
+python3 mobile-apps/ios/scripts/maintain_pokemon_metadata_release.py verify
+python3 mobile-apps/ios/scripts/maintain_pokemon_metadata_release.py build \
+  --output .artifacts/pokemon-metadata-locked/catalogs
+```
+
+See [Pokémon metadata reproducibility](pokemon-metadata-reproducibility.md)
+before refreshing the lock. The generic converter invocation below is useful
+for multi-game preflight and unlocked diagnostics, but it is not the Pokémon
+production release entrypoint.
+
 ```bash
 uv run mobile-apps/ios/scripts/build_universal_trainer_metadata.py \
   --pokemon /path/to/pokemon.json \
+  --pokemon-sets /path/to/pinned-tcgdex-cards-database.tar.gz \
+  --pokemon-family-overlay /path/to/reviewed-pokemon-families.json \
   --mtg /path/to/scryfall-default-cards.json \
   --yugioh /path/to/yugioh.json \
   --output .artifacts/huggingface/universal-arcface/catalogs
 ```
+
+`--pokemon-sets` is required for physical scanner builds and accepts either a
+set-registry JSON file or a pinned official TCGdex `cards-database` archive.
+It supplies every printing's ISO release date for Quick Scan's newest-print
+fallback. The family overlay is optional and must contain reviewed multi-print
+artwork families; without it, Pokémon printings remain safe singleton families.
 
 Required invariants before the next Pokémon release:
 
@@ -100,6 +121,11 @@ non-empty image references, and complete source checksums.
 
 ## 5. Build and audit the durable image library
 
+This step runs locally. The local updater—not a Hugging Face Job—owns all
+downloads from public catalog and artwork providers. See
+[Image-library ownership and update policy](image-library-ownership-and-update-policy.md).
+Hugging Face receives only the reviewed deterministic release produced here.
+
 Run the incremental sync using the plan and previous release:
 
 ```bash
@@ -116,8 +142,9 @@ uv run tools/scanner-image-library/sync_training_image_library.py sync \
 ```
 
 Review `diff.json`, `coverage.json`, `distribution-plan.json`, source
-provenance, and licensing. Coverage must be `ready` and 100% for a production
-release.
+provenance, licensing, and `library.json.selectionPolicy`. Coverage must be
+`ready` and 100% for selected representatives. Exact-print rows above the
+family cap remain metadata-only and are not coverage failures.
 
 Audit without network access:
 
@@ -128,7 +155,7 @@ uv run tools/scanner-image-library/sync_training_image_library.py audit \
 
 Do not use `--allow-incomplete` or trainer quarantine for a production release.
 
-## 6. Upload and pin the image release
+## 6. Optionally archive the image release
 
 ```bash
 uv run tools/scanner-image-library/sync_training_image_library.py upload \
@@ -136,15 +163,15 @@ uv run tools/scanner-image-library/sync_training_image_library.py upload \
   --repo ahzs645/tcger-scanner-images
 ```
 
-Record the returned immutable `pinnedRevision`. Never pass `main` to a full
-training job. Also pin the normalized catalog revision.
+This is a recovery copy, not the production training input. Never make a GPU
+job snapshot-download it. Always pin the normalized catalog revision.
 
 ## 7. Run a cheap preflight
 
 Before full training:
 
-1. verify Hub model and image-dataset revisions exist;
-2. dry-run/materialize a small image subset from the pinned release;
+1. verify the Hub model/catalog revision and local pack contract;
+2. audit the mounted representative pack without network access;
 3. load the intended checkpoint, if any;
 4. confirm catalog and image-library fingerprints match;
 5. run a quick isolated job for the changed game;
@@ -155,20 +182,16 @@ Quick jobs are plumbing tests and cannot be promoted as production models.
 
 ## 8. Submit a full isolated training job
 
-Example for one game:
+Run this on the operator machine. Local image acquisition and audit must already
+be complete. The CLI stages the bounded directory as a read-only volume before
+the remote GPU job starts:
 
 ```bash
-hf jobs uv run mobile-apps/ios/scripts/run_universal_arcface_hf_job.py \
-  --flavor l4x1 \
-  --timeout 24h \
-  --secrets HF_TOKEN \
-  -- \
-  --hub-repo ahzs645/tcger-universal-arcface \
-  --mode full \
-  --games pokemon \
-  --catalog-revision <40-character-catalog-commit> \
-  --image-library-repo ahzs645/tcger-scanner-images \
-  --image-library-revision <40-character-image-library-commit>
+uv run mobile-apps/ios/scripts/prepare_and_launch_two_stage_hf_job.py \
+  --game pokemon \
+  --bundle-revision <40-character-catalog-and-code-commit> \
+  --prepared-image-library-root .artifacts/scanner-image-library/<date> \
+  --artifact-variant bounded-family-v1
 ```
 
 Confirm current hardware pricing immediately before submission. The earlier
