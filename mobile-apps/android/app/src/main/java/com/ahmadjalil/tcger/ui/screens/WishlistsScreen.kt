@@ -41,9 +41,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -138,6 +141,7 @@ private fun WishlistRow(wishlist: Wishlist, onOpen: (String) -> Unit, onDelete: 
 }
 
 @Composable
+@OptIn(ExperimentalComposeUiApi::class)
 fun WishlistEditorDialog(
     title: String,
     confirmLabel: String,
@@ -153,6 +157,7 @@ fun WishlistEditorDialog(
     var matchAnyPrinting by remember(initial?.id) { mutableStateOf(initial?.matchAnyPrinting ?: false) }
 
     AlertDialog(
+        modifier = Modifier.semantics { testTagsAsResourceId = true },
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
