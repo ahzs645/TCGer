@@ -123,8 +123,15 @@ final class PackOpeningResourceTests: XCTestCase {
 
     func testOfflineSetDefinitionsMatchRendererAndMetadataIdentifiers() {
         XCTAssertEqual(PackOfflineSetDefinition.matching("base1")?.metadataSetCode, "base1")
+        XCTAssertEqual(PackOfflineSetDefinition.matching("base1")?.game, .pokemon)
         XCTAssertEqual(PackOfflineSetDefinition.matching("me5")?.metadataSetCode, "me05")
+        XCTAssertEqual(PackOfflineSetDefinition.matching("me5")?.game, .pokemon)
         XCTAssertEqual(PackOfflineSetDefinition.matching("ME05")?.packPool, "me5")
+        XCTAssertEqual(
+            PackOfflineSetDefinition.available.filter { $0.game == .pokemon }.count,
+            2
+        )
+        XCTAssertTrue(PackOfflineSetDefinition.available.filter { $0.game == .magic }.isEmpty)
         XCTAssertNil(PackOfflineSetDefinition.matching("swsh7"))
     }
 

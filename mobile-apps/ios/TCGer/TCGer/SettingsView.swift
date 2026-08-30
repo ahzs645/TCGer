@@ -13,7 +13,6 @@ struct SettingsView: View {
     @AppStorage("developerToolsUnlocked") private var developerToolsUnlocked = false
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var scannerDevModeRecordingEnabled = false
     @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var scannerCropRescueEnabled = false
-    @AppStorage(ScannerPerfOptions.ocrEnabledDefaultsKey) private var scannerOCREnabled = true
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var catalogStore = CatalogStore.shared
     @StateObject private var scannerAssets = ScannerAssetStore.shared
@@ -319,50 +318,31 @@ struct SettingsView: View {
                     Text("Enable or disable specific TCG games in search and analytics. A game can't be turned off while you still have its cards in a collection or wishlist.")
                 }
 
-                if isLocalMode {
-                    Section {
-                        Toggle(isOn: $environmentStore.sealedProductsEnabled) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Sealed Products")
-                                Text("Download searchable boxes, packs, decks, and other sealed products")
+                Section {
+                    NavigationLink {
+                        OfflineDownloadsView(
+                            catalogStore: catalogStore,
+                            scannerAssets: scannerAssets,
+                            packDownloads: offlinePackDownloads
+                        )
+                        .environmentObject(environmentStore)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Offline Downloads")
+                                Text("Catalogs, scanner models, and pack sets by game")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                        } icon: {
+                            Image(systemName: "icloud.and.arrow.down")
+                                .foregroundStyle(.tint)
                         }
-
-                        ForEach(TCGGame.catalogGames) { game in
-                            CatalogInstallRow(
-                                game: game,
-                                catalogStore: catalogStore,
-                                includeSealedProducts: environmentStore.sealedProductsEnabled
-                            )
-                        }
-                    } header: {
-                        Text("Offline Catalogs")
-                    } footer: {
-                        Text(environmentStore.sealedProductsEnabled
-                            ? "Each game downloads separately. Turning off Sealed Products removes its optional product catalogs but keeps your sealed inventory."
-                            : "Only card catalogs are downloaded. Each game stays separate, and removing one never removes your saved cards.")
-                    }
-                }
-
-                Section {
-                    Toggle(isOn: $scannerOCREnabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Use OCR for Difficult Scans")
-                            Text("Read card titles and collector numbers only when visual matching is uncertain")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    ForEach(ScannerAssetStore.downloadableGames) { game in
-                        ScannerAssetInstallRow(game: game, store: scannerAssets)
                     }
                 } header: {
-                    Text("Offline Scanner Models")
+                    Text("Downloads")
                 } footer: {
-                    Text("OCR is enabled by default and runs only on difficult intentional captures. Turning it off can make scans faster, but may reduce card and exact-print accuracy. Scanner models run entirely on this phone.")
+                    Text("Downloadable content is grouped under its relevant game. OCR remains in Scanner Options while scanning.")
                 }
 
                 CommunityGameLibrariesSection(store: gamePackages)
@@ -585,8 +565,6 @@ struct SettingsView: View {
                             : "Adds example binders, wishlists, sealed items, Code Vault entries, and transactions so you can try the app out. Your own data is never affected.")
                     }
                 }
-
-                OfflinePackDownloadsSection(manager: offlinePackDownloads)
 
                 // Data & Sync Section
                 Section {

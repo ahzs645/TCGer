@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct OfflinePackDownloadsSection: View {
+    let game: TCGGame
     @ObservedObject var manager: PackOfflineDownloadManager
 
     var body: some View {
         Section {
             NavigationLink {
-                OfflinePackDownloadsView(manager: manager)
+                OfflinePackDownloadsView(game: game, manager: manager)
             } label: {
                 Label {
                     VStack(alignment: .leading, spacing: 3) {
@@ -23,27 +24,32 @@ struct OfflinePackDownloadsSection: View {
         }
     }
 
+    private var definitions: [PackOfflineSetDefinition] {
+        manager.definitions(for: game)
+    }
+
     private var downloadSummary: String {
-        let downloadedCount = manager.definitions.reduce(into: 0) { count, definition in
+        let downloadedCount = definitions.reduce(into: 0) { count, definition in
             if case .downloaded = manager.status(for: definition) {
                 count += 1
             }
         }
-        return "\(downloadedCount) of \(manager.definitions.count) sets downloaded"
+        return "\(downloadedCount) of \(definitions.count) sets downloaded"
     }
 }
 
 struct OfflinePackDownloadsView: View {
+    let game: TCGGame
     @ObservedObject var manager: PackOfflineDownloadManager
 
     var body: some View {
         List {
             Section {
-                ForEach(manager.definitions) { definition in
+                ForEach(manager.definitions(for: game)) { definition in
                     OfflinePackSetRow(definition: definition, manager: manager)
                 }
             } footer: {
-                Text("Downloads each set’s pack wrappers and card artwork so its packs can be opened without an internet connection.")
+                Text("Downloads each \(game.displayName) set’s pack wrappers and card artwork so its packs can be opened without an internet connection.")
             }
         }
         .navigationTitle("Offline Packs")

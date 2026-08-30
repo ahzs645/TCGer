@@ -60,36 +60,47 @@ struct ScannerGameChoicePrompt: View {
                         }
 
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
+                        Image(systemName: "chevron.forward")
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(.tertiary)
                     }
+                    .padding(.vertical, 10)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
                 .accessibilityLabel("Scan \(mode.tcgGame.displayName)")
                 .accessibilityHint(packageSummary(for: mode.tcgGame))
             }
-            .navigationTitle("Which game are you scanning?")
+            .listStyle(.plain)
+            .contentMargins(.top, 8, for: .scrollContent)
+            .navigationTitle("Choose a Game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Not now") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Not now")
                 }
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(.systemBackground))
     }
 
     private func packageSummary(for game: TCGGame) -> String {
         if case .installed = store.installState(for: game) {
-            return "Scanner installed"
+            return "Ready to scan"
         }
         guard let manifest = store.manifests[game] else {
-            return "Scanner available to install"
+            return "Scanner download available"
         }
         let size = ByteCountFormatter.string(fromByteCount: Int64(manifest.downloadBytes), countStyle: .file)
-        return "\(manifest.displayedCardCount.formatted(.number)) cards · \(size)"
+        return "\(manifest.displayedCardCount.formatted(.number)) cards · \(size) download"
     }
 
     @ViewBuilder

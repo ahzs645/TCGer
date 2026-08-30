@@ -5,12 +5,25 @@ import UIKit
 nonisolated struct PackOfflineSetDefinition: Identifiable, Hashable, Sendable {
     let id: String
     let name: String
+    let game: TCGGame
     let metadataSetCode: String
     let packPool: String
 
     static let available: [Self] = [
-        .init(id: "base1", name: "Base Set", metadataSetCode: "base1", packPool: "base1"),
-        .init(id: "me5", name: "Pitch Black", metadataSetCode: "me05", packPool: "me5"),
+        .init(
+            id: "base1",
+            name: "Base Set",
+            game: .pokemon,
+            metadataSetCode: "base1",
+            packPool: "base1"
+        ),
+        .init(
+            id: "me5",
+            name: "Pitch Black",
+            game: .pokemon,
+            metadataSetCode: "me05",
+            packPool: "me5"
+        ),
     ]
 
     static func matching(_ setID: String) -> Self? {
@@ -122,6 +135,10 @@ final class PackOfflineDownloadManager: ObservableObject {
         return .notDownloaded
     }
 
+    func definitions(for game: TCGGame) -> [PackOfflineSetDefinition] {
+        definitions.filter { $0.game == game }
+    }
+
     func status(forSetID setID: String) -> Status? {
         guard let definition = PackOfflineSetDefinition.matching(setID) else { return nil }
         return status(for: definition)
@@ -184,7 +201,7 @@ final class PackOfflineDownloadManager: ObservableObject {
         guard NetworkMonitor.shared.isConnected else { throw DownloadError.noConnection }
 
         let entries = await CardIndexMetadataStore.shared.entries(
-            for: .pokemon,
+            for: definition.game,
             setCode: definition.metadataSetCode
         )
         let cardURLs = Self.cardArtworkURLs(from: entries)
