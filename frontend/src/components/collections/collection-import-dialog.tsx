@@ -192,7 +192,7 @@ export function CollectionImportDialog({
             Preview first. Nothing is written unless every row is valid.
             {offlineCsvOnly
               ? " The offline demo supports TCGer CSV."
-              : " Supports TCGer CSV, JSON, and Cardmarket Yu-Gi-Oh singles text."}{" "}
+              : " Supports TCGer, ManaBox, Moxfield, TCGPlayer, and Collectr exports, plus JSON and Cardmarket text."}{" "}
             Duplicate rows with identical copy attributes are merged.
           </DialogDescription>
         </DialogHeader>
@@ -250,6 +250,10 @@ export function CollectionImportDialog({
               <SelectContent>
                 <SelectItem value="auto">Auto-detect</SelectItem>
                 <SelectItem value="csv">TCGer CSV</SelectItem>
+                {!offlineCsvOnly && <SelectItem value="manabox-csv">ManaBox CSV</SelectItem>}
+                {!offlineCsvOnly && <SelectItem value="moxfield-csv">Moxfield CSV</SelectItem>}
+                {!offlineCsvOnly && <SelectItem value="tcgplayer-csv">TCGPlayer CSV</SelectItem>}
+                {!offlineCsvOnly && <SelectItem value="collectr-csv">Collectr CSV</SelectItem>}
                 {!offlineCsvOnly && <SelectItem value="json">JSON</SelectItem>}
                 {!offlineCsvOnly && (
                   <SelectItem value="cardmarket-text">

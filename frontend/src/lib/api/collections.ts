@@ -18,6 +18,8 @@ import type {
   BulkAddPreview,
   BulkAddRequest,
   BulkAddResult,
+  BinderShareLink,
+  CreateBinderShareLinkInput,
 } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 
@@ -43,6 +45,8 @@ export type {
   BulkAddPreview,
   BulkAddRequest,
   BulkAddResult,
+  BinderShareLink,
+  CreateBinderShareLinkInput,
 } from "@tcg/api-types";
 
 // Frontend uses "Collection" terminology; backend uses "Binder"
@@ -147,6 +151,59 @@ export async function deleteCollection(
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || "Failed to delete collection");
+  }
+}
+
+export async function getBinderShareLinks(
+  token: string,
+  collectionId: string,
+  viewer?: CollectionsViewerContext | null,
+): Promise<BinderShareLink[]> {
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/share-links`,
+    { headers: buildHeaders(token, viewer, false) },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to load share links");
+  }
+  return response.json();
+}
+
+export async function createBinderShareLink(
+  token: string,
+  collectionId: string,
+  input: CreateBinderShareLinkInput,
+  viewer?: CollectionsViewerContext | null,
+): Promise<BinderShareLink> {
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/share-links`,
+    {
+      method: "POST",
+      headers: buildHeaders(token, viewer),
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to create share link");
+  }
+  return response.json();
+}
+
+export async function revokeBinderShareLink(
+  token: string,
+  collectionId: string,
+  linkId: string,
+  viewer?: CollectionsViewerContext | null,
+): Promise<void> {
+  const response = await fetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/share-links/${encodeURIComponent(linkId)}`,
+    { method: "DELETE", headers: buildHeaders(token, viewer, false) },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to revoke share link");
   }
 }
 
@@ -320,7 +377,7 @@ async function importRequest<T>(
     {
       method: "POST",
       headers: buildHeaders(token, viewer),
-      body: JSON.stringify(input),
+      body: serializeCollectionImportRequest(input),
     },
   );
   const payload = await response.json().catch(() => ({}));
@@ -328,6 +385,12 @@ async function importRequest<T>(
     throw new Error(payload.message || `Failed to ${action} collection import`);
   }
   return payload as T;
+}
+
+export function serializeCollectionImportRequest(
+  input: CollectionImportRequest,
+): string {
+  return JSON.stringify(input);
 }
 
 export function previewCollectionCsv(
@@ -396,7 +459,7 @@ export async function downloadCollectionImportTemplate(
 
 export async function downloadCollectionExport(
   token: string,
-  format: "csv" | "json",
+  format: "csv" | "json" | "manabox" | "moxfield" | "tcgplayer" | "collectr",
   viewer?: CollectionsViewerContext | null,
 ): Promise<Blob> {
   const response = await fetch(

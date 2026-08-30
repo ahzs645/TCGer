@@ -94,6 +94,13 @@ export interface CardScanQualityMetrics {
 }
 
 export interface CardScanMeta {
+  /** Server-side catalog gate; rejected matches must never be auto-added. */
+  catalogDecision?: {
+    accepted: boolean;
+    reason?: string;
+    setCodeHint?: string;
+    candidateSetCode?: string;
+  } | null;
   quality?: CardScanQualityMetrics | null;
   thresholdUsed?: number;
   variantUsed?: string;
@@ -266,12 +273,20 @@ export async function scanCardImageApi(params: {
   file: File;
   token: string;
   tcg?: TcgCode | "all";
+  setCodeHint?: string;
   saveDebugCapture?: boolean;
   captureSource?: string;
   captureNotes?: string;
 }): Promise<CardScanResponse> {
-  const { file, token, tcg, saveDebugCapture, captureSource, captureNotes } =
-    params;
+  const {
+    file,
+    token,
+    tcg,
+    setCodeHint,
+    saveDebugCapture,
+    captureSource,
+    captureNotes,
+  } = params;
   const formData = new FormData();
   formData.append("image", file);
   if (saveDebugCapture) {
@@ -287,6 +302,9 @@ export async function scanCardImageApi(params: {
   const searchParams = new URLSearchParams();
   if (tcg && tcg !== "all") {
     searchParams.set("tcg", tcg);
+  }
+  if (setCodeHint?.trim()) {
+    searchParams.set("setCodeHint", setCodeHint.trim());
   }
 
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";

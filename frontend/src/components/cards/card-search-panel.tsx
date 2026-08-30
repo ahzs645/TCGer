@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Search as SearchIcon } from "lucide-react";
+import { Dices, Loader2, Search as SearchIcon } from "lucide-react";
+import {
+  getGameDefinition,
+  matchesCollectionFacets,
+  type CollectionFacetCard,
+  type GameFilterSelection,
+  type TcgCode,
+} from "@tcg/api-types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useCardSearch } from "@/lib/hooks/use-card-search";
+import { discoverCardsApi } from "@/lib/api-client";
 import { supportedGames, useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
@@ -29,6 +37,7 @@ import { useAuthStore } from "@/stores/auth";
 import type { Card as CardType } from "@/types/card";
 
 import { CardPreview } from "./card-preview";
+import { GameFacetFilters } from "@/components/collections/sandbox/game-facet-filters";
 
 import { useShallow } from "zustand/react/shallow";
 export function CardSearchPanel() {
@@ -51,6 +60,12 @@ export function CardSearchPanel() {
   const [setFilter, setSetFilter] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
   const [collectorFilter, setCollectorFilter] = useState("");
+  const [gameFacetSelections, setGameFacetSelections] = useState<
+    Record<string, GameFilterSelection | undefined>
+  >({});
+  const [discoveredCards, setDiscoveredCards] = useState<CardType[] | null>(null);
+  const [discoverSource, setDiscoverSource] = useState<string | null>(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
 
   const { data, error, isError, isFetching, refetch } = useCardSearch(
     searchQuery,
@@ -59,7 +74,13 @@ export function CardSearchPanel() {
   const normalizedSetFilter = setFilter.trim().toLowerCase();
   const normalizedRarityFilter = rarityFilter.trim().toLowerCase();
   const normalizedCollectorFilter = collectorFilter.trim().toLowerCase();
-  const filteredCards = (data ?? []).filter((card) => {
+  const selectedDefinition =
+    selectedGame === "all" ? null : getGameDefinition(selectedGame as TcgCode);
+  const sourceCards = discoveredCards ?? data ?? [];
+  const facetCards = sourceCards.map(
+    (card) => ({ ...card, quantity: 0 }) as CollectionFacetCard,
+  );
+  const filteredCards = sourceCards.filter((card) => {
     if (!enabledGames[card.tcg as keyof typeof enabledGames]) return false;
     if (
       normalizedSetFilter &&
@@ -81,6 +102,16 @@ export function CardSearchPanel() {
     ) {
       return false;
     }
+    if (
+      selectedDefinition &&
+      !matchesCollectionFacets(
+        { ...card, quantity: 0 } as CollectionFacetCard,
+        selectedDefinition.search.facets,
+        gameFacetSelections,
+      )
+    ) {
+      return false;
+    }
     return true;
   });
   const cards = filteredCards;
@@ -92,16 +123,42 @@ export function CardSearchPanel() {
     (enabled) => !enabled,
   );
   const hasFacetFilters = Boolean(
-    normalizedSetFilter || normalizedRarityFilter || normalizedCollectorFilter,
+    normalizedSetFilter ||
+      normalizedRarityFilter ||
+      normalizedCollectorFilter ||
+      Object.values(gameFacetSelections).some((value) => value !== undefined),
   );
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = inputValue.trim();
     if (!trimmed) return;
+    setDiscoveredCards(null);
+    setDiscoverSource(null);
     setSearchQuery(trimmed);
     if (trimmed === searchQuery) {
       void refetch();
+    }
+  };
+
+  const handleDiscover = async () => {
+    if (!token) return;
+    setIsDiscovering(true);
+    setDiscoverSource(null);
+    try {
+      const result = await discoverCardsApi({
+        tcg: selectedGame,
+        count: 6,
+        token,
+      });
+      setDiscoveredCards(result.cards as CardType[]);
+      setDiscoverSource(
+        result.sampledFrom
+          ? `${GAME_LABELS[result.sampledFrom.tcg as SupportedGame]} · ${result.sampledFrom.setName ?? result.sampledFrom.setCode}`
+          : "the catalog",
+      );
+    } finally {
+      setIsDiscovering(false);
     }
   };
 
@@ -171,6 +228,16 @@ export function CardSearchPanel() {
                   )}
                 </Button>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => void handleDiscover()}
+                disabled={isDiscovering || !isAuthenticated || noGamesEnabled}
+              >
+                {isDiscovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Dices className="h-4 w-4" />}
+                Discover random cards
+              </Button>
             </div>
 
             <div className="space-y-2" data-oid="zsrjmvw">
@@ -183,7 +250,11 @@ export function CardSearchPanel() {
               </label>
               <Select
                 value={selectedGame}
-                onValueChange={(value) => setGame(value as SupportedGame)}
+                onValueChange={(value) => {
+                  setGame(value as SupportedGame);
+                  setGameFacetSelections({});
+                  setDiscoveredCards(null);
+                }}
                 data-oid="19wtplw"
               >
                 <SelectTrigger
@@ -270,12 +341,29 @@ export function CardSearchPanel() {
                     setSetFilter("");
                     setRarityFilter("");
                     setCollectorFilter("");
+                    setGameFacetSelections({});
                   }}
                 >
                   Clear result filters
                 </Button>
               ) : null}
             </fieldset>
+            {selectedDefinition ? (
+              <GameFacetFilters
+                definition={{
+                  ...selectedDefinition,
+                  collection: {
+                    ...selectedDefinition.collection,
+                    facets: selectedDefinition.search.facets,
+                  },
+                }}
+                cards={facetCards}
+                selections={gameFacetSelections}
+                onChange={(facetId, selection) =>
+                  setGameFacetSelections((current) => ({ ...current, [facetId]: selection }))
+                }
+              />
+            ) : null}
           </form>
         </CardContent>
       </Card>
@@ -295,7 +383,9 @@ export function CardSearchPanel() {
                   ? error instanceof Error
                     ? error.message
                     : "Search failed."
-                  : searchQuery
+                  : discoveredCards
+                    ? `${cards.length} random cards from ${discoverSource ?? "the catalog"}.`
+                    : searchQuery
                     ? `${cards.length} cards matched "${searchQuery}".`
                     : "Enter a keyword and run a search to see results."}
             </CardDescription>

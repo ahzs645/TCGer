@@ -10,6 +10,21 @@ import { Filter, Tag as TagIcon } from "lucide-react";
 import type { CollectionTag } from "@/lib/api/collections";
 import { CONDITION_COPY, CONDITION_ORDER, formatCurrency } from "./helpers";
 import { formatTotalCopyCount } from "@/lib/copy-labels";
+import type {
+  CollectionFacetCard,
+  GameDefinition,
+  GameFilterSelection,
+  TcgCode,
+} from "@tcg/api-types";
+import { GAME_LABELS } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { GameFacetFilters } from "./game-facet-filters";
 
 interface FilterControlsProps {
   priceRange: [number, number];
@@ -24,6 +39,13 @@ interface FilterControlsProps {
     highlightedTags: [string, number][];
   };
   tags: CollectionTag[];
+  availableGames: TcgCode[];
+  selectedGame: TcgCode | "all";
+  onGameChange: (game: TcgCode | "all") => void;
+  gameDefinition: GameDefinition | null;
+  gameCards: readonly CollectionFacetCard[];
+  gameFacetSelections: Readonly<Record<string, GameFilterSelection | undefined>>;
+  onGameFacetChange: (facetId: string, selection: GameFilterSelection | undefined) => void;
 }
 
 export function FilterControls({
@@ -35,6 +57,13 @@ export function FilterControls({
   onToggleCondition,
   summary,
   tags,
+  availableGames,
+  selectedGame,
+  onGameChange,
+  gameDefinition,
+  gameCards,
+  gameFacetSelections,
+  onGameFacetChange,
 }: FilterControlsProps) {
   const highlightedLabels = useMemo(() => {
     return summary.highlightedTags
@@ -59,6 +88,26 @@ export function FilterControls({
 
   return (
     <div className="space-y-4" data-oid="zr0leh7">
+      <div className="space-y-2">
+        <Label className="text-xs uppercase text-muted-foreground">Game</Label>
+        <Select value={selectedGame} onValueChange={(value) => onGameChange(value as TcgCode | "all")}>
+          <SelectTrigger aria-label="Collection game"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All games</SelectItem>
+            {availableGames.map((game) => <SelectItem key={game} value={game}>{GAME_LABELS[game]}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {gameDefinition && (
+        <GameFacetFilters
+          definition={gameDefinition}
+          cards={gameCards}
+          selections={gameFacetSelections}
+          onChange={onGameFacetChange}
+        />
+      )}
+
       <div className="space-y-2" data-oid="bygxl2o">
         <Label
           className="text-xs uppercase text-muted-foreground"

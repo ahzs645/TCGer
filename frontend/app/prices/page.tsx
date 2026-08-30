@@ -29,6 +29,7 @@ import { useModuleStore } from "@/stores/preferences";
 import { useShallow } from "zustand/react/shallow";
 import { formatMoney } from "@/lib/format-money";
 import { GameBadge } from "@/components/cards/game-badge";
+import { PriceAlertDialog } from "@/components/prices/price-alert-dialog";
 import {
   collectionPriceLots,
   trackedPriceLookupKey,
@@ -38,6 +39,7 @@ const PRICE_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 interface OwnedPrice {
   key: string;
+  externalId: string;
   name: string;
   tcg: string;
   setName?: string;
@@ -49,6 +51,8 @@ interface OwnedPrice {
   source?: string;
   owned: number;
   change30d: number | null;
+  quoteStatus: "fresh" | "stale" | "missing" | "failed" | "low-confidence";
+  quoteMessage?: string;
 }
 
 function tcgLabel(tcg: string): string {
@@ -164,8 +168,7 @@ export default function PricesPage() {
   const marketPriceByCard = useMemo(() => {
     const map = new Map<string, TrackedPriceResult>();
     for (const result of trackedPricesQuery.data?.prices ?? []) {
-      if (result.price !== undefined) {
-        map.set(
+      map.set(
           trackedPriceLookupKey(
             result.tcg,
             result.externalId,
@@ -173,7 +176,6 @@ export default function PricesPage() {
           ),
           result,
         );
-      }
     }
     return map;
   }, [trackedPricesQuery.data]);
@@ -190,6 +192,11 @@ export default function PricesPage() {
 
   const owned = useMemo<OwnedPrice[]>(() => {
     const byKey = new Map<string, OwnedPrice>();
+    const quoteFreshnessCutoff =
+      Date.parse(
+        trackedPricesQuery.data?.refreshedAt ?? "1970-01-01T00:00:00.000Z",
+      ) -
+      48 * 60 * 60 * 1000;
     for (const binder of collections) {
       for (const card of binder.cards) {
         if (enabledGames[card.tcg as keyof typeof enabledGames] === false)
@@ -210,6 +217,7 @@ export default function PricesPage() {
           } else {
             byKey.set(key, {
               key,
+              externalId,
               name: card.name,
               tcg: card.tcg,
               setName: card.setName,
@@ -221,6 +229,16 @@ export default function PricesPage() {
               source: market?.source,
               owned: lot.quantity,
               change30d: changeByCard.get(cardChangeKey) ?? null,
+              quoteStatus: market?.error
+                ? "failed"
+                : market?.price === undefined
+                  ? "missing"
+                  : market.provenance?.match && (market.provenance.match.ambiguous || market.provenance.match.confidence < 0.8)
+                    ? "low-confidence"
+                    : market.updatedAt && Date.parse(market.updatedAt) < quoteFreshnessCutoff
+                      ? "stale"
+                      : "fresh",
+              quoteMessage: market?.error,
             });
           }
         }
@@ -233,6 +251,7 @@ export default function PricesPage() {
     selectedGame,
     changeByCard,
     marketPriceByCard,
+    trackedPricesQuery.data?.refreshedAt,
   ]);
 
   const filtered = useMemo(() => {
@@ -359,6 +378,13 @@ export default function PricesPage() {
             Live prices could not be refreshed. Stored collection prices are
             still shown.
           </p>
+        )}
+
+        {trackedPricesQuery.data?.health && (
+          <div className={`rounded-lg border p-4 text-sm ${trackedPricesQuery.data.health.status === "healthy" ? "border-emerald-300 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30" : trackedPricesQuery.data.health.status === "unsafe" ? "border-destructive/50 bg-destructive/5" : "border-amber-300 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/30"}`} role={trackedPricesQuery.data.health.status === "healthy" ? undefined : "alert"}>
+            <div className="flex flex-wrap items-center gap-2"><span className="font-medium">Pricing health: {trackedPricesQuery.data.health.status}</span><Badge variant="outline">{trackedPricesQuery.data.health.coverage}% fresh</Badge><span className="text-muted-foreground">{trackedPricesQuery.data.health.fresh} fresh · {trackedPricesQuery.data.health.stale} stale · {trackedPricesQuery.data.health.missing} missing · {trackedPricesQuery.data.health.failed} failed · {trackedPricesQuery.data.health.lowConfidence} low-confidence</span></div>
+            <p className="mt-1 text-muted-foreground">{trackedPricesQuery.data.health.message}{trackedPricesQuery.data.health.status === "unsafe" ? " Portfolio history capture is paused until coverage recovers." : ""}</p>
+          </div>
         )}
 
         {mounted && !isAuthenticated ? (
@@ -507,6 +533,7 @@ export default function PricesPage() {
                           onClick={() => handleSort("price")}
                           indicator={sortIndicator("price")}
                         />
+                        <th className="p-3 text-right font-medium text-muted-foreground">Watch</th>
                         <SortableTh
                           label="30d"
                           align="right"
@@ -556,7 +583,9 @@ export default function PricesPage() {
                                 {p.source}
                               </span>
                             )}
+                            {p.quoteStatus !== "fresh" && <Badge variant="outline" className="ml-2 text-[10px]" title={p.quoteMessage}>{p.quoteStatus}</Badge>}
                           </td>
+                          <td className="p-3 text-right"><PriceAlertDialog compact card={{ externalId: p.externalId, tcg: p.tcg, name: p.name, finishCode: p.finishCode, currency: p.currency }} currentPrice={p.price || undefined} /></td>
                           <td className="p-3 text-right">
                             {p.change30d === null ? (
                               <span className="text-muted-foreground">—</span>
@@ -578,7 +607,7 @@ export default function PricesPage() {
                       {filtered.length === 0 && (
                         <tr>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="p-6 text-center text-sm text-muted-foreground"
                           >
                             No cards match your search.

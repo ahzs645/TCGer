@@ -5,6 +5,7 @@ import type { Binder, TransactionResponse } from "@tcg/api-types";
 import {
   buildPurchasePerformanceLots,
   convertPurchasePerformanceLots,
+  purchaseCostCoverage,
   purchasePriceItems,
 } from "./purchase-performance";
 
@@ -65,6 +66,28 @@ test("purchase price requests retain copy finish, condition, and language", () =
       language: "English",
     },
   ]);
+});
+
+test("cost-basis coverage reports costed copies and untracked value", () => {
+  const mixed = structuredClone(collections);
+  mixed[0]!.cards.push({
+    ...mixed[0]!.cards[0]!,
+    id: "copy-2",
+    quantity: 2,
+    price: 12,
+    copies: [
+      { ...mixed[0]!.cards[0]!.copies[0]!, id: "copy-2" },
+      { ...mixed[0]!.cards[0]!.copies[0]!, id: "copy-3" },
+    ],
+  });
+  assert.deepEqual(purchaseCostCoverage(mixed, [transaction]), {
+    totalCopies: 3,
+    costedCopies: 1,
+    missingCopies: 2,
+    coveragePercent: (1 / 3) * 100,
+    untrackedMarketValue: 24,
+    cardsMissingCosts: 1,
+  });
 });
 
 test("linked purchase fields win over legacy copy cost", () => {

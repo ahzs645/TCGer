@@ -71,6 +71,7 @@ import type {
 import { describeWishlistRule } from "@tcg/api-types";
 import type { Card as CardType, TcgCode } from "@/types/card";
 import { copyCountNoun } from "@/lib/copy-labels";
+import { PriceAlertDialog } from "@/components/prices/price-alert-dialog";
 
 export function WishlistContent() {
   const [confirm, confirmDialog] = useConfirm();
@@ -1620,6 +1621,16 @@ function WishlistCardItem({
                   <Plus className="h-3 w-3" />
                 )}
               </Button>
+            </div>
+            <div className="pt-1">
+              <PriceAlertDialog
+                card={{
+                  externalId: card.externalId,
+                  tcg: card.tcg,
+                  name: card.name,
+                  imageUrl: card.imageUrlSmall ?? card.imageUrl,
+                }}
+              />
             </div>
           </div>
         </div>

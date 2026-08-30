@@ -57,6 +57,7 @@ import {
   getSealedInventory,
   getSealedOpenings,
   getSealedProducts,
+  getSealedProduct,
   recordOpenedCardSale,
   updateSealedInventory,
   updateCustomSealedProduct,
@@ -544,15 +545,15 @@ function InventoryCard({
               )}
             </div>
             <div className="flex flex-wrap gap-1">
-              {item.product.setCode && (
+              {(item.product.setCode || item.product.contentCount) && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={onBrowseSetCards}
-                  aria-label={`View cards in set ${item.product.setCode}`}
+                  aria-label={`View known contents of ${item.product.name}`}
                 >
                   <LayoutGrid className="mr-1.5 h-4 w-4" />
-                  Cards
+                  Contents
                 </Button>
               )}
               <Button
@@ -601,11 +602,20 @@ function SealedSetCardsDialog({
   const [search, setSearch] = useState("");
   const setCode = product?.setCode ?? "";
 
+  const productQuery = useQuery({
+    queryKey: ["sealed-product", product?.id],
+    queryFn: () => getSealedProduct(token!, product!.id),
+    enabled: Boolean(product && token && (product.contentCount || product.contents?.length)),
+    staleTime: 5 * 60_000,
+  });
+  const detailedProduct = productQuery.data ?? product;
+  const knownContents = detailedProduct?.contents ?? [];
+
   const cardsQuery = useQuery({
     queryKey: ["sealed-set-cards", product?.tcg, setCode],
     queryFn: () =>
       getSetCards(token!, product!.tcg as TcgCode, product!.setCode!),
-    enabled: Boolean(product && token && setCode),
+    enabled: Boolean(product && token && setCode && knownContents.length === 0 && !productQuery.isLoading),
     staleTime: 5 * 60_000,
   });
 
@@ -627,17 +637,26 @@ function SealedSetCardsDialog({
         ),
       );
   }, [cardsQuery.data, search]);
+  const filteredContents = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return knownContents.filter((card) =>
+      !query || `${card.name} ${card.rarity ?? ""} ${card.setCode ?? ""}`.toLocaleLowerCase().includes(query),
+    );
+  }, [knownContents, search]);
 
   return (
     <Dialog open={Boolean(product)} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92dvh] max-w-5xl flex-col">
         <DialogHeader>
           <DialogTitle>
-            {setCode ? `Set ${setCode} cards` : "Set cards"}
+            {detailedProduct?.name ?? (setCode ? `Set ${setCode} cards` : "Product contents")}
           </DialogTitle>
           <DialogDescription>
-            Cards from the linked set are shown here. Exact contents and pull
-            rates depend on the sealed product and its collation.
+            {knownContents.length
+              ? detailedProduct?.contentMode === "fixed"
+                ? "Known fixed deck contents. A missing quantity means the source identifies the card but not its copy count."
+                : "Eligible card pool; individual sealed products contain a collated subset."
+              : "Cards from the linked set are shown as an eligible pool. Exact contents and pull rates depend on collation."}
           </DialogDescription>
         </DialogHeader>
 
@@ -652,16 +671,16 @@ function SealedSetCardsDialog({
         </div>
 
         <ScrollArea className="min-h-0 flex-1 pr-3">
-          {cardsQuery.isLoading ? (
+          {productQuery.isLoading || cardsQuery.isLoading ? (
             <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {Array.from({ length: 10 }, (_, index) => (
                 <Skeleton key={index} className="aspect-[5/7] rounded-lg" />
               ))}
             </div>
-          ) : cardsQuery.error ? (
+          ) : productQuery.error || cardsQuery.error ? (
             <div className="py-12 text-center">
               <p className="text-sm text-destructive">
-                {(cardsQuery.error as Error).message}
+                {((productQuery.error ?? cardsQuery.error) as Error).message}
               </p>
               <Button
                 className="mt-4"
@@ -671,6 +690,28 @@ function SealedSetCardsDialog({
               >
                 Try again
               </Button>
+            </div>
+          ) : knownContents.length ? (
+            <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {filteredContents.map((card, index) => (
+                <div key={`${card.externalId ?? card.name}-${card.setCode ?? index}`} className="min-w-0 rounded-lg border bg-card p-2">
+                  <div className="relative aspect-[5/7] overflow-hidden rounded-md bg-muted">
+                    <CardImage
+                      src={card.imageUrl}
+                      tcg={product?.tcg ?? "yugioh"}
+                      alt={card.name}
+                      fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 18vw"
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </div>
+                  <p className="mt-2 truncate text-sm font-medium">{card.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[card.quantity ? `${card.quantity}×` : undefined, card.setCode, card.rarity].filter(Boolean).join(" · ") || "Included card"}
+                  </p>
+                </div>
+              ))}
             </div>
           ) : cards.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">
@@ -685,9 +726,11 @@ function SealedSetCardsDialog({
           )}
         </ScrollArea>
 
-        {!cardsQuery.isLoading && !cardsQuery.error && (
+        {!productQuery.isLoading && !cardsQuery.isLoading && !productQuery.error && !cardsQuery.error && (
           <p className="text-xs text-muted-foreground">
-            Showing {cards.length} of {(cardsQuery.data ?? []).length} cards
+            {knownContents.length
+              ? `Showing ${filteredContents.length} of ${knownContents.length} known contents`
+              : `Showing ${cards.length} of ${(cardsQuery.data ?? []).length} eligible cards`}
           </p>
         )}
       </DialogContent>
@@ -1005,6 +1048,7 @@ function AddInventoryDialog({
                           {tcgLabel(product.tcg)} · {product.productType}
                           {product.setCode ? ` · ${product.setCode}` : ""}
                           {product.isCustom ? " · Custom" : ""}
+                          {product.contentCount ? ` · ${product.contentCount} known contents` : ""}
                         </span>
                       </span>
                       {product.msrp !== undefined && (

@@ -105,11 +105,15 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
         id,
         useAuthStore.getState().user,
       );
-      set((state) => ({
-        collections: state.collections.filter((c) => c.id !== id),
+      const collections = await collectionsApi.getCollections(
+        token,
+        useAuthStore.getState().user,
+      );
+      set({
+        collections,
         isLoading: false,
         hasFetched: true,
-      }));
+      });
     } catch (error) {
       set({
         error:

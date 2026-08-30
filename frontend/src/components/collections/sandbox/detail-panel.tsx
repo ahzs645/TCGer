@@ -110,6 +110,8 @@ export interface DetailPanelProps {
 }
 
 export interface CopyTrackingDraft {
+  printedName: string;
+  searchAliases: string;
   gradingCompany: string;
   gradingScore: string;
   certNumber: string;
@@ -555,12 +557,38 @@ function CopyTrackingEditor({
   return (
     <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
       <div>
-        <p className="text-sm font-medium">Grading & storage</p>
+        <p className="text-sm font-medium">
+          Printed identity, grading & storage
+        </p>
         <p className="text-xs text-muted-foreground">
           Tracking details for this physical copy.
         </p>
       </div>
       <div className={compact ? "space-y-3" : "grid grid-cols-2 gap-3"}>
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor={fieldId("printedName")}>
+            Printed name
+          </Label>
+          <Input
+            id={fieldId("printedName")}
+            className="h-9"
+            value={value.printedName}
+            onChange={(event) => onChange("printedName", event.target.value)}
+            placeholder="Localized name on this copy"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs" htmlFor={fieldId("searchAliases")}>
+            Search aliases
+          </Label>
+          <Input
+            id={fieldId("searchAliases")}
+            className="h-9"
+            value={value.searchAliases}
+            onChange={(event) => onChange("searchAliases", event.target.value)}
+            placeholder="Comma-separated names"
+          />
+        </div>
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor={fieldId("gradingCompany")}>
             Grading company

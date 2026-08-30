@@ -3,6 +3,7 @@ import type {
   Card,
   CardPrintsResponse,
   SearchCardsResponse,
+  DiscoverCardsResponse,
   TcgCode,
 } from "@/types/card";
 
@@ -35,6 +36,22 @@ export async function searchCardsApi(params: {
 
   const data = await handleResponse<SearchCardsResponse>(res);
   return data.cards ?? [];
+}
+
+export async function discoverCardsApi(params: {
+  tcg?: TcgCode | "all";
+  count?: number;
+  token?: string | null;
+}): Promise<DiscoverCardsResponse> {
+  const usp = new URLSearchParams({ count: String(params.count ?? 6) });
+  if (params.tcg) usp.set("tcg", params.tcg);
+  const headers: Record<string, string> = {};
+  if (params.token) headers.Authorization = `Bearer ${params.token}`;
+  const response = await fetch(`${API_BASE_URL}/cards/discover?${usp.toString()}`, {
+    headers,
+    credentials: "include",
+  });
+  return handleResponse<DiscoverCardsResponse>(response);
 }
 
 export async function fetchCardPrintsApi(params: {

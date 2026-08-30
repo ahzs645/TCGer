@@ -27,17 +27,23 @@ function saveBlob(blob: Blob, filename: string) {
 export function CollectionExportMenu() {
   const token = useAuthStore((state) => state.token);
   const viewer = useAuthStore((state) => state.user);
-  const [format, setFormat] = useState<"csv" | "json" | null>(null);
+  type ExportFormat = "csv" | "json" | "manabox" | "moxfield" | "tcgplayer" | "collectr";
+  const [format, setFormat] = useState<ExportFormat | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const exportCollection = async (nextFormat: "csv" | "json") => {
+  const exportCollection = async (nextFormat: ExportFormat) => {
     if (!token) return;
     setFormat(nextFormat);
     setError(null);
     try {
       const blob = await downloadCollectionExport(token, nextFormat, viewer);
       const date = new Date().toISOString().slice(0, 10);
-      saveBlob(blob, `tcger-collection-${date}.${nextFormat}`);
+      saveBlob(
+        blob,
+        nextFormat === "csv" || nextFormat === "json"
+          ? `tcger-collection-${date}.${nextFormat}`
+          : `tcger-${nextFormat}-${date}.csv`,
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -75,6 +81,12 @@ export function CollectionExportMenu() {
             <FileJson className="mr-2 h-4 w-4" />
             Export JSON
           </DropdownMenuItem>
+          {(["manabox", "moxfield", "tcgplayer", "collectr"] as const).map((profile) => (
+            <DropdownMenuItem key={profile} onSelect={() => void exportCollection(profile)}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Export {profile === "tcgplayer" ? "TCGPlayer" : profile === "manabox" ? "ManaBox" : profile[0].toUpperCase() + profile.slice(1)} CSV
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
       {error ? (

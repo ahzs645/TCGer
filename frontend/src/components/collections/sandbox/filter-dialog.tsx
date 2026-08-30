@@ -14,6 +14,12 @@ import { FilterControls } from "./filter-controls";
 import { Filter } from "lucide-react";
 import type { CollectionTag } from "@/lib/api/collections";
 import type { CONDITION_ORDER } from "./helpers";
+import type {
+  CollectionFacetCard,
+  GameDefinition,
+  GameFilterSelection,
+  TcgCode,
+} from "@tcg/api-types";
 
 interface FilterDialogProps {
   priceRange: [number, number];
@@ -28,6 +34,13 @@ interface FilterDialogProps {
     highlightedTags: [string, number][];
   };
   tags: CollectionTag[];
+  availableGames: TcgCode[];
+  selectedGame: TcgCode | "all";
+  onGameChange: (game: TcgCode | "all") => void;
+  gameDefinition: GameDefinition | null;
+  gameCards: readonly CollectionFacetCard[];
+  gameFacetSelections: Readonly<Record<string, GameFilterSelection | undefined>>;
+  onGameFacetChange: (facetId: string, selection: GameFilterSelection | undefined) => void;
 }
 
 export function FilterDialog(props: FilterDialogProps) {
@@ -36,11 +49,15 @@ export function FilterDialog(props: FilterDialogProps) {
     return (
       props.activeTags.length +
       props.activeConditions.length +
+      (props.selectedGame === "all" ? 0 : 1) +
+      Object.values(props.gameFacetSelections).filter((value) => value !== undefined).length +
       (props.priceRange[0] > 0 || props.priceRange[1] < 3000 ? 1 : 0)
     );
   }, [
     props.activeTags.length,
     props.activeConditions.length,
+    props.selectedGame,
+    props.gameFacetSelections,
     props.priceRange,
   ]);
 

@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchCardPrintsApi } from "@/lib/api-client";
+import { getCardPrices, type PriceResult } from "@/lib/api/pricing";
 import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
 import { useAuthStore } from "@/stores/auth";
@@ -56,6 +57,7 @@ interface CardPreviewProps {
 
 export function CardPreview({ card }: CardPreviewProps) {
   const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
+  const showPricing = useModuleStore((state) => state.showPricing);
   const cardRef = useRef<HTMLDivElement>(null);
   const [throttledPos, setThrottledPos] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
@@ -100,10 +102,17 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [isSealedPromo, setIsSealedPromo] = useState(false);
   const [isOversized, setIsOversized] = useState(false);
   const [isPeelOff, setIsPeelOff] = useState(false);
+  const [priceQuotes, setPriceQuotes] = useState<PriceResult[] | null>(null);
+  const [isLoadingPriceQuotes, setIsLoadingPriceQuotes] = useState(false);
+  const [priceQuoteError, setPriceQuoteError] = useState<string | null>(null);
   const selectedBinder = collections.find(
     (binder) => binder.id === selectedBinderId,
   );
   const activeCard = supportsPrintSelection ? selectedPrintCard : card;
+  useEffect(() => {
+    setPriceQuotes(null);
+    setPriceQuoteError(null);
+  }, [activeCard.id, selectedFinishCode]);
   const cardBackImage = getCardBackImage(activeCard.tcg);
   const existingEntry = selectedBinder?.cards.find(
     (binderCard: CollectionCard) => binderCard.cardId === activeCard.id,
@@ -291,6 +300,31 @@ export function CardPreview({ card }: CardPreviewProps) {
     setOptimisticQuantity(null);
     setStatus("idle");
     setStatusMessage(null);
+  };
+
+  const handleComparePrices = async () => {
+    if (!token) return;
+    if (priceQuotes) {
+      setPriceQuotes(null);
+      return;
+    }
+    setIsLoadingPriceQuotes(true);
+    setPriceQuoteError(null);
+    try {
+      const quotes = await getCardPrices(
+        token,
+        activeCard.tcg,
+        activeCard.id,
+        selectedFinishCode || undefined,
+        "automatic",
+        true,
+      );
+      setPriceQuotes(quotes.sort((left, right) => left.price - right.price));
+    } catch (error) {
+      setPriceQuoteError(error instanceof Error ? error.message : "Price comparison failed.");
+    } finally {
+      setIsLoadingPriceQuotes(false);
+    }
   };
 
   const handleOpenPrintDialog = () => {
@@ -963,6 +997,30 @@ export function CardPreview({ card }: CardPreviewProps) {
           )}
         </div>
         <div className="mt-3 w-full space-y-3 text-xs" data-oid="o_l5hdy">
+          {showPricing && isSignedIn ? (
+            <div className="space-y-2 rounded-md border p-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 w-full"
+                onClick={() => void handleComparePrices()}
+                disabled={isLoadingPriceQuotes}
+              >
+                {isLoadingPriceQuotes ? "Checking markets…" : priceQuotes ? "Hide market quotes" : "Compare market quotes"}
+              </Button>
+              {priceQuotes?.map((quote) => (
+                <div key={`${quote.source}:${quote.currency}`} className="flex items-center justify-between gap-2">
+                  <span className="truncate text-muted-foreground">{quote.source}</span>
+                  <span className="font-medium tabular-nums">
+                    {new Intl.NumberFormat(undefined, { style: "currency", currency: quote.currency }).format(quote.price)}
+                  </span>
+                </div>
+              ))}
+              {priceQuotes?.length === 0 ? <p className="text-muted-foreground">No provider quotes available.</p> : null}
+              {priceQuoteError ? <p className="text-destructive">{priceQuoteError}</p> : null}
+            </div>
+          ) : null}
           {collections.length ? (
             <>
               <div className="space-y-1" data-oid="z7b92u2">

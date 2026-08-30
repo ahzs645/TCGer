@@ -10,6 +10,7 @@ export type {
   PokemonFunctionalGroup,
   CardPrintsResponse,
   SearchCardsResponse,
+  DiscoverCardsResponse,
 } from "@tcg/api-types";
 
 export type { CollectionCardCopy, CollectionCard } from "@/lib/api/collections";

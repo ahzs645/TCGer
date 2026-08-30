@@ -23,6 +23,27 @@ export type {
   YdkExportResult,
 };
 
+export interface DeckCheckoutAllocation {
+  id: string;
+  deckCardId: string;
+  collectionEntryId: string;
+  quantity: number;
+  containerId?: string;
+  compartmentId?: string;
+  slotIndex?: number;
+  refilledAt?: string;
+}
+
+export interface DeckCheckoutSession {
+  id: string;
+  deckId: string;
+  status: "checked_out" | "checked_in";
+  note?: string;
+  checkedOutAt: string;
+  checkedInAt?: string;
+  allocations: DeckCheckoutAllocation[];
+}
+
 async function authFetch(
   url: string,
   token: string,
@@ -153,5 +174,32 @@ export async function importDeck(
   return authFetch(`${API_BASE_URL}/decks/import`, token, {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export async function getActiveDeckCheckout(
+  token: string,
+  deckId: string,
+): Promise<DeckCheckoutSession | null> {
+  return authFetch(`${API_BASE_URL}/decks/${deckId}/checkout`, token);
+}
+
+export async function checkoutDeck(
+  token: string,
+  deckId: string,
+  note?: string,
+): Promise<DeckCheckoutSession> {
+  return authFetch(`${API_BASE_URL}/decks/${deckId}/checkout`, token, {
+    method: "POST",
+    body: JSON.stringify({ note: note?.trim() || undefined }),
+  });
+}
+
+export async function checkinDeck(
+  token: string,
+  deckId: string,
+): Promise<DeckCheckoutSession> {
+  return authFetch(`${API_BASE_URL}/decks/${deckId}/checkin`, token, {
+    method: "POST",
   });
 }

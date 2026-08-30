@@ -82,6 +82,16 @@ export async function getSealedProducts(
   return authFetch(`${API_BASE_URL}/sealed/products${query}`, token);
 }
 
+export async function getSealedProduct(
+  token: string,
+  productId: string,
+): Promise<SealedProductResponse> {
+  return authFetch(
+    `${API_BASE_URL}/sealed/products/${encodeURIComponent(productId)}`,
+    token,
+  );
+}
+
 export async function createCustomSealedProduct(
   token: string,
   input: CustomSealedProductInput,

@@ -37,6 +37,7 @@ import {
   buildPurchasePerformanceLots,
   convertPurchasePerformanceLots,
   purchasePriceItems,
+  purchaseCostCoverage,
 } from "@/lib/pricing/purchase-performance";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
@@ -142,6 +143,10 @@ export function CostReturnsContent() {
         trackedPricesQuery.data?.prices ?? [],
       ),
     [collections, trackedPricesQuery.data?.prices, transactionsQuery.data],
+  );
+  const costCoverage = useMemo(
+    () => purchaseCostCoverage(collections, transactionsQuery.data ?? []),
+    [collections, transactionsQuery.data],
   );
 
   const rateRequests = useMemo(() => {
@@ -266,6 +271,30 @@ export function CostReturnsContent() {
           CPI-adjusted view can be added later without putting inflation
           controls in the card editor.
         </div>
+
+        {mounted && isAuthenticated && hasFetched && !transactionsQuery.isLoading ? (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between gap-3 text-base">
+                <span>Cost-basis completeness</span>
+                <span className="tabular-nums">{costCoverage.coveragePercent.toFixed(0)}%</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{ width: `${costCoverage.coveragePercent}%` }}
+                />
+              </div>
+              <div className="grid gap-2 text-sm sm:grid-cols-3">
+                <span>{costCoverage.costedCopies} of {costCoverage.totalCopies} copies costed</span>
+                <span>{costCoverage.cardsMissingCosts} card rows need costs</span>
+                <span>{formatMoney(costCoverage.untrackedMarketValue, { currency: "USD" })} value lacks cost basis</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {!mounted || loading ? (
           <Card>

@@ -1,6 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
+import Link from "next/link";
+import { Archive } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CollectionView } from "@/components/collections/sandbox/collection-view";
@@ -10,6 +12,7 @@ import { BulkAddDialog } from "@/components/collections/bulk-add-dialog";
 import { CollectionExportMenu } from "@/components/collections/collection-export-menu";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 
 export default function CollectionsPage() {
   return (
@@ -20,6 +23,12 @@ export default function CollectionsPage() {
           description="Manage every card and individual copy across your binders."
           actions={
             <>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/collections/organize">
+                  <Archive className="mr-2 h-4 w-4" />
+                  Organize
+                </Link>
+              </Button>
               <CollectionExportMenu />
               <BulkAddDialog />
               <CollectionHistoryDialog />

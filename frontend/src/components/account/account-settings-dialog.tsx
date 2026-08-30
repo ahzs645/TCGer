@@ -77,6 +77,7 @@ import { useModuleStore, type ManageableGame } from "@/stores/preferences";
 import { useTheme } from "next-themes";
 import { CatalogManagementPanel } from "./catalog-management-panel";
 import { CommunityGameLibrariesPanel } from "./community-game-libraries-panel";
+import { CatalogMaintenancePanel } from "./catalog-maintenance-panel";
 
 import { useShallow } from "zustand/react/shallow";
 interface AccountSettingsDialogProps {
@@ -921,6 +922,13 @@ export function AccountSettingsDialog({
                   </div>
                 ) : null}
               </section>
+
+              {token && !isDemoMode() && (
+                <>
+                  <Separator />
+                  <CatalogMaintenancePanel token={token} />
+                </>
+              )}
             </>
           )}
 

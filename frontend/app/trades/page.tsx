@@ -46,6 +46,7 @@ import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { formatMoney } from "@/lib/format-money";
 import { PageHeader } from "@/components/layout/page-header";
+import { useCollectionsStore } from "@/stores/collections";
 
 type StatusKey = "pending" | "accepted" | "declined";
 
@@ -88,6 +89,7 @@ export default function TradesPage() {
   const { token, user, isAuthenticated } = useAuthStore();
   const userId = user?.id;
   const queryClient = useQueryClient();
+  const fetchCollections = useCollectionsStore((state) => state.fetchCollections);
 
   const tradesQuery = useQuery({
     queryKey: ["trades"],
@@ -101,7 +103,14 @@ export default function TradesPage() {
 
   const acceptMutation = useMutation({
     mutationFn: (id: string) => acceptTrade(token!, id),
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      invalidate();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance"] }),
+        token ? fetchCollections(token) : Promise.resolve(),
+      ]);
+    },
   });
   const declineMutation = useMutation({
     mutationFn: (id: string) => declineTrade(token!, id),
@@ -167,6 +176,7 @@ export default function TradesPage() {
             </Button>
           }
         />
+        {acceptMutation.error && <p role="alert" className="text-sm text-destructive">{(acceptMutation.error as Error).message}</p>}
 
         {mounted && !isAuthenticated ? (
           <Card>
@@ -255,7 +265,15 @@ export default function TradesPage() {
                     key={trade.id}
                     trade={trade}
                     userId={userId}
-                    onAccept={() => acceptMutation.mutate(trade.id)}
+                    onAccept={async () => {
+                      const ok = await confirm({
+                        title: "Settle this trade now?",
+                        description: "TCGer will verify both collectors still own the reserved copies, move both inventories, and write finance and audit records in one atomic settlement. If any copy is missing, nothing changes.",
+                        confirmLabel: "Verify and settle",
+                        cancelLabel: "Review trade",
+                      });
+                      if (ok) acceptMutation.mutate(trade.id);
+                    }}
                     onDecline={() => declineMutation.mutate(trade.id)}
                     onCancel={async () => {
                       const ok = await confirm({
@@ -338,6 +356,8 @@ function TradeRow({
               <StatusIcon className="mr-1 h-3 w-3" />
               {cfg.label}
             </Badge>
+            {trade.settlementStatus === "settled" && <Badge>Inventory settled</Badge>}
+            {trade.status === "pending" && trade.settlementStatus === "reserved" && <Badge variant="outline">Copies reserved</Badge>}
             <span className="text-xs text-muted-foreground">
               {new Date(trade.updatedAt).toLocaleDateString(undefined, {
                 month: "short",

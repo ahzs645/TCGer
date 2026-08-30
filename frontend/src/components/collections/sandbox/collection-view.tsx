@@ -13,6 +13,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Sparkles, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { YugiohLimitBadge } from "@/components/cards/yugioh-limit-badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -60,14 +61,21 @@ import {
   type CreateCollectionInput,
   type UpdateCollectionInput,
   type UpdateCollectionCardInput,
+  type BinderShareLink,
+  createBinderShareLink,
+  getBinderShareLinks,
+  revokeBinderShareLink,
 } from "@/lib/api/collections";
 import { fetchCardPrintsApi } from "@/lib/api-client";
+import { getCatalogCorrections } from "@/lib/api/catalog-corrections";
+import { getCurrentYugiohBanlist } from "@/lib/api/banlists";
 import {
   conditionRangeLabel,
   formatCurrency,
   CONDITION_ORDER,
 } from "./helpers";
 import { FilterDialog } from "./filter-dialog";
+import { ConsolidatedCollection } from "./consolidated-collection";
 import { BinderList } from "./binder-list";
 import {
   SmartFolderManager,
@@ -86,6 +94,10 @@ import { useAuthStore } from "@/stores/auth";
 import { useModuleStore } from "@/stores/preferences";
 import { cn, GAME_LABELS } from "@/lib/utils";
 import { getAppRoute } from "@/lib/app-routes";
+import {
+  banlistEntryForCollectionCard,
+  indexYugiohBanlist,
+} from "@/lib/yugioh-banlist";
 import type {
   Card as TcgCard,
   CardPrintsResponse,
@@ -105,7 +117,36 @@ import {
 } from "@/lib/copy-labels";
 
 import { useShallow } from "zustand/react/shallow";
+import {
+  applyCatalogCorrections,
+  getGameDefinition,
+  matchesCollectionFacets,
+  type CatalogCorrection,
+  type GameFilterSelection,
+  type YugiohBanlistFormat,
+  type YugiohBanlistSnapshot,
+} from "@tcg/api-types";
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 3000];
+const EMPTY_GAME_FACETS: Readonly<
+  Record<string, GameFilterSelection | undefined>
+> = {};
+
+type PrintedIdentityCard = CollectionCard & {
+  printedName?: string;
+  searchAliases?: string[];
+};
+
+function displayCardName(card: CollectionCard): string {
+  return (card as PrintedIdentityCard).printedName?.trim() || card.name;
+}
+
+function cardSearchText(card: CollectionCard): string {
+  const identity = card as PrintedIdentityCard;
+  return [card.name, identity.printedName, ...(identity.searchAliases ?? [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase();
+}
 const DEFAULT_BINDER_COLORS = [
   "#4B5563",
   "#6B7280",
@@ -247,6 +288,20 @@ export function CollectionView() {
   const [activeConditions, setActiveConditions] = useState<
     (typeof CONDITION_ORDER)[number][]
   >([]);
+  const [gameFilter, setGameFilter] = useState<TcgCode | "all">("all");
+  const [gameFacetSelectionsByGame, setGameFacetSelectionsByGame] = useState<
+    Partial<Record<TcgCode, Record<string, GameFilterSelection | undefined>>>
+  >({});
+  const [catalogCorrections, setCatalogCorrections] = useState<
+    CatalogCorrection[]
+  >([]);
+  const [identityMode, setIdentityMode] = useState<"collector" | "consolidated">("collector");
+  const [banlistFormat, setBanlistFormat] = useState<YugiohBanlistFormat>("tcg");
+  const [yugiohBanlist, setYugiohBanlist] = useState<YugiohBanlistSnapshot | null>(null);
+  const yugiohBanlistIndex = useMemo(
+    () => indexYugiohBanlist(yugiohBanlist),
+    [yugiohBanlist],
+  );
   const [priceRange, setPriceRange] =
     useState<[number, number]>(DEFAULT_PRICE_RANGE);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -268,6 +323,8 @@ export function CollectionView() {
   const [draftIsOversized, setDraftIsOversized] = useState(false);
   const [draftIsPeelOff, setDraftIsPeelOff] = useState(false);
   const [draftTracking, setDraftTracking] = useState<CopyTrackingDraft>({
+    printedName: "",
+    searchAliases: "",
     gradingCompany: "",
     gradingScore: "",
     certNumber: "",
@@ -315,6 +372,9 @@ export function CollectionView() {
     string | null
   >(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [managedShareLinks, setManagedShareLinks] = useState<BinderShareLink[]>([]);
+  const [newShareLinkLabel, setNewShareLinkLabel] = useState("");
+  const [copiedShareLinkId, setCopiedShareLinkId] = useState<string | null>(null);
   const [isEditingBinder, setIsEditingBinder] = useState(false);
   const [editBinderError, setEditBinderError] = useState<string | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -362,8 +422,49 @@ export function CollectionView() {
     }
   }, [token, fetchTags]);
 
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const corrections = await getCatalogCorrections(token);
+        if (!cancelled) setCatalogCorrections(corrections);
+      } catch {
+        if (!cancelled) setCatalogCorrections([]);
+      }
+    };
+    void load();
+    const refresh = () => void load();
+    window.addEventListener("tcger:catalog-corrections-changed", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("tcger:catalog-corrections-changed", refresh);
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    void getCurrentYugiohBanlist(token, banlistFormat)
+      .then((snapshot) => {
+        if (!cancelled) setYugiohBanlist(snapshot);
+      })
+      .catch(() => {
+        if (!cancelled) setYugiohBanlist(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, banlistFormat]);
+
   const binders = collections;
-  const flattenedCards = useMemo(() => flattenBinders(binders), [binders]);
+  const flattenedCards = useMemo(
+    () =>
+      flattenBinders(binders).map((card) =>
+        applyCatalogCorrections(card, catalogCorrections),
+      ),
+    [binders, catalogCorrections],
+  );
   const activeBinder = useMemo(
     () => binders.find((binder) => binder.id === binderFilter) ?? null,
     [binders, binderFilter],
@@ -384,6 +485,30 @@ export function CollectionView() {
     smartFolders,
     activeSmartFolderId,
   ]);
+  const availableGames = useMemo(
+    () =>
+      Array.from(new Set(workingCards.map((card) => card.tcg))).sort() as TcgCode[],
+    [workingCards],
+  );
+  const activeFacetGame =
+    gameFilter !== "all"
+      ? gameFilter
+      : availableGames.length === 1
+        ? availableGames[0]!
+        : null;
+  const activeGameDefinition = activeFacetGame
+    ? getGameDefinition(activeFacetGame)
+    : null;
+  const gameFacetSelections = activeFacetGame
+    ? (gameFacetSelectionsByGame[activeFacetGame] ?? EMPTY_GAME_FACETS)
+    : EMPTY_GAME_FACETS;
+  const gameFacetCards = useMemo(
+    () =>
+      activeFacetGame
+        ? workingCards.filter((card) => card.tcg === activeFacetGame)
+        : [],
+    [activeFacetGame, workingCards],
+  );
 
   const maxPrice = useMemo(() => {
     const maxValue = flattenedCards.reduce(
@@ -399,10 +524,26 @@ export function CollectionView() {
 
   const filteredCards = useMemo(() => {
     return workingCards.filter((card) => {
+      if (gameFilter !== "all" && card.tcg !== gameFilter) {
+        return false;
+      }
+
+      if (
+        activeGameDefinition &&
+        card.tcg === activeGameDefinition.id &&
+        !matchesCollectionFacets(
+          card,
+          activeGameDefinition.collection.facets,
+          gameFacetSelections,
+        )
+      ) {
+        return false;
+      }
+
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
         const matchesText =
-          card.name.toLowerCase().includes(query) ||
+          cardSearchText(card).includes(query) ||
           (card.setName?.toLowerCase().includes(query) ?? false) ||
           (card.setCode?.toLowerCase().includes(query) ?? false);
         if (!matchesText) {
@@ -442,7 +583,16 @@ export function CollectionView() {
 
       return true;
     });
-  }, [workingCards, searchTerm, activeTags, activeConditions, priceRange]);
+  }, [
+    workingCards,
+    gameFilter,
+    activeGameDefinition,
+    gameFacetSelections,
+    searchTerm,
+    activeTags,
+    activeConditions,
+    priceRange,
+  ]);
 
   const sortedCards = useMemo(
     () =>
@@ -556,6 +706,11 @@ export function CollectionView() {
       setDraftIsOversized(selectedCopy.isOversized ?? false);
       setDraftIsPeelOff(selectedCopy.isPeelOff ?? false);
       setDraftTracking({
+        printedName:
+          (selectedCard as PrintedIdentityCard | null)?.printedName ?? "",
+        searchAliases: (
+          (selectedCard as PrintedIdentityCard | null)?.searchAliases ?? []
+        ).join(", "),
         gradingCompany: selectedCopy.gradingCompany ?? "",
         gradingScore: selectedCopy.gradingScore ?? "",
         certNumber: selectedCopy.certNumber ?? "",
@@ -571,6 +726,8 @@ export function CollectionView() {
       setDraftIsOversized(false);
       setDraftIsPeelOff(false);
       setDraftTracking({
+        printedName: "",
+        searchAliases: "",
         gradingCompany: "",
         gradingScore: "",
         certNumber: "",
@@ -852,6 +1009,21 @@ export function CollectionView() {
         updates[field] = draftTracking[field].trim() || null;
       }
     }
+    const identity = selectedCard as PrintedIdentityCard | null;
+    if (draftTracking.printedName !== (identity?.printedName ?? "")) {
+      Object.assign(updates, {
+        printedName: draftTracking.printedName.trim() || null,
+      });
+    }
+    const aliases = draftTracking.searchAliases
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (
+      aliases.join("\u0000") !== (identity?.searchAliases ?? []).join("\u0000")
+    ) {
+      Object.assign(updates, { searchAliases: aliases });
+    }
     return Object.keys(updates).length ? updates : null;
   };
 
@@ -898,6 +1070,11 @@ export function CollectionView() {
     setDraftIsOversized(selectedCopy.isOversized ?? false);
     setDraftIsPeelOff(selectedCopy.isPeelOff ?? false);
     setDraftTracking({
+      printedName:
+        (selectedCard as PrintedIdentityCard | null)?.printedName ?? "",
+      searchAliases: (
+        (selectedCard as PrintedIdentityCard | null)?.searchAliases ?? []
+      ).join(", "),
       gradingCompany: selectedCopy.gradingCompany ?? "",
       gradingScore: selectedCopy.gradingScore ?? "",
       certNumber: selectedCopy.certNumber ?? "",
@@ -1110,8 +1287,16 @@ export function CollectionView() {
     setEditBinderIsPublic(binder.isPublic ?? false);
     setEditBinderShareToken(binder.shareToken ?? null);
     setShareCopied(false);
+    setManagedShareLinks(binder.shareLinks ?? []);
+    setNewShareLinkLabel("");
+    setCopiedShareLinkId(null);
     setEditBinderError(null);
     setIsEditBinderOpen(true);
+    if (token) {
+      void getBinderShareLinks(token, binderId)
+        .then(setManagedShareLinks)
+        .catch(() => undefined);
+    }
   };
 
   const handleEditBinderColor = (binderId: string) => {
@@ -1136,7 +1321,7 @@ export function CollectionView() {
     const confirmed = await confirm({
       title: `Delete "${binder.name}"?`,
       description:
-        "The binder and every card in it will be removed. This cannot be undone.",
+        "The binder will be deleted. Its cards will be kept and moved to Unsorted.",
       confirmLabel: "Delete binder",
       destructive: true,
     });
@@ -1164,6 +1349,9 @@ export function CollectionView() {
     setEditBinderIsPublic(false);
     setEditBinderShareToken(null);
     setShareCopied(false);
+    setManagedShareLinks([]);
+    setNewShareLinkLabel("");
+    setCopiedShareLinkId(null);
     setIsEditingBinder(false);
     setEditBinderError(null);
   };
@@ -1233,6 +1421,51 @@ export function CollectionView() {
       setEditBinderError(
         error instanceof Error ? error.message : "Failed to rotate share link.",
       );
+    } finally {
+      setIsEditingBinder(false);
+    }
+  };
+
+  const managedShareUrl = (shareToken: string) =>
+    typeof window === "undefined"
+      ? ""
+      : `${window.location.origin}${getAppRoute(
+          `/shared/${encodeURIComponent(shareToken)}`,
+          pathname,
+        )}`;
+
+  const handleCreateManagedShareLink = async () => {
+    if (!token || !editBinderId || !newShareLinkLabel.trim()) return;
+    setIsEditingBinder(true);
+    setEditBinderError(null);
+    try {
+      const created = await createBinderShareLink(token, editBinderId, {
+        label: newShareLinkLabel.trim(),
+      });
+      setManagedShareLinks((links) => [created, ...links]);
+      setNewShareLinkLabel("");
+    } catch (error) {
+      setEditBinderError(error instanceof Error ? error.message : "Failed to create share link.");
+    } finally {
+      setIsEditingBinder(false);
+    }
+  };
+
+  const handleRevokeManagedShareLink = async (link: BinderShareLink) => {
+    if (!token || !editBinderId) return;
+    const confirmed = await confirm({
+      title: `Revoke “${link.label}”?`,
+      description: "Anyone using this link will immediately lose access.",
+      confirmLabel: "Revoke link",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setIsEditingBinder(true);
+    try {
+      await revokeBinderShareLink(token, editBinderId, link.id);
+      setManagedShareLinks((links) => links.filter((item) => item.id !== link.id));
+    } catch (error) {
+      setEditBinderError(error instanceof Error ? error.message : "Failed to revoke share link.");
     } finally {
       setIsEditingBinder(false);
     }
@@ -1418,6 +1651,34 @@ export function CollectionView() {
                 className="flex flex-col gap-2 sm:flex-row sm:items-center"
                 data-oid="ite-ed1"
               >
+                <Select
+                  value={identityMode}
+                  onValueChange={(value) => setIdentityMode(value as "collector" | "consolidated")}
+                >
+                  <SelectTrigger className="w-full sm:w-40" aria-label="Collection identity view">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="collector">Collector</SelectItem>
+                    <SelectItem value="consolidated">Consolidated</SelectItem>
+                  </SelectContent>
+                </Select>
+                {availableGames.includes("yugioh") ? (
+                  <Select
+                    value={banlistFormat}
+                    onValueChange={(value) => setBanlistFormat(value as YugiohBanlistFormat)}
+                  >
+                    <SelectTrigger className="w-full sm:w-40" aria-label="Yu-Gi-Oh banlist format">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tcg">TCG Advanced</SelectItem>
+                      <SelectItem value="traditional">Traditional</SelectItem>
+                      <SelectItem value="ocg">OCG</SelectItem>
+                      <SelectItem value="goat">Goat</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : null}
                 <Input
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
@@ -1435,6 +1696,22 @@ export function CollectionView() {
                   onToggleCondition={toggleConditionFilter}
                   summary={summary}
                   tags={tags}
+                  availableGames={availableGames}
+                  selectedGame={gameFilter}
+                  onGameChange={setGameFilter}
+                  gameDefinition={activeGameDefinition}
+                  gameCards={gameFacetCards}
+                  gameFacetSelections={gameFacetSelections}
+                  onGameFacetChange={(facetId, selection) => {
+                    if (!activeFacetGame) return;
+                    setGameFacetSelectionsByGame((current) => ({
+                      ...current,
+                      [activeFacetGame]: {
+                        ...(current[activeFacetGame] ?? {}),
+                        [facetId]: selection,
+                      },
+                    }));
+                  }}
                   data-oid="m7iwvx7"
                 />
               </div>
@@ -1458,12 +1735,25 @@ export function CollectionView() {
               </span>
             </div>
           </CardHeader>
+          {identityMode === "consolidated" ? (
+            <CardContent className="p-0">
+              <ConsolidatedCollection
+                cards={sortedCards}
+                selectedCardId={selectedCardId}
+                showPricing={showPricing}
+                banlist={yugiohBanlist}
+                onSelect={(cardId, trigger) => selectCard(cardId, undefined, trigger)}
+              />
+            </CardContent>
+          ) : (
+            <>
           {/* Mobile: compact card list */}
           <CardContent className="p-0 md:hidden" data-oid="4crtseg">
             <div className="divide-y" data-oid="a2m72_x">
               {sortedCards.map((card) => {
                 const expanded = expandedRows[card.id];
                 const isSelected = selectedCardId === card.id;
+                const limitEntry = banlistEntryForCollectionCard(card, yugiohBanlistIndex);
                 const binderColor = card.binderColorHex
                   ? card.binderColorHex.startsWith("#")
                     ? card.binderColorHex
@@ -1525,8 +1815,14 @@ export function CollectionView() {
                               className="text-sm font-medium truncate"
                               data-oid="aznvj8q"
                             >
-                              {card.name}
+                              {displayCardName(card)}
                             </p>
+                            <YugiohLimitBadge entry={limitEntry} compact />
+                            {displayCardName(card) !== card.name && (
+                              <p className="truncate text-[11px] text-muted-foreground">
+                                Canonical: {card.name}
+                              </p>
+                            )}
                           </div>
                           <div
                             className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-xs text-muted-foreground"
@@ -1678,6 +1974,7 @@ export function CollectionView() {
               <TableBody data-oid="obe9u.h">
                 {sortedCards.map((card) => {
                   const expanded = expandedRows[card.id];
+                  const limitEntry = banlistEntryForCollectionCard(card, yugiohBanlistIndex);
                   const aggregatedTags = Array.from(
                     new Set(
                       card.copies?.flatMap((copy) =>
@@ -1745,8 +2042,14 @@ export function CollectionView() {
                                 className="block font-medium leading-tight"
                                 data-oid="4hzd59i"
                               >
-                                {card.name}
+                                {displayCardName(card)}
                               </span>
+                              <YugiohLimitBadge entry={limitEntry} />
+                              {displayCardName(card) !== card.name && (
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  Canonical: {card.name}
+                                </span>
+                              )}
                               {showCardNumbers && (
                                 <span
                                   className="block text-xs text-muted-foreground"
@@ -1960,6 +2263,8 @@ export function CollectionView() {
               </TableBody>
             </Table>
           </CardContent>
+            </>
+          )}
         </Card>
 
         <DetailPanel
@@ -2725,6 +3030,63 @@ export function CollectionView() {
                   Save changes to create the public link.
                 </p>
               )}
+              <div className="border-t pt-3">
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    value={newShareLinkLabel}
+                    onChange={(event) => setNewShareLinkLabel(event.target.value)}
+                    placeholder="Link label, e.g. Trade night"
+                    aria-label="New share link label"
+                    className="min-w-48 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleCreateManagedShareLink}
+                    disabled={!newShareLinkLabel.trim() || isEditingBinder}
+                  >
+                    Create link
+                  </Button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {managedShareLinks.map((link) => {
+                    const url = managedShareUrl(link.token);
+                    return (
+                      <div key={link.id} className="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 p-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{link.label}</p>
+                          <p className="truncate text-xs text-muted-foreground">{url}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(url);
+                            setCopiedShareLinkId(link.id);
+                          }}
+                        >
+                          {copiedShareLinkId === link.id ? "Copied" : "Copy"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={() => void handleRevokeManagedShareLink(link)}
+                        >
+                          Revoke
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  {!managedShareLinks.length ? (
+                    <p className="text-xs text-muted-foreground">
+                      Create separate links for friends, events, or listings, then revoke each one independently.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             </div>
             {editBinderError && (
               <p className="text-sm text-destructive" data-oid="3qglhv.">

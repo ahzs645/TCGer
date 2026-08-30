@@ -63,6 +63,11 @@ import { useGameFilterStore } from "@/stores/game-filter";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
 
 import { GameBadge } from "@/components/cards/game-badge";
+import { YugiohLimitBadge } from "@/components/cards/yugioh-limit-badge";
+import { getCurrentYugiohBanlist } from "@/lib/api/banlists";
+import { indexYugiohBanlist } from "@/lib/yugioh-banlist";
+import { normalizeYugiohCardName } from "@tcg/api-types";
+import { DeckCheckoutPanel } from "@/components/decks/deck-checkout-panel";
 import { gameColor } from "@/lib/games";
 const MANAGEABLE_GAMES: readonly ManageableGame[] = [
   "magic",
@@ -431,6 +436,7 @@ function DeckDetail({
           <span className="text-muted-foreground">Total</span>
           <span className="font-semibold">{deck.cardCount} cards</span>
         </div>
+        <DeckCheckoutPanel deck={deck} />
       </CardContent>
     </Card>
   );
@@ -478,6 +484,25 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
     queryFn: () => getDeckOwnership(token!, deck.id),
     enabled: Boolean(token),
   });
+  const banlistQuery = useQuery({
+    queryKey: ["yugioh-banlist", deck.format ?? "tcg"],
+    queryFn: () => getCurrentYugiohBanlist(
+      token!,
+      /traditional/i.test(deck.format ?? "")
+        ? "traditional"
+        : /ocg/i.test(deck.format ?? "")
+          ? "ocg"
+          : /goat/i.test(deck.format ?? "")
+            ? "goat"
+            : "tcg",
+    ),
+    enabled: Boolean(token),
+    staleTime: 6 * 60 * 60 * 1000,
+  });
+  const banlistIndex = useMemo(
+    () => indexYugiohBanlist(banlistQuery.data),
+    [banlistQuery.data],
+  );
   const addMutation = useMutation({
     mutationFn: (card: CardResult) =>
       addCardToDeck(token!, deck.id, {
@@ -516,22 +541,18 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
   });
   const validationMutation = useMutation({
     mutationFn: async () => {
+      if (validationMode === "classical") {
+        return validateDeck(token!, deck.id, { format: deck.format });
+      }
       const cards = JSON.parse(banlistCards) as Record<string, string | number>;
       return validateDeck(token!, deck.id, {
         format: deck.format,
-        banlist:
-          validationMode === "genesys"
-            ? {
-                type: "genesys",
-                name: "Genesys",
-                maxPoints: Number(maxPoints),
-                cards: cards as Record<string, number>,
-              }
-            : {
-                type: "classical",
-                name: deck.format || "TCG Advanced",
-                cards: cards as Record<string, string>,
-              },
+        banlist: {
+          type: "genesys",
+          name: "Genesys",
+          maxPoints: Number(maxPoints),
+          cards: cards as Record<string, number>,
+        },
       });
     },
     onMutate: () => setValidationError(null),
@@ -670,6 +691,11 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
                       owned {owned.get(deckCardBaseId(card)) ?? 0}
                     </span>
                   </span>
+                  <YugiohLimitBadge
+                    entry={banlistIndex.byExternalId.get(deckCardBaseId(card))
+                      ?? banlistIndex.byName.get(normalizeYugiohCardName(card.name))}
+                    compact
+                  />
                   <Button
                     size="icon"
                     variant="ghost"
@@ -763,6 +789,13 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
             </SelectContent>
           </Select>
         </div>
+        {validationMode === "classical" && banlistQuery.data ? (
+          <p className="text-xs text-muted-foreground">
+            {banlistQuery.data.name}
+            {banlistQuery.data.effectiveDate ? ` · effective ${banlistQuery.data.effectiveDate}` : ""}
+            {` · ${banlistQuery.data.entries.length} restricted cards`}
+          </p>
+        ) : null}
         {validationMode === "genesys" && (
           <Input
             aria-label="Maximum Genesys points"
@@ -773,14 +806,16 @@ function YugiohDeckBuilder({ deck }: { deck: DeckResponse }) {
             placeholder="Maximum points"
           />
         )}
-        <Textarea
-          aria-label="Banlist card map"
-          value={banlistCards}
-          onChange={(event) => setBanlistCards(event.target.value)}
-          rows={3}
-          placeholder='{"46986414":"Limited"} or {"46986414":4}'
-          className="font-mono text-xs"
-        />
+        {validationMode === "genesys" && (
+          <Textarea
+            aria-label="Genesys points map"
+            value={banlistCards}
+            onChange={(event) => setBanlistCards(event.target.value)}
+            rows={3}
+            placeholder='{"46986414":4}'
+            className="font-mono text-xs"
+          />
+        )}
         <Button size="sm" onClick={() => validationMutation.mutate()}>
           Validate deck
         </Button>

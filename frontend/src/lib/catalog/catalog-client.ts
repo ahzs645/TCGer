@@ -43,6 +43,18 @@ export interface SealedCatalogProduct {
   imageUrl?: string;
   marketPrice?: number;
   upc?: string;
+  contentMode?: "fixed" | "pool";
+  contentCount?: number;
+  contents?: Array<{
+    externalId?: string;
+    name: string;
+    quantity?: number;
+    setCode?: string;
+    rarity?: string;
+    imageUrl?: string;
+  }>;
+  contentSource?: string;
+  contentUpdatedAt?: string;
 }
 
 interface SealedCatalogPack {
@@ -270,6 +282,16 @@ function parseCatalogPack(
   };
 }
 
+function isSealedProductContent(value: unknown): boolean {
+  return isRecord(value) &&
+    isOptionalString(value.externalId) &&
+    isString(value.name) &&
+    isOptionalNumber(value.quantity) &&
+    isOptionalString(value.setCode) &&
+    isOptionalString(value.rarity) &&
+    isOptionalString(value.imageUrl);
+}
+
 function isSealedCatalogProduct(value: unknown): value is SealedCatalogProduct {
   return (
     isRecord(value) &&
@@ -284,7 +306,12 @@ function isSealedCatalogProduct(value: unknown): value is SealedCatalogProduct {
     isOptionalString(value.releaseDate) &&
     isOptionalString(value.imageUrl) &&
     isOptionalNumber(value.marketPrice) &&
-    isOptionalString(value.upc)
+    isOptionalString(value.upc) &&
+    (value.contentMode === undefined || value.contentMode === "fixed" || value.contentMode === "pool") &&
+    isOptionalNumber(value.contentCount) &&
+    (value.contents === undefined || (Array.isArray(value.contents) && value.contents.every(isSealedProductContent))) &&
+    isOptionalString(value.contentSource) &&
+    isOptionalString(value.contentUpdatedAt)
   );
 }
 

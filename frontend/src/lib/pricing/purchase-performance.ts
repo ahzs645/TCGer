@@ -20,6 +20,56 @@ export interface PurchasePerformanceLot {
   currentCurrency: string;
 }
 
+export interface PurchaseCostCoverage {
+  totalCopies: number;
+  costedCopies: number;
+  missingCopies: number;
+  coveragePercent: number;
+  untrackedMarketValue: number;
+  cardsMissingCosts: number;
+}
+
+export function purchaseCostCoverage(
+  collections: Binder[],
+  transactions: TransactionResponse[],
+): PurchaseCostCoverage {
+  const purchasedEntries = new Set(
+    transactions
+      .filter((transaction) => transaction.type === "purchase")
+      .flatMap((transaction) =>
+        transaction.collectionEntryId ? [transaction.collectionEntryId] : [],
+      ),
+  );
+  let totalCopies = 0;
+  let costedCopies = 0;
+  let untrackedMarketValue = 0;
+  let cardsMissingCosts = 0;
+  for (const binder of collections) {
+    for (const card of binder.cards) {
+      totalCopies += card.quantity;
+      const costedInCard = card.copies.filter(
+        (copy) => purchasedEntries.has(copy.id) || copy.acquisitionPrice !== undefined,
+      ).length;
+      const covered = Math.min(card.quantity, costedInCard);
+      costedCopies += covered;
+      const missing = Math.max(0, card.quantity - covered);
+      if (missing > 0) {
+        cardsMissingCosts += 1;
+        untrackedMarketValue += (card.price ?? 0) * missing;
+      }
+    }
+  }
+  const missingCopies = Math.max(0, totalCopies - costedCopies);
+  return {
+    totalCopies,
+    costedCopies,
+    missingCopies,
+    coveragePercent: totalCopies ? (costedCopies / totalCopies) * 100 : 0,
+    untrackedMarketValue,
+    cardsMissingCosts,
+  };
+}
+
 function copyFinish(copy: Binder["cards"][number]["copies"][number]) {
   return copy.finishCode?.trim() || (copy.isFoil ? "foil" : undefined);
 }

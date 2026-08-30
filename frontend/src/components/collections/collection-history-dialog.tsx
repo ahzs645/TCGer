@@ -34,6 +34,7 @@ const KIND_LABELS: Record<
   move: "Moved",
   bulk: "Bulk",
   import: "Imported",
+  trade_settlement: "Trade settled",
   undo: "Undo",
 };
 

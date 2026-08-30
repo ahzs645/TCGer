@@ -180,10 +180,12 @@ export async function getCardPrices(
   cardId: string,
   finishCode?: string,
   source: PriceSource = "automatic",
+  compare = false,
 ): Promise<PriceResult[]> {
   const params = new URLSearchParams();
   if (finishCode) params.set("finish", finishCode);
   params.set("source", source);
+  if (compare) params.set("compare", "true");
   const query = params.size ? `?${params.toString()}` : "";
   return authFetch(
     `${API_BASE_URL}/prices/${encodeURIComponent(tcg)}/${encodeURIComponent(cardId)}${query}`,
@@ -211,16 +213,61 @@ export async function getTrackedCardPrices(
   }
   if (responses.length === 0) {
     const now = new Date().toISOString();
-    return { prices: [], refreshedAt: now, refreshAfter: now };
+    return {
+      prices: [],
+      refreshedAt: now,
+      refreshAfter: now,
+      health: {
+        status: "healthy",
+        total: 0,
+        priced: 0,
+        fresh: 0,
+        stale: 0,
+        missing: 0,
+        failed: 0,
+        lowConfidence: 0,
+        coverage: 100,
+        freshnessHours: 48,
+        message: "No cards were requested.",
+      },
+    };
   }
+  const prices = responses.flatMap((response) => response.prices);
+  const total = responses.reduce((sum, response) => sum + response.health.total, 0);
+  const sum = (field: "priced" | "fresh" | "stale" | "missing" | "failed" | "lowConfidence") =>
+    responses.reduce((value, response) => value + response.health[field], 0);
+  const fresh = sum("fresh");
+  const lowConfidence = sum("lowConfidence");
+  const coverage = total ? Math.round((fresh / total) * 10_000) / 100 : 100;
+  const healthStatus = coverage >= 90 && lowConfidence === 0
+    ? "healthy"
+    : coverage >= 70
+      ? "degraded"
+      : "unsafe";
   return {
-    prices: responses.flatMap((response) => response.prices),
+    prices,
     refreshedAt: responses[responses.length - 1].refreshedAt,
     refreshAfter: responses.reduce(
       (earliest, response) =>
         response.refreshAfter < earliest ? response.refreshAfter : earliest,
       responses[0].refreshAfter,
     ),
+    health: {
+      status: healthStatus,
+      total,
+      priced: sum("priced"),
+      fresh,
+      stale: sum("stale"),
+      missing: sum("missing"),
+      failed: sum("failed"),
+      lowConfidence,
+      coverage,
+      freshnessHours: Math.max(...responses.map((response) => response.health.freshnessHours)),
+      message:
+        healthStatus === "healthy"
+          ? `${fresh} of ${total} cards have fresh, trusted quotes.`
+          : `${fresh} of ${total} cards have fresh quotes; ${sum("missing")} are missing and ${lowConfidence} are low-confidence.`,
+    },
   };
 }
 
