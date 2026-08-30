@@ -45,9 +45,13 @@ data class CardEmbeddingMetadata(
             !format.equals("pocket", ignoreCase = true) &&
             imageURL?.contains("/tcgp/", ignoreCase = true) != true
 
-    fun isEligibleForGame(requestedGame: String): Boolean = when (normalizeScannerGame(requestedGame)) {
-        "pokemon" -> isPhysicalPokemonCard
-        else -> game?.let(::normalizeScannerGame) == normalizeScannerGame(requestedGame)
+    fun isEligibleForGame(requestedGame: String): Boolean {
+        val normalized = normalizeScannerGame(requestedGame)
+        val gameMatches = when (normalized) {
+            "pokemon" -> isPhysicalPokemonCard
+            else -> game?.let(::normalizeScannerGame) == normalized
+        }
+        return gameMatches && !ScannerGalleryExclusions.excludes(name, normalized)
     }
 
     fun exactPrintingRows(): List<CardEmbeddingMetadata> = if (printings.isEmpty()) {
@@ -192,4 +196,32 @@ class PackedCardEmbeddingIndex private constructor(
             return PackedCardEmbeddingIndex(count, dimension, packed, rowNorms, byIndex as Array<CardEmbeddingMetadata>)
         }
     }
+}
+
+/**
+ * Catalog rows that are not scan targets and must never be retrieved:
+ * substitute cards, World Championship bio cards, emblems, punchcards,
+ * checklists. A blank or glare-saturated crop embeds within 0.93 of a
+ * Double-Faced Substitute Card render — above every strong-accept point.
+ * Mirrors `tools/scanner-gallery-exclusions.json`.
+ */
+object ScannerGalleryExclusions {
+    private val magic = listOf(
+        "^double-faced substitute card$",
+        "^substitute card$",
+        "^blank card$",
+        " bio( \\(\\d{4}\\))?$",
+        " emblem$",
+        "^punchcard$",
+        "checklist",
+        "^art card:",
+        "^the tokenator$",
+    ).map { Regex(it, RegexOption.IGNORE_CASE) }
+
+    fun patterns(game: String): List<Regex> = when (normalizeScannerGame(game)) {
+        "magic" -> magic
+        else -> emptyList()
+    }
+
+    fun excludes(name: String, game: String): Boolean = patterns(game).any { it.containsMatchIn(name) }
 }

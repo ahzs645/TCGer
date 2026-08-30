@@ -75,9 +75,10 @@ next lever for the remaining abstentions, and it only helps with **real-camera
 positives** (foil, glare, sleeves, perspective); another catalog-only run with
 the same recipe would reproduce the same 0.55–0.70 band. The camera-corpus
 plan in [Current state and direction](current-state-and-direction-2026-08-29.md)
-is the prerequisite. Index hygiene is also pending: ~724 v2 rows have a
->0.9-cosine neighbour of a different name (back faces, CE/WC/30A, playtest
-`unk` rows); those are what a degenerate query lands on.
+is the prerequisite. The attractor rows (~880 v2 rows with a >0.9 neighbour of
+a different name) turned out to be a symptom, not a lever — see the
+[camera corpus note](camera-corpus-2026-08-29.md); the guard that works is
+the policy's hub rejection plus the non-card gallery exclusions.
 
 ## Follow-ups
 

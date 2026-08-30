@@ -81,7 +81,10 @@ struct CardIndexMetadataEntry: Codable {
         if format?.caseInsensitiveCompare("pocket") == .orderedSame {
             return false
         }
-        return imageURL?.localizedCaseInsensitiveContains("/tcgp/") != true
+        if imageURL?.localizedCaseInsensitiveContains("/tcgp/") == true {
+            return false
+        }
+        return !ScannerGalleryExclusions.excludes(name: name, game: resolvedGame)
     }
 
     /// Scanner packages published before the visual-family contract omit a
@@ -412,5 +415,40 @@ actor CardIndexMetadataStore {
         return Set(tokens.compactMap { game, patterns in
             patterns.contains { data.range(of: $0) != nil } ? game : nil
         })
+    }
+}
+
+/// Catalog rows that are not scan targets and must never be retrieved:
+/// substitute cards, World Championship bio cards, emblems, punchcards,
+/// checklists. A blank or glare-saturated crop embeds within 0.93 of a
+/// Double-Faced Substitute Card render — above every strong-accept point —
+/// so these rows would turn degenerate input into confident wrong accepts.
+/// Mirrors `tools/scanner-gallery-exclusions.json`; publishers drop the rows
+/// when they re-pack an index, this keeps already-installed packs safe.
+nonisolated enum ScannerGalleryExclusions {
+    static let magicPatterns: [NSRegularExpression] = [
+        "^double-faced substitute card$",
+        "^substitute card$",
+        "^blank card$",
+        " bio( \\(\\d{4}\\))?$",
+        " emblem$",
+        "^punchcard$",
+        "checklist",
+        "^art card:",
+        "^the tokenator$",
+    ].compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
+
+    static func patterns(for game: TCGGame) -> [NSRegularExpression] {
+        switch game {
+        case .magic: return magicPatterns
+        default: return []
+        }
+    }
+
+    static func excludes(name: String, game: TCGGame) -> Bool {
+        let patterns = patterns(for: game)
+        guard !patterns.isEmpty else { return false }
+        let range = NSRange(name.startIndex..., in: name)
+        return patterns.contains { $0.firstMatch(in: name, options: [], range: range) != nil }
     }
 }

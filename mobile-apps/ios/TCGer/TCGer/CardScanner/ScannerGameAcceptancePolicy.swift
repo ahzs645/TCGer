@@ -55,6 +55,16 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
     /// family from `evidenceFloor`; the printing is then resolved normally.
     var titleAgreementRescue: Bool
     var collectorNumberScope: CollectorNumberScope
+    /// Hub rejection: abstain when at least `hubDistinctNames` DIFFERENT
+    /// card names sit at or above `hubSimilarity` among the top `hubTopK`
+    /// neighbours. Genuine matches never look like that; degenerate crops
+    /// (blank, glare-saturated, mis-rectified) do — measured 2026-08-29:
+    /// 0 hits on 364 verified real-camera crops, 8/12 on the degenerate
+    /// Stone Quarry attempts that scored 0.99 against a back face.
+    /// `hubDistinctNames == 0` disables the rule.
+    var hubSimilarity: Double
+    var hubDistinctNames: Int
+    var hubTopK: Int
 
     init(
         strongAcceptanceScore: Double,
@@ -63,8 +73,14 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
         titleGate: TitleGate = .never,
         uniqueTitleRescue: Bool = true,
         titleAgreementRescue: Bool = true,
-        collectorNumberScope: CollectorNumberScope = .family
+        collectorNumberScope: CollectorNumberScope = .family,
+        hubSimilarity: Double = 0.90,
+        hubDistinctNames: Int = 3,
+        hubTopK: Int = 5
     ) {
+        self.hubSimilarity = hubSimilarity
+        self.hubDistinctNames = hubDistinctNames
+        self.hubTopK = hubTopK
         self.strongAcceptanceScore = strongAcceptanceScore
         self.ambiguityMargin = ambiguityMargin
         self.evidenceFloor = evidenceFloor
@@ -83,6 +99,9 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
         case uniqueTitleRescue
         case titleAgreementRescue
         case collectorNumberScope
+        case hubSimilarity
+        case hubDistinctNames
+        case hubTopK
     }
 
     /// Missing keys take the `fallback` value so a manifest may declare only
@@ -105,6 +124,9 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
             ?? defaults.titleAgreementRescue
         collectorNumberScope = try container.decodeIfPresent(CollectorNumberScope.self, forKey: .collectorNumberScope)
             ?? defaults.collectorNumberScope
+        hubSimilarity = try container.decodeIfPresent(Double.self, forKey: .hubSimilarity) ?? defaults.hubSimilarity
+        hubDistinctNames = try container.decodeIfPresent(Int.self, forKey: .hubDistinctNames) ?? defaults.hubDistinctNames
+        hubTopK = try container.decodeIfPresent(Int.self, forKey: .hubTopK) ?? defaults.hubTopK
     }
 
     private var declaredSchema: String?
@@ -118,6 +140,9 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
             && (0.0...1.0).contains(ambiguityMargin)
             && (0.0...1.0).contains(evidenceFloor)
             && evidenceFloor <= strongAcceptanceScore
+            && (0.0...1.0).contains(hubSimilarity)
+            && hubDistinctNames >= 0
+            && hubTopK >= 1
     }
 
     /// Conservative profile for a game with no replay evidence: the highest
@@ -173,8 +198,19 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
             titleGate: .intentionalCaptures,
             uniqueTitleRescue: true,
             titleAgreementRescue: false,
-            collectorNumberScope: .representative
+            collectorNumberScope: .representative,
+            hubDistinctNames: 0
         )
+    }
+
+    /// Hub collapse: `candidates` are (name, similarity) in ranked order.
+    func isHubCollapse(_ candidates: [(name: String, similarity: Double)]) -> Bool {
+        guard hubDistinctNames > 0 else { return false }
+        var names: Set<String> = []
+        for candidate in candidates.prefix(hubTopK) where candidate.similarity >= hubSimilarity {
+            names.insert(CardTitleOCR.normalizedName(candidate.name))
+        }
+        return names.count >= hubDistinctNames
     }
 
     /// Whether this policy demands an exact printed title before accepting.

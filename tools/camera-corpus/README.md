@@ -8,7 +8,7 @@ human review only where the evidence disagrees.
 |---|---|
 | `build_camera_corpus.py` | Crop cards out of Roboflow COCO archives / folders / whole-card photos, embed them with the **released** encoder, OCR titles and footers with Apple Vision (production parity), and pseudo-label with the app's own evidence rules. Emits `corpus.jsonl`, `review.jsonl`, `negatives.jsonl`, `report.json`, `augmentation-bank.json`. |
 | `ocr-titles.swift` | `VNRecognizeTextRequest` over a list of image paths → JSONL. Used by the builder; usable standalone. |
-| `index_hygiene.py` | Audit a packed index for attractor rows (different-name neighbours above 0.9), cluster them, and emit `index-hygiene.json` (exclude/review actions) plus `orientation-negatives.json` (trainer recipe for rotate-180 / back-face reject samples). |
+| `index_hygiene.py` | Audit a packed index: attractor rows (different-name neighbours above 0.9) with clusters and suggested actions, same-name rows with identical vectors under different family keys (`familyMergeCandidates`), and `orientation-negatives.json` (back-face reject recipe; rotation was measured *not* to target the attractor). |
 
 Requirements: `~/.venvs/tcger-label` (onnxruntime, numpy, Pillow), Xcode CLT for `swift`.
 Inputs never leave the machine; outputs go to `.artifacts/camera-corpus/<game>/`

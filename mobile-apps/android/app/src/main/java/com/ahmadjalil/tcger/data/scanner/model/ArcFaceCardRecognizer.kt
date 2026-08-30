@@ -47,6 +47,7 @@ class ArcFaceCardRecognizer private constructor(
                 matches,
                 strongAcceptanceScore = acceptancePolicy.strongAcceptanceScore,
                 ambiguityMargin = acceptancePolicy.ambiguityMargin,
+                policy = acceptancePolicy,
             ),
             matches = matches,
             preprocessMs = preprocessNs / 1_000_000.0,

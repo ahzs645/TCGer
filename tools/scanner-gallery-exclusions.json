@@ -1,0 +1,28 @@
+{
+  "schema": "tcger-scanner-gallery-exclusions-v1",
+  "description": "Catalog rows that are not scan targets and must not sit in a scanner gallery: a blank, glare-saturated or empty-pocket crop embeds within 0.93 of a Double-Faced Substitute Card render, above every strong-accept point, so these rows turn degenerate input into confident wrong accepts. Publishers drop matching rows when they re-pack an index (browser); native clients mirror the same patterns in their metadata eligibility so already-published packs are protected. Patterns are case-insensitive regular expressions over the row name. See docs/scanner-system/game-acceptance-policy.md.",
+  "games": {
+    "magic": {
+      "namePatterns": [
+        "^double-faced substitute card$",
+        "^substitute card$",
+        "^blank card$",
+        " bio( \\(\\d{4}\\))?$",
+        " emblem$",
+        "^punchcard$",
+        "checklist",
+        "^art card:",
+        "^the tokenator$"
+      ],
+      "evidence": "2026-08-29 index audit of visual-style-v2: 58 substitute cards, 118 World Championship bio cards, 107 emblems, 26 punchcards, 9 checklists in the gallery; a flat white crop scored 0.932 vs a substitute card with a 0.07 margin."
+    },
+    "pokemon": {
+      "namePatterns": [],
+      "evidence": "physical-v2 audit found no non-card rows (23 attractor rows total, all real cards)."
+    },
+    "yugioh": {
+      "namePatterns": [],
+      "evidence": "not audited"
+    }
+  }
+}

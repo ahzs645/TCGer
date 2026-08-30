@@ -751,6 +751,15 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let policy = acceptancePolicy(for: recognizedGame)
         let strongAcceptanceScore = policy.strongAcceptanceScore
         let ambiguityMargin = policy.ambiguityMargin
+
+        // Hub collapse: a degenerate crop (blank, glare-saturated, badly
+        // rectified) does not land near ONE card, it lands near many
+        // unrelated rows at once — the 0.99-to-a-back-face failure. No
+        // printed evidence can rescue an embedding that is not of a card.
+        if policy.isHubCollapse(ranked.map { ($0.details.identity.name, $0.confidence.score) }) {
+            recordOutcome(.hubRejected)
+            return nil
+        }
         // What THIS attempt must score to be accepted on visual evidence
         // alone (retry hypotheses carry the extra margin). Every OCR stage
         // keys off this, so a crop that cannot pass visually always gets its

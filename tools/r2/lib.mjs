@@ -219,5 +219,30 @@ export async function loadAcceptancePolicy(game, overridePath = null) {
   for (const key of ["uniqueTitleRescue", "titleAgreementRescue"]) {
     if (typeof result[key] !== "boolean") throw new Error(`Acceptance policy ${key} must be boolean`);
   }
+  result.hubSimilarity ??= 0.9;
+  result.hubDistinctNames ??= 3;
+  result.hubTopK ??= 5;
+  if (!(result.hubSimilarity >= 0 && result.hubSimilarity <= 1)) throw new Error("Acceptance policy hubSimilarity must be within [0, 1]");
+  if (!(Number.isInteger(result.hubDistinctNames) && result.hubDistinctNames >= 0)) throw new Error("Acceptance policy hubDistinctNames must be a non-negative integer");
+  if (!(Number.isInteger(result.hubTopK) && result.hubTopK >= 1)) throw new Error("Acceptance policy hubTopK must be a positive integer");
   return result;
+}
+
+/**
+ * Non-card rows that must not sit in a scanner gallery (substitute cards,
+ * bio cards, emblems, punchcards, checklists…), as case-insensitive name
+ * regexes per game from `tools/scanner-gallery-exclusions.json`. A blank or
+ * glare-saturated crop embeds within 0.93 of such rows, above every
+ * strong-accept point.
+ */
+export async function loadGalleryExclusions(game) {
+  const document = JSON.parse(await readFile(resolve(REPO_ROOT, "tools/scanner-gallery-exclusions.json"), "utf8"));
+  if (document.schema !== "tcger-scanner-gallery-exclusions-v1") {
+    throw new Error(`Unsupported gallery exclusions schema ${String(document.schema)}`);
+  }
+  const patterns = (document.games?.[game]?.namePatterns ?? []).map((pattern) => new RegExp(pattern, "i"));
+  return {
+    patterns,
+    excludes: (name) => patterns.some((pattern) => pattern.test(String(name ?? ""))),
+  };
 }

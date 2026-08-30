@@ -48,9 +48,14 @@ def main() -> None:
     vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
     names = np.array([r["name"] for r in rows])
 
-    # Exact all-pairs nearest different-name neighbour, chunked.
+    # Exact all-pairs nearest different-name neighbour, chunked. Also collect
+    # same-name rows whose vectors are (near-)identical under different
+    # family keys: the runtime treats them as rivals and abstains as
+    # `printingAmbiguous` even when the card is right — merge candidates.
     flagged: dict[int, tuple[int, float]] = {}
     nn_same = np.zeros(count, dtype=np.float32)
+    families = [r.get("recognitionFamilyId") for r in rows]
+    merge_candidates: dict[int, tuple[int, float]] = {}
     for start in range(0, count, args.chunk):
         block = vectors[start:start + args.chunk] @ vectors.T
         for local in range(block.shape[0]):
@@ -62,6 +67,9 @@ def main() -> None:
             nn_same[i] = scores[order[0]]
             if best_other is not None and scores[best_other] >= args.threshold:
                 flagged[i] = (int(best_other), float(scores[best_other]))
+            twin = order[0]
+            if names[twin] == names[i] and families[twin] != families[i] and scores[twin] >= 0.995:
+                merge_candidates[i] = (int(twin), float(scores[twin]))
 
     # Union-find clusters among flagged rows.
     parent = {i: i for i in flagged}
@@ -103,6 +111,13 @@ def main() -> None:
          for root, members in clusters.items()),
         key=lambda c: -c["size"],
     )
+    merges = [
+        {"annIndex": i, "cardId": rows[i]["cardId"], "name": rows[i]["name"], "setCode": rows[i].get("setCode"),
+         "collectorNumber": rows[i].get("collectorNumber"), "recognitionFamilyId": families[i],
+         "twin": {"annIndex": j, "cardId": rows[j]["cardId"], "setCode": rows[j].get("setCode"),
+                  "collectorNumber": rows[j].get("collectorNumber"), "recognitionFamilyId": families[j], "similarity": score}}
+        for i, (j, score) in sorted(merge_candidates.items())
+    ]
     summary = {
         "schema": "tcger-index-hygiene-v1",
         "rows": count,
@@ -110,8 +125,10 @@ def main() -> None:
         "flagged": len(flagged),
         "actions": dict(collections.Counter(e["action"] for e in entries)),
         "mean_nearest_neighbour_cosine": float(nn_same.mean()),
+        "duplicateVectorFamilies": len(merges),
         "clusters": cluster_summary[:25],
         "entries": entries,
+        "familyMergeCandidates": merges,
     }
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "index-hygiene.json").write_text(json.dumps(summary, indent=1))
@@ -119,23 +136,25 @@ def main() -> None:
     negatives = {
         "schema": "tcger-orientation-negatives-v1",
         "description": (
-            "Trainer recipe additions. For every training family add (a) its representative "
-            "render rotated 180 degrees and (b) any back-face render of the same card as "
-            "samples of a shared reject class (not a new identity), so inverted or reversed "
-            "crops learn to score low against every family instead of collapsing onto the "
-            "attractor rows listed in index-hygiene.json. Gold-border / Collectors' Edition "
-            "reprints in `nonGallerySets` are excluded from the gallery and used only as "
-            "extra positives for their same-art family."
+            "Trainer recipe additions measured 2026-08-29. Back-face renders join a shared "
+            "reject class (not a new identity). Rotated-180 renders are NOT the attractor: "
+            "clean rotations already score p50 0.55 / p90 0.62 and only 1/40 land on a flagged "
+            "row, so a rotation reject class does not address the degenerate-crop failure — "
+            "that needs real-camera positives. Non-gallery rows (see "
+            "tools/scanner-gallery-exclusions.json) leave the gallery at publish/runtime; "
+            "`nonGallerySets` rows stay in the gallery unless a product decision folds them "
+            "into their same-art family (467 of them are the only row for their name)."
         ),
-        "rejectClass": "__inverted_or_reverse__",
-        "rotate180PerFamily": True,
+        "rejectClass": "__reverse_face__",
+        "rotate180PerFamily": False,
         "backFacesAsReject": True,
         "nonGallerySets": sorted(NON_GALLERY_SETS),
         "excludeAnnIndices": [e["annIndex"] for e in entries if e["action"].startswith("exclude:")],
         "reviewAnnIndices": [e["annIndex"] for e in entries if e["action"].startswith("review:")],
+        "familyMergeCandidates": len(merges),
     }
     (args.out / "orientation-negatives.json").write_text(json.dumps(negatives, indent=1))
-    print(json.dumps({k: v for k, v in summary.items() if k not in ("entries", "clusters")}, indent=1))
+    print(json.dumps({k: v for k, v in summary.items() if k not in ("entries", "clusters", "familyMergeCandidates")}, indent=1))
     for cluster in cluster_summary[:6]:
         print(cluster)
 

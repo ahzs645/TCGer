@@ -284,8 +284,11 @@ class DefaultTCGerRepository(
             }.onFailure { error ->
                 if (options.engine == CardScanEngine.ON_DEVICE_OCR) serverFailure = error
             }
+            val hubRejected = (localResult?.decision as? ArcFaceRecognitionDecision.Rejected)?.reason ==
+                ArcFaceRecognitionDecision.Rejected.Reason.HUB
             if (localRecognizer?.acceptancePolicy?.permitsManualOcrRescue == true &&
                 localResult?.decision !is ArcFaceRecognitionDecision.Accepted &&
+                !hubRejected &&
                 LocalEmbeddingDispatch.permitsManualOcrRescue(options)
             ) {
                 val evidence = runCatching { textRecognizer.recognizeEmbeddingEvidence(imageBytes) }

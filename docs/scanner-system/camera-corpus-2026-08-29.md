@@ -92,8 +92,8 @@ Index audit (`index-hygiene.json`): **880 rows** with a >0.9 different-name
 neighbour; mean nearest neighbour 0.66. Actions: 556 `exclude:non-gallery-set`
 (Collectors' Edition, World Championship, 30A, `unk` playtest…), 17
 `exclude:back-face`, 307 `review:attractor-member` (retro-frame lands, LTR /
-RVR showcase rows). `orientation-negatives.json` is the trainer recipe for
-rotate-180 and back-face reject samples.
+RVR showcase rows). These are *descriptive*; see "What this means" for why
+excluding them is not the fix.
 
 ### Camera-domain augmentation bank (Pokémon, 200 pairs)
 
@@ -125,10 +125,24 @@ domain step available. The Magic bank has only 7 pairs — too few to use.
    captured data: a few hundred phone crops across frames, foils, sleeves,
    and angles, labeled by title + collector number. Every Dev Mode session is
    that data; the labeling loop already exists.
-3. **Index hygiene is independent of any of this** and should ship first:
-   drop the 573 exclude rows from the Magic gallery, keep them as extra
-   positives for their same-art family, and add the orientation reject class
-   to the next training run.
+3. **Index hygiene — corrected after an independent check.** Dropping the
+   573 `exclude:*` rows does *not* stop the 0.99-to-garbage failure: the
+   degenerate Stone Quarry crops re-ranked without those rows land on the
+   same LTR showcase rows, and with all 880 flagged rows removed still score
+   0.82–0.87 on unflagged retro-frame rows. Clean 180° rotations are not the
+   attractor either (p50 0.55, 1/40 on a flagged row), so a rotation reject
+   class targets the wrong thing. What the check found instead: a blank or
+   glare-saturated crop scores **0.93 with a 0.07 margin against
+   "Double-Faced Substitute Card"** — an accept under the current policy —
+   and 318 such non-card rows (substitute, bio, emblem, punchcard,
+   checklist, blank) sit in the gallery. Two changes followed:
+   `tools/scanner-gallery-exclusions.json` (dropped by the browser index
+   builder and by both native clients' metadata eligibility) and a
+   **hub-rejection** rule in the acceptance policy (≥3 distinct names ≥0.90
+   in the top 5 → abstain): 0 hits on 364 verified real crops, 8/12 on the
+   degenerate Stone Quarry attempts, the rest caught by the ambiguity
+   margin. 115 same-name rows with identical vectors under different family
+   keys are listed as `familyMergeCandidates` (mostly dungeons/tokens).
 
 ## Licensing
 

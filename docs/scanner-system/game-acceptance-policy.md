@@ -34,12 +34,26 @@ Design background: [Two-stage recognition](two-stage-recognition.md) and the
 | `uniqueTitleRescue` | An exact, catalog-unique title confirms its visual neighbour from `evidenceFloor`. |
 | `titleAgreementRescue` | An exact title naming the same card the image ranked first — with no different-name rival inside `ambiguityMargin` — confirms the visual **family** from `evidenceFloor`. The printing is then chosen by the normal Quick Scan / Exact Printing resolver. |
 | `collectorNumberScope` | Which printings a footer collector number is matched against: `representative` (the family row only) or `family` (every printing the row represents; the confirmed printing becomes the result with `verified` provenance). |
+| `hubSimilarity` / `hubDistinctNames` / `hubTopK` | **Hub rejection.** Abstain when at least `hubDistinctNames` *different* card names sit at or above `hubSimilarity` among the top `hubTopK` neighbours (defaults 0.90 / 3 / 5; `hubDistinctNames: 0` disables). A genuine match never looks like that; a degenerate crop — blank, glare-saturated, mis-rectified — lands near many unrelated rows at once (the 0.99-to-a-back-face failure). Checked before any threshold or OCR rescue. Measured 2026-08-29: 0 hits on 364 verified real-camera crops, 8/12 on the degenerate Stone Quarry attempts. |
 
 Every field is optional in a manifest; an omitted field takes the `default`
 profile's value. A declared policy that fails validation (values outside
 [0, 1], `evidenceFloor` above `strongAcceptanceScore`, unknown `schema`) is
 ignored and the client uses its built-in profile — a broken publish degrades
 to known behaviour, never to nonsense thresholds.
+
+### Gallery exclusions (companion contract)
+
+`tools/scanner-gallery-exclusions.json` (`tcger-scanner-gallery-exclusions-v1`)
+lists per-game name patterns for catalog rows that are not scan targets —
+substitute cards, World Championship bio cards, emblems, punchcards,
+checklists, blank cards. A flat white crop embeds within 0.93 of a substitute
+card render, above every strong-accept point, so these rows would turn
+degenerate input into confident wrong accepts. The browser index builder drops
+them (rows and vectors) at publish time; iOS (`ScannerGalleryExclusions`) and
+Android (`ScannerGalleryExclusions`) mirror the patterns in their metadata
+eligibility so already-installed packs are protected. A new game with such
+rows adds its patterns to that file and the two client tables.
 
 What the policy does **not** change: the candidate evidence floor used to
 build the shortlist (0.55), the open-set ambiguity rule itself, the
@@ -72,6 +86,8 @@ keep working, and new clients prefer the policy object.
 4. **`fallback`/`default`** — the profile every unknown game starts with.
 
 ## Shipped profiles
+
+All profiles use hub rejection at 0.90 / 3 distinct names / top 5.
 
 | Game | strong | margin | floor | titleGate | rescues | footer scope | Evidence |
 |---|---:|---:|---:|---|---|---|---|

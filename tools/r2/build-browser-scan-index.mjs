@@ -7,6 +7,7 @@ import {
   parseCliArgs,
   positiveInteger,
   loadAcceptancePolicy,
+  loadGalleryExclusions,
 } from "./lib.mjs";
 
 function usage() {
@@ -77,6 +78,7 @@ export function buildBrowserIndex({
   modelFile,
   model,
   acceptancePolicy = null,
+  galleryExclusions = null,
   minSimilarity = 0.65,
   minVerifiedSimilarity = 0.58,
   minMargin = 0.05,
@@ -104,7 +106,17 @@ export function buildBrowserIndex({
       throw new Error(`Metadata row ${index} belongs to ${String(entry.game)}`);
     }
   });
-  const entries = metadata.map(browserEntry);
+  // Non-card rows (substitute cards, bio cards, emblems…) leave the gallery
+  // here, together with their vector rows, so a blank crop cannot retrieve
+  // them; entries are re-numbered to stay positional.
+  const excludes = galleryExclusions?.excludes ?? (() => false);
+  const kept = metadata.map((entry, index) => index).filter((index) => !excludes(metadata[index].name));
+  const excludedCount = metadata.length - kept.length;
+  const packedRows = vectorContents.subarray(8);
+  const keptVectors = excludedCount === 0
+    ? packedRows
+    : Buffer.concat(kept.map((index) => packedRows.subarray(index * dimension, (index + 1) * dimension)));
+  const entries = kept.map((index, position) => ({ ...browserEntry(metadata[index]), annIndex: position }));
   return {
     version,
     kind: "embedding-index",
@@ -117,12 +129,13 @@ export function buildBrowserIndex({
     scale: 127,
     normalized: true,
     total: entries.length,
+    excludedRows: excludedCount,
     printingTotal: entries.reduce((sum, entry) => sum + entry.printings.length, 0),
     thresholds: { minSimilarity, minVerifiedSimilarity, minMargin },
     acceptancePolicy: acceptancePolicy ?? null,
     modelUrl: basename(modelFile),
     entries,
-    vectors: vectorContents.subarray(8).toString("base64"),
+    vectors: keptVectors.toString("base64"),
   };
 }
 
@@ -141,7 +154,9 @@ async function main() {
     game,
     values.get("acceptance-policy") ? resolve(values.get("acceptance-policy")) : null,
   );
+  const galleryExclusions = await loadGalleryExclusions(game);
   const artifact = buildBrowserIndex({
+    galleryExclusions,
     metadata,
     vectorContents: await readFile(vectorsPath),
     game,

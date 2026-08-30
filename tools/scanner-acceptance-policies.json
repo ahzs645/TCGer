@@ -9,7 +9,10 @@
     "uniqueTitleRescue": "An exact, catalog-unique title confirms its visual neighbour from evidenceFloor.",
     "titleAgreementRescue": "An exact title naming the same card the image ranked first (no different-name rival inside ambiguityMargin) confirms the visual family from evidenceFloor.",
     "collectorNumberScope": "Which printings a footer collector number is matched against: representative | family.",
-    "calibration": "Free text: what the numbers were measured on."
+    "calibration": "Free text: what the numbers were measured on.",
+    "hubSimilarity": "Hub rejection: similarity at which neighbours count as hub hits.",
+    "hubDistinctNames": "Abstain when at least this many DIFFERENT card names sit at or above hubSimilarity within the top hubTopK neighbours; genuine matches never look like that, degenerate crops (blank, glare-saturated, mis-rectified) do. 0 disables.",
+    "hubTopK": "Neighbours inspected by hub rejection."
   },
   "games": {
     "pokemon": {
@@ -20,17 +23,23 @@
       "uniqueTitleRescue": true,
       "titleAgreementRescue": true,
       "collectorNumberScope": "family",
-      "calibration": "physical-v2-107fe33b; 76-label reference replay 2026-08-29: 0.65 is the smallest point above the pack/empty negatives (0.6285/0.6476)."
+      "calibration": "physical-v2-107fe33b; 76-label reference replay 2026-08-29: 0.65 is the smallest point above the pack/empty negatives (0.6285/0.6476).",
+      "hubSimilarity": 0.9,
+      "hubDistinctNames": 3,
+      "hubTopK": 5
     },
     "magic": {
-      "strongAcceptanceScore": 0.70,
+      "strongAcceptanceScore": 0.7,
       "ambiguityMargin": 0.05,
       "evidenceFloor": 0.55,
       "titleGate": "binderPage",
       "uniqueTitleRescue": true,
       "titleAgreementRescue": true,
       "collectorNumberScope": "family",
-      "calibration": "visual-style-v2-5c27e506-r2; 49 labeled frames (sessions 2026-08-27 and 2026-08-29): plain-visual 0.65 admitted three wrong accepts at 0.64-0.69, 0.70 admitted none; simulator replay 28 -> 36 correct, 0 wrong."
+      "calibration": "visual-style-v2-5c27e506-r2; 49 labeled frames (sessions 2026-08-27 and 2026-08-29): plain-visual 0.65 admitted three wrong accepts at 0.64-0.69, 0.70 admitted none; simulator replay 28 -> 36 correct, 0 wrong. Hub rejection: 0 false positives on 364 verified real-camera crops, fires on 8/12 degenerate Stone Quarry attempts (2026-08-29).",
+      "hubSimilarity": 0.9,
+      "hubDistinctNames": 3,
+      "hubTopK": 5
     },
     "yugioh": {
       "strongAcceptanceScore": 0.65,
@@ -40,17 +49,23 @@
       "uniqueTitleRescue": true,
       "titleAgreementRescue": true,
       "collectorNumberScope": "family",
-      "calibration": "Inherits the encoder-level ArcFace point; no labeled phone sessions yet."
+      "calibration": "Inherits the encoder-level ArcFace point; no labeled phone sessions yet.",
+      "hubSimilarity": 0.9,
+      "hubDistinctNames": 3,
+      "hubTopK": 5
     }
   },
   "default": {
-    "strongAcceptanceScore": 0.70,
+    "strongAcceptanceScore": 0.7,
     "ambiguityMargin": 0.05,
     "evidenceFloor": 0.55,
     "titleGate": "never",
     "uniqueTitleRescue": true,
     "titleAgreementRescue": true,
     "collectorNumberScope": "family",
-    "calibration": "Conservative profile for a game with no replay evidence: the highest measured strong-accept point, visual-first, bounded OCR rescues."
+    "calibration": "Conservative profile for a game with no replay evidence: the highest measured strong-accept point, visual-first, bounded OCR rescues.",
+    "hubSimilarity": 0.9,
+    "hubDistinctNames": 3,
+    "hubTopK": 5
   }
 }

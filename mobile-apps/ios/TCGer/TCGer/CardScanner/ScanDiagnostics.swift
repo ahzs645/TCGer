@@ -41,6 +41,9 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         case printingAmbiguous
         case titlePrintingUnresolved
         case indexUnavailable
+        /// Hub collapse: several different cards all above the hub similarity —
+        /// the crop embedded into a degenerate region, not onto a card.
+        case hubRejected
     }
 
     /// Semantic orientation is deliberately separate from pixel orientation.

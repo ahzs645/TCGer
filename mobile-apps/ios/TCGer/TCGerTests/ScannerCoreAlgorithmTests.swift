@@ -289,6 +289,53 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertFalse(legacy.requiresTitleConfirmation(purpose: .singleCard, source: .livePreview))
     }
 
+    func testHubCollapseRejectsManyUnrelatedHighNeighboursButNotGenuineMatches() {
+        let policy = ScannerGameAcceptancePolicy.builtin(for: .magic)
+        // The Stone Quarry failure: unrelated rows all above 0.90.
+        XCTAssertTrue(policy.isHubCollapse([
+            ("Radha, Heart of Keld", 0.995), ("Instill Energy", 0.954),
+            ("The Bath Song", 0.934), ("Song of Eärendil", 0.911), ("Forest", 0.91),
+        ]))
+        // A genuine strong match with same-name printings and distant rivals.
+        XCTAssertFalse(policy.isHubCollapse([
+            ("Nazgûl", 0.94), ("Nazgûl", 0.93), ("Nazgûl", 0.93), ("Karplusan Forest", 0.60),
+        ]))
+        XCTAssertFalse(policy.isHubCollapse([
+            ("Crew Captain", 0.936), ("Brokers Charm", 0.61), ("Maestros Charm", 0.58),
+        ]))
+        // Only the top-K window counts.
+        XCTAssertFalse(policy.isHubCollapse([
+            ("A", 0.95), ("B", 0.60), ("C", 0.60), ("D", 0.60), ("E", 0.60), ("F", 0.95), ("G", 0.95),
+        ]))
+        // Disabled by policy (legacy Magic profile).
+        XCTAssertFalse(ScannerGameAcceptancePolicy.legacyMagic().isHubCollapse([
+            ("A", 0.99), ("B", 0.98), ("C", 0.97),
+        ]))
+        XCTAssertFalse(ScannerGameAcceptancePolicy(strongAcceptanceScore: 0.7, ambiguityMargin: 0.05, hubTopK: 0).isValid)
+    }
+
+    func testGalleryExclusionsDropNonCardRowsOnlyForMagic() {
+        for name in ["Double-Faced Substitute Card", "Jan Tomcani Bio", "Tom van de Logt Bio (2001)",
+                     "Koth of the Hammer Emblem", "Punchcard", "Ixalan Checklist"] {
+            XCTAssertTrue(ScannerGalleryExclusions.excludes(name: name, game: .magic), name)
+        }
+        for name in ["Mindful Biomancer", "Pollywog Symbiote", "Stone Quarry", "Emblem of the Warmind"] {
+            XCTAssertFalse(ScannerGalleryExclusions.excludes(name: name, game: .magic), name)
+        }
+        XCTAssertFalse(ScannerGalleryExclusions.excludes(name: "Double-Faced Substitute Card", game: .pokemon))
+
+        let substitute = CardIndexMetadataEntry(
+            annIndex: 0, cardId: "x", name: "Double-Faced Substitute Card", game: "magic",
+            setCode: "sznr", setName: nil, rarity: nil, imageURL: nil, price: nil
+        )
+        XCTAssertFalse(substitute.isPhysicalScanEligible)
+        let card = CardIndexMetadataEntry(
+            annIndex: 1, cardId: "y", name: "Stone Quarry", game: "magic",
+            setCode: "c19", setName: nil, rarity: nil, imageURL: nil, price: nil
+        )
+        XCTAssertTrue(card.isPhysicalScanEligible)
+    }
+
     func testMetadataNameMatchIsExactAndReturnsEveryPrinting() async {
         let entries = [
             CardIndexMetadataEntry(

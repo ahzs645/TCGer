@@ -36,6 +36,15 @@ data class ScannerAcceptancePolicy(
      */
     val titleAgreementRescue: Boolean = true,
     val collectorNumberScope: CollectorNumberScope = CollectorNumberScope.FAMILY,
+    /**
+     * Hub rejection: abstain when at least [hubDistinctNames] DIFFERENT card
+     * names sit at or above [hubSimilarity] among the top [hubTopK]
+     * neighbours. Genuine matches never look like that; degenerate crops
+     * (blank, glare-saturated, mis-rectified) do. 0 disables.
+     */
+    val hubSimilarity: Double = 0.90,
+    val hubDistinctNames: Int = 3,
+    val hubTopK: Int = 5,
 ) {
     @Serializable
     enum class TitleGate {
@@ -58,7 +67,18 @@ data class ScannerAcceptancePolicy(
             strongAcceptanceScore in 0.0..1.0 &&
             ambiguityMargin in 0.0..1.0 &&
             evidenceFloor in 0.0..1.0 &&
-            evidenceFloor <= strongAcceptanceScore
+            evidenceFloor <= strongAcceptanceScore &&
+            hubSimilarity in 0.0..1.0 && hubDistinctNames >= 0 && hubTopK >= 1
+
+    /** Hub collapse over ranked (name, similarity) pairs; see [hubDistinctNames]. */
+    fun isHubCollapse(candidates: List<Pair<String, Double>>): Boolean {
+        if (hubDistinctNames <= 0) return false
+        val names = candidates.take(hubTopK)
+            .filter { it.second >= hubSimilarity }
+            .map { normalizedScannerCardName(it.first) }
+            .toSet()
+        return names.size >= hubDistinctNames
+    }
 
     /** Whether any bounded OCR rescue is enabled for intentional captures. */
     val permitsManualOcrRescue: Boolean

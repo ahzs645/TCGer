@@ -5,6 +5,7 @@ import {
   assertPhysicalScannerEntries,
   isPokemonPocketScannerEntry,
   loadAcceptancePolicy,
+  loadGalleryExclusions,
 } from "./lib.mjs";
 
 test("physical scanner guard recognizes every Pokemon Pocket marker", () => {
@@ -46,4 +47,24 @@ test("shared acceptance policies publish per game with the conservative default 
   assert.equal(future.titleGate, "never");
   assert.equal(future.uniqueTitleRescue, true);
   assert.ok(future.evidenceFloor <= future.strongAcceptanceScore);
+});
+
+test("acceptance policies carry hub rejection and gallery exclusions drop non-card rows", async () => {
+  const magic = await loadAcceptancePolicy("magic");
+  assert.equal(magic.hubSimilarity, 0.9);
+  assert.equal(magic.hubDistinctNames, 3);
+  assert.equal(magic.hubTopK, 5);
+
+  const exclusions = await loadGalleryExclusions("magic");
+  assert.equal(exclusions.excludes("Double-Faced Substitute Card"), true);
+  assert.equal(exclusions.excludes("Jan Tomcani Bio"), true);
+  assert.equal(exclusions.excludes("Tom van de Logt Bio (2001)"), true);
+  assert.equal(exclusions.excludes("Koth of the Hammer Emblem"), true);
+  assert.equal(exclusions.excludes("Punchcard"), true);
+  assert.equal(exclusions.excludes("Ixalan Checklist"), true);
+  assert.equal(exclusions.excludes("Mindful Biomancer"), false);
+  assert.equal(exclusions.excludes("Pollywog Symbiote"), false);
+  assert.equal(exclusions.excludes("Stone Quarry"), false);
+  const pokemon = await loadGalleryExclusions("pokemon");
+  assert.equal(pokemon.excludes("Double-Faced Substitute Card"), false);
 });
