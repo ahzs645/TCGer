@@ -232,6 +232,37 @@ actor CardIndexMetadataStore {
         return indices
     }
 
+    /// Physical rows restricted to a user-selected deck. A row matches when
+    /// its representative id, exact-printing id, or any nested printing id is
+    /// present in the deck. This preserves visual-family packages while also
+    /// supporting the current Yu-Gi-Oh singleton/passcode package.
+    func physicalCardIndices(
+        for game: TCGGame,
+        setCode: String?,
+        externalCardIDs: Set<String>
+    ) -> Set<Int> {
+        loadIfNeeded()
+        let normalizedIDs = Set(externalCardIDs.map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }.filter { !$0.isEmpty })
+        guard !normalizedIDs.isEmpty else { return [] }
+        return Set(cache.values.lazy.filter { entry in
+            guard (game == .all || entry.resolvedGame == game),
+                  entry.resolvedGame != .all,
+                  entry.isPhysicalScanEligible,
+                  setCode.map({ entry.contains(setCode: $0) }) ?? true
+            else { return false }
+            if normalizedIDs.contains(entry.cardId.lowercased()) { return true }
+            if let exact = entry.exactPrintingId?.lowercased(), normalizedIDs.contains(exact) {
+                return true
+            }
+            return entry.printings?.contains { printing in
+                normalizedIDs.contains(printing.cardId.lowercased()) ||
+                    printing.exactPrintingId.map { normalizedIDs.contains($0.lowercased()) } == true
+            } == true
+        }.map(\.annIndex))
+    }
+
     func entries(for game: TCGGame, setCode: String) -> [CardIndexMetadataEntry] {
         loadIfNeeded()
         return cache.values

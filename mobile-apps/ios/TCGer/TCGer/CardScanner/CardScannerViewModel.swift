@@ -35,6 +35,9 @@ final class CardScannerViewModel: ObservableObject {
     @Published var state: ViewState = .idle
     @Published var selectedMode: ScanMode = .pokemon {
         didSet {
+            if selectedMode != .yugioh {
+                selectedDeckScope = nil
+            }
             normalizeSelectedEngine()
             rebuildContext()
             prepareRecognitionInBackgroundIfPossible()
@@ -71,6 +74,7 @@ final class CardScannerViewModel: ObservableObject {
             rebuildContext()
         }
     }
+    @Published private(set) var selectedDeckScope: CardScanDeckScope?
     @Published var latestResult: CardScanResult? {
         didSet { syncCameraOverlayState() }
     }
@@ -106,6 +110,18 @@ final class CardScannerViewModel: ObservableObject {
         didSet { rebuildContext() }
     }
     private(set) var scanScope: CardScanScope?
+
+    /// Selects an explicit Yu-Gi-Oh deck gallery. Passing nil restores the full
+    /// catalog. A deck selection also selects Yu-Gi-Oh mode so the restricted
+    /// gallery cannot silently be applied to another game's encoder.
+    func selectDeckScope(_ deck: Deck?) {
+        selectedDeckScope = deck.flatMap(CardScanDeckScope.init(deck:))
+        if selectedDeckScope != nil, selectedMode != .yugioh {
+            selectedMode = .yugioh
+        } else {
+            rebuildContext()
+        }
+    }
 
     let cameraController = CardScannerCameraController()
     private var coordinator: CardScannerCoordinator
@@ -861,6 +877,7 @@ final class CardScannerViewModel: ObservableObject {
                 ? nil
                 : captureNotes.trimmingCharacters(in: .whitespacesAndNewlines),
             setCode: scanScope?.setCode,
+            deckScope: selectedDeckScope,
             printingMode: printingMode
         )
         lastAnalysisDate = .distantPast

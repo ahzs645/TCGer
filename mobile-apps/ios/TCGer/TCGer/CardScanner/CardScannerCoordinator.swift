@@ -118,11 +118,16 @@ final class CardScannerCoordinator: @unchecked Sendable {
         context: CardScannerContext,
         source: ScanInvocationKind
     ) async -> Result<CardScanResult, CardScannerError> {
-        let eligibleStrategies = eligibleStrategies(
+        let strategiesForRequest = eligibleStrategies(
             for: context.mode,
             source: source,
             preferredEngine: context.enginePreference
         )
+        // Deck Scan is a restricted exact-vector search, not a post-hoc label
+        // filter over a full-catalog hash/server result.
+        let eligibleStrategies = context.deckScope == nil
+            ? strategiesForRequest
+            : strategiesForRequest.filter { $0.kind == .mlDetector }
         guard !eligibleStrategies.isEmpty else {
             return .failure(.ineligibleMode)
         }
@@ -144,6 +149,27 @@ final class CardScannerCoordinator: @unchecked Sendable {
                     source: source,
                     apiService: apiService
                 ) {
+                    if let deckScope = context.deckScope {
+                        let scopedCandidates = ([result.primary] + result.alternatives).filter { candidate in
+                            deckScope.contains(candidate.details) ||
+                                candidate.printingAlternatives.contains { deckScope.contains($0) }
+                        }
+                        guard let primary = scopedCandidates.first else {
+                            sawCleanNoMatch = true
+                            continue
+                        }
+                        result = CardScanResult(
+                            mode: result.mode,
+                            capturedImage: result.capturedImage,
+                            primary: primary,
+                            alternatives: Array(scopedCandidates.dropFirst()),
+                            resolution: result.resolution,
+                            printingResolutionProvenance: result.printingResolutionProvenance,
+                            elapsed: result.elapsed,
+                            debugCapture: result.debugCapture,
+                            debugCaptureError: result.debugCaptureError
+                        )
+                    }
                     if let setCode = context.setCode {
                         let scopedCandidates = ([result.primary] + result.alternatives).filter {
                             $0.details.identity.setCode?.caseInsensitiveCompare(setCode) == .orderedSame

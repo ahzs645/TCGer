@@ -441,6 +441,53 @@ enum CardScanPurpose: String, Sendable {
     case binderPage
 }
 
+/// An explicitly user-selected restricted recognition gallery. Deck-scoped
+/// results are useful during play, but they are not evidence of full-catalog
+/// accuracy and must remain distinguishable in diagnostics and UI.
+struct CardScanDeckScope: Hashable, Sendable {
+    let deckID: String
+    let deckName: String
+    let game: TCGGame
+    let externalCardIDs: Set<String>
+
+    init(deckID: String, deckName: String, game: TCGGame, externalCardIDs: Set<String>) {
+        self.deckID = deckID
+        self.deckName = deckName
+        self.game = game
+        self.externalCardIDs = Set(externalCardIDs.compactMap(Self.normalizedCardID))
+    }
+
+    init?(deck: Deck) {
+        guard let game = TCGGame.scannerGame(from: deck.tcg), game == .yugioh else { return nil }
+        let cardIDs = Set(deck.cards.compactMap { Self.normalizedCardID($0.externalId) })
+        guard !cardIDs.isEmpty else { return nil }
+        self.init(deckID: deck.id, deckName: deck.name, game: game, externalCardIDs: cardIDs)
+    }
+
+    nonisolated func contains(_ details: CardDetails) -> Bool {
+        let identity = details.identity
+        let rawIDs = [identity.id] + [identity.exactPrintingID].compactMap { $0 }
+        let candidateIDs = rawIDs.compactMap(Self.normalizedCardID)
+        return candidateIDs.contains { externalCardIDs.contains($0) }
+    }
+
+    nonisolated private static func normalizedCardID(_ raw: String) -> String? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return value.isEmpty ? nil : value
+    }
+}
+
+private extension TCGGame {
+    static func scannerGame(from raw: String) -> TCGGame? {
+        switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "pokemon": return .pokemon
+        case "magic", "mtg": return .magic
+        case "yugioh", "yu-gi-oh", "yu_gi_oh", "yu-gi-oh!": return .yugioh
+        default: return nil
+        }
+    }
+}
+
 nonisolated enum ScanStrategyKind: String, Sendable {
     case manual
     case textOCR
@@ -479,6 +526,9 @@ struct CardScannerContext: Sendable {
     let saveDebugCapture: Bool
     let captureNotes: String?
     let setCode: String?
+    /// Optional restricted gallery selected by the user. Thresholds and
+    /// abstention behavior remain unchanged; this only limits rows searched.
+    var deckScope: CardScanDeckScope? = nil
     var printingMode: ScannerPrintingMode = .quickLatest
     /// Binder pages use a stricter auto-import policy and may surface a
     /// title-confirmed, printing-unresolved suggestion for human review.
