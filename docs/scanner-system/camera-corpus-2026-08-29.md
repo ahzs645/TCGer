@@ -171,6 +171,15 @@ Pokémon boxes (Apache-2.0), and tmikonen's OpenCV contour pipeline.
 | `draw` YOLOv8 (YGO) | 0.03 / 0.02 | 0.37 / 0.39 | 42 |
 | tmikonen contour | produced no candidates in this harness | — | 21 |
 
+Restricting TCGX to its 139 one-card images (the app pipeline's actual job)
+changes the picture: app YOLO11s box **0.954 / 1.00 / 0.94**, `vision-app`
+0.946 / 1.00 / 0.90, DETR 0.899 / 1.00 / 0.64, `draw2` OBB 0.705 / 0.86 /
+0.13, lo-calvin 0.26. The earlier 0.80 was the ten multi-card images
+dragging the single-card detector down; on one card per frame the app's own
+detector is the most precise localizer tested. All 101 labeled Dev Mode frames
+are single-card captures (no binder pages), so the recognition table below is
+already single-card only.
+
 The app pipeline is single-card by design, so the spread result is expected;
 it is the binder path's job. Nothing third-party beats the app's own detector
 on single-card precision (R@0.9 0.78 vs DETR's 0.62): DETR finds more cards
