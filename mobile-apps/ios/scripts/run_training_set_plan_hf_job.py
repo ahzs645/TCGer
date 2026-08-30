@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -29,6 +30,29 @@ PLAN_SCHEMA = "tcger-training-set-plan-v1"
 
 class PlanRunError(RuntimeError):
     pass
+
+
+def clean_download_workdir(work: Path) -> list[Path]:
+    """Remove only the two ephemeral Hub snapshots used by a plan job."""
+    work = work.expanduser().resolve()
+    filesystem_root = Path(work.anchor)
+    script_parents = Path(__file__).resolve().parents
+    script_root = script_parents[3] if len(script_parents) > 3 else filesystem_root
+    forbidden = {filesystem_root, Path.home().resolve()}
+    if script_root != filesystem_root:
+        forbidden.add(script_root)
+    if work in forbidden or len(work.parts) < 3:
+        raise PlanRunError(f"refusing to clean unsafe workdir: {work}")
+    removed = []
+    for name in ("plan", "source-library"):
+        target = work / name
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+            removed.append(target)
+        elif target.is_dir():
+            shutil.rmtree(target)
+            removed.append(target)
+    return removed
 
 
 def decode_hub_path(value: str) -> str:
@@ -253,7 +277,14 @@ def main() -> None:
 
     from huggingface_hub import hf_hub_download, snapshot_download
 
-    work = args.workdir
+    work = args.workdir.expanduser().resolve()
+    removed_work = clean_download_workdir(work)
+    if removed_work:
+        print(
+            "cleaned previous generated Hub snapshots: "
+            + ", ".join(path.name for path in removed_work),
+            flush=True,
+        )
     work.mkdir(parents=True, exist_ok=True)
     plan_snapshot = Path(snapshot_download(
         repo_id=args.plan_repo,

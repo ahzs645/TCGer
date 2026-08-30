@@ -87,6 +87,52 @@ PRINTING_METADATA_FIELDS = tuple(
     if field not in {"annIndex", "recognitionFamilyId", "name", "game"}
 )
 
+EXPORT_ARTIFACT_NAMES = (
+    "CardEmbeddings-arcface.mlpackage.zip",
+    "CardsIndexVectors-arcface.bin",
+    "CardsIndexMetadata.json",
+    "arcface-eval.json",
+    "provenance.json",
+    "run-config.json",
+    "shards",
+)
+
+
+def remove_exact_generated_path(path: Path, parent: Path, expected_name: str) -> bool:
+    """Remove one allow-listed generated child without following symlinks."""
+    candidate = Path(os.path.abspath(path))
+    allowed_parent = Path(os.path.abspath(parent))
+    if candidate.parent != allowed_parent or candidate.name != expected_name:
+        raise ValueError(f"refusing to remove unexpected generated path: {candidate}")
+    if candidate.is_symlink() or candidate.is_file():
+        candidate.unlink()
+        return True
+    if candidate.is_dir():
+        shutil.rmtree(candidate)
+        return True
+    return False
+
+
+def clean_previous_export_artifacts(
+    output_dir: Path = OUT_DIR,
+    package_dir: Path = PACKAGE_DIR,
+) -> list[Path]:
+    """Clean only replaceable exports, preserving checkpoints and image coverage."""
+    if output_dir.is_symlink():
+        raise ValueError(f"refusing to clean symlinked output directory: {output_dir}")
+    removed = []
+    for name in EXPORT_ARTIFACT_NAMES:
+        path = output_dir / name
+        if remove_exact_generated_path(path, output_dir, name):
+            removed.append(path)
+    if remove_exact_generated_path(
+        package_dir,
+        output_dir.parent,
+        "CardEmbeddings-arcface.mlpackage",
+    ):
+        removed.append(package_dir)
+    return removed
+
 
 class ImageCoverageError(RuntimeError):
     """Raised when a production catalog does not have a valid image per row."""
@@ -840,6 +886,14 @@ def main():
     if training_views_per_card < 1 or args.views_per_card < 1:
         parser.error("training and evaluation views per card must be positive")
 
+    removed_exports = clean_previous_export_artifacts()
+    if removed_exports:
+        print(
+            "cleaned previous generated exports: "
+            + ", ".join(path.name for path in removed_exports),
+            flush=True,
+        )
+
     metadata_paths = args.metadata or [META_PATH]
     entries = load_entries(metadata_paths)
     if args.limit_per_game:
@@ -1402,6 +1456,13 @@ def main():
         inputs=[ct.ImageType(name="image", shape=example.shape, scale=1 / 255.0,
                              color_layout=ct.colorlayout.RGB)],
         outputs=[ct.TensorType(name="embedding")],
+    )
+    # Core ML/Xcode packages are directory artifacts. They must be replaced as
+    # a unit rather than saved over a previous conversion.
+    remove_exact_generated_path(
+        PACKAGE_DIR,
+        OUT_DIR.parent,
+        "CardEmbeddings-arcface.mlpackage",
     )
     ml.save(str(PACKAGE_DIR))
     shutil.make_archive(str(OUT_DIR / "CardEmbeddings-arcface.mlpackage"), "zip",

@@ -194,6 +194,12 @@ uv run mobile-apps/ios/scripts/prepare_and_launch_two_stage_hf_job.py \
   --artifact-variant bounded-family-v1
 ```
 
+The job runner resets only its named generated work directories and previous
+Core ML export package before a run. It preserves the validated card-image
+cache and refuses cleanup when a generated directory contains the mounted
+prepared pack. The final Hub upload deletes stale files only inside that run's
+scoped `exports/...` prefix as part of the replacement upload.
+
 Confirm current hardware pricing immediately before submission. The earlier
 US$45–60 figure was a planning ceiling, not a standing authorization or an
 actual-cost record.
@@ -232,6 +238,10 @@ a primary constraint, not only top-1 recovery.
 The full training output includes Core ML. Android/web use the checked fp32
 ONNX export path. Validate its `android-onnx-eval.json` against the checkpoint
 and exact ONNX bytes.
+
+Core ML export replaces the exact generated `.mlpackage` directory before
+saving. Do not manually remove the parent output/work directory: it may contain
+the resumable checkpoint, coverage report, or other reviewed evidence.
 
 Expected ONNX contract:
 

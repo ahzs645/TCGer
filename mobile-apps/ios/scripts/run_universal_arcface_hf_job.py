@@ -58,6 +58,44 @@ REQUEST_HEADERS = {
     "Accept": "application/json;q=0.9,*/*;q=0.8",
 }
 
+GENERATED_WORKDIR_NAMES = (
+    "source",
+    "normalized",
+    "outputs",
+    "image-library-hub",
+    "scripts",
+    "hub",
+    "CardEmbeddings-arcface.mlpackage",
+)
+
+
+def clean_generated_workdir(work: Path, protected_paths=()) -> list[Path]:
+    """Reset exact job-owned children while preserving caches and mounted inputs."""
+    work = work.expanduser().resolve()
+    filesystem_root = Path(work.anchor)
+    script_parents = Path(__file__).resolve().parents
+    script_root = script_parents[3] if len(script_parents) > 3 else filesystem_root
+    forbidden = {filesystem_root, Path.home().resolve()}
+    if script_root != filesystem_root:
+        forbidden.add(script_root)
+    if work in forbidden or len(work.parts) < 3:
+        raise ValueError(f"refusing to clean unsafe workdir: {work}")
+    protected = [Path(path).expanduser().resolve() for path in protected_paths if path]
+    removed = []
+    for name in GENERATED_WORKDIR_NAMES:
+        target = work / name
+        if any(target == path or target in path.parents for path in protected):
+            raise ValueError(
+                f"generated workdir target contains a protected input: {target}"
+            )
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+            removed.append(target)
+        elif target.is_dir():
+            shutil.rmtree(target)
+            removed.append(target)
+    return removed
+
 
 def download(url: str, destination: Path) -> None:
     import requests
@@ -326,7 +364,17 @@ def main() -> None:
         exist_ok=True,
     )
 
-    work = args.workdir
+    work = args.workdir.expanduser().resolve()
+    removed_work = clean_generated_workdir(
+        work,
+        protected_paths=[args.prepared_image_library_root, args.trainer_script],
+    )
+    if removed_work:
+        print(
+            "cleaned previous generated job artifacts: "
+            + ", ".join(path.name for path in removed_work),
+            flush=True,
+        )
     source_dir = work / "source"
     normalized_dir = work / "normalized"
     output_dir = work / "outputs"
@@ -601,6 +649,9 @@ def main() -> None:
         path_in_repo=export_prefix,
         repo_id=args.hub_repo,
         repo_type="model",
+        # Replace only this run's scoped export prefix, in the upload commit,
+        # so removed shards/files from an older export cannot survive remotely.
+        delete_patterns="*",
     )
     print(f"results: https://huggingface.co/{args.hub_repo}", flush=True)
 

@@ -17,7 +17,9 @@ Usage: python3 convert-dinov2-coreml.py [--model facebook/dinov2-small] [--out <
 """
 import argparse
 import os
+import shutil
 import types
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -100,9 +102,16 @@ def main():
     )
     mlmodel.short_description = "DINOv2-small card embedding encoder (384-d, L2-normalised)"
 
-    os.makedirs(args.out, exist_ok=True)
-    out_path = os.path.join(args.out, "CardEmbeddings.mlpackage")
-    mlmodel.save(out_path)
+    output_dir = Path(args.out).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / "CardEmbeddings.mlpackage"
+    # A Core ML package is a generated directory. Replace only this exact
+    # child and unlink symlinks rather than following them into another tree.
+    if out_path.is_symlink() or out_path.is_file():
+        out_path.unlink()
+    elif out_path.is_dir():
+        shutil.rmtree(out_path)
+    mlmodel.save(str(out_path))
     print(f"[coreml] saved {out_path}")
 
 

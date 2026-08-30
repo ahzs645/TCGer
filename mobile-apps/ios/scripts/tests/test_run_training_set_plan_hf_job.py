@@ -22,6 +22,27 @@ def canonical(value: object) -> str:
 
 
 class TrainingSetPlanJobTests(unittest.TestCase):
+    def test_cleanup_removes_only_ephemeral_snapshots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary) / "tcger-plan-job"
+            (work / "plan").mkdir(parents=True)
+            (work / "source-library").mkdir()
+            (work / "keep").mkdir()
+
+            removed = MODULE.clean_download_workdir(work)
+
+            self.assertEqual({path.name for path in removed}, {"plan", "source-library"})
+            self.assertTrue((work / "keep").is_dir())
+
+    def test_cleanup_rejects_filesystem_root(self) -> None:
+        with self.assertRaisesRegex(MODULE.PlanRunError, "unsafe workdir"):
+            MODULE.clean_download_workdir(Path("/"))
+
+    def test_cleanup_rejects_repository_root(self) -> None:
+        repository_root = SCRIPT.parents[3]
+        with self.assertRaisesRegex(MODULE.PlanRunError, "unsafe workdir"):
+            MODULE.clean_download_workdir(repository_root)
+
     def test_decodes_hub_only_paths_for_job_arguments(self) -> None:
         self.assertEqual(
             MODULE.decode_hub_path("hub:jobs/training/run.py"),

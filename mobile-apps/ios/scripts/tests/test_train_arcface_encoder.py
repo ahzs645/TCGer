@@ -48,6 +48,59 @@ class ArcFaceImageLibraryTests(unittest.TestCase):
     def status_writer(self, **payload):
         self.statuses.append(payload)
 
+    def test_export_cleanup_is_allowlisted_and_preserves_checkpoint(self):
+        output = self.root / "job" / "outputs"
+        output.mkdir(parents=True)
+        checkpoint = output / "arcface-checkpoint.pt"
+        checkpoint.write_text("resume me")
+        (output / "CardsIndexMetadata.json").write_text("stale")
+        (output / "shards" / "old-game").mkdir(parents=True)
+        package = output.parent / "CardEmbeddings-arcface.mlpackage"
+        package.mkdir()
+
+        removed = trainer.clean_previous_export_artifacts(output, package)
+
+        self.assertEqual(
+            {path.name for path in removed},
+            {"CardsIndexMetadata.json", "shards", package.name},
+        )
+        self.assertTrue(checkpoint.is_file())
+        self.assertFalse(package.exists())
+
+    def test_export_cleanup_unlinks_package_symlink_without_following_it(self):
+        output = self.root / "job" / "outputs"
+        output.mkdir(parents=True)
+        external = self.root / "keep"
+        external.mkdir()
+        (external / "model.mlmodel").write_text("keep")
+        package = output.parent / "CardEmbeddings-arcface.mlpackage"
+        package.symlink_to(external, target_is_directory=True)
+
+        trainer.clean_previous_export_artifacts(output, package)
+
+        self.assertFalse(package.exists())
+        self.assertEqual((external / "model.mlmodel").read_text(), "keep")
+
+    def test_export_cleanup_rejects_a_non_allowlisted_path(self):
+        with self.assertRaisesRegex(ValueError, "unexpected generated path"):
+            trainer.remove_exact_generated_path(
+                self.root / "valuable",
+                self.root / "job",
+                "valuable",
+            )
+
+    def test_export_cleanup_rejects_symlinked_output_directory(self):
+        external = self.root / "external"
+        external.mkdir()
+        output = self.root / "outputs"
+        output.symlink_to(external, target_is_directory=True)
+
+        with self.assertRaisesRegex(ValueError, "symlinked output directory"):
+            trainer.clean_previous_export_artifacts(
+                output,
+                self.root / "CardEmbeddings-arcface.mlpackage",
+            )
+
     def test_recognition_families_share_training_label_and_partitions_are_held_out(self):
         rows = [
             dict(entry("print-a", "https://images.invalid/a.png", 0), recognitionFamilyId="art-shared"),
