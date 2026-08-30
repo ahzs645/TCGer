@@ -7,7 +7,11 @@ interface TCGerRepository {
         createBinder(BinderInput(name = name, description = description))
     suspend fun updateBinder(id: String, input: BinderInput): Binder
     suspend fun deleteBinder(id: String)
+    suspend fun getBinderShareLinks(id: String): List<BinderShareLink>
+    suspend fun createBinderShareLink(id: String, label: String): BinderShareLink
+    suspend fun revokeBinderShareLink(id: String, linkId: String)
     suspend fun searchCards(query: String, tcg: String? = null): List<CatalogCard>
+    suspend fun discoverCards(tcg: String? = null, count: Int = 6): List<CatalogCard>
     suspend fun scanCard(imageBytes: ByteArray, tcg: String, options: CardScanOptions = CardScanOptions()): CardScanResult
     suspend fun getScanDebugCaptures(limit: Int = 12): List<ScanDebugCapture>
     suspend fun updateScanDebugCapture(

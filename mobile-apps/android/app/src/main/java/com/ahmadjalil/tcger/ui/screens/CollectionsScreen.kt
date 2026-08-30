@@ -78,6 +78,7 @@ fun CollectionsScreen(
     onOpen: (String) -> Unit,
 ) {
     var creating by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<Binder?>(null) }
     Column(
         Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.COLLECTIONS_BROWSE)).padding(
             start = 16.dp,
@@ -99,7 +100,7 @@ fun CollectionsScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            items(state.binders, key = { it.id }) { binder -> BinderRow(binder, onOpen, onDelete) }
+            items(state.binders, key = { it.id }) { binder -> BinderRow(binder, onOpen) { pendingDelete = binder } }
         }
     }
 
@@ -114,6 +115,21 @@ fun CollectionsScreen(
             creating = false
         },
     )
+
+    pendingDelete?.let { binder ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete ${binder.name}?") },
+            text = { Text("The binder will be deleted. Its cards will be kept and moved to Unsorted.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDelete = null
+                    onDelete(binder.id)
+                }) { Text("Delete binder") }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel") } },
+        )
+    }
 }
 
 @Composable

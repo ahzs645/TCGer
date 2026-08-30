@@ -25,11 +25,30 @@ interface TCGerApi {
         @Body request: JsonObject,
     ): BinderDto
     @DELETE("collections/{id}") suspend fun deleteBinder(@Header("Authorization") auth: String, @Path("id") id: String)
+    @GET("collections/{id}/share-links") suspend fun getBinderShareLinks(
+        @Header("Authorization") auth: String,
+        @Path("id") id: String,
+    ): List<BinderShareLinkDto>
+    @POST("collections/{id}/share-links") suspend fun createBinderShareLink(
+        @Header("Authorization") auth: String,
+        @Path("id") id: String,
+        @Body request: CreateBinderShareLinkRequest,
+    ): BinderShareLinkDto
+    @DELETE("collections/{id}/share-links/{linkId}") suspend fun revokeBinderShareLink(
+        @Header("Authorization") auth: String,
+        @Path("id") id: String,
+        @Path("linkId") linkId: String,
+    )
     @GET("cards/search") suspend fun searchCards(
         @Header("Authorization") auth: String,
         @Query("query") query: String,
         @Query("tcg") tcg: String? = null,
     ): CardSearchResponse
+    @GET("cards/discover") suspend fun discoverCards(
+        @Header("Authorization") auth: String,
+        @Query("tcg") tcg: String? = null,
+        @Query("count") count: Int = 6,
+    ): CardDiscoveryResponse
     @Multipart
     @POST("cards/scan")
     suspend fun scanCard(
@@ -40,6 +59,7 @@ interface TCGerApi {
         @Part("captureSource") captureSource: RequestBody,
         @Part("saveDebugCapture") saveDebugCapture: RequestBody,
         @Part("captureNotes") captureNotes: RequestBody,
+        @Part("setCodeHint") setCodeHint: RequestBody,
     ): ScanCardResponseDto
     @GET("cards/scan/debug-captures")
     suspend fun getScanDebugCaptures(

@@ -98,6 +98,8 @@ data class ScannerSessionOptions(
     val replacesBinderPageImages: Boolean = true,
     val binderPageNumber: Int = 1,
     val language: String = "English",
+    /** Optional hard catalog mask used before scanner scoring. */
+    val setCodeHint: String = "",
     val sharedSessionCode: String = "",
     val recognitionEngine: ScannerRecognitionEngine = ScannerRecognitionEngine.AUTOMATIC,
     val encoderVariant: ScannerEncoderVariant = ScannerEncoderVariant.ARCFACE,

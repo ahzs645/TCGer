@@ -1,6 +1,7 @@
 package com.ahmadjalil.tcger.data.remote
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class HealthDto(val status: String)
@@ -25,10 +26,19 @@ data class CardDto(
     val collectorNumber: String? = null,
     val imageUrl: String? = null,
     val imageUrlSmall: String? = null,
+    val artist: String? = null,
+    val supertype: String? = null,
+    val attributes: JsonObject? = null,
 )
 
 @Serializable
 data class CardSearchResponse(val cards: List<CardDto> = emptyList(), val total: Int = 0)
+
+@Serializable
+data class CardDiscoveryResponse(
+    val cards: List<CardDto> = emptyList(),
+    val total: Int = 0,
+)
 
 @Serializable
 data class ScanMatchDto(
@@ -59,7 +69,16 @@ data class ScanMetaDto(
     val perspectiveCorrected: Boolean? = null,
     val rerankUsed: Boolean? = null,
     val shortlistSize: Int? = null,
+    val catalogDecision: CatalogDecisionDto? = null,
     val timings: ScanTimingDto? = null,
+)
+
+@Serializable
+data class CatalogDecisionDto(
+    val accepted: Boolean,
+    val reason: String,
+    val topConfidence: Double? = null,
+    val runnerUpConfidence: Double? = null,
 )
 
 @Serializable
@@ -137,6 +156,7 @@ data class CollectionCardDto(
     val quantity: Int = 1,
     val condition: String? = null,
     val price: Double? = null,
+    val acquisitionPrice: Double? = null,
 )
 
 @Serializable
@@ -155,6 +175,19 @@ data class BinderDto(
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )
+
+@Serializable
+data class BinderShareLinkDto(
+    val id: String,
+    val label: String,
+    val token: String,
+    val expiresAt: String? = null,
+    val createdAt: String,
+    val lastUsedAt: String? = null,
+)
+
+@Serializable
+data class CreateBinderShareLinkRequest(val label: String, val expiresAt: String? = null)
 
 @Serializable
 data class CreateBinderRequest(

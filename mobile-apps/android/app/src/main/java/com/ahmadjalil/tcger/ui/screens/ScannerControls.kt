@@ -146,6 +146,15 @@ internal fun ScannerOptionsSheet(
             }
             item {
                 OptionSection("Printing") {
+                    OutlinedTextField(
+                        value = options.setCodeHint,
+                        onValueChange = { onOptionsChanged(options.copy(setCodeHint = it.trimStart())) },
+                        enabled = !isProcessing,
+                        label = { Text("Pinned set code (optional)") },
+                        supportingText = { Text("Masks the catalog to this set before scoring.") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     ScannerPrintingMode.entries.forEach { mode ->
                         RadioOption(
                             title = mode.displayName,

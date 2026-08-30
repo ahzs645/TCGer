@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -43,6 +44,19 @@ data class TrackedPricesResponse(
     val prices: List<TrackedPriceResult>,
     val refreshedAt: String,
     val refreshAfter: String,
+)
+
+@Serializable
+data class MarketPriceQuote(
+    val source: String,
+    val price: Double,
+    val currency: String,
+    val basePrice: Double? = null,
+    val foilPrice: Double? = null,
+    val etchedPrice: Double? = null,
+    val reverseHoloPrice: Double? = null,
+    val finishCode: String? = null,
+    val updatedAt: String? = null,
 )
 
 @Serializable
@@ -112,10 +126,18 @@ data class TrackedCard(
 
 data class PricePortfolio(
     val cards: List<TrackedCard>,
+    val costCoverage: CostBasisCoverage,
     val refreshedAt: String? = null,
     val refreshAfter: String? = null,
     val warning: String? = null,
 ) { val totalValue: Double get() = cards.sumOf(TrackedCard::totalValue) }
+
+data class CostBasisCoverage(
+    val totalCopies: Int,
+    val costedCopies: Int,
+    val cardsMissingCosts: Int,
+    val untrackedMarketValue: Double,
+) { val fraction: Double get() = if (totalCopies == 0) 0.0 else costedCopies.toDouble() / totalCopies }
 
 data class AnalyticsSnapshot(
     val history: ValueHistory,
@@ -135,6 +157,7 @@ data class PortfolioConnection(val serverUrl: String = "", val authToken: String
 
 interface PortfolioRepository {
     suspend fun prices(binders: List<Binder>, force: Boolean = false): PricePortfolio
+    suspend fun comparePrices(card: TrackedCard): List<MarketPriceQuote>
     suspend fun analytics(binders: List<Binder>, period: AnalyticsPeriod): AnalyticsSnapshot
 }
 
@@ -175,6 +198,14 @@ class DefaultPortfolioRepository(
                 refreshAfter = responses.minOfOrNull(TrackedPricesResponse::refreshAfter),
             )
         }.getOrElse { local.copy(warning = "Live prices unavailable; showing stored collection prices. ${it.message.orEmpty()}".trim()) }
+    }
+
+    override suspend fun comparePrices(card: TrackedCard): List<MarketPriceQuote> {
+        if (connection.serverUrl.isBlank() || connection.authToken.isNullOrBlank()) return emptyList()
+        return request(
+            "prices/${card.tcg}/${card.externalId}?source=automatic&compare=true",
+            serializer = ListSerializer(MarketPriceQuote.serializer()),
+        ).sortedWith(compareBy<MarketPriceQuote> { it.currency }.thenBy { it.price })
     }
 
     override suspend fun analytics(binders: List<Binder>, period: AnalyticsPeriod): AnalyticsSnapshot {
@@ -222,6 +253,13 @@ fun buildLocalPricePortfolio(binders: List<Binder>): PricePortfolio {
         if (existing == null) grouped[key] = Accumulator(owned, owned.quantity, (owned.price ?: 0.0) * owned.quantity)
         else { existing.quantity += owned.quantity; existing.value += (owned.price ?: 0.0) * owned.quantity }
     }
+    val coverage = CostBasisCoverage(
+        totalCopies = binders.sumOf(Binder::totalCopies),
+        costedCopies = binders.flatMap(Binder::cards).filter { it.acquisitionPrice != null }.sumOf { it.quantity },
+        cardsMissingCosts = binders.flatMap(Binder::cards).count { it.acquisitionPrice == null },
+        untrackedMarketValue = binders.flatMap(Binder::cards).filter { it.acquisitionPrice == null }
+            .sumOf { (it.price ?: 0.0) * it.quantity },
+    )
     return PricePortfolio(grouped.map { (key, value) ->
         val card = value.sample.card
         TrackedCard(
@@ -230,7 +268,7 @@ fun buildLocalPricePortfolio(binders: List<Binder>): PricePortfolio {
             quantity = value.quantity, unitPrice = if (value.quantity == 0) 0.0 else value.value / value.quantity,
             currency = "USD", source = null, percentChange = null,
         )
-    }.sortedByDescending(TrackedCard::totalValue))
+    }.sortedByDescending(TrackedCard::totalValue), costCoverage = coverage)
 }
 
 fun buildLocalAnalytics(binders: List<Binder>, period: AnalyticsPeriod): AnalyticsSnapshot {

@@ -12,6 +12,9 @@ data class CatalogCard(
     val recognitionFamilyId: String? = null,
     val exactPrintingId: String? = null,
     val releaseDate: String? = null,
+    val artist: String? = null,
+    val supertype: String? = null,
+    val attributes: Map<String, List<String>> = emptyMap(),
 )
 
 enum class CardScanSource { SERVER_IMAGE_MATCH, ON_DEVICE_EMBEDDING, ON_DEVICE_TEXT }
@@ -31,10 +34,26 @@ data class CardScanOptions(
     val saveDebugCapture: Boolean = false,
     val captureSource: String = "android-card-scanner",
     val captureNotes: String? = null,
+    val setCodeHint: String? = null,
     val printingMode: com.ahmadjalil.tcger.data.scanner.ScannerPrintingMode =
         com.ahmadjalil.tcger.data.scanner.ScannerPrintingMode.QUICK_LATEST,
     val ocrEnabled: Boolean = true,
 )
+
+data class CatalogScanDecision(
+    val accepted: Boolean,
+    val reason: String,
+    val topConfidence: Double? = null,
+    val runnerUpConfidence: Double? = null,
+) {
+    val rejectionMessage: String?
+        get() = if (accepted) null else when (reason) {
+            "no-catalog-match" -> "No card in the selected catalog scope matched this capture."
+            "low-confidence" -> "The closest catalog match was below the safe confidence threshold."
+            "ambiguous" -> "The scanner found multiple similarly likely catalog matches."
+            else -> "The scanner server declined this catalog match ($reason)."
+        }
+}
 
 data class CardScanCandidate(
     val card: CatalogCard,
@@ -51,6 +70,7 @@ data class CardScanResult(
     val debugCaptureError: String? = null,
     val printingResolutionProvenance: String = "verified",
     val requiresPrintingChoice: Boolean = false,
+    val catalogDecision: CatalogScanDecision? = null,
 )
 
 enum class ScanDebugFeedbackStatus(val apiValue: String, val displayName: String) {
@@ -93,6 +113,7 @@ data class OwnedCard(
     val quantity: Int,
     val condition: String? = null,
     val price: Double? = null,
+    val acquisitionPrice: Double? = null,
 )
 
 data class Binder(
@@ -114,6 +135,15 @@ data class Binder(
     val totalCopies: Int get() = cards.sumOf(OwnedCard::quantity)
     val totalValue: Double get() = cards.sumOf { (it.price ?: 0.0) * it.quantity }
 }
+
+data class BinderShareLink(
+    val id: String,
+    val label: String,
+    val token: String,
+    val expiresAt: String? = null,
+    val createdAt: String,
+    val lastUsedAt: String? = null,
+)
 
 data class BinderInput(
     val name: String,

@@ -10,6 +10,7 @@ import com.ahmadjalil.tcger.domain.AccentChoice
 import com.ahmadjalil.tcger.domain.AppPreferences
 import com.ahmadjalil.tcger.domain.Binder
 import com.ahmadjalil.tcger.domain.BinderInput
+import com.ahmadjalil.tcger.domain.BinderShareLink
 import com.ahmadjalil.tcger.domain.BottomNavigationItem
 import com.ahmadjalil.tcger.domain.CardScanCandidate
 import com.ahmadjalil.tcger.domain.CardScanEngine
@@ -152,6 +153,15 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     fun deleteBinder(id: String) = launchMutation { repository.deleteBinder(id) }
 
+    suspend fun getBinderShareLinks(id: String): List<BinderShareLink> =
+        repository.getBinderShareLinks(id)
+
+    suspend fun createBinderShareLink(id: String, label: String): BinderShareLink =
+        repository.createBinderShareLink(id, label)
+
+    suspend fun revokeBinderShareLink(id: String, linkId: String) =
+        repository.revokeBinderShareLink(id, linkId)
+
     fun createWishlist(input: WishlistInput) = launchMutation {
         if (input.name.isBlank()) return@launchMutation
         repository.createWishlist(input)
@@ -163,6 +173,18 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun deleteWishlist(id: String) = launchMutation { repository.deleteWishlist(id) }
+
+    fun discoverCards() {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _state.update { it.copy(isSearching = true, message = null) }
+            runCatching { repository.discoverCards(_state.value.searchGame, 6) }
+                .onSuccess { cards ->
+                    _state.update { it.copy(isSearching = false, searchResults = cards) }
+                }
+                .onFailure(::showError)
+        }
+    }
     fun removeWishlistCard(wishlistId: String, cardId: String) = launchMutation {
         repository.removeWishlistCard(wishlistId, cardId)
     }
@@ -628,6 +650,7 @@ private fun AndroidScannerRequest.toDomainScanOptions() = CardScanOptions(
     saveDebugCapture = options.saveServerDebugCapture,
     captureSource = debugCapture.source,
     captureNotes = debugCapture.notes,
+    setCodeHint = options.setCodeHint.trim().ifBlank { null },
     printingMode = options.printingMode,
     ocrEnabled = options.ocrEnabled,
 )

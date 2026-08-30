@@ -26,6 +26,17 @@ interface TCGerDao {
     @Query("DELETE FROM binders WHERE id = :id")
     suspend fun deleteBinder(id: String)
 
+    @Query("UPDATE owned_cards SET binderId = :destinationBinderId WHERE binderId = :sourceBinderId")
+    suspend fun moveOwnedCards(sourceBinderId: String, destinationBinderId: String)
+
+    @Transaction
+    suspend fun archiveBinder(binderId: String, unsortedBinder: BinderEntity) {
+        if (binderId == unsortedBinder.id) return
+        if (getBinder(unsortedBinder.id) == null) upsertBinder(unsortedBinder)
+        moveOwnedCards(binderId, unsortedBinder.id)
+        deleteBinder(binderId)
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertOwnedCard(card: OwnedCardEntity)
 

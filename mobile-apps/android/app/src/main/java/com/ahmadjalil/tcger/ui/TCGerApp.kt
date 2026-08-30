@@ -557,9 +557,13 @@ fun TCGerApp(container: AppContainer) {
                         showPricing = state.preferences.showPricing,
                         showCardNumbers = state.preferences.showCardNumbers,
                         currency = state.preferences.currency,
+                        shareSiteUrl = state.preferences.serverUrl,
                         onBack = navController::popBackStack,
                         onRemove = viewModel::removeCard,
                         onUpdate = viewModel::updateBinder,
+                        onLoadShareLinks = viewModel::getBinderShareLinks,
+                        onCreateShareLink = viewModel::createBinderShareLink,
+                        onRevokeShareLink = viewModel::revokeBinderShareLink,
                     )
                 }
                 composable("wishlist/{wishlistId}", arguments = listOf(navArgument("wishlistId") { type = NavType.StringType })) { entry ->

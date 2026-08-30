@@ -54,6 +54,8 @@ import com.ahmadjalil.tcger.data.scanner.ScannerOptionsStore
 import com.ahmadjalil.tcger.data.backup.CollectionBackupJson
 import com.ahmadjalil.tcger.data.preferences.AppCacheManager
 import com.ahmadjalil.tcger.generated.ParityFeatureIDs
+import com.ahmadjalil.tcger.feature.libraryoperations.LibraryOperationsHostScreen
+import com.ahmadjalil.tcger.feature.libraryoperations.RemoteLibraryOperationsRepository
 import com.ahmadjalil.tcger.ui.AppUiState
 import com.ahmadjalil.tcger.ui.AppViewModel
 
@@ -71,6 +73,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var serverDialog by remember { mutableStateOf(false) }
     var signInDialog by remember { mutableStateOf(false) }
+    var showingLibraryOperations by remember { mutableStateOf(false) }
     var transferMessage by remember { mutableStateOf<String?>(null) }
     var pendingExport by remember { mutableStateOf("") }
     val cacheManager = remember(context) { AppCacheManager(context) }
@@ -98,6 +101,27 @@ fun SettingsScreen(
         BiometricManager.from(context).canAuthenticate(
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
         ) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+    val libraryOperationsRepository = remember(
+        state.preferences.serverUrl,
+        state.preferences.authToken,
+        state.preferences.dataSourceMode,
+    ) {
+        val token = state.preferences.authToken
+        if (state.preferences.dataSourceMode == DataSourceMode.SERVER && !token.isNullOrBlank()) {
+            runCatching {
+                RemoteLibraryOperationsRepository.create(state.preferences.serverUrl, token)
+            }.getOrNull()
+        } else null
+    }
+
+    if (showingLibraryOperations) {
+        LibraryOperationsHostScreen(
+            repository = libraryOperationsRepository,
+            contentPadding = contentPadding,
+            onBack = { showingLibraryOperations = false },
+        )
+        return
     }
 
     LaunchedEffect(state.scannerSupportedGames) {
@@ -376,6 +400,10 @@ fun SettingsScreen(
                 FilledTonalButton(onClick = onFinanceHistory, modifier = Modifier.fillMaxWidth()) {
                     Text("Purchase, sale & trade history")
                 }
+                FilledTonalButton(
+                    onClick = { showingLibraryOperations = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Library operations") }
                 Text(
                     "Imports merge into the current data. Existing records are not erased.",
                     style = MaterialTheme.typography.bodySmall,

@@ -115,6 +115,7 @@ import com.ahmadjalil.tcger.data.scanner.ScannerSessionEntry
 import com.ahmadjalil.tcger.data.scanner.ScannerSessionStore
 import com.ahmadjalil.tcger.data.scanner.AutoScanConsensus
 import com.ahmadjalil.tcger.data.scanner.AutoScanConsensusUpdate
+import com.ahmadjalil.tcger.data.scanner.AutomaticCaptureRearmGate
 import com.ahmadjalil.tcger.data.scanner.boundedAutomaticIntervalMillis
 import com.ahmadjalil.tcger.data.scanner.withRequiredTrainingEvidence
 import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetInstallStatus
@@ -299,6 +300,8 @@ fun ScannerScreen(
     var referenceRequest by remember { mutableStateOf<AndroidScannerRequest?>(null) }
     var referenceSnapshot by remember { mutableStateOf<ScannerReferenceRunSnapshot?>(null) }
     val autoConsensus = remember { AutoScanConsensus(requiredMatches = 2) }
+    val automaticRearmGate = remember { AutomaticCaptureRearmGate() }
+    var automaticCaptureNeedsRearm by remember { mutableStateOf(false) }
     var consensusUpdate by remember { mutableStateOf<AutoScanConsensusUpdate?>(null) }
     var replayFrames by remember { mutableStateOf<List<RecordedScannerFrame>>(emptyList()) }
     var replayIndex by remember { mutableStateOf(0) }
@@ -832,13 +835,28 @@ fun ScannerScreen(
                 .onFailure { ioMessage = it.message }
             }
         }
+        val automaticCapture = lastCaptureSource == "automatic-camera"
+        if (automaticCapture && automaticRearmGate.isWaitingForCardRemoval) {
+            automaticRearmGate.observe(top?.card?.id)
+            automaticCaptureNeedsRearm = automaticRearmGate.isWaitingForCardRemoval
+            autoConsensus.reset()
+            consensusUpdate = null
+            showingResult = false
+            return@LaunchedEffect
+        }
+        val catalogRejection = result.catalogDecision?.rejectionMessage
+        if (catalogRejection != null) {
+            autoConsensus.reset()
+            consensusUpdate = null
+            showingResult = true
+            return@LaunchedEffect
+        }
         if (result.requiresPrintingChoice) {
             autoConsensus.reset()
             consensusUpdate = null
             showingResult = true
             return@LaunchedEffect
         }
-        val automaticCapture = lastCaptureSource == "automatic-camera"
         if (automaticCapture) {
             val update = autoConsensus.observe(top?.card?.id, top?.card?.name)
             consensusUpdate = update
@@ -846,6 +864,8 @@ fun ScannerScreen(
                 val created = addToSession(listOf(top), result.source)
                 fetchSessionPrices(created)
                 syncSharedSession(created)
+                automaticRearmGate.accepted(top.card.id)
+                automaticCaptureNeedsRearm = true
                 showingResult = options.automaticallyShowResults
             } else {
                 showingResult = false
@@ -1049,6 +1069,13 @@ fun ScannerScreen(
                 },
                 resultAvailable = result != null,
                 onOpenResult = { showingResult = true },
+                automaticCaptureNeedsRearm = automaticCaptureNeedsRearm,
+                onNextAutomaticCard = {
+                    automaticRearmGate.next()
+                    automaticCaptureNeedsRearm = false
+                    autoConsensus.reset()
+                    consensusUpdate = null
+                },
                 onTestRecognize = {
                     if (ParityTestMode.isEnabled) {
                         lastCaptureSource = "test-fixture"
@@ -1082,11 +1109,13 @@ fun ScannerScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    val summary = when (result.source) {
-                        CardScanSource.SERVER_IMAGE_MATCH -> "Matched from card artwork on the scanner server"
-                        CardScanSource.ON_DEVICE_EMBEDDING -> "Matched from card artwork on this device"
-                        CardScanSource.ON_DEVICE_TEXT -> "Read on this device — confirm the title before adding"
-                    }
+                    val summary = result.catalogDecision?.rejectionMessage?.let {
+                        "No safe catalog match was accepted"
+                    } ?: when (result.source) {
+                            CardScanSource.SERVER_IMAGE_MATCH -> "Matched from card artwork on the scanner server"
+                            CardScanSource.ON_DEVICE_EMBEDDING -> "Matched from card artwork on this device"
+                            CardScanSource.ON_DEVICE_TEXT -> "Read on this device — confirm the title before adding"
+                        }
                     Text(summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (result.requiresPrintingChoice) {
@@ -1094,6 +1123,15 @@ fun ScannerScreen(
                         Text(
                             "This artwork has multiple printings. Choose the set shown on your card; nothing was added automatically.",
                             color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                result.catalogDecision?.rejectionMessage?.let { rejection ->
+                    item {
+                        Text(
+                            rejection,
+                            color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -1126,6 +1164,10 @@ fun ScannerScreen(
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth().testTag(ParityControlIDs.ACTION_SCANNER_RESCAN),
                         onClick = {
+                            automaticRearmGate.next()
+                            automaticCaptureNeedsRearm = false
+                            autoConsensus.reset()
+                            consensusUpdate = null
                             showingResult = false
                             viewModel.resetScanner()
                         },
@@ -1600,6 +1642,8 @@ private fun ScannerCapturePane(
     onAdjustCrop: () -> Unit,
     resultAvailable: Boolean,
     onOpenResult: () -> Unit,
+    automaticCaptureNeedsRearm: Boolean,
+    onNextAutomaticCard: () -> Unit,
     onTestRecognize: () -> Unit,
     demoCaptureMode: ScannerCaptureMode,
     showTestingTools: Boolean,
@@ -1669,6 +1713,18 @@ private fun ScannerCapturePane(
                 onReview = onReviewSession,
                 onClear = onClearSession,
             )
+        }
+        if (automaticCaptureNeedsRearm) {
+            item {
+                Button(onClick = onNextAutomaticCard, modifier = Modifier.fillMaxWidth()) {
+                    Text("Next card")
+                }
+                Text(
+                    "Automatic add is paused. Remove the accepted card from the guide, or tap Next card to rearm.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         item {
             Box(

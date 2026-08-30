@@ -25,6 +25,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -101,6 +102,30 @@ fun PricesScreen(
                     MetricCard("Copies", result.cards.sumOf(TrackedCard::quantity).toString(), Modifier.weight(1f))
                 }
             }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth()) {
+                            Text("Cost-basis completeness", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            Text("${(result.costCoverage.fraction * 100).toInt()}%")
+                        }
+                        LinearProgressIndicator(
+                            progress = { result.costCoverage.fraction.toFloat() },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "${result.costCoverage.costedCopies} of ${result.costCoverage.totalCopies} copies costed · " +
+                                "${result.costCoverage.cardsMissingCosts} rows need costs",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "${formatPortfolioMoney(result.costCoverage.untrackedMarketValue, displayCurrency)} value lacks cost basis",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
             result.warning?.let { item { WarningCard(it) } }
             result.refreshedAt?.let { item { Text("Market prices checked $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         }
@@ -120,7 +145,7 @@ fun PricesScreen(
         error?.let { item { WarningCard(it) } }
         if (!loading && portfolio?.cards?.isEmpty() == true) item { EmptyCard("No tracked cards", "Add priced cards to a binder to start tracking their value.") }
         if (!loading && cards.isEmpty() && portfolio?.cards?.isNotEmpty() == true) item { EmptyCard("No matching cards", "Try a different search or game filter.") }
-        items(cards, key = TrackedCard::id) { card -> TrackedPriceCard(card) }
+        items(cards, key = TrackedCard::id) { card -> TrackedPriceCard(card, repository) }
     }
 }
 
@@ -210,11 +235,44 @@ fun AnalyticsScreen(
     Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(title, style = MaterialTheme.typography.labelSmall)
 } }
 
-@Composable private fun TrackedPriceCard(card: TrackedCard) = Card(Modifier.fillMaxWidth()) {
-    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        AsyncImage(card.imageUrl, null, Modifier.size(54.dp))
-        Column(Modifier.weight(1f)) { Text(card.name, fontWeight = FontWeight.SemiBold, maxLines = 1); Text(listOfNotNull(card.setName, card.rarity).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${card.quantity} owned${card.source?.let { " · $it" }.orEmpty()}", style = MaterialTheme.typography.labelSmall) }
-        Column(horizontalAlignment = Alignment.End) { Text(formatPortfolioMoney(card.unitPrice, card.currency), fontWeight = FontWeight.SemiBold); Text(formatPortfolioMoney(card.totalValue, card.currency), style = MaterialTheme.typography.bodySmall); card.percentChange?.let { Text(signedPercent(it), color = if (it >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) } }
+@Composable private fun TrackedPriceCard(card: TrackedCard, repository: PortfolioRepository) = Card(Modifier.fillMaxWidth()) {
+    val scope = rememberCoroutineScope()
+    var quotes by remember(card.tcg, card.externalId) { mutableStateOf<List<MarketPriceQuote>?>(null) }
+    var comparing by remember(card.tcg, card.externalId) { mutableStateOf(false) }
+    var comparisonError by remember(card.tcg, card.externalId) { mutableStateOf<String?>(null) }
+    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AsyncImage(card.imageUrl, null, Modifier.size(54.dp))
+            Column(Modifier.weight(1f)) { Text(card.name, fontWeight = FontWeight.SemiBold, maxLines = 1); Text(listOfNotNull(card.setName, card.rarity).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${card.quantity} owned${card.source?.let { " · $it" }.orEmpty()}", style = MaterialTheme.typography.labelSmall) }
+            Column(horizontalAlignment = Alignment.End) { Text(formatPortfolioMoney(card.unitPrice, card.currency), fontWeight = FontWeight.SemiBold); Text(formatPortfolioMoney(card.totalValue, card.currency), style = MaterialTheme.typography.bodySmall); card.percentChange?.let { Text(signedPercent(it), color = if (it >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) } }
+        }
+        TextButton(
+            onClick = {
+                if (quotes != null) {
+                    quotes = null
+                } else {
+                    scope.launch {
+                        comparing = true
+                        comparisonError = null
+                        runCatching { repository.comparePrices(card) }
+                            .onSuccess {
+                                quotes = it
+                                if (it.isEmpty()) comparisonError = "No comparison quotes are available. Connect to a signed-in server to compare markets."
+                            }
+                            .onFailure { comparisonError = it.message ?: "Price comparison failed" }
+                        comparing = false
+                    }
+                }
+            },
+            enabled = !comparing,
+        ) { Text(if (comparing) "Comparing…" else if (quotes == null) "Compare markets" else "Hide comparison") }
+        comparisonError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        quotes?.forEach { quote ->
+            Row(Modifier.fillMaxWidth()) {
+                Text(quote.source.replace('-', ' ').replaceFirstChar(Char::uppercase), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                Text(formatPortfolioMoney(quote.price, quote.currency), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 
