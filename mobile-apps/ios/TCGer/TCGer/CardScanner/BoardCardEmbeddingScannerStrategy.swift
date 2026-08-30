@@ -38,6 +38,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     let kind: ScanStrategyKind = .mlDetector
     let supportsLiveScanning: Bool = true
 
+
     private let cropper: CardCropper
     private let encoder: CardEmbeddingEncoder
     private let indexStore: ANNIndexProviding
@@ -53,6 +54,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     /// selected `ScannerEncoderVariant` (env overrides win for sweeps).
     private let strongAcceptanceScore: Double
     private let ambiguityMargin: Double
+    /// Kept so `recognize` can resolve the per-game acceptance policy once
+    /// the retrieved game is known (see `acceptancePolicy(for:)`).
+    private let variant: ScannerEncoderVariant
+    /// Policies declared by installed manifests (`acceptancePolicy`), keyed
+    /// by game. Games without an entry run their built-in profile.
+    private let declaredPolicies: [TCGGame: ScannerGameAcceptancePolicy]
 
     /// Single-slot footer-OCR cache for "the card currently in front of the
     /// camera". A steady card re-reads the same footer at ~1/s through an
@@ -81,7 +88,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         ocr: CollectorNumberOCR = CollectorNumberOCR(),
         titleOCR: CardTitleOCR = CardTitleOCR(),
         rejectionGate: CardFaceRejectionGate? = nil,
-        supportedModes: Set<ScanMode>? = nil
+        supportedModes: Set<ScanMode>? = nil,
+        acceptancePolicies: [TCGGame: ScannerGameAcceptancePolicy] = [:]
     ) {
         self.cropper = cropper
         self.encoder = encoder ?? CardEmbeddingEncoder(
@@ -96,6 +104,19 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             ?? (variant.usesRejectionGate ? CardFaceRejectionGate.loadBundled() : nil)
         self.strongAcceptanceScore = variant.strongAcceptanceScore
         self.ambiguityMargin = variant.ambiguityMargin
+        self.variant = variant
+        self.declaredPolicies = acceptancePolicies
+    }
+
+    /// The acceptance policy this strategy applies to `game`: the manifest's
+    /// declared policy when valid, else the built-in profile, with
+    /// environment overrides last (see `ScannerGameAcceptancePolicy`).
+    func acceptancePolicy(for game: TCGGame) -> ScannerGameAcceptancePolicy {
+        ScannerGameAcceptancePolicy.resolve(
+            game: game,
+            declared: declaredPolicies[game],
+            variant: variant
+        )
     }
 
     func supports(_ mode: ScanMode) -> Bool {
@@ -725,6 +746,18 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // ambiguity checks through that game's shard. The crop was embedded
         // once; only metadata/index filtering changes from this point on.
         let recognizedGame = primary.details.identity.game
+        // Per-game acceptance policy (declared by the manifest or built in).
+        // Its operating point shadows the encoder-level defaults from here on.
+        let policy = acceptancePolicy(for: recognizedGame)
+        let strongAcceptanceScore = policy.strongAcceptanceScore
+        let ambiguityMargin = policy.ambiguityMargin
+        // What THIS attempt must score to be accepted on visual evidence
+        // alone (retry hypotheses carry the extra margin). Every OCR stage
+        // keys off this, so a crop that cannot pass visually always gets its
+        // evidence read instead of abstaining unexamined.
+        let requiredScore = attempt.isBaseline
+            ? strongAcceptanceScore
+            : strongAcceptanceScore + Configuration.retryAttemptMargin
 
         // The gate is intentionally not an unconditional early return. It has
         // false negatives on foil/full-art cards. When the frame is rejected,
@@ -732,8 +765,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // retrieval to one catalog name; collector OCR must still confirm any
         // gate override or close printing decision.
         let initialRival = ranked.first { $0.id != primary.id }
-        let requiresTitleConfirmation = Self.requiresTitleConfirmation(
-            game: recognizedGame,
+        let requiresTitleConfirmation = policy.requiresTitleConfirmation(
             purpose: context.purpose,
             source: source
         )
@@ -741,7 +773,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let needsTitleEvidence = ocrEnabled && source != .livePreview && (
             requiresTitleConfirmation ||
             gateRejected ||
-                primary.confidence.score < strongAcceptanceScore ||
+                primary.confidence.score < requiredScore ||
                 initialRival.map {
                     primary.confidence.score - $0.confidence.score < ambiguityMargin
                 } == true
@@ -751,51 +783,80 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // pairs, then letter-prefixed promo codes, then slash-less digit runs
         // (the last only when every confirmed candidate agrees on ONE
         // number). Shared verbatim by both OCR orderings below.
-        func resolvedCollectorNumber(for candidate: CardScanCandidate) -> String? {
-            if let value = candidate.details.identity.collectorNumber {
+        func resolvedCollectorNumber(for details: CardDetails) -> String? {
+            if let value = details.identity.collectorNumber {
                 let normalized = CollectorNumberOCR.normalize(value)
                 if !normalized.isEmpty { return normalized }
             }
-            return CollectorNumberOCR.collectorNumber(fromCardId: candidate.details.identity.id)
+            return CollectorNumberOCR.collectorNumber(fromCardId: details.identity.id)
+        }
+
+        // A family-index row carries one representative printing plus the
+        // rest of the family's printings as alternatives. A footer reading
+        // proves the PRINTING, so it must be matched against every printing
+        // the row represents — matching only the representative discarded
+        // correct readings (C17 258 nested under a SCD 306 row, 2026-08-29).
+        struct CollectorNumberMatch {
+            let candidate: CardScanCandidate
+            let printing: CardDetails
+            let collectorNumber: String?
+        }
+
+        func printingOptions(for candidate: CardScanCandidate) -> [CardDetails] {
+            if policy.collectorNumberScope == .representative { return [candidate.details] }
+            var seen: Set<String> = []
+            var options: [CardDetails] = []
+            for details in [candidate.details] + candidate.printingAlternatives {
+                let key = details.identity.exactPrintingID ?? details.identity.id
+                guard seen.insert(key).inserted else { continue }
+                options.append(details)
+            }
+            return options
         }
 
         func matchCollectorNumber(
             in candidates: [CardScanCandidate],
             reading: CollectorNumberOCR.FooterReading
-        ) -> CardScanCandidate? {
+        ) -> CollectorNumberMatch? {
+            let options: [(candidate: CardScanCandidate, printing: CardDetails, number: String)] =
+                candidates.flatMap { candidate in
+                    printingOptions(for: candidate).compactMap { printing in
+                        resolvedCollectorNumber(for: printing).map { (candidate, printing, $0) }
+                    }
+                }
+            func match(_ option: (candidate: CardScanCandidate, printing: CardDetails, number: String)) -> CollectorNumberMatch {
+                CollectorNumberMatch(
+                    candidate: option.candidate,
+                    printing: option.printing,
+                    collectorNumber: option.number
+                )
+            }
             let pairNumbers = Set(reading.pairNumbers)
-            var matched = candidates.first { candidate in
-                guard !pairNumbers.isEmpty,
-                      let cn = resolvedCollectorNumber(for: candidate)
-                else { return false }
-                return pairNumbers.contains(cn)
+            if !pairNumbers.isEmpty,
+               let hit = options.first(where: { pairNumbers.contains($0.number) }) {
+                return match(hit)
             }
             // Letter-prefixed promo numbers ("SWSH204") never print as
             // NNN/NNN, so without this branch the entire promo class was
             // structurally impossible to OCR-confirm.
-            if matched == nil, !reading.promoCodes.isEmpty {
+            if !reading.promoCodes.isEmpty {
                 let promoCodes = Set(reading.promoCodes)
-                matched = candidates.first { candidate in
-                    guard let cn = resolvedCollectorNumber(for: candidate),
-                          cn.contains(where: \.isLetter)
-                    else { return false }
-                    return promoCodes.contains(cn)
+                if let hit = options.first(where: {
+                    $0.number.contains(where: \.isLetter) && promoCodes.contains($0.number)
+                }) {
+                    return match(hit)
                 }
             }
-            if matched == nil, !reading.digitRuns.isEmpty {
-                let confirmed = candidates.filter { candidate in
-                    guard let cn = resolvedCollectorNumber(for: candidate)
-                    else { return false }
-                    return CollectorNumberOCR.runsConfirm(number: cn, in: reading.digitRuns)
+            if !reading.digitRuns.isEmpty {
+                let confirmed = options.filter {
+                    CollectorNumberOCR.runsConfirm(number: $0.number, in: reading.digitRuns)
                 }
-                let distinctNumbers = Set(confirmed.compactMap {
-                    resolvedCollectorNumber(for: $0)
-                })
-                if distinctNumbers.count == 1 {
-                    matched = confirmed.first
+                let distinctNumbers = Set(confirmed.map(\.number))
+                if distinctNumbers.count == 1, let hit = confirmed.first {
+                    return match(hit)
                 }
             }
-            return matched
+            return nil
         }
 
         var ocrVerified = false
@@ -811,7 +872,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             let preTiebreak = ranked.count >= 2 &&
                 (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
             let preVerification = gateRejected ||
-                primary.confidence.score < strongAcceptanceScore
+                primary.confidence.score < requiredScore
             if preTiebreak || preVerification {
                 let eligible = ranked.filter { candidate in
                     preVerification ||
@@ -827,13 +888,22 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 footerFirstReading = reading
                 evidenceFooterPairs = reading.pairNumbers
                 if let matched = matchCollectorNumber(in: eligible, reading: reading) {
-                    let collectorNumber = resolvedCollectorNumber(for: matched)
-                    primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
+                    primary = ocrVerifiedCandidate(
+                        matched.candidate,
+                        printing: matched.printing,
+                        collectorNumber: matched.collectorNumber
+                    )
                     ocrVerified = true
-                    evidenceOCRNumber = collectorNumber
+                    evidenceOCRNumber = matched.collectorNumber
                 }
             }
         }
+
+        // The unconstrained visual leader, remembered so title evidence can
+        // be judged as agreeing with (or contradicting) the image.
+        let visualLeaderName = primary.details.identity.name
+        let visualLeaderScore = primary.confidence.score
+        let visualRival = initialRival
 
         var titlePrintingCount = 0
         var titleRunnerScore: Double?
@@ -913,7 +983,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             let needsOCRTiebreak = ranked.count >= 2 &&
                 (ranked[0].confidence.score - ranked[1].confidence.score) < Configuration.ocrMargin
             let needsOCRVerification = gateRejected ||
-                primary.confidence.score < strongAcceptanceScore
+                primary.confidence.score < requiredScore
             if needsOCRTiebreak || needsOCRVerification {
                 let ocrEligibleCandidates = ranked.filter { candidate in
                     needsOCRVerification ||
@@ -934,10 +1004,13 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     evidenceFooterPairs = reading.pairNumbers
                 }
                 if let matched = matchCollectorNumber(in: ocrEligibleCandidates, reading: reading) {
-                    let collectorNumber = resolvedCollectorNumber(for: matched)
-                    primary = ocrVerifiedCandidate(matched, collectorNumber: collectorNumber)
+                    primary = ocrVerifiedCandidate(
+                        matched.candidate,
+                        printing: matched.printing,
+                        collectorNumber: matched.collectorNumber
+                    )
                     ocrVerified = true
-                    evidenceOCRNumber = collectorNumber
+                    evidenceOCRNumber = matched.collectorNumber
                 }
             }
         }
@@ -961,14 +1034,34 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             }
         }
 
-        let requiredScore = attempt.isBaseline
-            ? strongAcceptanceScore
-            : strongAcceptanceScore + Configuration.retryAttemptMargin
-        let uniqueTitleVerified = Self.acceptsUniqueTitleEvidence(
+        let uniqueTitleVerified = policy.uniqueTitleRescue && Self.acceptsUniqueTitleEvidence(
             score: primary.confidence.score,
-            printingCount: titleConstrained ? titlePrintingCount : 0
+            printingCount: titleConstrained ? titlePrintingCount : 0,
+            floor: policy.evidenceFloor
         )
-        guard primary.confidence.score >= requiredScore || ocrVerified || uniqueTitleVerified else {
+        // Two independent signals naming the same card: the exact printed
+        // title and the image's own unconstrained leader. Together they
+        // confirm the visual FAMILY (the printing is still resolved below),
+        // which lets a reprinted card through on the same 0.55 evidence
+        // floor a unique title already enjoys — provided no different-name
+        // rival was within the ambiguity margin of that leader.
+        let titleAgreesWithVisual = Self.titleAgreesWithVisualLeader(
+            titleConstrained: titleConstrained,
+            titleName: evidenceTitleName,
+            visualLeaderName: visualLeaderName,
+            visualLeaderScore: visualLeaderScore,
+            rivalName: visualRival?.details.identity.name,
+            rivalScore: visualRival?.confidence.score,
+            ambiguityMargin: ambiguityMargin,
+            evidenceScore: primary.confidence.score,
+            enabled: policy.titleAgreementRescue,
+            evidenceFloor: policy.evidenceFloor
+        )
+        guard primary.confidence.score >= requiredScore
+                || ocrVerified
+                || uniqueTitleVerified
+                || titleAgreesWithVisual
+        else {
             recordOutcome(.belowAcceptanceThreshold)
             return nil
         }
@@ -998,7 +1091,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 && (candidate.details.identity.exactPrintingID ?? candidate.details.identity.id)
                     != (primary.details.identity.exactPrintingID ?? primary.details.identity.id)
         }
-        if !ocrVerified, titlePrintingCount > 1, !familyHasMultiplePrintings {
+        // When the title merely CONTRADICTS nothing but the image did not
+        // independently pick the same name, keep the strict bar. When the
+        // image and the title agree on the name, the family is confirmed and
+        // `CardPrintingResolver` owns the printing choice (newest in Quick
+        // Scan, user choice in Exact Printing).
+        if !ocrVerified, titlePrintingCount > 1, !familyHasMultiplePrintings, !titleAgreesWithVisual {
             guard primary.confidence.score >= 0.85,
                   let titleRunnerScore,
                   primary.confidence.score - titleRunnerScore >= 0.05
@@ -1081,24 +1179,56 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     /// collector-number and printing-ambiguity policy below.
     static func acceptsUniqueTitleEvidence(
         score: Double,
-        printingCount: Int
+        printingCount: Int,
+        floor: Double = Configuration.minimumEvidenceScore
     ) -> Bool {
-        printingCount == 1 && score >= Configuration.minimumEvidenceScore
+        printingCount == 1 && score >= floor
     }
 
+    /// Title agreement: the exact printed title names the same card the
+    /// image ranked first, that leader is at or above the evidence floor,
+    /// and no different-name rival sat within the ambiguity margin of it.
+    /// Internal so the rule can be regression-tested without Core ML.
+    static func titleAgreesWithVisualLeader(
+        titleConstrained: Bool,
+        titleName: String?,
+        visualLeaderName: String,
+        visualLeaderScore: Double,
+        rivalName: String?,
+        rivalScore: Double?,
+        ambiguityMargin: Double,
+        evidenceScore: Double,
+        enabled: Bool = true,
+        evidenceFloor: Double = Configuration.minimumEvidenceScore
+    ) -> Bool {
+        guard enabled, titleConstrained, let titleName else { return false }
+        guard evidenceScore >= evidenceFloor else { return false }
+        let title = CardTitleOCR.normalizedName(titleName)
+        guard CardTitleOCR.normalizedName(visualLeaderName) == title else { return false }
+        if let rivalName, let rivalScore,
+           CardTitleOCR.normalizedName(rivalName) != title,
+           visualLeaderScore - rivalScore < ambiguityMargin {
+            return false
+        }
+        return true
+    }
+
+    /// The built-in policy's title requirement for `game` (no manifest
+    /// declaration). Visual-first since 2026-08-29: a single-card Magic
+    /// capture is accepted on visual evidence alone at its per-game
+    /// operating point, the same way Pokémon is; title/footer OCR is a
+    /// verifier for weak or ambiguous scores, never a gate. Binder pages keep
+    /// the title requirement — a page multiplies every false-positive
+    /// opportunity by the pocket count and produced wrong accepts from
+    /// 180-degree retries. `SCANNER_MTG_TITLE_GATE=1` restores the gate on
+    /// intentional captures for A/B replays.
     nonisolated static func requiresTitleConfirmation(
         game: TCGGame,
         purpose: CardScanPurpose,
         source: ScanInvocationKind
     ) -> Bool {
-        let isIntentionalCapture: Bool
-        switch source {
-        case .livePreview:
-            isIntentionalCapture = false
-        case .photoCapture, .importedPhoto:
-            isIntentionalCapture = true
-        }
-        return game == .magic && (purpose == .binderPage || isIntentionalCapture)
+        ScannerGameAcceptancePolicy.resolve(game: game, declared: nil)
+            .requiresTitleConfirmation(purpose: purpose, source: source)
     }
 
     /// Live-preview frames reuse the previous frame's footer reading when the
@@ -1199,8 +1329,12 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         return candidates.sorted { $0.confidence.score > $1.confidence.score }
     }
 
+    /// The confirmed printing becomes the candidate's identity (so the
+    /// printing resolver's verified path selects it) while the family's
+    /// alternative list and candidate id are preserved.
     private func ocrVerifiedCandidate(
         _ candidate: CardScanCandidate,
+        printing: CardDetails,
         collectorNumber: String?
     ) -> CardScanCandidate {
         var debugInfo = candidate.debugInfo
@@ -1218,7 +1352,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
         return CardScanCandidate(
             id: candidate.id,
-            details: candidate.details,
+            details: printing,
             confidence: CardScanConfidence(score: candidate.confidence.score, reason: reason),
             originatingStrategy: candidate.originatingStrategy,
             debugInfo: debugInfo,

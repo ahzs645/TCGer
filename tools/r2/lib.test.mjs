@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertPhysicalScannerEntries,
   isPokemonPocketScannerEntry,
+  loadAcceptancePolicy,
 } from "./lib.mjs";
 
 test("physical scanner guard recognizes every Pokemon Pocket marker", () => {
@@ -26,4 +27,23 @@ test("physical Pokemon and non-Pokemon rows remain publishable", () => {
   ];
   assert.ok(rows.every((row) => !isPokemonPocketScannerEntry(row)));
   assert.doesNotThrow(() => assertPhysicalScannerEntries(rows));
+});
+
+test("shared acceptance policies publish per game with the conservative default for unknown games", async () => {
+  const magic = await loadAcceptancePolicy("magic");
+  assert.equal(magic.schema, "tcger-scanner-acceptance-policy-v1");
+  assert.equal(magic.strongAcceptanceScore, 0.7);
+  assert.equal(magic.titleGate, "binderPage");
+  assert.equal(magic.collectorNumberScope, "family");
+  assert.equal(magic.calibration, undefined);
+
+  const pokemon = await loadAcceptancePolicy("pokemon");
+  assert.equal(pokemon.strongAcceptanceScore, 0.65);
+  assert.equal(pokemon.titleGate, "never");
+
+  const future = await loadAcceptancePolicy("lorcana");
+  assert.equal(future.strongAcceptanceScore, 0.7);
+  assert.equal(future.titleGate, "never");
+  assert.equal(future.uniqueTitleRescue, true);
+  assert.ok(future.evidenceFloor <= future.strongAcceptanceScore);
 });

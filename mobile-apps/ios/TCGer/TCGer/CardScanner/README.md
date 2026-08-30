@@ -360,7 +360,7 @@ selects one as an ATOMIC bundle of model + index + thresholds + gate:
 |---|---|---|
 | Model | `CardEmbeddings-arcface.mlpackage` (FastViT-T8, 6.9 MB) | `CardEmbeddings.mlpackage` (dinov2-small, 44 MB) |
 | Index | `CardsIndexVectors-arcface.bin` | `CardsIndexVectors.bin` |
-| Strong accept / ambiguity | 0.65 / 0.05 | 0.72 / 0.02 |
+| Strong accept / ambiguity | 0.65 / 0.05 (Magic: 0.70 / 0.05, see `strongAcceptanceScore(for:)`) | 0.72 / 0.02 |
 | Rejection gate | none (gate is DINOv2-trained) | `CardFaceGate.json` |
 | Replay corpus (76 labeled) | **46 correct, 0 wrong accepts** | 31 correct, 1 wrong accept |
 

@@ -17,6 +17,8 @@ import com.ahmadjalil.tcger.data.remote.AddCardRequest
 import com.ahmadjalil.tcger.data.remote.AddSealedInventoryRequest
 import com.ahmadjalil.tcger.data.remote.AddWishlistCardRequest
 import com.ahmadjalil.tcger.data.remote.BinderDto
+import com.ahmadjalil.tcger.data.remote.BinderShareLinkDto
+import com.ahmadjalil.tcger.data.remote.CreateBinderShareLinkRequest
 import com.ahmadjalil.tcger.data.remote.CardDataRequest
 import com.ahmadjalil.tcger.data.remote.CardDto
 import com.ahmadjalil.tcger.data.remote.CreateBinderRequest
@@ -50,6 +52,7 @@ import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetStore
 import com.ahmadjalil.tcger.data.scanner.model.normalizeScannerGame
 import com.ahmadjalil.tcger.domain.Binder
 import com.ahmadjalil.tcger.domain.BinderInput
+import com.ahmadjalil.tcger.domain.BinderShareLink
 import com.ahmadjalil.tcger.domain.hasValidCoverUrl
 import com.ahmadjalil.tcger.domain.CardScanCandidate
 import com.ahmadjalil.tcger.domain.CardScanEngine
@@ -61,6 +64,7 @@ import com.ahmadjalil.tcger.domain.ScanDebugCapture
 import com.ahmadjalil.tcger.domain.ScanDebugFeedbackStatus
 import com.ahmadjalil.tcger.domain.ScanDebugReviewTag
 import com.ahmadjalil.tcger.domain.CatalogCard
+import com.ahmadjalil.tcger.domain.CatalogScanDecision
 import com.ahmadjalil.tcger.domain.DataSourceMode
 import com.ahmadjalil.tcger.domain.OwnedCard
 import com.ahmadjalil.tcger.domain.SealedInventoryItem
@@ -182,8 +186,42 @@ class DefaultTCGerRepository(
     }
 
     override suspend fun deleteBinder(id: String) = withSource(
-        local = { dao.deleteBinder(id) },
+        local = {
+            val now = System.currentTimeMillis()
+            dao.archiveBinder(
+                id,
+                BinderEntity(
+                    id = "__library__",
+                    name = "Unsorted Library",
+                    description = "Cards not yet assigned to a binder",
+                    colorHex = "#9E9E9E",
+                    defaultCondition = null,
+                    containerType = null,
+                    imageUrl = null,
+                    associatedTcg = null,
+                    associatedSetCode = null,
+                    associatedSetName = null,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+        },
         remote = { api, auth -> api.deleteBinder(auth, id) },
+    )
+
+    override suspend fun getBinderShareLinks(id: String): List<BinderShareLink> = withSource(
+        local = { emptyList() },
+        remote = { api, auth -> api.getBinderShareLinks(auth, id).map(BinderShareLinkDto::toDomain) },
+    )
+
+    override suspend fun createBinderShareLink(id: String, label: String): BinderShareLink = withSource(
+        local = { error("Share links require a connected server") },
+        remote = { api, auth -> api.createBinderShareLink(auth, id, CreateBinderShareLinkRequest(label.trim())).toDomain() },
+    )
+
+    override suspend fun revokeBinderShareLink(id: String, linkId: String) = withSource(
+        local = { error("Share links require a connected server") },
+        remote = { api, auth -> api.revokeBinderShareLink(auth, id, linkId) },
     )
 
     override suspend fun searchCards(query: String, tcg: String?): List<CatalogCard> = withSource(
@@ -198,6 +236,21 @@ class DefaultTCGerRepository(
         remote = { api, auth -> api.searchCards(auth, query.trim(), tcg).cards.map(CardDto::toDomain) },
     )
 
+    override suspend fun discoverCards(tcg: String?, count: Int): List<CatalogCard> = withSource(
+        local = {
+            dao.getBinders()
+                .flatMap { it.cards }
+                .asSequence()
+                .filter { tcg == null || it.tcg == tcg }
+                .distinctBy { it.externalId }
+                .map(OwnedCardEntity::toCatalogCard)
+                .shuffled()
+                .take(count.coerceIn(1, 24))
+                .toList()
+        },
+        remote = { api, auth -> api.discoverCards(auth, tcg, count.coerceIn(1, 24)).cards.map(CardDto::toDomain) },
+    )
+
     override suspend fun scanCard(imageBytes: ByteArray, tcg: String, options: CardScanOptions): CardScanResult {
         require(imageBytes.isNotEmpty()) { "Capture or choose a card image first" }
         val settings = preferencesStore.current()
@@ -209,7 +262,9 @@ class DefaultTCGerRepository(
             var localRecognizer: ArcFaceCardRecognizer? = null
             runCatching {
                 getArcFaceRecognizer(tcg).also { localRecognizer = it }.let { recognizer ->
-                    withContext(Dispatchers.Default) { recognizer.recognize(imageBytes) }
+                    withContext(Dispatchers.Default) {
+                        recognizer.recognize(imageBytes, setCode = options.setCodeHint)
+                    }
                 }
             }.onSuccess { local ->
                 localResult = local
@@ -229,7 +284,7 @@ class DefaultTCGerRepository(
             }.onFailure { error ->
                 if (options.engine == CardScanEngine.ON_DEVICE_OCR) serverFailure = error
             }
-            if (normalizeScannerGame(tcg) == "magic" &&
+            if (localRecognizer?.acceptancePolicy?.permitsManualOcrRescue == true &&
                 localResult?.decision !is ArcFaceRecognitionDecision.Accepted &&
                 LocalEmbeddingDispatch.permitsManualOcrRescue(options)
             ) {
@@ -240,7 +295,7 @@ class DefaultTCGerRepository(
                         null
                     }
                 if (evidence != null) {
-                    when (val rescue = localRecognizer?.rescueMagicManualCapture(
+                    when (val rescue = localRecognizer?.rescueManualCapture(
                         checkNotNull(localResult),
                         evidence,
                     )) {
@@ -278,7 +333,9 @@ class DefaultTCGerRepository(
             }
             if (recognizer != null) {
                 val local = runCatching {
-                    withContext(Dispatchers.Default) { recognizer.recognize(imageBytes) }
+                    withContext(Dispatchers.Default) {
+                        recognizer.recognize(imageBytes, setCode = options.setCodeHint)
+                    }
                 }.getOrElse { error ->
                     if (options.engine == CardScanEngine.ON_DEVICE_OCR) throw error
                     serverFailure = error
@@ -345,8 +402,28 @@ class DefaultTCGerRepository(
                     captureSource = options.captureSource.toRequestBody(textBody),
                     saveDebugCapture = (if (options.saveDebugCapture) "1" else "0").toRequestBody(textBody),
                     captureNotes = options.captureNotes.orEmpty().trim().toRequestBody(textBody),
+                    setCodeHint = options.setCodeHint.orEmpty().trim().toRequestBody(textBody),
                 )
             }.onSuccess { response ->
+                val catalogDecision = response.meta?.catalogDecision?.let {
+                    CatalogScanDecision(
+                        accepted = it.accepted,
+                        reason = it.reason,
+                        topConfidence = it.topConfidence,
+                        runnerUpConfidence = it.runnerUpConfidence,
+                    )
+                }
+                if (catalogDecision?.accepted == false) {
+                    return CardScanResult(
+                        candidates = emptyList(),
+                        source = CardScanSource.SERVER_IMAGE_MATCH,
+                        engine = response.meta?.engine ?: options.engine.apiValue,
+                        elapsedMs = response.meta?.timings?.totalMs,
+                        debugCaptureId = response.debugCapture?.id,
+                        debugCaptureError = response.debugCaptureError,
+                        catalogDecision = catalogDecision,
+                    )
+                }
                 val matches = listOfNotNull(response.match).plus(response.candidates)
                     .distinctBy(ScanMatchDto::externalId)
                 if (matches.isNotEmpty()) {
@@ -357,6 +434,7 @@ class DefaultTCGerRepository(
                         elapsedMs = response.meta?.timings?.totalMs,
                         debugCaptureId = response.debugCapture?.id,
                         debugCaptureError = response.debugCaptureError,
+                        catalogDecision = catalogDecision,
                     )
                 }
             }.onFailure { serverFailure = it }
@@ -865,7 +943,25 @@ private suspend fun WishlistWithCards.toDomain(dao: TCGerDao) = Wishlist(
 )
 
 private fun CardDto.toDomain() = CatalogCard(
-    id, name, tcg, setCode, setName, rarity, collectorNumber, imageUrlSmall ?: imageUrl,
+    id = id,
+    name = name,
+    tcg = tcg,
+    setCode = setCode,
+    setName = setName,
+    rarity = rarity,
+    collectorNumber = collectorNumber,
+    imageUrl = imageUrlSmall ?: imageUrl,
+    artist = artist,
+    supertype = supertype,
+    attributes = attributes.orEmpty().mapValues { (_, value) ->
+        when (value) {
+            is kotlinx.serialization.json.JsonArray -> value.mapNotNull {
+                (it as? kotlinx.serialization.json.JsonPrimitive)?.content
+            }
+            is kotlinx.serialization.json.JsonPrimitive -> listOf(value.content)
+            else -> emptyList()
+        }
+    },
 )
 
 private fun ScanMatchDto.toDomain() = CatalogCard(
@@ -988,8 +1084,17 @@ private fun BinderDto.toDomain() = Binder(
             remote.collectorNumber,
             remote.imageUrlSmall ?: remote.imageUrl,
         )
-        OwnedCard(remote.id, id, catalog, remote.quantity, remote.condition, remote.price)
+        OwnedCard(remote.id, id, catalog, remote.quantity, remote.condition, remote.price, remote.acquisitionPrice)
     },
+)
+
+private fun BinderShareLinkDto.toDomain() = BinderShareLink(
+    id = id,
+    label = label,
+    token = token,
+    expiresAt = expiresAt,
+    createdAt = createdAt,
+    lastUsedAt = lastUsedAt,
 )
 
 private fun WishlistDto.toDomain() = Wishlist(

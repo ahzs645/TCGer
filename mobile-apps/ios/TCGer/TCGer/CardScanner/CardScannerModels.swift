@@ -347,12 +347,16 @@ nonisolated enum CardPrintingResolver {
         mode: ScannerPrintingMode,
         verifiedExactPrintingID: String? = nil
     ) -> Decision {
+        // Expanded printings keep the family's alternative list so a
+        // resolved result still knows which printings it stands in for
+        // (the result editor and replay scoring both read it).
         let expanded = primary.printingAlternatives.map { details in
             CardScanCandidate(
                 details: details,
                 confidence: primary.confidence,
                 originatingStrategy: primary.originatingStrategy,
-                debugInfo: primary.debugInfo
+                debugInfo: primary.debugInfo,
+                printingAlternatives: primary.printingAlternatives
             )
         }
         let unique = (expanded + [primary] + candidates).reduce(into: [String: CardScanCandidate]()) {

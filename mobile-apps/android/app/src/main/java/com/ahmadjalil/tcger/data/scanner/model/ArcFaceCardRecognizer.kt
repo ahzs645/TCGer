@@ -20,6 +20,8 @@ class ArcFaceCardRecognizer private constructor(
     private val contract: ArcFaceRuntimeContract,
 ) : Closeable {
     val artifactVersion: String get() = contract.version
+    /** The declarative per-game policy this runtime scans under. */
+    val acceptancePolicy: ScannerAcceptancePolicy get() = contract.acceptancePolicy
 
     fun recognize(
         imageBytes: ByteArray,
@@ -43,8 +45,8 @@ class ArcFaceCardRecognizer private constructor(
         return ArcFaceRecognitionResult(
             decision = ArcFaceRecognitionPolicy.decide(
                 matches,
-                strongAcceptanceScore = contract.strongAcceptanceScore,
-                ambiguityMargin = contract.ambiguityMargin,
+                strongAcceptanceScore = acceptancePolicy.strongAcceptanceScore,
+                ambiguityMargin = acceptancePolicy.ambiguityMargin,
             ),
             matches = matches,
             preprocessMs = preprocessNs / 1_000_000.0,
@@ -54,15 +56,19 @@ class ArcFaceCardRecognizer private constructor(
         )
     }
 
-    /** Magic's intentional-capture policy: exact unique title evidence may
-     * rescue a 0.55+ visual neighbor; a one-glyph OCR repair is bounded to an
-     * already-strong 0.75+ visual shortlist. Other games retain their current
-     * calibrated acceptance behavior until they have equivalent replay data. */
-    fun rescueMagicManualCapture(
+    /** Bounded OCR rescue for an intentional capture the visual policy did
+     * not accept, driven by the game's [acceptancePolicy]: a footer collector
+     * number confirms an exact printing (searching every printing the family
+     * row represents when the scope is FAMILY); an exact catalog-unique title,
+     * or an exact title agreeing with the image's own leader, confirms the
+     * family from the evidence floor; a one-glyph OCR repair is bounded to an
+     * already-strong 0.75+ visual shortlist. OCR never establishes identity
+     * from weak or unrelated visual evidence. */
+    fun rescueManualCapture(
         result: ArcFaceRecognitionResult,
         evidence: DinoV2OcrEvidence,
     ): DinoV2OcrRescueDecision {
-        require(contract.game == "magic") { "Magic OCR rescue requires a Magic runtime" }
+        require(acceptancePolicy.permitsManualOcrRescue) { "OCR rescue is disabled for ${contract.game}" }
         return DinoV2ManualOcrRescue.decide(
             evidence = evidence,
             originalMatches = result.matches,
@@ -70,17 +76,26 @@ class ArcFaceCardRecognizer private constructor(
                 index.nearest(
                     query = result.embedding,
                     limit = 10,
-                    physicalPokemonOnly = false,
+                    physicalPokemonOnly = contract.game == "pokemon",
                     game = contract.game,
                     normalizedCardName = normalizedName,
                 ) to index.printingCountForGame(contract.game, normalizedName)
             },
-            strongAcceptanceScore = contract.strongAcceptanceScore,
-            ambiguityMargin = contract.ambiguityMargin,
-            uniqueTitleEvidenceScore = 0.55,
+            strongAcceptanceScore = acceptancePolicy.strongAcceptanceScore,
+            ambiguityMargin = acceptancePolicy.ambiguityMargin,
+            uniqueTitleEvidenceScore = acceptancePolicy.evidenceFloor,
             singleEditVisualFloor = 0.75,
+            uniqueTitleRescue = acceptancePolicy.uniqueTitleRescue,
+            titleAgreementRescue = acceptancePolicy.titleAgreementRescue,
+            collectorNumberScope = acceptancePolicy.collectorNumberScope,
         )
     }
+
+    @Deprecated("Use rescueManualCapture; the policy is declared per game", ReplaceWith("rescueManualCapture(result, evidence)"))
+    fun rescueMagicManualCapture(
+        result: ArcFaceRecognitionResult,
+        evidence: DinoV2OcrEvidence,
+    ): DinoV2OcrRescueDecision = rescueManualCapture(result, evidence)
 
     override fun close() = encoder.close()
 

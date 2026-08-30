@@ -93,6 +93,38 @@ An ANN top-K list is not the print chooser: large families such as basic lands
 can contain far more printings than the shortlist. Exact-print candidates must
 be expanded from the catalog by `recognitionFamilyId` after visual retrieval.
 
+## Visual-first acceptance (Magic, 2026-08-29)
+
+A single-card Magic capture is accepted the same way a Pokémon capture is:
+on visual evidence alone at its per-game operating point. The iOS ArcFace
+runtime uses a Magic strong-accept of 0.70 (Pokémon keeps 0.65) with the
+shared 0.05 ambiguity margin; the value was chosen from the two labeled MTG
+sessions, where a plain-visual policy at 0.65 admitted three wrong accepts
+between 0.64 and 0.69 and 0.70 admitted none. Title OCR is no longer a gate
+on intentional captures (binder pages still require it); it is read only when
+a crop cannot pass on its own score and then acts as bounded evidence:
+
+- an exact, globally unique title confirms a 0.55-or-higher neighbour (unchanged);
+- an exact title that names the same card the image ranked first, with no
+  different-name rival inside the ambiguity margin, confirms the visual
+  *family* from the same 0.55 floor — the printing is then resolved by the
+  normal Quick Scan / Exact Printing policy instead of the former "0.85 or
+  abstain" rule that blocked every reprinted card;
+- a footer collector number is matched against every printing a family row
+  represents, not only its representative, so a correct reading pins the
+  exact printing (verified provenance) inside the family.
+
+Simulator replay of the two labeled MTG sessions (49 frames, v2 index):
+28 correct / 0 wrong / 21 abstain before, 36 / 0 / 13 after, with no
+previously accepted frame lost. `SCANNER_MTG_LEGACY_POLICY=1` replays the
+previous policy from the same build for A/B runs.
+
+These rules are not Magic code: they are the fields of the per-game
+[acceptance policy](game-acceptance-policy.md) (`strongAcceptanceScore`,
+`ambiguityMargin`, `evidenceFloor`, `titleGate`, `uniqueTitleRescue`,
+`titleAgreementRescue`, `collectorNumberScope`), declared in each game's
+scanner manifest and resolved to a built-in or default profile when absent.
+
 ## User OCR control
 
 OCR is an optional verifier, not the primary recognizer. It defaults on and is

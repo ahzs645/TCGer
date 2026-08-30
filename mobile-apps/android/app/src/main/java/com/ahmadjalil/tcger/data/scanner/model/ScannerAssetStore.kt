@@ -52,6 +52,8 @@ data class ScannerAssetManifest(
     val metadata: ScannerAssetManifestFile,
     val strongAcceptanceScore: Double,
     val ambiguityMargin: Double,
+    /** Optional `tcger-scanner-acceptance-policy-v1`; absent on manifests published before 2026-08-29. */
+    val acceptancePolicy: ScannerAcceptancePolicy? = null,
 ) {
     val displayedCardCount: Int get() = printingCount ?: cardCount
 }
@@ -255,6 +257,7 @@ class ScannerAssetStore internal constructor(
         }
         require(manifest.strongAcceptanceScore in -1.0..1.0) { "Scanner acceptance score is invalid" }
         require(manifest.ambiguityMargin in 0.0..2.0) { "Scanner ambiguity margin is invalid" }
+        manifest.acceptancePolicy?.let { require(it.isValid) { "Scanner acceptance policy is invalid" } }
         val descriptors = listOf(manifest.model, manifest.vectors, manifest.metadata)
         descriptors.forEach { descriptor ->
             require(descriptor.file.isNotBlank()) { "Scanner asset path is missing" }
@@ -331,6 +334,7 @@ class ScannerAssetStore internal constructor(
         embeddingDimension = dimension,
         strongAcceptanceScore = strongAcceptanceScore,
         ambiguityMargin = ambiguityMargin,
+        acceptancePolicy = ScannerAcceptancePolicy.resolve(normalizeScannerGame(game), acceptancePolicy),
     )
 
     companion object {

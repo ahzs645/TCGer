@@ -15,6 +15,7 @@ import {
   createR2Client,
   isNotFound,
   parseCliArgs,
+  loadAcceptancePolicy,
 } from "./lib.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -103,6 +104,11 @@ async function buildPlan(options) {
     }
   }
 
+  const acceptancePolicy = await loadAcceptancePolicy(options.game, options.acceptancePolicy ?? null);
+  // The legacy top-level operating point stays in sync with the declared
+  // policy unless a sweep overrides it explicitly.
+  const strongAcceptanceScore = options.strongAcceptanceScore ?? acceptancePolicy.strongAcceptanceScore;
+  const ambiguityMargin = options.ambiguityMargin ?? acceptancePolicy.ambiguityMargin;
   const model = asset(options.prefix, basename(options.model), modelContents);
   const vectors = asset(options.prefix, basename(options.vectors), vectorContents);
   const metadataAsset = asset(options.prefix, basename(options.metadata), metadataContents);
@@ -120,9 +126,10 @@ async function buildPlan(options) {
     recognitionContract: "tcger-two-stage-recognition-v2",
     dimension,
     downloadBytes: assets.reduce((sum, item) => sum + item.bytes, 0),
-    strongAcceptanceScore: options.strongAcceptanceScore,
-    ambiguityMargin: options.ambiguityMargin,
+    strongAcceptanceScore,
+    ambiguityMargin,
     operatingPointStatus: options.operatingPointStatus,
+    acceptancePolicy,
     model: { file: model.file, bytes: model.bytes, sha256: model.sha256 },
     vectors: { file: vectors.file, bytes: vectors.bytes, sha256: vectors.sha256 },
     metadata: {
@@ -206,6 +213,7 @@ async function main() {
   const valueNames = new Set([
     "game", "version", "model", "vectors", "metadata", "onnx-eval",
     "prefix", "bucket", "strong-acceptance-score", "ambiguity-margin", "operating-point-status",
+    "acceptance-policy",
   ]);
   for (const key of values.keys()) if (!valueNames.has(key)) throw new Error(`Unknown option: --${key}`);
   for (const key of flags) if (!new Set(["dry-run", "wrangler", "help", "h"]).has(key)) throw new Error(`Unknown flag: --${key}`);
@@ -216,11 +224,17 @@ async function main() {
   if (!/^[a-z0-9-]+$/.test(game)) throw new Error("--game must be a lowercase key");
   const version = Number.parseInt(values.get("version"), 10);
   if (!Number.isSafeInteger(version) || version <= 0) throw new Error("--version must be positive");
-  const strongAcceptanceScore = Number(values.get("strong-acceptance-score") ?? "0.65");
-  const ambiguityMargin = Number(values.get("ambiguity-margin") ?? "0.05");
+  const strongAcceptanceScore = values.has("strong-acceptance-score")
+    ? Number(values.get("strong-acceptance-score"))
+    : null;
+  const ambiguityMargin = values.has("ambiguity-margin") ? Number(values.get("ambiguity-margin")) : null;
   const operatingPointStatus = values.get("operating-point-status") ?? "provisional-explicit-mode-only";
-  if (!(strongAcceptanceScore > 0 && strongAcceptanceScore <= 1)) throw new Error("invalid strong acceptance score");
-  if (!(ambiguityMargin >= 0 && ambiguityMargin <= 1)) throw new Error("invalid ambiguity margin");
+  if (strongAcceptanceScore !== null && !(strongAcceptanceScore > 0 && strongAcceptanceScore <= 1)) {
+    throw new Error("invalid strong acceptance score");
+  }
+  if (ambiguityMargin !== null && !(ambiguityMargin >= 0 && ambiguityMargin <= 1)) {
+    throw new Error("invalid ambiguity margin");
+  }
 
   const dryRun = flags.has("dry-run");
   const useWrangler = flags.has("wrangler");
@@ -237,6 +251,7 @@ async function main() {
     vectors: resolve(values.get("vectors")),
     metadata: resolve(values.get("metadata")),
     onnxEval: values.get("onnx-eval") ? resolve(values.get("onnx-eval")) : null,
+    acceptancePolicy: values.get("acceptance-policy") ? resolve(values.get("acceptance-policy")) : null,
   });
   console.log(JSON.stringify({
     dryRun,

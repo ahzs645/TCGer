@@ -85,7 +85,8 @@ final class CardScannerCoordinator: @unchecked Sendable {
                 ),
                 indexStore: AnnoyIndexStore(fileURL: runtime.vectorsURL),
                 metadataStore: CardIndexMetadataStore(fileURL: runtime.metadataURL),
-                supportedModes: [mode]
+                supportedModes: [mode],
+                acceptancePolicies: runtime.acceptancePolicy.map { [game: $0] } ?? [:]
             ))
         }
         if includeBundledTestFallbacks {

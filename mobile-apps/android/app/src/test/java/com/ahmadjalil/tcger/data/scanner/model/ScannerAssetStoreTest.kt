@@ -212,6 +212,38 @@ class ScannerAssetStoreTest {
         assertEquals(109546, decoded.displayedCardCount)
     }
 
+    @Test
+    fun `declared acceptance policy overrides the built-in profile and invalid ones fall back`() {
+        val declared = Json { ignoreUnknownKeys = true }.decodeFromString<ScannerAssetManifest>(
+            """
+            {
+              "formatVersion":2,"game":"magic","version":"visual-style-v2","encoder":"arcface","modelName":"fastvit_t8",
+              "cardCount":1,"printingCount":2,"metadataSchema":"tcger-cards-index-metadata-v3",
+              "recognitionContract":"tcger-two-stage-recognition-v2","dimension":3,"downloadBytes":3,
+              "strongAcceptanceScore":0.6,"ambiguityMargin":0.05,
+              "acceptancePolicy":{"schema":"tcger-scanner-acceptance-policy-v1","strongAcceptanceScore":0.68,"titleGate":"intentionalCaptures"},
+              "model":{"file":"objects/a.onnx","bytes":1,"sha256":"${"a".repeat(64)}"},
+              "vectors":{"file":"objects/b.bin","bytes":1,"sha256":"${"b".repeat(64)}"},
+              "metadata":{"file":"objects/c.json","bytes":1,"sha256":"${"c".repeat(64)}"}
+            }
+            """.trimIndent(),
+        )
+        val policy = checkNotNull(declared.acceptancePolicy)
+        assertTrue(policy.isValid)
+        assertEquals(0.68, policy.strongAcceptanceScore, 1e-9)
+        assertEquals(ScannerAcceptancePolicy.TitleGate.INTENTIONAL_CAPTURES, policy.titleGate)
+        // Unstated fields take the fallback values, not zero.
+        assertEquals(ScannerAcceptancePolicy.CollectorNumberScope.FAMILY, policy.collectorNumberScope)
+        assertEquals(0.68, ScannerAcceptancePolicy.resolve("magic", policy).strongAcceptanceScore, 1e-9)
+
+        val builtin = ScannerAcceptancePolicy.builtin("magic")
+        assertEquals(0.70, builtin.strongAcceptanceScore, 1e-9)
+        assertEquals(ScannerAcceptancePolicy.TitleGate.BINDER_PAGE, builtin.titleGate)
+        assertEquals(ScannerAcceptancePolicy.fallback, ScannerAcceptancePolicy.builtin("lorcana"))
+        assertEquals(builtin, ScannerAcceptancePolicy.resolve("magic", ScannerAcceptancePolicy(strongAcceptanceScore = 1.7)))
+        assertEquals(builtin, ScannerAcceptancePolicy.resolve("magic", null))
+    }
+
     private fun store(responses: MutableMap<String, ByteArray> = mutableMapOf()) = ScannerAssetStore(
         root = temporaryFolder.newFolder("scanner-assets-${System.nanoTime()}"),
         remoteBaseURL = BASE,

@@ -65,6 +65,13 @@ data class ArcFaceRuntimeContract(
     val embeddingDimension: Int,
     val strongAcceptanceScore: Double,
     val ambiguityMargin: Double,
+    /**
+     * The per-game acceptance policy this runtime scans under: the manifest's
+     * declared `acceptancePolicy` when valid, else the built-in profile for
+     * [game]. Its operating point takes precedence over the two legacy
+     * top-level fields above, which remain for manifests that predate it.
+     */
+    val acceptancePolicy: ScannerAcceptancePolicy = ScannerAcceptancePolicy.builtin(game),
 ) {
     val assets: List<ScannerModelAsset> = listOf(model, vectors, metadata)
 }

@@ -6,6 +6,7 @@ import {
   assertPhysicalScannerEntries,
   parseCliArgs,
   positiveInteger,
+  loadAcceptancePolicy,
 } from "./lib.mjs";
 
 function usage() {
@@ -75,6 +76,7 @@ export function buildBrowserIndex({
   version,
   modelFile,
   model,
+  acceptancePolicy = null,
   minSimilarity = 0.65,
   minVerifiedSimilarity = 0.58,
   minMargin = 0.05,
@@ -117,6 +119,7 @@ export function buildBrowserIndex({
     total: entries.length,
     printingTotal: entries.reduce((sum, entry) => sum + entry.printings.length, 0),
     thresholds: { minSimilarity, minVerifiedSimilarity, minMargin },
+    acceptancePolicy: acceptancePolicy ?? null,
     modelUrl: basename(modelFile),
     entries,
     vectors: vectorContents.subarray(8).toString("base64"),
@@ -132,6 +135,12 @@ async function main() {
   const modelFile = required(values, "model-file");
   const outputPath = resolve(required(values, "output"));
   const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+  // The browser operating point is the game's declared acceptance policy
+  // unless a sweep overrides it explicitly.
+  const acceptancePolicy = await loadAcceptancePolicy(
+    game,
+    values.get("acceptance-policy") ? resolve(values.get("acceptance-policy")) : null,
+  );
   const artifact = buildBrowserIndex({
     metadata,
     vectorContents: await readFile(vectorsPath),
@@ -139,9 +148,10 @@ async function main() {
     version: positiveInteger(required(values, "version"), "version"),
     modelFile,
     model: values.get("model") ?? `tcger/arcface-fastvit-t8-${game}-full`,
-    minSimilarity: finiteNumber(values, "min-similarity", 0.65),
-    minVerifiedSimilarity: finiteNumber(values, "min-verified-similarity", 0.58),
-    minMargin: finiteNumber(values, "min-margin", 0.05),
+    minSimilarity: finiteNumber(values, "min-similarity", acceptancePolicy.strongAcceptanceScore),
+    minVerifiedSimilarity: finiteNumber(values, "min-verified-similarity", acceptancePolicy.evidenceFloor),
+    minMargin: finiteNumber(values, "min-margin", acceptancePolicy.ambiguityMargin),
+    acceptancePolicy,
   });
   const serialized = `${JSON.stringify(artifact)}\n`;
   await writeFile(outputPath, serialized);

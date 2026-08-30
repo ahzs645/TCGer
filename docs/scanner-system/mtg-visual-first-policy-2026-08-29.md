@@ -1,0 +1,94 @@
+# Magic visual-first policy — 2026-08-29 replay record
+
+Companion to [Real-camera recognition findings](real-camera-recognition-findings-2026-08-29.md)
+(the diagnosis) and [Two-stage recognition](two-stage-recognition.md) (the
+contract). This note records the iOS policy change and the simulator replay
+that measured it.
+
+## What changed (iOS)
+
+`mobile-apps/ios/TCGer/TCGer/CardScanner/BoardCardEmbeddingScannerStrategy.swift`
+and `ScannerEncoderVariant.swift`:
+
+1. **Per-game strong accept.** Magic runs at 0.70 on ArcFace; other games
+   keep the encoder value (now `ScannerGameAcceptancePolicy.builtin(for:)`).
+   `SCANNER_STRONG_ACCEPT_MAGIC` overrides it for sweeps.
+2. **No title gate on single-card captures.** `requiresTitleConfirmation` is
+   true only for Magic binder pages (or with `SCANNER_MTG_TITLE_GATE=1`).
+   A Magic photo is accepted on visual evidence like a Pokémon photo.
+3. **OCR keyed to the attempt's required score.** Title/footer OCR runs when a
+   crop cannot pass on its own score, including retry hypotheses that need
+   the +0.02 margin. Previously a 0.71 whole-frame retry was neither accepted
+   nor examined.
+4. **Footer numbers match every represented printing.** A family row's
+   `printingAlternatives` are searched, and the confirmed printing becomes the
+   result identity with `verified` provenance.
+5. **Title/visual agreement confirms the family.** When the exact printed title
+   names the same card the image ranked first (and no different-name rival is
+   inside the ambiguity margin), the family is accepted from the 0.55
+   evidence floor and `CardPrintingResolver` chooses the printing. The
+   "0.85 or abstain" rule now applies only when title and image disagree.
+6. `CardPrintingResolver` keeps `printingAlternatives` on expanded candidates,
+   and `DevModeSessionReplayTests` scores a same-family newest-printing
+   fallback as a family match rather than a wrong accept.
+
+`SCANNER_MTG_LEGACY_POLICY=1` restores the previous behaviour from the same
+build for A/B replays.
+
+Items 1, 2, 4 and 5 were then lifted out of Magic-specific code into the
+declarative per-game [acceptance policy](game-acceptance-policy.md)
+(`ScannerGameAcceptancePolicy` on iOS, `ScannerAcceptancePolicy` on Android,
+`tools/scanner-acceptance-policies.json` for publishers), so the same rules
+apply to any game from its manifest. Android's manual-capture OCR rescue is
+now policy-gated rather than Magic-only and matches footer numbers across a
+family's printings; the browser index takes its thresholds from the policy.
+
+## Replay (iOS Simulator, iPhone 17 Pro clone, Magic visual-family v2 runtime)
+
+Sessions: `scan-session-20260827-223150` (22 MTG frames, HOB foils) and
+`scan-session-20260829-200235` (27 frames, reprint-heavy; labels added to
+`DevModeSessionReplayTests.expectedCards`, session ingested into
+`TCGer-Session-Reference`).
+
+| Policy | Correct | of which family fallback | Wrong | Abstain | Lost accepts |
+|---|---:|---:|---:|---:|---:|
+| Legacy (`SCANNER_MTG_LEGACY_POLICY=1`) | 28/49 | 3 | 0 | 21 | — |
+| Visual-first | **36/49** | 4 | **0** | 13 | 0 |
+
+Per session: 08-27 stays 15/22 (its unique-title rescues are preserved);
+08-29 goes 13/27 → 21/27. Recovered frames are the title-agreement cases
+(Nivix Guildmage, Corpse Appraiser, Racers' Ring ×2, Broken Wings, Riveteers
+Charm) and the nested-printing footer cases (Jwar Isle Refuge C17 258 and
+Forsaken Sanctuary SOI 273, both now `verified`).
+
+Still abstaining, all model-side: Bilbo's Deadly Slice (correct family below
+the 0.55 floor), Stone Quarry (catastrophic camera-domain embedding; its
+0.99 hits on unrelated retro-frame/back-face rows are caught by the ambiguity
+margin, i.e. `printingAmbiguous`), Rage into the Valley at 0.65 with a title
+match whose image leader disagreed, and Jungle Hollow whose Simulator crop
+scores 0.59 (device scored 0.70 with footer 239 — expected to pass on device).
+
+## Does this need a retrain?
+
+Not for these gains — they are policy and metadata handling. A retrain is the
+next lever for the remaining abstentions, and it only helps with **real-camera
+positives** (foil, glare, sleeves, perspective); another catalog-only run with
+the same recipe would reproduce the same 0.55–0.70 band. The camera-corpus
+plan in [Current state and direction](current-state-and-direction-2026-08-29.md)
+is the prerequisite. Index hygiene is also pending: ~724 v2 rows have a
+>0.9-cosine neighbour of a different name (back faces, CE/WC/30A, playtest
+`unk` rows); those are what a degenerate query lands on.
+
+## Follow-ups
+
+- Android now shares the policy contract and the rescue rules (title gate,
+  agreement rescue, family-scoped footer matching); item 3 (OCR keyed to the
+  retry-attempt required score) has no Android equivalent because Android
+  evaluates one crop. Web reads the policy's thresholds only.
+- Add the visual leader name/score to `ScanDiagnostics.Attempt` so
+  title-agreement decisions are auditable from evidence alone.
+- Pokémon regression (full session library, physical-v2 runtime, same
+  build): 51/76 labeled correct, 0 wrong accepts — versus 47/76 in the v2
+  release gate. Five device accepts abstain in the Simulator; all five are in
+  the release gate's own lost-vs-device list (Simulator Vision divergence),
+  so they predate this change.

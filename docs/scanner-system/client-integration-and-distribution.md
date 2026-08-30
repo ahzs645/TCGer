@@ -26,6 +26,13 @@ objects by SHA-256 metadata, and write the mutable manifest last. A client
 therefore never observes a new release whose referenced files have not been
 uploaded.
 
+Native scanner manifests (iOS format 3, Android format 2) and the browser
+index carry the game's `acceptancePolicy`
+(`tcger-scanner-acceptance-policy-v1`), embedded by the publishers from
+`tools/scanner-acceptance-policies.json`. Clients that predate the field, or
+manifests that omit it, run the built-in profile for the game; see
+[Game acceptance policy](game-acceptance-policy.md).
+
 Training images are deliberately absent from public R2. They belong in the
 private Hugging Face image dataset. Clients receive only trained runtimes,
 indexes, metadata, public catalog packs, and pack-opening assets.

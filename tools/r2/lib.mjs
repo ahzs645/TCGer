@@ -179,3 +179,45 @@ export function assertPhysicalScannerEntries(entries, description = "Scanner met
     );
   }
 }
+
+/**
+ * Per-game scanner acceptance policy (`tcger-scanner-acceptance-policy-v1`)
+ * from `tools/scanner-acceptance-policies.json`, the single source of truth
+ * every scanner-manifest publisher embeds as `acceptancePolicy`. A game with
+ * no entry publishes the conservative `default` profile; `overridePath`
+ * substitutes a reviewed policy file for a calibration release.
+ */
+export async function loadAcceptancePolicy(game, overridePath = null) {
+  const source = overridePath ?? resolve(REPO_ROOT, "tools/scanner-acceptance-policies.json");
+  const document = JSON.parse(await readFile(source, "utf8"));
+  const policy = overridePath
+    ? document
+    : (document.games?.[game] ?? document.default);
+  if (!policy || typeof policy !== "object") {
+    throw new Error(`No acceptance policy for ${game}`);
+  }
+  const schema = policy.schema ?? document.schema ?? "tcger-scanner-acceptance-policy-v1";
+  if (schema !== "tcger-scanner-acceptance-policy-v1") {
+    throw new Error(`Unsupported acceptance policy schema ${String(schema)}`);
+  }
+  const result = { schema, ...policy };
+  delete result.calibration;
+  for (const key of ["strongAcceptanceScore", "ambiguityMargin", "evidenceFloor"]) {
+    if (!(typeof result[key] === "number" && result[key] >= 0 && result[key] <= 1)) {
+      throw new Error(`Acceptance policy ${key} must be within [0, 1]`);
+    }
+  }
+  if (result.evidenceFloor > result.strongAcceptanceScore) {
+    throw new Error("Acceptance policy evidenceFloor exceeds strongAcceptanceScore");
+  }
+  if (!["never", "binderPage", "intentionalCaptures"].includes(result.titleGate)) {
+    throw new Error("Acceptance policy titleGate is invalid");
+  }
+  if (!["representative", "family"].includes(result.collectorNumberScope)) {
+    throw new Error("Acceptance policy collectorNumberScope is invalid");
+  }
+  for (const key of ["uniqueTitleRescue", "titleAgreementRescue"]) {
+    if (typeof result[key] !== "boolean") throw new Error(`Acceptance policy ${key} must be boolean`);
+  }
+  return result;
+}

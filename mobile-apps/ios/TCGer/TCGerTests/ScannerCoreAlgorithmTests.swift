@@ -139,6 +139,156 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         ))
     }
 
+    func testTitleAgreementConfirmsFamilyOnlyWhenImageLeaderMatchesAndIsUnrivaled() {
+        // Title and unconstrained visual leader name the same card, no rival:
+        // the family is confirmed from the 0.55 evidence floor.
+        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.titleAgreesWithVisualLeader(
+            titleConstrained: true,
+            titleName: "Racers' Ring",
+            visualLeaderName: "Racers’ Ring",
+            visualLeaderScore: 0.79,
+            rivalName: nil,
+            rivalScore: nil,
+            ambiguityMargin: 0.05,
+            evidenceScore: 0.79
+        ))
+        // A same-name rival (another printing family) never blocks agreement.
+        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.titleAgreesWithVisualLeader(
+            titleConstrained: true,
+            titleName: "Nivix Guildmage",
+            visualLeaderName: "Nivix Guildmage",
+            visualLeaderScore: 0.836,
+            rivalName: "Nivix Guildmage",
+            rivalScore: 0.83,
+            ambiguityMargin: 0.05,
+            evidenceScore: 0.836
+        ))
+        // The image preferred a different card: title alone is not enough.
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.titleAgreesWithVisualLeader(
+            titleConstrained: true,
+            titleName: "Corpse Appraiser",
+            visualLeaderName: "Swamp",
+            visualLeaderScore: 0.68,
+            rivalName: "Corpse Appraiser",
+            rivalScore: 0.67,
+            ambiguityMargin: 0.05,
+            evidenceScore: 0.67
+        ))
+        // A different-name rival inside the ambiguity margin keeps the guard.
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.titleAgreesWithVisualLeader(
+            titleConstrained: true,
+            titleName: "Jungle Hollow",
+            visualLeaderName: "Jungle Hollow",
+            visualLeaderScore: 0.70,
+            rivalName: "Swamp",
+            rivalScore: 0.66,
+            ambiguityMargin: 0.05,
+            evidenceScore: 0.70
+        ))
+        // Below the evidence floor, or without a title match, nothing applies.
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.titleAgreesWithVisualLeader(
+            titleConstrained: true,
+            titleName: "Jungle Hollow",
+            visualLeaderName: "Jungle Hollow",
+            visualLeaderScore: 0.54,
+            rivalName: nil,
+            rivalScore: nil,
+            ambiguityMargin: 0.05,
+            evidenceScore: 0.54
+        ))
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.titleAgreesWithVisualLeader(
+            titleConstrained: false,
+            titleName: nil,
+            visualLeaderName: "Jungle Hollow",
+            visualLeaderScore: 0.80,
+            rivalName: nil,
+            rivalScore: nil,
+            ambiguityMargin: 0.05,
+            evidenceScore: 0.80
+        ))
+    }
+
+    func testBuiltInAcceptancePoliciesMatchTheShippedProfiles() {
+        let magic = ScannerGameAcceptancePolicy.builtin(for: .magic)
+        XCTAssertEqual(magic.strongAcceptanceScore, 0.70, accuracy: 1e-9)
+        XCTAssertEqual(magic.ambiguityMargin, 0.05, accuracy: 1e-9)
+        XCTAssertEqual(magic.titleGate, .binderPage)
+        XCTAssertEqual(magic.collectorNumberScope, .family)
+        XCTAssertTrue(magic.titleAgreementRescue)
+
+        let pokemon = ScannerGameAcceptancePolicy.builtin(for: .pokemon)
+        XCTAssertEqual(pokemon.strongAcceptanceScore, ScannerEncoderVariant.arcface.strongAcceptanceScore, accuracy: 1e-9)
+        XCTAssertEqual(pokemon.titleGate, .never)
+
+        // A game the client has never heard of runs the conservative profile.
+        XCTAssertEqual(ScannerGameAcceptancePolicy.builtin(for: .all), .fallback)
+        XCTAssertEqual(ScannerGameAcceptancePolicy.fallback.strongAcceptanceScore, 0.70, accuracy: 1e-9)
+        XCTAssertEqual(ScannerGameAcceptancePolicy.fallback.titleGate, .never)
+    }
+
+    func testDeclaredAcceptancePolicyDecodesWithDefaultsAndWinsOverBuiltIn() throws {
+        let json = Data("""
+        {"schema":"tcger-scanner-acceptance-policy-v1","strongAcceptanceScore":0.68,"titleGate":"intentionalCaptures"}
+        """.utf8)
+        let declared = try JSONDecoder().decode(ScannerGameAcceptancePolicy.self, from: json)
+        XCTAssertTrue(declared.isValid)
+        XCTAssertEqual(declared.strongAcceptanceScore, 0.68, accuracy: 1e-9)
+        XCTAssertEqual(declared.titleGate, .intentionalCaptures)
+        // Unstated fields take the fallback values, not zero.
+        XCTAssertEqual(declared.ambiguityMargin, ScannerGameAcceptancePolicy.fallback.ambiguityMargin, accuracy: 1e-9)
+        XCTAssertEqual(declared.collectorNumberScope, .family)
+
+        let resolved = ScannerGameAcceptancePolicy.resolve(game: .magic, declared: declared, environment: [:])
+        XCTAssertEqual(resolved.strongAcceptanceScore, 0.68, accuracy: 1e-9)
+        XCTAssertTrue(resolved.requiresTitleConfirmation(purpose: .singleCard, source: .photoCapture))
+    }
+
+    func testInvalidDeclaredAcceptancePolicyFallsBackToBuiltIn() throws {
+        let broken = try JSONDecoder().decode(
+            ScannerGameAcceptancePolicy.self,
+            from: Data(#"{"strongAcceptanceScore":1.7}"#.utf8)
+        )
+        XCTAssertFalse(broken.isValid)
+        let resolved = ScannerGameAcceptancePolicy.resolve(game: .magic, declared: broken, environment: [:])
+        XCTAssertEqual(resolved, ScannerGameAcceptancePolicy.builtin(for: .magic))
+
+        let wrongSchema = try JSONDecoder().decode(
+            ScannerGameAcceptancePolicy.self,
+            from: Data(#"{"schema":"tcger-scanner-acceptance-policy-v9","strongAcceptanceScore":0.7}"#.utf8)
+        )
+        XCTAssertFalse(wrongSchema.isValid)
+    }
+
+    func testAcceptancePolicyEnvironmentOverridesApplyLast() {
+        let perGame = ScannerGameAcceptancePolicy.resolve(
+            game: .magic,
+            declared: nil,
+            environment: ["SCANNER_STRONG_ACCEPT_MAGIC": "0.75"]
+        )
+        XCTAssertEqual(perGame.strongAcceptanceScore, 0.75, accuracy: 1e-9)
+        XCTAssertEqual(
+            ScannerGameAcceptancePolicy.resolve(
+                game: .pokemon,
+                declared: nil,
+                environment: ["SCANNER_STRONG_ACCEPT_MAGIC": "0.75"]
+            ).strongAcceptanceScore,
+            ScannerGameAcceptancePolicy.builtin(for: .pokemon).strongAcceptanceScore,
+            accuracy: 1e-9
+        )
+
+        let legacy = ScannerGameAcceptancePolicy.resolve(
+            game: .magic,
+            declared: nil,
+            environment: ["SCANNER_MTG_LEGACY_POLICY": "1"]
+        )
+        XCTAssertEqual(legacy, ScannerGameAcceptancePolicy.legacyMagic())
+        XCTAssertEqual(legacy.titleGate, .intentionalCaptures)
+        XCTAssertEqual(legacy.collectorNumberScope, .representative)
+        XCTAssertFalse(legacy.titleAgreementRescue)
+        XCTAssertTrue(legacy.requiresTitleConfirmation(purpose: .singleCard, source: .importedPhoto))
+        XCTAssertFalse(legacy.requiresTitleConfirmation(purpose: .singleCard, source: .livePreview))
+    }
+
     func testMetadataNameMatchIsExactAndReturnsEveryPrinting() async {
         let entries = [
             CardIndexMetadataEntry(

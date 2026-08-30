@@ -140,6 +140,15 @@ platforms. Each platform manifest retains its current atomic model/index
 contract. Scanner format scope is explicit; Pokémon's physical scanner lists
 `tabletop`, never `pocket`.
 
+Each platform scanner manifest may also declare an `acceptancePolicy`
+(`tcger-scanner-acceptance-policy-v1`): the per-game operating point and the
+bounded OCR evidence rules the client applies. The policy is data, resolved
+manifest → built-in profile → conservative default, so a new game gets a
+working scanner under the default profile with no client code and moves to
+its own calibrated point by republishing its manifest. Contract, shipped
+values, and the calibration procedure are in
+[Game acceptance policy](game-acceptance-policy.md).
+
 ## Install profiles
 
 Clients can present four simple choices backed by individual capability state:

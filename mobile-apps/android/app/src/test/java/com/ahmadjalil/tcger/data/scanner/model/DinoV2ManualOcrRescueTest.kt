@@ -122,6 +122,71 @@ class DinoV2ManualOcrRescueTest {
         assertNull(LocalEmbeddingDispatch.select("pokemon", manual.copy(engine = CardScanEngine.SERVER_PHASH)))
     }
 
+    @Test fun familyScopedFooterMatchPinsANestedPrinting() {
+        val family = CardEmbeddingMatch(
+            index = 0,
+            similarity = 0.82,
+            card = CardEmbeddingMetadata(
+                0, "scd-306", "Jwar Isle Refuge", game = "magic",
+                setCode = "scd", collectorNumber = "306", recognitionFamilyId = "magic:visual:jwar",
+                printings = listOf(
+                    CardEmbeddingPrinting("scd-306", setCode = "scd", collectorNumber = "306", releaseDate = "2022-12-02"),
+                    CardEmbeddingPrinting("c17-258", setCode = "c17", collectorNumber = "258", releaseDate = "2017-08-25"),
+                ),
+            ),
+        )
+        val evidence = DinoV2OcrEvidence("258/309", emptyList(), "258/309")
+
+        val representativeOnly = DinoV2ManualOcrRescue.decide(
+            evidence, listOf(family),
+            collectorNumberScope = ScannerAcceptancePolicy.CollectorNumberScope.REPRESENTATIVE,
+        ) { emptyList<CardEmbeddingMatch>() to 0 }
+        assertTrue(representativeOnly is DinoV2OcrRescueDecision.Rejected)
+
+        val familyScoped = DinoV2ManualOcrRescue.decide(
+            evidence, listOf(family),
+            collectorNumberScope = ScannerAcceptancePolicy.CollectorNumberScope.FAMILY,
+        ) { emptyList<CardEmbeddingMatch>() to 0 }
+        val accepted = familyScoped as DinoV2OcrRescueDecision.Accepted
+        assertEquals(DinoV2OcrRescueDecision.Accepted.Reason.COLLECTOR_NUMBER, accepted.reason)
+        assertEquals("c17-258", accepted.match.card.cardId)
+        assertEquals("magic:visual:jwar", accepted.match.card.recognitionFamilyId)
+    }
+
+    @Test fun titleAgreeingWithTheVisualLeaderConfirmsAReprintedFamilyFromTheEvidenceFloor() {
+        val leader = match("snc-352", "Racers' Ring", 0.79)
+        val evidence = DinoV2OcrEvidence("Racers' Ring", listOf("Racers' Ring"), "")
+        val ranked = { _: String -> listOf(leader) to 3 }
+
+        val strict = DinoV2ManualOcrRescue.decide(
+            evidence, listOf(leader),
+            strongAcceptanceScore = 0.70, ambiguityMargin = 0.05, uniqueTitleEvidenceScore = 0.55,
+            titleAgreementRescue = false, exactTitleMatches = ranked,
+        )
+        assertEquals(
+            DinoV2OcrRescueDecision.Rejected.Reason.TITLE_PRINTING_UNRESOLVED,
+            (strict as DinoV2OcrRescueDecision.Rejected).reason,
+        )
+
+        val agreeing = DinoV2ManualOcrRescue.decide(
+            evidence, listOf(leader),
+            strongAcceptanceScore = 0.70, ambiguityMargin = 0.05, uniqueTitleEvidenceScore = 0.55,
+            titleAgreementRescue = true, exactTitleMatches = ranked,
+        )
+        assertEquals("snc-352", (agreeing as DinoV2OcrRescueDecision.Accepted).match.card.cardId)
+
+        // The image preferred a different card: the title alone stays bounded.
+        val swamp = match("basic-1", "Swamp", 0.68)
+        val corpse = match("snc-302", "Corpse Appraiser", 0.67)
+        val contradicted = DinoV2ManualOcrRescue.decide(
+            DinoV2OcrEvidence("Corpse Appraiser", listOf("Corpse Appraiser"), ""),
+            listOf(swamp, corpse),
+            strongAcceptanceScore = 0.70, ambiguityMargin = 0.05, uniqueTitleEvidenceScore = 0.55,
+            titleAgreementRescue = true,
+        ) { listOf(corpse) to 3 }
+        assertTrue(contradicted is DinoV2OcrRescueDecision.Rejected)
+    }
+
     private fun match(id: String, name: String, score: Double) = CardEmbeddingMatch(
         index = 0,
         similarity = score,

@@ -10,7 +10,7 @@ final class BinderPageModelsTests: XCTestCase {
         XCTAssertFalse(BinderPageScanner.shouldIncludeByDefault(status: .unmatched))
     }
 
-    func testMTGFinalCapturesRequireTitleWhileLivePreviewRemainsVisual() {
+    func testMTGBinderPagesRequireTitleWhileSingleCardCapturesAreVisualFirst() {
         XCTAssertTrue(BoardCardEmbeddingScannerStrategy.requiresTitleConfirmation(
             game: .magic,
             purpose: .binderPage,
@@ -21,7 +21,11 @@ final class BinderPageModelsTests: XCTestCase {
             purpose: .singleCard,
             source: .livePreview
         ))
-        XCTAssertTrue(BoardCardEmbeddingScannerStrategy.requiresTitleConfirmation(
+        // 2026-08-29 visual-first policy: an intentional single-card Magic
+        // capture is accepted on its per-game visual operating point; OCR is
+        // a verifier, not a gate (SCANNER_MTG_TITLE_GATE=1 restores the gate
+        // for A/B replays).
+        XCTAssertFalse(BoardCardEmbeddingScannerStrategy.requiresTitleConfirmation(
             game: .magic,
             purpose: .singleCard,
             source: .photoCapture

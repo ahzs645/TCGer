@@ -31,9 +31,13 @@ object DinoV2ManualOcrRescue {
         ambiguityMargin: Double = DinoV2ModelContract.ambiguityMargin,
         uniqueTitleEvidenceScore: Double = strongAcceptanceScore,
         singleEditVisualFloor: Double? = null,
+        uniqueTitleRescue: Boolean = true,
+        titleAgreementRescue: Boolean = false,
+        collectorNumberScope: ScannerAcceptancePolicy.CollectorNumberScope =
+            ScannerAcceptancePolicy.CollectorNumberScope.REPRESENTATIVE,
         exactTitleMatches: (String) -> Pair<List<CardEmbeddingMatch>, Int>,
     ): DinoV2OcrRescueDecision {
-        collectorConfirmed(originalMatches, evidence.footerText)?.let { match ->
+        collectorConfirmed(originalMatches, evidence.footerText, collectorNumberScope)?.let { match ->
             return DinoV2OcrRescueDecision.Accepted(
                 match,
                 DinoV2OcrRescueDecision.Accepted.Reason.COLLECTOR_NUMBER,
@@ -53,26 +57,42 @@ object DinoV2ManualOcrRescue {
         }
         val titleCandidates = (exactTitleCandidates + listOfNotNull(correctedTitle)).distinct()
 
+        // The image's own unconstrained leader, so title evidence can be
+        // judged as agreeing with (or contradicting) the picture.
+        val visualLeader = originalMatches.firstOrNull()
+        val visualRival = visualLeader?.let { leader ->
+            originalMatches.firstOrNull {
+                normalizedScannerCardName(it.card.name) != normalizedScannerCardName(leader.card.name)
+            }
+        }
+
         titleCandidates.forEach { title ->
             val (ranked, printingCount) = exactTitleMatches(title)
             val primary = ranked.firstOrNull() ?: return@forEach
-            collectorConfirmed(ranked, evidence.footerText)?.let { match ->
+            collectorConfirmed(ranked, evidence.footerText, collectorNumberScope)?.let { match ->
                 return DinoV2OcrRescueDecision.Accepted(
                     match,
                     DinoV2OcrRescueDecision.Accepted.Reason.COLLECTOR_NUMBER,
                     evidence.fullText,
                 )
             }
-            val requiredTitleScore = if (printingCount == 1) {
-                uniqueTitleEvidenceScore
-            } else {
-                strongAcceptanceScore
+            // Two independent signals naming the same card — the printed
+            // title and the image's leader — confirm the visual FAMILY from
+            // the evidence floor; the printing is resolved downstream.
+            val titleAgreesWithVisual = titleAgreementRescue &&
+                visualLeader != null &&
+                normalizedScannerCardName(visualLeader.card.name) == title &&
+                (visualRival == null || visualLeader.similarity - visualRival.similarity >= ambiguityMargin)
+            val requiredTitleScore = when {
+                printingCount == 1 && uniqueTitleRescue -> uniqueTitleEvidenceScore
+                titleAgreesWithVisual -> uniqueTitleEvidenceScore
+                else -> strongAcceptanceScore
             }
             if (primary.similarity < requiredTitleScore) {
                 return DinoV2OcrRescueDecision.Rejected(DinoV2OcrRescueDecision.Rejected.Reason.TITLE_BELOW_THRESHOLD)
             }
             val runner = ranked.firstOrNull { it.card.cardId != primary.card.cardId }
-            if (printingCount > 1 && (
+            if (printingCount > 1 && !titleAgreesWithVisual && (
                     primary.similarity < 0.85 || runner == null || primary.similarity - runner.similarity < 0.05
                 )) {
                 return DinoV2OcrRescueDecision.Rejected(DinoV2OcrRescueDecision.Rejected.Reason.TITLE_PRINTING_UNRESOLVED)
@@ -137,28 +157,46 @@ object DinoV2ManualOcrRescue {
         return edits <= 1
     }
 
-    private fun collectorConfirmed(matches: List<CardEmbeddingMatch>, text: String): CardEmbeddingMatch? {
+    /**
+     * A footer reading proves the PRINTING, so with [ScannerAcceptancePolicy.CollectorNumberScope.FAMILY]
+     * it is matched against every printing a family row represents, and the
+     * confirmed printing row becomes the match's card (so the caller pins
+     * that exact printing). REPRESENTATIVE keeps the legacy single-row check.
+     */
+    private fun collectorConfirmed(
+        matches: List<CardEmbeddingMatch>,
+        text: String,
+        scope: ScannerAcceptancePolicy.CollectorNumberScope,
+    ): CardEmbeddingMatch? {
+        val options: List<Pair<CardEmbeddingMatch, String>> = matches.flatMap { match ->
+            val rows = when (scope) {
+                ScannerAcceptancePolicy.CollectorNumberScope.REPRESENTATIVE -> listOf(match.card)
+                ScannerAcceptancePolicy.CollectorNumberScope.FAMILY -> match.card.exactPrintingRows()
+            }
+            rows.mapNotNull { row -> collectorNumber(row)?.let { match.copy(card = row) to it } }
+        }
         val pairs = Regex("(\\d{1,4})\\s*/\\s*(\\d{1,4})").findAll(text)
             .map { normalizeCollector(it.groupValues[1]) }.toSet()
-        if (pairs.isNotEmpty()) matches.firstOrNull { collectorNumber(it.card.cardId) in pairs }?.let { return it }
+        if (pairs.isNotEmpty()) options.firstOrNull { it.second in pairs }?.let { return it.first }
 
         val promos = Regex("\\b([A-Za-z]{2,5})\\s*[-–]?\\s*0*(\\d{1,4})\\b").findAll(text)
             .map { it.groupValues[1].lowercase() + normalizeCollector(it.groupValues[2]) }.toSet()
-        if (promos.isNotEmpty()) matches.firstOrNull { match ->
-            collectorNumber(match.card.cardId)?.takeIf { number -> number.any(Char::isLetter) } in promos
-        }?.let { return it }
+        if (promos.isNotEmpty()) options.firstOrNull { (_, number) ->
+            number.any(Char::isLetter) && number in promos
+        }?.let { return it.first }
 
         val runs = Regex("\\d{5,8}").findAll(text).map { it.value }.toList()
-        val confirmed = matches.filter { match ->
-            val number = collectorNumber(match.card.cardId) ?: return@filter false
+        val confirmed = options.filter { (_, number) ->
             number.all(Char::isDigit) && runs.any { run -> Regex("^0{0,3}${Regex.escape(number)}\\d{2,3}$").matches(run) }
         }
-        val numbers = confirmed.mapNotNull { collectorNumber(it.card.cardId) }.toSet()
-        return confirmed.firstOrNull().takeIf { numbers.size == 1 }
+        val numbers = confirmed.map { it.second }.toSet()
+        return confirmed.firstOrNull()?.first.takeIf { numbers.size == 1 }
     }
 
-    private fun collectorNumber(cardId: String): String? = cardId.substringAfter('-', "")
-        .takeIf(String::isNotEmpty)?.let(::normalizeCollector)
+    /** Printed collector number of a metadata row, else the `SET-NUM` suffix of legacy ids. */
+    private fun collectorNumber(row: CardEmbeddingMetadata): String? =
+        row.collectorNumber?.let(::normalizeCollector)?.takeIf(String::isNotEmpty)
+            ?: row.cardId.substringAfter('-', "").takeIf(String::isNotEmpty)?.let(::normalizeCollector)
 
     private fun normalizeCollector(raw: String): String {
         val normalized = raw.trim().lowercase().dropWhile { it == '0' }

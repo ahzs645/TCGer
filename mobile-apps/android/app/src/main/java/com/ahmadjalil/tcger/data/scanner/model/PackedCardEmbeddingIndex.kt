@@ -36,6 +36,8 @@ data class CardEmbeddingMetadata(
     val exactPrintingId: String? = null,
     val recognitionFamilyId: String? = null,
     val releaseDate: String? = null,
+    /** Printed collector number of the representative printing (family rows) or the card. */
+    val collectorNumber: String? = null,
     val printings: List<CardEmbeddingPrinting> = emptyList(),
 ) {
     val isPhysicalPokemonCard: Boolean
@@ -62,6 +64,7 @@ data class CardEmbeddingMetadata(
                 price = printing.price,
                 exactPrintingId = printing.exactPrintingId ?: printing.cardId,
                 releaseDate = printing.releaseDate,
+                collectorNumber = printing.collectorNumber,
                 printings = emptyList(),
             )
         }

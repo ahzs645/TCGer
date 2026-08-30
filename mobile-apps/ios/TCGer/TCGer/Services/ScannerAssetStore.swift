@@ -32,6 +32,10 @@ nonisolated struct ScannerAssetManifest: Decodable, Sendable {
     let modelPackage: [ScannerModelPackageFile]
     let vectors: ScannerAssetFile
     let metadata: ScannerAssetFile
+    /// Optional `tcger-scanner-acceptance-policy-v1` object. Absent on
+    /// manifests published before 2026-08-29; the client then runs its
+    /// built-in profile for the game.
+    let acceptancePolicy: ScannerGameAcceptancePolicy?
 
     var displayedCardCount: Int { printingCount ?? cardCount }
 }
@@ -42,6 +46,8 @@ nonisolated struct ScannerRuntimeAssets: Sendable {
     let modelURL: URL
     let vectorsURL: URL
     let metadataURL: URL
+    /// The policy the installed manifest declared, if any.
+    let acceptancePolicy: ScannerGameAcceptancePolicy?
 }
 
 nonisolated enum ScannerAssetInstallState: Equatable {
@@ -292,6 +298,9 @@ final class ScannerAssetStore: ObservableObject {
                 throw StoreError.invalidManifest
             }
         }
+        if let policy = manifest.acceptancePolicy, !policy.isValid {
+            throw StoreError.invalidManifest
+        }
         let files = manifest.modelPackage.map {
             ScannerAssetFile(file: $0.file, bytes: $0.bytes, sha256: $0.sha256)
         } + [manifest.vectors, manifest.metadata]
@@ -465,12 +474,19 @@ final class ScannerAssetStore: ObservableObject {
         guard fileManager.fileExists(atPath: modelURL.path),
               fileManager.fileExists(atPath: vectorsURL.path),
               fileManager.fileExists(atPath: metadataURL.path) else { return nil }
+        // The manifest is staged next to the runtime files at install time;
+        // its declared policy travels with the version it was published for.
+        let manifestURL = directory.appendingPathComponent("manifest.json", isDirectory: false)
+        let declaredPolicy = (try? Data(contentsOf: manifestURL))
+            .flatMap { try? JSONDecoder().decode(ScannerAssetManifest.self, from: $0) }?
+            .acceptancePolicy
         return ScannerRuntimeAssets(
             game: game,
             version: version,
             modelURL: modelURL,
             vectorsURL: vectorsURL,
-            metadataURL: metadataURL
+            metadataURL: metadataURL,
+            acceptancePolicy: declaredPolicy?.isValid == true ? declaredPolicy : nil
         )
     }
 

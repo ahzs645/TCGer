@@ -16,6 +16,7 @@ import {
   createR2Client,
   isNotFound,
   parseCliArgs,
+  loadAcceptancePolicy,
 } from "./lib.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -32,7 +33,9 @@ function usage() {
     --vectors /path/CardsIndexVectors-arcface.bin \\
     --metadata /path/CardsIndexMetadata.json \\
     [--evaluation /path/arcface-eval.json] \\
-    [--provenance /path/provenance.json] [--dry-run] [--wrangler]
+    [--provenance /path/provenance.json] \\
+    [--acceptance-policy /path/policy.json  # default: tools/scanner-acceptance-policies.json entry] \\
+    [--dry-run] [--wrangler]
 
 The publisher validates the paired model/index metadata, uploads immutable
 content-addressed objects first, and writes the per-game manifest last.`);
@@ -183,6 +186,7 @@ export async function buildPlan(options) {
   const provenance = options.provenance
     ? await readJson(options.provenance, "Catalog provenance")
     : null;
+  const acceptancePolicy = await loadAcceptancePolicy(options.game, options.acceptancePolicy ?? null);
   const downloadBytes = assets.reduce((sum, asset) => sum + asset.bytes, 0);
   const manifest = {
     formatVersion: 3,
@@ -208,6 +212,7 @@ export async function buildPlan(options) {
       bytes: metadataAsset.bytes,
       sha256: metadataAsset.sha256,
     },
+    acceptancePolicy,
     evaluation,
     provenance,
   };
@@ -279,7 +284,7 @@ async function main() {
   if (flags.has("help") || flags.has("h")) return usage();
   const allowedValues = new Set([
     "game", "version", "model-package", "vectors", "metadata", "evaluation",
-    "provenance", "prefix", "bucket",
+    "provenance", "prefix", "bucket", "acceptance-policy",
   ]);
   for (const key of values.keys()) if (!allowedValues.has(key)) throw new Error(`Unknown option: --${key}`);
   for (const key of flags) if (!new Set(["dry-run", "wrangler", "help", "h"]).has(key)) throw new Error(`Unknown flag: --${key}`);
@@ -304,6 +309,7 @@ async function main() {
     metadata: resolve(values.get("metadata")),
     evaluation: values.get("evaluation") ? resolve(values.get("evaluation")) : null,
     provenance: values.get("provenance") ? resolve(values.get("provenance")) : null,
+    acceptancePolicy: values.get("acceptance-policy") ? resolve(values.get("acceptance-policy")) : null,
   });
 
   console.log(JSON.stringify({
