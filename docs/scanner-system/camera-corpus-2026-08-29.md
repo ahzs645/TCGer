@@ -144,6 +144,69 @@ domain step available. The Magic bank has only 7 pairs — too few to use.
    margin. 115 same-name rows with identical vectors under different family
    keys are listed as `familyMergeCandidates` (mostly dungeons/tokens).
 
+## Localizer bake-off (2026-08-30)
+
+`tools/camera-corpus/bench_localizers.py` ran every card localizer with
+downloadable weights against the same ground truth and, more importantly,
+through the same released encoders on the 101 labeled Dev Mode frames
+(49 Magic, 52 Pokémon). Candidates: the app's own Apple Vision path
+(`vision-app` = document segmentation → rectangles → YOLO11s box, via
+`vision-quads.swift`), its individual stages, the quad the phone actually
+recorded (`device`), `Trading-Card-Scanner-lo-calvin` YOLO11n-seg (MIT),
+HichTala `draw2` YOLO11-OBB and `draw` YOLOv8 (AGPL, Yu-Gi-Oh! synthetic),
+`JakeTurner616` MTG region-seg (MIT), `Matthieu68857` DETR-ResNet50
+Pokémon boxes (Apache-2.0), and tmikonen's OpenCV contour pipeline.
+1vcian's TF.js OBB model was not run (no TF.js runtime here).
+
+### Localization vs ground truth
+
+| Localizer | TCGX 149 Pokémon photos (polygons): mean IoU / R@0.5 / R@0.9 | 6klau 50 Magic spreads (~20 cards each): IoU / R@0.5 | ms/img (CPU) |
+|---|---|---|---|
+| DETR Pokémon boxes | **0.884 / 0.99 / 0.62** | 0.43 / 0.47 | 231 |
+| app YOLO11s box | 0.801 / 0.84 / **0.78** | 0.04 / 0.04 | — |
+| `vision-app` (current pipeline) | 0.795 / 0.82 / 0.74 | 0.04 / 0.04 | — |
+| `draw2` YOLO11-OBB (YGO) | 0.635 / 0.75 / 0.12 | **0.47 / 0.54** | 71 |
+| lo-calvin YOLO11n-seg | 0.224 / 0.27 / 0.06 | 0.25 / 0.22 | 55 |
+| MTG region-seg | 0.458 / 0.29 / 0.02 (finds regions, not cards) | 0.10 / 0.06 | 40 |
+| `draw` YOLOv8 (YGO) | 0.03 / 0.02 | 0.37 / 0.39 | 42 |
+| tmikonen contour | produced no candidates in this harness | — | 21 |
+
+The app pipeline is single-card by design, so the spread result is expected;
+it is the binder path's job. Nothing third-party beats the app's own detector
+on single-card precision (R@0.9 0.78 vs DETR's 0.62): DETR finds more cards
+loosely, YOLO11s finds fewer cards tightly.
+
+### Recognition on the labeled frames (the number that matters)
+
+Each localizer's largest quad → 720×1000 warp (both orientations) → released
+encoder → rank of the correct family. "acceptable" = correct top-1 at the
+game's strong-accept point with margin.
+
+| Localizer | Magic 49: top-1 / top-5 / acceptable / correct-sim p50 | Pokémon 52: top-1 / top-5 / acceptable / correct-sim p50 |
+|---|---|---|
+| `device` (what the phone used) | 34 / 38 / 28 / 0.749 | 36 / 38 / 30 / 0.702 |
+| `vision-app` (offline replay of the pipeline) | 37 / 41 / 28 / 0.748 | **40 / 43 / 32 / 0.730** |
+| app YOLO11s box only | 38 / **43** / 29 / 0.764 | 36 / 39 / 25 / 0.628 |
+| `draw2` YOLO11-OBB | 38 / 40 / **30** / 0.771 | 36 / 37 / 22 / 0.633 |
+| DETR boxes | **39** / 42 / 27 / 0.768 | 36 / 39 / 27 / 0.687 |
+| `vision-rect` only | 27 / 30 / 24 / **0.774** | 27 / 30 / 24 / 0.737 |
+| lo-calvin seg | 28 / 30 / 22 / 0.763 | 26 / 27 / 15 / 0.554 |
+| MTG region-seg | 1 / 2 / 0 | 10 / 13 / 5 |
+| `draw` YOLOv8 | 0 / 0 / 0 | 0 / 0 / 0 |
+
+Reading: every competent localizer lands in the same band — Magic top-1
+34–39 of 49 and 27–30 policy-acceptable, correct-family similarity
+p50 ≈ 0.75 regardless of who drew the quad. Swapping the localizer buys at
+most +2 acceptable frames; the crop is **not** the bottleneck on these
+sessions, the embedding band is. The one localizer that meaningfully
+changes similarity (`vision-rect`, +0.025 p50) does so by finding fewer
+cards. A seg/OBB head still earns its place for what the current pipeline
+cannot do at all — multi-card spreads, steep angles (the 16-photo
+`magic-classification` set is not in this test) — not for single-card
+similarity. Note that `device` trails the offline `vision-app` replay on
+Pokémon (36 vs 40 top-1): the phone's guide crop and Simulator/device Vision
+divergence cost more than any third-party model would add.
+
 ## Licensing
 
 Roboflow archives are CC BY 4.0 (attribution required; card artwork remains

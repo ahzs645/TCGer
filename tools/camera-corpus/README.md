@@ -8,6 +8,8 @@ human review only where the evidence disagrees.
 |---|---|
 | `build_camera_corpus.py` | Crop cards out of Roboflow COCO archives / folders / whole-card photos, embed them with the **released** encoder, OCR titles and footers with Apple Vision (production parity), and pseudo-label with the app's own evidence rules. Emits `corpus.jsonl`, `review.jsonl`, `negatives.jsonl`, `report.json`, `augmentation-bank.json`. |
 | `ocr-titles.swift` | `VNRecognizeTextRequest` over a list of image paths → JSONL. Used by the builder; usable standalone. |
+| `bench_localizers.py` | Card-localizer bake-off: Ultralytics seg/OBB/det weights, HF DETR, tmikonen contours, and Apple Vision stages (`vision-quads.swift`, optionally gated by the app's `CardDetector.mlmodelc`) against COCO polygons/boxes, plus end-to-end recognition of labeled Dev Mode frames through the released encoders. |
+| `vision-quads.swift` | Apple Vision document-segmentation / rectangle / Core ML detector quads per image → JSONL, for offline parity with `CardCropper`. |
 | `index_hygiene.py` | Audit a packed index: attractor rows (different-name neighbours above 0.9) with clusters and suggested actions, same-name rows with identical vectors under different family keys (`familyMergeCandidates`), and `orientation-negatives.json` (back-face reject recipe; rotation was measured *not* to target the attractor). |
 
 Requirements: `~/.venvs/tcger-label` (onnxruntime, numpy, Pillow), Xcode CLT for `swift`.
