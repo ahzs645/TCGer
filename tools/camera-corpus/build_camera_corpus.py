@@ -159,8 +159,17 @@ class Runtime:
     def printing_options(self, index: int):
         row = self.rows[index]
         options = row.get("printings") or [row]
+        def number(printing):
+            # Printed collector number, else the `SET-NUM` suffix of legacy ids
+            # (Pokémon runtimes carry only the id) — same fallback as the app.
+            value = printing.get("collectorNumber")
+            if value:
+                return value
+            card_id = printing.get("cardId") or ""
+            return card_id.split("-", 1)[1] if "-" in card_id else None
+
         return [
-            (p.get("exactPrintingId") or p.get("cardId"), p.get("setCode"), p.get("collectorNumber"))
+            (p.get("exactPrintingId") or p.get("cardId"), p.get("setCode"), number(p))
             for p in options
         ]
 
@@ -179,10 +188,11 @@ def dedupe_roboflow(names: list[str]) -> dict[str, str]:
 def iter_coco(source: str, annotations: Path, image_dir: Path, category: str | None):
     data = json.loads(annotations.read_text())
     categories = {c["id"]: c["name"] for c in data["categories"]}
-    wanted = {cid for cid, name in categories.items() if category is None or name == category}
-    if category is None:
-        # Roboflow COCO exports carry a synthetic parent category with no boxes.
-        wanted = {cid for cid, name in categories.items() if name != data["categories"][0]["name"]}
+    # Roboflow COCO exports carry a synthetic parent category (supercategory
+    # "none") that owns no boxes; it may share its NAME with the real class,
+    # so select by id: every category that actually has annotations.
+    annotated = {a["category_id"] for a in data["annotations"]}
+    wanted = {cid for cid, name in categories.items() if cid in annotated and (category is None or name == category)}
     images = {i["id"]: i for i in data["images"]}
     representative = dedupe_roboflow([i["file_name"] for i in data["images"]])
     keep = set(representative.values())
@@ -386,7 +396,10 @@ def main() -> None:
         lines = ocr.get(record["crop_path"], {}).get("lines", [])
         top = record["neighbours"][0] if record["neighbours"] else None
         top_key = normalized_name(top["name"]) if top else None
-        rival = next((n for n in record["neighbours"][1:] if normalized_name(n["name"]) != top_key), None) if top else None
+        # Rival = nearest neighbour from a DIFFERENT family (the app's
+        # ambiguity rule); a same-name rival still counts for games whose
+        # families are single printings (Pokémon), where "Pikachu" is many cards.
+        rival = next((n for n in record["neighbours"][1:] if n["family"] != top["family"]), None) if top else None
         titles = title_candidates(lines)
         matched_key = next((t for t in titles if t in runtime.names_by_key), None)
         if matched_key is None:
