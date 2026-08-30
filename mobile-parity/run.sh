@@ -59,14 +59,21 @@ case "${1:-}" in
   android)
     require_command adb
     require_command maestro
-    mobile-apps/android/gradlew -p mobile-apps/android assembleDebug
+    if [[ "${PARITY_ANDROID_SKIP_BUILD:-false}" != "true" ]]; then
+      mobile-apps/android/gradlew -p mobile-apps/android assembleDebug
+    fi
+    android_apk="mobile-apps/android/app/build/outputs/apk/debug/app-debug.apk"
+    if [[ ! -f "$android_apk" ]]; then
+      echo "Android parity APK was not found at $android_apk." >&2
+      exit 1
+    fi
     adb wait-for-device
     android_device="${MAESTRO_DEVICE_ID:-$(adb devices | awk 'NR > 1 && $2 == "device" { print $1; exit }')}"
     if [[ -z "$android_device" ]]; then
       echo "No ready Android emulator or device was found." >&2
       exit 1
     fi
-    adb -s "$android_device" install -r mobile-apps/android/app/build/outputs/apk/debug/app-debug.apk
+    adb -s "$android_device" install -r "$android_apk"
     run_maestro "$android_device" "com.ahmadjalil.tcger" android
     ;;
   ios)
