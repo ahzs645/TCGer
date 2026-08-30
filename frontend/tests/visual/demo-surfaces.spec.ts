@@ -31,6 +31,19 @@ test(
   },
 );
 
+test("demo exposes the server-free browser scanner", async ({ page }) => {
+  await page.goto("/demo/scan");
+  await expect(
+    page.getByRole("heading", { name: "Browser Card Scanner" }),
+  ).toBeVisible();
+  await expect(page.getByText("Scan is disabled in demo mode")).toHaveCount(0);
+  await expect(page.getByText("Video Scan Lab")).toBeVisible();
+  await page.getByRole("combobox", { name: "Scan Scope" }).click();
+  await expect(
+    page.getByRole("option", { name: "Magic: The Gathering" }),
+  ).toBeVisible();
+});
+
 test(
   parityTitle(
     ParityFeatureIDs.collectionsBrowse,

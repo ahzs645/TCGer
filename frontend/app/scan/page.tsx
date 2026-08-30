@@ -28,8 +28,8 @@ export default function ScanPage() {
             data-oid="ce33h2j"
           >
             Switch between still-image scan and local video scan. Video mode
-            defaults to a fully on-device model (DINOv2) — no sign-in or server
-            needed (Pokémon today).
+            defaults to the fully on-device ArcFace packages for Pokémon, Magic:
+            The Gathering, and Yu-Gi-Oh! — no sign-in or server needed.
           </p>
         </div>
         <Tabs defaultValue="video" className="space-y-4">
@@ -49,7 +49,7 @@ export default function ScanPage() {
               </div>
               <p className="max-w-3xl text-sm text-muted-foreground">
                 Browser-side scanner for local video files. By default it runs
-                the on-device DINOv2 embedding model — fully client-side, no
+                the on-device ArcFace embedding models — fully client-side, no
                 sign-in — drawing live track overlays and the current best match
                 without sending any frame to the server.
               </p>

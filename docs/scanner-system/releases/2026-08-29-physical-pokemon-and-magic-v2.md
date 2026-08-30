@@ -47,13 +47,23 @@ shortlist and only when the result is unambiguous. Weak or conflicting evidence
 abstains.
 
 The native iOS reference gate passes, and equivalent Android and browser policy
-tests pass. Magic remains unpublished until the browser image-level replay and
-coordinated client/package compatibility checks are complete.
+tests pass. The Magic browser package was promoted atomically on 2026-08-29 as
+version 2 for controlled online testing. Its CDN-retrieved index reproduces the
+expected SHA-256 digest and contains 67,849 visual families representing all
+109,546 printings. The public Pokémon and Yu-Gi-Oh! object pointers remained
+unchanged during that manifest update.
 
 The family-aware browser artifact is generated reproducibly with
 `npm run scanner:build-browser-index`. It contains 67,849 vectors and expands
 to all 109,546 printings as metadata. R2 gzip delivery is 31.9 MB for the index,
-plus the 14.3 MB encoder; the current live v1 index is roughly 40.0 MB compressed.
+plus the 14.3 MB encoder; the previous v1 index was roughly 40.0 MB compressed.
+
+Native Magic remains unpublished. The currently released iOS and Android apps
+do not accept the family-aware manifest formats, and the expanded native
+printing metadata still produces 118.0 MB and 125.1 MB candidate downloads.
+Before a native promotion, ship compatible client builds, replay the reference
+set on those builds, and decide whether to split printing metadata from the
+family vector package.
 
 ## Publication invariant
 

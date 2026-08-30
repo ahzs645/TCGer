@@ -88,8 +88,8 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          Recommended: select one TCG before downloading hashes into the
-          browser.
+          Recommended: select one TCG before downloading its visual index into
+          the browser.
         </p>
       </div>
 
@@ -102,14 +102,15 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
             disabled={props.detectionOnly}
             className="rounded border-gray-300"
           />
-          On-device model (DINOv2)
+          On-device ArcFace model
           <Badge variant="secondary" className="ml-1">
             Recommended
           </Badge>
         </label>
         <p className="pl-6 text-xs text-muted-foreground">
           Runs fully in your browser — no sign-in or server needed. Best
-          accuracy. Pokémon index available today.
+          accuracy. Published indexes are available for Pokémon, Magic: The
+          Gathering, and Yu-Gi-Oh!.
         </p>
       </div>
 
@@ -269,17 +270,21 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
         )}
       </div>
 
-      {props.mounted && (props.error || !props.isAuthenticated) && (
-        <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            <span>
-              {props.error ??
-                "Sign in to download the scan hashes and process video locally."}
-            </span>
+      {props.mounted &&
+        (props.error ||
+          (!props.isAuthenticated &&
+            !props.embeddingMode &&
+            !props.detectionOnly)) && (
+          <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              <span>
+                {props.error ??
+                  "Sign in to use the legacy server-backed hash matcher."}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

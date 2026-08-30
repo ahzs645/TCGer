@@ -348,8 +348,8 @@ export function VideoScanLab() {
           <Badge variant="secondary">Experimental</Badge>
         </CardTitle>
         <CardDescription>
-          Import a video from your computer, download the scan hash corpus into
-          the browser, and step through sampled frames with a live guess panel.
+          Import a video, run the published encoder and visual-family index in
+          this browser, and step through sampled frames with a live guess panel.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 xl:grid-cols-[380px_1fr]">

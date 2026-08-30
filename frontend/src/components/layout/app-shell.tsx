@@ -120,16 +120,8 @@ function isNavigationItemActive(pathname: string, href: string) {
   return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
 }
 
-/**
- * /scan needs the server-side hash store and upload API, so in demo mode it can
- * only say "disabled". Spending one of the five desktop slots — and one of the
- * three mobile tabs — on a dead end is a poor first impression, so demo mode
- * drops it from the primary nav and keeps it reachable from More.
- */
-function primaryNavigationFor(demoMode: boolean): NavigationItem[] {
-  return demoMode
-    ? navigation.filter((item) => item.href !== "/scan")
-    : navigation;
+function primaryNavigationFor(): NavigationItem[] {
+  return navigation;
 }
 
 interface AppShellProps {
@@ -163,7 +155,7 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
       (item.href !== "/sealed" || sealedProductsEnabled) &&
       (demoMode || !item.feature || isFeatureAvailable(features, item.feature)),
   );
-  const primaryNavigation = primaryNavigationFor(demoMode);
+  const primaryNavigation = primaryNavigationFor();
   const mobilePrimaryHrefs = ["/", "/collections", "/cards"];
   const mobileNavPrimary = mobilePrimaryHrefs.flatMap((href) => {
     const item = primaryNavigation.find((candidate) => candidate.href === href);
@@ -173,8 +165,6 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
     ...primaryNavigation.filter(
       (item) => !mobilePrimaryHrefs.includes(item.href),
     ),
-    // Scan still belongs somewhere in demo mode — it explains why it is off.
-    ...(demoMode ? navigation.filter((item) => item.href === "/scan") : []),
     ...availableSecondaryNavigation,
   ];
   const isDesktopSecondaryActive = availableSecondaryNavigation.some((item) =>
