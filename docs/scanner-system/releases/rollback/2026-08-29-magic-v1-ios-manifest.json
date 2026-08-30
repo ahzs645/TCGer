@@ -1,0 +1,92 @@
+{
+  "formatVersion": 1,
+  "game": "magic",
+  "version": 1,
+  "generatedAt": "2026-08-27T22:15:54.331Z",
+  "encoder": "arcface",
+  "modelName": "CardEmbeddings-arcface",
+  "cardCount": 111131,
+  "dimension": 384,
+  "downloadBytes": 84728327,
+  "modelPackage": [
+    {
+      "relativePath": "Data/com.apple.CoreML/model.mlmodel",
+      "file": "objects/5d157cee5de4a10a8f03b82e361195f69a4efd31b7004e9f7d9df78c2d8b4611.mlmodel",
+      "bytes": 147188,
+      "sha256": "5d157cee5de4a10a8f03b82e361195f69a4efd31b7004e9f7d9df78c2d8b4611"
+    },
+    {
+      "relativePath": "Data/com.apple.CoreML/weights/weight.bin",
+      "file": "objects/48048e42884c2b81c9c293e29371a34fb5ecafa6449294eb32cd300e7d48eccc.bin",
+      "bytes": 7110656,
+      "sha256": "48048e42884c2b81c9c293e29371a34fb5ecafa6449294eb32cd300e7d48eccc"
+    },
+    {
+      "relativePath": "Manifest.json",
+      "file": "objects/ecd89df24910f9997f7d4684361d971359d85d9ff0f85e65909b58330f510ec2.json",
+      "bytes": 617,
+      "sha256": "ecd89df24910f9997f7d4684361d971359d85d9ff0f85e65909b58330f510ec2"
+    }
+  ],
+  "vectors": {
+    "file": "objects/4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8.bin",
+    "bytes": 42674312,
+    "sha256": "4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8"
+  },
+  "metadata": {
+    "file": "objects/35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54.json",
+    "bytes": 34795554,
+    "sha256": "35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54"
+  },
+  "evaluation": {
+    "student": {
+      "recall@1": 0.9120000004768372,
+      "recall@5": 0.9787999987602234
+    },
+    "byGame": {
+      "magic": {
+        "recall@1": 0.9120000004768372,
+        "recall@5": 0.9787999987602234
+      }
+    },
+    "epochs": 12,
+    "backbone": "fastvit_t8.apple_in1k",
+    "trainingViewsPerCard": 3,
+    "evaluationViewsPerCard": 3,
+    "optimizerStepsPerEpoch": 1302,
+    "configuredOptimizerSteps": 15624
+  },
+  "provenance": {
+    "createdAt": "2026-08-24T20:56:06.367607+00:00",
+    "schema": "tcger-cards-index-metadata-v1",
+    "sources": {
+      "pokemon": {
+        "file": "pokemon.json",
+        "sha256": "e1b4ed3a64f59b0a1970f5c0d8d29dffa746f7cf02959bdb39bdeae2b3718141",
+        "rows": 21828,
+        "uniqueCardIds": 21828,
+        "uniqueImageURLs": 21828
+      },
+      "magic": {
+        "file": "magic-default-cards.json",
+        "sha256": "83b475188b2d15638878ef549a4c4ce4f64c266007c0061d2ad68fd1e24c5c36",
+        "rows": 111131,
+        "uniqueCardIds": 107193,
+        "uniqueImageURLs": 111131
+      },
+      "yugioh": {
+        "file": "yugioh.json",
+        "sha256": "a19197213fc32755556f85a79b13c845e9e280c2df22de9d598952888139c21d",
+        "rows": 14683,
+        "uniqueCardIds": 14683,
+        "uniqueImageURLs": 14683
+      }
+    },
+    "combinedRows": 147642,
+    "gameOrder": [
+      "pokemon",
+      "magic",
+      "yugioh"
+    ]
+  }
+}

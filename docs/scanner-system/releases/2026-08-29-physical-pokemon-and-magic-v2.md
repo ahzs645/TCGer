@@ -58,19 +58,30 @@ The family-aware browser artifact is generated reproducibly with
 to all 109,546 printings as metadata. R2 gzip delivery is 31.9 MB for the index,
 plus the 14.3 MB encoder; the previous v1 index was roughly 40.0 MB compressed.
 
-Native Magic remains unpublished while compatible client builds move through
-TestFlight and Android distribution. Immutable native candidates are staged at
-`ios/scan-assets-candidate-v2` and `android/scan-assets-candidate-v2`; production
-Magic pointers still resolve to version 1.
+Native Magic v2 was promoted on 2026-08-29 after the family-aware clients,
+candidate packages, and production-v1-to-v2 upgrade paths passed their release
+gates. The iOS production manifest is format 3/version 2 and the Android
+production manifest is format 2/version 2. Both expose 67,849 visual families
+representing 109,546 exact printings. The immutable candidates remain staged at
+`ios/scan-assets-candidate-v2` and `android/scan-assets-candidate-v2` for release
+diagnostics.
 
-The staged candidates passed real production-v1-to-candidate-v2 installation
-tests on 2026-08-29. Both clients downloaded production v1, detected the staged
+Before promotion, both clients downloaded production v1, detected the staged
 update, verified every content digest, decoded the 67,849-row index, activated
 v2 atomically, and retained no inactive v1 directory. iOS also compiled the
-downloaded Core ML package. The candidate manifests declare 118.0 MB on iOS and
-125.1 MB on Android as the verified installed byte totals. Cloudflare compresses
-the large JSON metadata in transit; these totals are deliberately not estimates
-of wire transfer size.
+downloaded Core ML package. Publication then uploaded the content-addressed
+production objects first and each platform manifest last.
+
+Post-publication CDN downloads reproduce every declared SHA-256 digest and byte
+count. iOS totals 118,044,412 installed bytes; Android totals 125,091,531 bytes.
+The shared vectors digest is
+`acfbead865eb1e7cc17bc8ff532e0e2bea20645e916f8122810f87b1be30878c`,
+and the shared metadata digest is
+`49e720b582587ebe8017b434b1bba6ec9cb8e4dafef3484658cf6d8139007c2f`.
+The Android ONNX digest is
+`9c1b7c94e3f1a83308d0a4706a4b855dbf8986e43c6a97e93a3e4b7c83cb4195`.
+Cloudflare compresses the large JSON metadata in transit; the manifest totals
+deliberately describe verified installed bytes rather than wire transfer size.
 
 The release-gate tests are opt-in and reproducible. Build iOS with
 `TCGER_SCANNER_ASSET_BASE_URL` set to the iOS candidate base, or set
@@ -80,11 +91,12 @@ base with `-PtcgerScannerAssetBaseUrl=...`. Normal CI skips external candidate
 downloads but keeps deterministic manifest, index, rollback, and inactive-version
 cleanup coverage.
 
-The final promotion gate is distribution compatibility: confirm the iOS and
-Android builds containing family-manifest support are available to testers,
-then publish the already-validated immutable objects under the production
-prefixes and write each platform's Magic manifest last. Re-run the production
-v1-to-v2 update test against the public pointers immediately after promotion.
+The authoritative three-platform parity run for the promotion commits passed on
+2026-08-29: contract, web, Android, iOS, and report jobs were all successful in
+GitHub Actions run `33287148160`. The superseded v1 manifests are retained beside
+this note as rollback pointers: [iOS](rollback/2026-08-29-magic-v1-ios-manifest.json)
+and [Android](rollback/2026-08-29-magic-v1-android-manifest.json). Their referenced
+immutable objects remain in R2 and were rechecked after promotion.
 
 ## Publication invariant
 
