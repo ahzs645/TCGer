@@ -177,21 +177,89 @@ function collectionValue(rows: AnalyticsRow[]) {
   );
 }
 
-function snapshotValue(rows: AnalyticsRow[]) {
+type SnapshotQuality = {
+  totalCopies: number;
+  pricedCopies: number;
+  freshCopies: number;
+  lowConfidenceCopies: number;
+  priceCoverage: number;
+  qualityStatus: "healthy" | "degraded" | "unsafe";
+};
+
+async function snapshotValue(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  rows: AnalyticsRow[]
+) {
   const byTcg: Record<string, number> = {};
   let totalValue = 0;
+  const cutoff = Date.now() - 48 * 60 * 60 * 1_000;
+  const recentSnapshots = await ctx.db
+    .query("cardPriceSnapshots")
+    .withIndex("by_user_and_captured_at", (q) =>
+      q.eq("userId", userId).gte("capturedAt", cutoff)
+    )
+    .order("desc")
+    .take(5_001);
+  if (recentSnapshots.length > 5_000) {
+    throw new ConvexError({
+      code: "LIMIT_EXCEEDED",
+      message: "Pricing quality supports up to 5,000 recent quotes per account"
+    });
+  }
+  const latestByCard = new Map<string, Doc<"cardPriceSnapshots">>();
+  for (const snapshot of recentSnapshots) {
+    const key = `${snapshot.tcg}:${snapshot.externalId}:${snapshot.finishCode ?? ""}`;
+    if (!latestByCard.has(key)) latestByCard.set(key, snapshot);
+  }
+  let totalCopies = 0;
+  let pricedCopies = 0;
+  let freshCopies = 0;
+  let lowConfidenceCopies = 0;
 
   for (const { entry, card } of rows) {
-    const value = usableStoredPrice(entry.price) * entry.quantity;
+    const quantity = Math.max(0, Math.trunc(entry.quantity));
+    totalCopies += quantity;
+    const exactKey = `${card.tcg}:${card.externalId}:${entry.finishCode ?? ""}`;
+    const baseKey = `${card.tcg}:${card.externalId}:`;
+    const quote = latestByCard.get(exactKey) ?? latestByCard.get(baseKey);
+    const quoteIsFresh = Boolean(quote && (quote.sourceUpdatedAt ?? quote.capturedAt) >= cutoff);
+    const quoteIsTrusted = Boolean(quote && (quote.matchConfidence ?? 1) >= 0.8);
+    const quotePrice = quote && quoteIsFresh && quoteIsTrusted
+      ? usableStoredPrice(quote.convertedPrice ?? quote.nativePrice)
+      : 0;
+    const unitPrice = quotePrice || usableStoredPrice(entry.price);
+    if (unitPrice > 0) pricedCopies += quantity;
+    if (quotePrice > 0) freshCopies += quantity;
+    if (quote && (quote.matchConfidence ?? 1) < 0.8) {
+      lowConfidenceCopies += quantity;
+    }
+    const value = unitPrice * quantity;
     totalValue += value;
     byTcg[card.tcg] = (byTcg[card.tcg] ?? 0) + value;
   }
+
+  const priceCoverage = totalCopies > 0
+    ? Math.round((freshCopies / totalCopies) * 10_000) / 100
+    : 100;
+  const qualityStatus: SnapshotQuality["qualityStatus"] =
+    priceCoverage >= 90 && lowConfidenceCopies === 0
+      ? "healthy"
+      : priceCoverage >= 70
+        ? "degraded"
+        : "unsafe";
 
   return {
     totalValue: roundCurrency(totalValue),
     byTcg: Object.fromEntries(
       Object.entries(byTcg).map(([tcg, value]) => [tcg, roundCurrency(value)])
-    )
+    ),
+    totalCopies,
+    pricedCopies,
+    freshCopies,
+    lowConfidenceCopies,
+    priceCoverage,
+    qualityStatus
   };
 }
 
@@ -212,7 +280,14 @@ async function captureSnapshotForUser(
   userId: Id<"users">,
   day: string
 ) {
-  const value = snapshotValue(await loadAnalyticsRows(ctx, userId));
+  const value = await snapshotValue(ctx, userId, await loadAnalyticsRows(ctx, userId));
+  if (value.qualityStatus === "unsafe" && value.totalCopies > 0) {
+    return {
+      captured: false as const,
+      qualityStatus: value.qualityStatus,
+      priceCoverage: value.priceCoverage
+    };
+  }
   const existing = await ctx.db
     .query("collectionValueSnapshots")
     .withIndex("by_user_and_day", (q) =>
@@ -221,12 +296,18 @@ async function captureSnapshotForUser(
     .unique();
 
   if (!existing) {
-    return await ctx.db.insert("collectionValueSnapshots", {
+    const snapshotId = await ctx.db.insert("collectionValueSnapshots", {
       userId,
       day,
       capturedAt: Date.now(),
       ...value
     });
+    return {
+      captured: true as const,
+      snapshotId,
+      qualityStatus: value.qualityStatus,
+      priceCoverage: value.priceCoverage
+    };
   }
 
   if (
@@ -238,12 +319,28 @@ async function captureSnapshotForUser(
       ...value
     });
   }
-  return existing._id;
+  return {
+    captured: true as const,
+    snapshotId: existing._id,
+    qualityStatus: value.qualityStatus,
+    priceCoverage: value.priceCoverage
+  };
 }
+
+const snapshotCaptureValidator = v.object({
+  captured: v.boolean(),
+  snapshotId: v.optional(v.id("collectionValueSnapshots")),
+  qualityStatus: v.union(
+    v.literal("healthy"),
+    v.literal("degraded"),
+    v.literal("unsafe")
+  ),
+  priceCoverage: v.number()
+});
 
 export const captureCurrentValueSnapshot = internalMutation({
   args: { subject: v.string() },
-  returns: v.id("collectionValueSnapshots"),
+  returns: snapshotCaptureValidator,
   handler: async (ctx, args) => {
     const user = await requireUserBySubject(ctx, args.subject);
     return await captureSnapshotForUser(ctx, user._id, utcDayKey());
@@ -252,7 +349,7 @@ export const captureCurrentValueSnapshot = internalMutation({
 
 export const captureDailySnapshotForUser = internalMutation({
   args: { userId: v.id("users"), day: v.string() },
-  returns: v.id("collectionValueSnapshots"),
+  returns: snapshotCaptureValidator,
   handler: async (ctx, args) => {
     return await captureSnapshotForUser(ctx, args.userId, args.day);
   }
@@ -618,11 +715,21 @@ export const getPublicCollection = internalQuery({
   args: { shareToken: v.string() },
   returns: publicCollectionValidator,
   handler: async (ctx, args) => {
-    const binder = await ctx.db
+    let binder = await ctx.db
       .query("binders")
       .withIndex("by_share_token", (q) => q.eq("shareToken", args.shareToken))
       .unique();
-    if (!binder || binder.isPublic !== true) return null;
+    if (!binder) {
+      const link = await ctx.db
+        .query("binderShareLinks")
+        .withIndex("by_token", (q) => q.eq("token", args.shareToken))
+        .unique();
+      if (!link || (link.expiresAt !== undefined && link.expiresAt <= Date.now())) return null;
+      binder = await ctx.db.get(link.binderId);
+      if (!binder) return null;
+    } else if (binder.isPublic !== true) {
+      return null;
+    }
 
     const [owner, entries] = await Promise.all([
       ctx.db.get(binder.userId),

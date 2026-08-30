@@ -427,6 +427,7 @@ function normalizedImportCsv(rows: ReturnType<typeof parseCollectionImportSource
     language: row.language,
     notes: row.notes,
     price: row.price,
+    acquisition_price: row.acquisitionPrice,
     edition: row.edition,
     is_foil: row.isFoil,
     is_signed: row.isSigned,

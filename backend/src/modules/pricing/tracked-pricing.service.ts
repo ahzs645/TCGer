@@ -3,6 +3,7 @@ import type {
   TrackedPriceItem,
   TrackedPriceResult,
   TrackedPricesResponse,
+  PricingHealthSummary,
 } from '@tcg/api-types';
 import { env } from '../../config/env';
 import {
@@ -31,9 +32,57 @@ interface TrackedPricingOptions {
   forceCooldownMs: number;
   concurrency?: number;
   now?: () => number;
-  justTcgBatchFetcher?: (
-    items: TrackedPriceItem[],
-  ) => Promise<Map<string, LivePriceResult>>;
+  justTcgBatchFetcher?: (items: TrackedPriceItem[]) => Promise<Map<string, LivePriceResult>>;
+}
+
+export const PRICING_FRESHNESS_HOURS = 48;
+
+export function summarizePricingHealth(
+  prices: TrackedPriceResult[],
+  now = Date.now(),
+  freshnessHours = PRICING_FRESHNESS_HOURS,
+): PricingHealthSummary {
+  const cutoff = now - freshnessHours * 60 * 60 * 1000;
+  let fresh = 0;
+  let stale = 0;
+  let failed = 0;
+  let lowConfidence = 0;
+  for (const result of prices) {
+    if (result.error) failed += 1;
+    if (result.price === undefined || !Number.isFinite(result.price) || result.price <= 0) continue;
+    const updatedAt = result.updatedAt ? Date.parse(result.updatedAt) : Number.NaN;
+    if (Number.isFinite(updatedAt) && updatedAt >= cutoff) fresh += 1;
+    else stale += 1;
+    const match = result.provenance?.match;
+    if (match && (match.ambiguous === true || match.confidence < 0.8)) lowConfidence += 1;
+  }
+  const total = prices.length;
+  const priced = fresh + stale;
+  const missing = Math.max(0, total - priced - failed);
+  const coverage = total ? Math.round((fresh / total) * 10_000) / 100 : 100;
+  const status = coverage >= 90 && lowConfidence === 0
+    ? 'healthy'
+    : coverage >= 70
+      ? 'degraded'
+      : 'unsafe';
+  const message = total === 0
+    ? 'No cards were requested.'
+    : status === 'healthy'
+      ? `${fresh} of ${total} cards have fresh, trusted quotes.`
+      : `${fresh} of ${total} cards have fresh quotes; ${missing} are missing and ${lowConfidence} are low-confidence.`;
+  return {
+    status,
+    total,
+    priced,
+    fresh,
+    stale,
+    missing,
+    failed,
+    lowConfidence,
+    coverage,
+    freshnessHours,
+    message,
+  };
 }
 
 export function trackedPriceKey(item: TrackedPriceItem, source: PriceSource = 'automatic'): string {
@@ -43,7 +92,10 @@ export function trackedPriceKey(item: TrackedPriceItem, source: PriceSource = 'a
     item.finishCode?.trim().toLowerCase() ?? '',
   ];
   if (item.condition || item.language) {
-    parts.push(item.condition?.trim().toLowerCase() ?? '', item.language?.trim().toLowerCase() ?? '');
+    parts.push(
+      item.condition?.trim().toLowerCase() ?? '',
+      item.language?.trim().toLowerCase() ?? '',
+    );
   }
   const itemKey = parts.join(':');
   return source === 'automatic' ? itemKey : `${source}:${itemKey}`;
@@ -84,6 +136,7 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
               currency: quote.currency,
               source: quote.source,
               updatedAt: quote.updatedAt,
+              provenance: quote.provenance,
               cached: false,
             }
           : { ...item, key, cached: false, error: 'No market price is available' };
@@ -155,6 +208,7 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
                   currency: quote.currency,
                   source: quote.source,
                   updatedAt: quote.updatedAt,
+                  provenance: quote.provenance,
                   cached: false,
                 }
               : { ...item, key, cached: false, error: 'No market price is available' };
@@ -183,6 +237,10 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
         prices: unique.map((item) => results.get(trackedPriceKey(item, source))!),
         refreshedAt: refreshedAt.toISOString(),
         refreshAfter: new Date(refreshedAt.getTime() + options.ttlMs).toISOString(),
+        health: summarizePricingHealth(
+          unique.map((item) => results.get(trackedPriceKey(item, source))!),
+          refreshedAt.getTime(),
+        ),
       };
     }
     const prices: TrackedPriceResult[] = [];
@@ -198,6 +256,7 @@ export function createTrackedPricingService(fetcher: PriceFetcher, options: Trac
       prices,
       refreshedAt: refreshedAt.toISOString(),
       refreshAfter: new Date(refreshedAt.getTime() + options.ttlMs).toISOString(),
+      health: summarizePricingHealth(prices, refreshedAt.getTime()),
     };
   }
 
@@ -214,7 +273,13 @@ async function fetchTrackedPrice(
   if (env.BACKEND_MODE === 'convex') {
     return fetchLiveCardPrices(tcg, externalId, finishCode, source, item);
   }
-  return (await import('./pricing.service')).fetchCardPrices(tcg, externalId, finishCode, source, item);
+  return (await import('./pricing.service')).fetchCardPrices(
+    tcg,
+    externalId,
+    finishCode,
+    source,
+    item,
+  );
 }
 
 export const trackedPricingService = createTrackedPricingService(fetchTrackedPrice, {

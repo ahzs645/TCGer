@@ -8,8 +8,17 @@ export const publicRouter = Router();
 publicRouter.get('/collections/:shareToken', asyncHandler(async (req, res) => {
   const { shareToken } = req.params;
 
-  const binder = await prisma.binder.findUnique({
-    where: { shareToken },
+  const managedLink = await prisma.binderShareLink.findUnique({
+    where: { token: shareToken },
+    select: { binderId: true, expiresAt: true }
+  });
+  if (managedLink?.expiresAt && managedLink.expiresAt <= new Date()) {
+    res.status(404).json({ error: 'NOT_FOUND', message: 'Collection not found or link expired' });
+    return;
+  }
+
+  const binder = await prisma.binder.findFirst({
+    where: managedLink ? { id: managedLink.binderId } : { shareToken },
     include: {
       collections: {
         take: 5_001,
@@ -22,9 +31,15 @@ publicRouter.get('/collections/:shareToken', asyncHandler(async (req, res) => {
     }
   });
 
-  if (!binder || !binder.isPublic) {
+  if (!binder || (!managedLink && !binder.isPublic)) {
     res.status(404).json({ error: 'NOT_FOUND', message: 'Collection not found or is private' });
     return;
+  }
+  if (managedLink) {
+    void prisma.binderShareLink.update({
+      where: { token: shareToken },
+      data: { lastUsedAt: new Date() }
+    }).catch(() => undefined);
   }
   if (binder.collections.length > 5_000) {
     res.status(422).json({

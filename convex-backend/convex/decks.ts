@@ -6,6 +6,8 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { currentClassicalBanlist } from "./banlists";
+import { normalizeYugiohName } from "./lib/yugiohBanlist";
 
 type ReaderCtx = QueryCtx | MutationCtx;
 type DeckZone = "main" | "extra" | "side";
@@ -1061,7 +1063,14 @@ export const validate = internalQuery({
       };
     }
 
-    if (deck.tcg !== "yugioh" || !args.banlist) return result;
+    if (deck.tcg !== "yugioh") return result;
+    const effectiveBanlist = args.banlist ?? await currentClassicalBanlist(ctx, format || "tcg");
+    if (!effectiveBanlist) {
+      return {
+        ...result,
+        warnings: [...result.warnings, "No synchronized Yu-Gi-Oh banlist is available for this format"],
+      };
+    }
     const violations: Array<{
       externalId?: string;
       name?: string;
@@ -1069,19 +1078,19 @@ export const validate = internalQuery({
       message: string;
     }> = [];
     let points: number | undefined;
-    if (args.banlist.type === "genesys") {
+    if (effectiveBanlist.type === "genesys") {
       points = hydrated.cards.reduce(
         (sum, card) =>
           sum +
-          (args.banlist!.type === "genesys"
-            ? (args.banlist!.cards[resolveYugiohBaseId(card)] ?? 0) *
+          (effectiveBanlist.type === "genesys"
+            ? (effectiveBanlist.cards[resolveYugiohBaseId(card)] ?? 0) *
               Math.max(0, card.quantity)
             : 0),
         0,
       );
-      if (points > args.banlist.maxPoints) {
+      if (points > effectiveBanlist.maxPoints) {
         violations.push({
-          message: `${args.banlist.name} points total is ${points}; maximum is ${args.banlist.maxPoints}`,
+          message: `${effectiveBanlist.name} points total is ${points}; maximum is ${effectiveBanlist.maxPoints}`,
         });
       }
     } else {
@@ -1101,7 +1110,8 @@ export const validate = internalQuery({
         counts.set(externalId, usage);
       }
       for (const [externalId, usage] of counts) {
-        const status = args.banlist.cards[externalId];
+        const status = effectiveBanlist.cards[externalId]
+          ?? effectiveBanlist.cards[`name:${normalizeYugiohName(usage.name)}`];
         const normalized = status?.trim().toLowerCase();
         const limit =
           normalized === "forbidden" || normalized === "banned"

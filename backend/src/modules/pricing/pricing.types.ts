@@ -6,6 +6,36 @@ export interface PriceProviderQuote {
   etchedPrice?: number;
   reverseHoloPrice?: number;
   currency: string;
+  provenance?: PriceProvenance;
+}
+
+export interface PriceOriginalQuote {
+  amount: number;
+  currency: string;
+  source: string;
+  asOf?: string;
+}
+
+export interface PriceMatchProvenance {
+  method: 'exact-id' | 'exact-set-number' | 'exact-name' | 'fuzzy';
+  confidence: number;
+  ambiguous?: boolean;
+  providerProductId?: string;
+  providerGroupId?: string;
+}
+
+export interface PriceProvenance {
+  provider: string;
+  retrievedAt: string;
+  originalQuotes: PriceOriginalQuote[];
+  fx?: {
+    fromCurrency: string;
+    toCurrency: string;
+    rate: number;
+    source: string;
+    asOf: string;
+  };
+  match?: PriceMatchProvenance;
 }
 
 export interface PriceProvider {
@@ -32,6 +62,7 @@ export interface LivePriceResult {
   reverseHoloPrice?: number;
   finishCode?: string;
   updatedAt: string;
+  provenance?: PriceProvenance;
 }
 
 export function isUsablePrice(value: unknown): value is number {
@@ -56,6 +87,7 @@ export function normalizePriceQuote(quote: PriceProviderQuote | null): PriceProv
     foilPrice: isUsablePrice(quote.foilPrice) ? quote.foilPrice : undefined,
     etchedPrice: isUsablePrice(quote.etchedPrice) ? quote.etchedPrice : undefined,
     reverseHoloPrice: isUsablePrice(quote.reverseHoloPrice) ? quote.reverseHoloPrice : undefined,
+    provenance: quote.provenance,
   };
   return normalized.price ||
     normalized.foilPrice ||

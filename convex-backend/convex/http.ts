@@ -7,6 +7,7 @@ import type { RichCardMetadata } from "./lib/cardMetadata";
 import {
   collectionImportTemplate,
   previewCollectionImport,
+  previewCollectionImportSource,
   type CollectionImportPreview
 } from "./lib/collectionImport";
 import {
@@ -30,6 +31,13 @@ import { registerAnalyticsRoutes } from "./analyticsHttp";
 import { registerTradesRoutes } from "./tradesHttp";
 import { registerOnlineCodesRoutes } from "./onlineCodesHttp";
 import { registerScanSessionRoutes } from "./scanSessionsHttp";
+import { registerDomainRoutes } from "./domainHttp";
+import { registerCatalogCorrectionRoutes } from "./catalogCorrectionsHttp";
+import { registerProviderCacheRoutes } from "./providerCacheHttp";
+import { registerPricingHistoryRoutes } from "./pricingHistoryHttp";
+import { registerAlertsAutomationsRoutes } from "./alertsAutomationsHttp";
+import { registerBanlistRoutes } from "./banlistsHttp";
+import { registerNotificationRoutes } from "./notificationsHttp";
 
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
@@ -43,6 +51,18 @@ const TCG_CODES: readonly TcgCode[] = [
   "lorcana",
   "dragonball"
 ];
+
+function importPreviewFromBody(body: Record<string, any>) {
+  if (typeof body.content === "string") {
+    return previewCollectionImportSource({
+      content: body.content,
+      fileName: typeof body.fileName === "string" ? body.fileName : undefined,
+      format: ["csv", "json", "cardmarket-text", "pdf", "auto", "manabox-csv", "moxfield-csv", "tcgplayer-csv", "collectr-csv"].includes(body.format) ? body.format : "auto",
+      resolutions: body.resolutions && typeof body.resolutions === "object" ? body.resolutions : undefined,
+    });
+  }
+  return previewCollectionImport(typeof body.csv === "string" ? body.csv : "");
+}
 
 function isTcgCode(value: unknown): value is TcgCode {
   return typeof value === "string" && TCG_CODES.includes(value as TcgCode);
@@ -628,6 +648,10 @@ function asBinderId(value: string) {
   return value as any;
 }
 
+function asBinderShareLinkId(value: string) {
+  return value as any;
+}
+
 function asCollectionMutationAuditId(value: string) {
   return value as any;
 }
@@ -797,6 +821,34 @@ function toCsv(rows: ReturnType<typeof toExportRows>) {
   );
 
   return [headers.join(","), ...records].join("\n");
+}
+
+type MarketplaceExportFormat = "manabox" | "moxfield" | "tcgplayer" | "collectr";
+
+function toMarketplaceCsv(rows: ReturnType<typeof toExportRows>, format: MarketplaceExportFormat) {
+  const definitions: Record<MarketplaceExportFormat, { headers: string[]; values: (row: (typeof rows)[number]) => unknown[] }> = {
+    manabox: {
+      headers: ["Name", "Set code", "Set name", "Collector number", "Foil", "Rarity", "Quantity", "Scryfall ID", "Purchase price", "Condition", "Language", "Binder Name"],
+      values: (row) => [row.cardName, row.setCode, row.setName, row.collectorNumber, row.isFoil ? "foil" : "normal", row.rarity, 1, row.tcg === "magic" ? row.externalId : "", row.acquisitionPrice, row.condition, row.language, row.binderName],
+    },
+    moxfield: {
+      headers: ["Count", "Name", "Edition", "Condition", "Language", "Foil", "Tags", "Collector Number", "Purchase Price", "Scryfall ID"],
+      values: (row) => [1, row.cardName, row.setCode, row.condition, row.language, row.isFoil ? "foil" : "", row.tags.join(";"), row.collectorNumber, row.acquisitionPrice, row.tcg === "magic" ? row.externalId : ""],
+    },
+    tcgplayer: {
+      headers: ["TCGplayer Id", "Product Line", "Set Name", "Product Name", "Rarity", "Condition", "TCG Market Price", "Total Quantity"],
+      values: (row) => [row.externalId.startsWith("tcgplayer:") ? row.externalId.slice(10) : "", row.tcg, row.setName, row.cardName, row.rarity, row.condition, row.price, 1],
+    },
+    collectr: {
+      headers: ["Card", "Game", "Set", "Set Code", "Number", "Rarity", "Variant", "Condition", "Quantity", "Market Price", "External ID"],
+      values: (row) => [row.cardName, row.tcg, row.setName, row.setCode, row.collectorNumber, row.rarity, row.finishLabel ?? (row.isFoil ? "Foil" : "Normal"), row.condition, 1, row.price, row.externalId],
+    },
+  };
+  const definition = definitions[format];
+  return [
+    definition.headers.map(escapeCsvField).join(","),
+    ...rows.map((row) => definition.values(row).map((value) => escapeCsvField(value as string | number | null | undefined)).join(",")),
+  ].join("\n");
 }
 
 http.route({
@@ -1601,7 +1653,7 @@ http.route({
         subject: identity.subject
       })) as NativeBinderDetail[];
       const preview = validateCollectionImportTargets(
-        previewCollectionImport(typeof body.csv === "string" ? body.csv : ""),
+        importPreviewFromBody(body),
         binders,
         typeof options.defaultBinderId === "string" ? options.defaultBinderId : undefined,
         options.createMissingBinders === true
@@ -1630,7 +1682,7 @@ http.route({
           ? options.defaultBinderId
           : undefined;
       const preview = validateCollectionImportTargets(
-        previewCollectionImport(typeof body.csv === "string" ? body.csv : ""),
+        importPreviewFromBody(body),
         binders,
         defaultBinderId,
         options.createMissingBinders === true
@@ -1728,6 +1780,13 @@ http.route({
         return textResponse(toCsv(rows), 200, {
           "Content-Type": "text/csv",
           "Content-Disposition": 'attachment; filename="collection-export.csv"'
+        });
+      }
+
+      if (["manabox", "moxfield", "tcgplayer", "collectr"].includes(format)) {
+        return textResponse(toMarketplaceCsv(rows, format as MarketplaceExportFormat), 200, {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="collection-${format}-export.csv"`
         });
       }
 
@@ -1839,6 +1898,13 @@ http.route({
       const identity = await requireBridgeIdentity(ctx, request);
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/collections\//, "").split("/").filter(Boolean);
+      if (segments.length === 2 && segments[1] === "share-links") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        return json(await ctx.runQuery(internal.bridge.listBinderShareLinks, {
+          subject: identity.subject,
+          binderId: asBinderId(binderId)
+        }));
+      }
       if (segments.length === 2 && segments[1] === "pages") {
         const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
         return json(await ctx.runQuery(internal.bridge.listBinderPages, {
@@ -1869,6 +1935,18 @@ http.route({
       const identity = await requireBridgeIdentity(ctx, request);
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/collections\//, "").split("/").filter(Boolean);
+
+      if (segments.length === 2 && segments[1] === "share-links") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        const body = await parseJsonBody(request);
+        const expiresAt = typeof body.expiresAt === "string" ? Date.parse(body.expiresAt) : undefined;
+        return json(await ctx.runMutation(internal.bridge.createBinderShareLink, {
+          subject: identity.subject,
+          binderId: asBinderId(binderId),
+          label: typeof body.label === "string" ? body.label : "Shared binder",
+          expiresAt: expiresAt !== undefined && Number.isFinite(expiresAt) ? expiresAt : undefined
+        }), 201);
+      }
 
       if (
         segments.length === 3 &&
@@ -2166,6 +2244,14 @@ http.route({
             typeof body.storageLocation === "string" || body.storageLocation === null
               ? body.storageLocation
               : undefined,
+          printedName:
+            typeof body.printedName === "string" || body.printedName === null
+              ? body.printedName
+              : undefined,
+          searchAliases:
+            Array.isArray(body.searchAliases) && body.searchAliases.every((value: unknown) => typeof value === "string")
+              ? body.searchAliases
+              : undefined,
           tagIds: Array.isArray(body.tags) ? body.tags : undefined,
           newTags: Array.isArray(body.newTags) ? body.newTags : undefined,
           cardOverride:
@@ -2203,11 +2289,25 @@ http.route({
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/collections\//, "").split("/").filter(Boolean);
 
+      if (segments.length === 3 && segments[1] === "share-links") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        await ctx.runMutation(internal.bridge.revokeBinderShareLink, {
+          subject: identity.subject,
+          binderId: asBinderId(binderId),
+          linkId: asBinderShareLinkId(segments[2])
+        });
+        return noContent();
+      }
+
       if (segments.length === 1) {
         const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
         await ctx.runMutation(internal.bridge.deleteBinder, {
           subject: identity.subject,
-          binderId
+          binderId,
+          cardDisposition:
+            url.searchParams.get("cardDisposition") === "delete"
+              ? "delete"
+              : "move_to_unsorted"
         });
         return noContent();
       }
@@ -2267,4 +2367,11 @@ registerAnalyticsRoutes(http);
 registerTradesRoutes(http);
 registerOnlineCodesRoutes(http);
 registerScanSessionRoutes(http);
+registerDomainRoutes(http);
+registerProviderCacheRoutes(http);
+registerPricingHistoryRoutes(http);
+registerAlertsAutomationsRoutes(http);
+registerCatalogCorrectionRoutes(http);
+registerBanlistRoutes(http);
+registerNotificationRoutes(http);
 export default http;

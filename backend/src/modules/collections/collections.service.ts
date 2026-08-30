@@ -8,6 +8,9 @@ import type {
   CardDataPayload,
   CollectionCard,
   CollectionCardCopy,
+  CreateBinderShareLinkInput,
+  BinderShareLink,
+  DeleteBinderQuery,
   TcgCode
 } from '@tcg/api-types';
 
@@ -53,6 +56,24 @@ const collectionInclude = {
     }
   }
 } as const;
+
+function formatShareLink(link: {
+  id: string;
+  label: string;
+  token: string;
+  expiresAt: Date | null;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+}): BinderShareLink {
+  return {
+    id: link.id,
+    label: link.label,
+    token: link.token,
+    expiresAt: link.expiresAt?.toISOString(),
+    lastUsedAt: link.lastUsedAt?.toISOString(),
+    createdAt: link.createdAt.toISOString()
+  };
+}
 
 type PrismaCollectionWithCard = Prisma.CollectionGetPayload<{
   include: typeof collectionInclude;
@@ -703,6 +724,7 @@ export async function getUserBinders(userId: string) {
     prisma.binder.findMany({
       where: { userId },
       include: {
+        shareLinks: { orderBy: { createdAt: 'desc' } },
         collections: {
           include: collectionInclude
         }
@@ -729,6 +751,7 @@ export async function getUserBinders(userId: string) {
     associatedSetName: binder.associatedSetName ?? undefined,
     shareToken: binder.shareToken ?? undefined,
     isPublic: binder.isPublic,
+    shareLinks: binder.shareLinks.map(formatShareLink),
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: aggregateCollectionEntries(binder.collections)
@@ -753,6 +776,7 @@ export async function getUserBinders(userId: string) {
     associatedSetName: undefined,
     shareToken: undefined,
     isPublic: false,
+    shareLinks: [],
     createdAt: (looseCollections[0]?.createdAt ?? fallbackDate).toISOString(),
     updatedAt: latestUpdated.toISOString(),
     cards: aggregateCollectionEntries(looseCollections, {
@@ -774,6 +798,45 @@ export async function getUserBinder(userId: string, binderId: string) {
   }
 
   return binder;
+}
+
+export async function createBinderShareLink(
+  userId: string,
+  binderId: string,
+  input: CreateBinderShareLinkInput
+): Promise<BinderShareLink> {
+  const binder = await prisma.binder.findFirst({ where: { id: binderId, userId } });
+  if (!binder) throw new Error('Binder not found');
+  const link = await prisma.binderShareLink.create({
+    data: {
+      binderId,
+      label: input.label.trim(),
+      token: randomBytes(24).toString('hex'),
+      expiresAt: input.expiresAt ? new Date(input.expiresAt) : null
+    }
+  });
+  return formatShareLink(link);
+}
+
+export async function listBinderShareLinks(
+  userId: string,
+  binderId: string
+): Promise<BinderShareLink[]> {
+  const binder = await prisma.binder.findFirst({ where: { id: binderId, userId } });
+  if (!binder) throw new Error('Binder not found');
+  const links = await prisma.binderShareLink.findMany({
+    where: { binderId },
+    orderBy: { createdAt: 'desc' }
+  });
+  return links.map(formatShareLink);
+}
+
+export async function revokeBinderShareLink(userId: string, binderId: string, linkId: string) {
+  const link = await prisma.binderShareLink.findFirst({
+    where: { id: linkId, binderId, binder: { userId } }
+  });
+  if (!link) throw new Error('Share link not found');
+  await prisma.binderShareLink.delete({ where: { id: link.id } });
 }
 
 export async function createBinder(userId: string, input: CreateBinderInput) {
@@ -805,6 +868,7 @@ export async function createBinder(userId: string, input: CreateBinderInput) {
     associatedSetName: binder.associatedSetName ?? undefined,
     shareToken: binder.shareToken ?? undefined,
     isPublic: binder.isPublic,
+    shareLinks: [],
     createdAt: binder.createdAt.toISOString(),
     updatedAt: binder.updatedAt.toISOString(),
     cards: []
@@ -851,6 +915,7 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
           : binder.shareToken
     },
     include: {
+      shareLinks: { orderBy: { createdAt: 'desc' } },
       collections: {
         include: collectionInclude
       }
@@ -870,13 +935,18 @@ export async function updateBinder(userId: string, binderId: string, input: Upda
     associatedSetName: updated.associatedSetName ?? undefined,
     shareToken: updated.shareToken ?? undefined,
     isPublic: updated.isPublic,
+    shareLinks: updated.shareLinks.map(formatShareLink),
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
     cards: aggregateCollectionEntries(updated.collections)
   };
 }
 
-export async function deleteBinder(userId: string, binderId: string) {
+export async function deleteBinder(
+  userId: string,
+  binderId: string,
+  cardDisposition: DeleteBinderQuery["cardDisposition"] = "move_to_unsorted"
+) {
   // Verify ownership
   const binder = await prisma.binder.findFirst({
     where: { id: binderId, userId }
@@ -886,8 +956,16 @@ export async function deleteBinder(userId: string, binderId: string) {
     throw new Error('Binder not found');
   }
 
-  await prisma.binder.delete({
-    where: { id: binderId }
+  await prisma.$transaction(async (tx) => {
+    if (cardDisposition === "delete") {
+      await tx.collection.deleteMany({ where: { binderId, userId } });
+    } else {
+      await tx.collection.updateMany({
+        where: { binderId, userId },
+        data: { binderId: null }
+      });
+    }
+    await tx.binder.delete({ where: { id: binderId } });
   });
 }
 

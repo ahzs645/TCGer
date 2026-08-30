@@ -21,6 +21,12 @@ import { convexDecksRouter } from './decks.convex.router';
 import { convexGuidesRouter } from './guides.convex.router';
 import { convexOnlineCodesRouter } from './online-codes.convex.router';
 import { convexScanSessionsRouter } from './scan-sessions.convex.router';
+import { gradingRouter } from './grading.router';
+import { convexCatalogCorrectionsRouter } from './catalog-corrections.convex.router';
+import { convexAlertsRouter } from './alerts.convex.router';
+import { convexAutomationsRouter } from './automations.convex.router';
+import { convexBanlistsRouter } from './banlists.convex.router';
+import { convexNotificationsRouter } from './notifications.convex.router';
 
 async function loadCollectionsRouter(): Promise<ExpressRouter> {
   if (env.BACKEND_MODE === 'convex' || env.COLLECTIONS_BACKEND === 'convex') {
@@ -100,6 +106,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/guides', convexGuidesRouter);
   app.use('/news', newsRouter);
   app.use('/prices', pricesRouter);
+  app.use('/grading', gradingRouter);
+  app.use('/catalog-corrections', convexCatalogCorrectionsRouter);
+  app.use('/banlists', convexBanlistsRouter);
   app.use('/online-codes', convexOnlineCodesRouter);
   app.use('/scan-sessions', convexScanSessionsRouter);
 
@@ -111,10 +120,10 @@ export async function registerRoutes(app: Express): Promise<void> {
     app.use('/sealed', convexSealedRouter);
     app.use('/analytics', convexAnalyticsRouter);
     app.use('/trades', convexTradesRouter);
-    app.use('/notifications', createNotImplementedRouter('notifications'));
-    app.use('/alerts', createNotImplementedRouter('alerts'));
+    app.use('/notifications', convexNotificationsRouter);
+    app.use('/alerts', convexAlertsRouter);
     app.use('/shops', createNotImplementedRouter('shops'));
-    app.use('/automations', createNotImplementedRouter('automations'));
+    app.use('/automations', convexAutomationsRouter);
     app.use('/shipments', createNotImplementedRouter('shipments'));
     app.use('/public', convexPublicRouter);
   }

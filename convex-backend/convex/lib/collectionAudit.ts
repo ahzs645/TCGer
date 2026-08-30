@@ -298,10 +298,12 @@ export async function undoAuditedCollectionMutation(
       message: "Collection history entry not found"
     });
   }
-  if (source.operationKind === "undo") {
+  if (source.operationKind === "undo" || source.operationKind === "trade_settlement") {
     throw new ConvexError({
       code: "BAD_REQUEST",
-      message: "Undo records cannot be undone"
+      message: source.operationKind === "trade_settlement"
+        ? "Trade settlements must be reconciled as a complete trade"
+        : "Undo records cannot be undone"
     });
   }
   const previousUndo = await ctx.db

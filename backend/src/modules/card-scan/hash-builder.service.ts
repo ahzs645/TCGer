@@ -66,11 +66,11 @@ type HashBuildResult =
 
 const DEFAULT_HASH_BUILD_CONCURRENCY = parsePositiveInteger(
   process.env.CARD_HASH_BUILD_CONCURRENCY,
-  6
+  6,
 );
 const DEFAULT_HASH_UPSERT_BATCH_SIZE = parsePositiveInteger(
   process.env.CARD_HASH_BUILD_UPSERT_BATCH_SIZE,
-  250
+  250,
 );
 
 // ---------- rate limiting ----------
@@ -110,7 +110,7 @@ function isLocalUrl(url: string): boolean {
  */
 export async function buildHashDatabase(
   tcg: 'magic' | 'pokemon' | 'yugioh',
-  options: HashBuildOptions = {}
+  options: HashBuildOptions = {},
 ): Promise<HashBuildProgress> {
   const progress: HashBuildProgress = {
     tcg,
@@ -144,9 +144,7 @@ export async function buildHashDatabase(
 
   const existingRecords = options.force
     ? new Map<string, CardHashRecord>()
-    : new Map(
-        (await getAllCardHashes({ tcg })).map((record) => [record.externalId, record])
-      );
+    : new Map((await getAllCardHashes({ tcg })).map((record) => [record.externalId, record]));
   const pendingUpserts: CardHashRecord[] = [];
   const concurrency = Math.max(1, options.concurrency ?? DEFAULT_HASH_BUILD_CONCURRENCY);
   const upsertBatchSize = Math.max(1, options.upsertBatchSize ?? DEFAULT_HASH_UPSERT_BATCH_SIZE);
@@ -171,9 +169,7 @@ export async function buildHashDatabase(
       pendingCards.push(card);
     }
 
-    const results = await Promise.all(
-      pendingCards.map((card) => buildHashRecord(tcg, card))
-    );
+    const results = await Promise.all(pendingCards.map((card) => buildHashRecord(tcg, card)));
 
     for (const result of results) {
       if (result.status === 'error') {
@@ -192,7 +188,7 @@ export async function buildHashDatabase(
       if (progress.processed % 50 === 0) {
         logger.info(
           { tcg, processed: progress.processed, total: progress.total },
-          'Hash build progress'
+          'Hash build progress',
         );
       }
 
@@ -217,7 +213,7 @@ export async function buildHashDatabase(
 
 async function buildHashRecord(
   tcg: 'magic' | 'pokemon' | 'yugioh',
-  card: CardImageEntry
+  card: CardImageEntry,
 ): Promise<HashBuildResult> {
   try {
     // External image hosts need throttling; in-cluster cache services do not.
@@ -273,7 +269,28 @@ export async function getHashDatabaseStats() {
     countCardHashes(),
   ]);
 
-  return { magic, pokemon, yugioh, total, storeMode: getCardHashStoreMode() };
+  const catalog = {
+    magic: env.CARD_SCAN_CATALOG_TOTAL_MAGIC,
+    pokemon: env.CARD_SCAN_CATALOG_TOTAL_POKEMON,
+    yugioh: env.CARD_SCAN_CATALOG_TOTAL_YUGIOH,
+  };
+  const indexed = { magic, pokemon, yugioh };
+  const coverage = Object.fromEntries(
+    Object.entries(indexed).map(([tcg, count]) => {
+      const denominator = catalog[tcg as keyof typeof catalog];
+      return [
+        tcg,
+        {
+          indexed: count,
+          catalog: denominator ?? null,
+          percent:
+            denominator && denominator > 0 ? Math.min(100, (count / denominator) * 100) : null,
+        },
+      ];
+    }),
+  );
+
+  return { magic, pokemon, yugioh, total, coverage, storeMode: getCardHashStoreMode() };
 }
 
 // ---------- TCG-specific card fetchers ----------
@@ -282,17 +299,15 @@ export async function getHashDatabaseStats() {
  * Fetch Magic cards from Scryfall.
  * Uses the /cards/search endpoint or bulk data for full builds.
  */
-async function fetchMagicCards(
-  setCode?: string,
-  limit?: number
-): Promise<CardImageEntry[]> {
+async function fetchMagicCards(setCode?: string, limit?: number): Promise<CardImageEntry[]> {
   const apiRoot = env.SCRYFALL_API_BASE_URL.replace(/\/+$/, '');
   const requestDelayMs = isLocalUrl(apiRoot) ? 0 : 100;
   const cards: CardImageEntry[] = [];
 
   // Build search query
   const query = setCode ? `set:${setCode}` : 'game:paper';
-  let url: string | null = `${apiRoot}/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=set`;
+  let url: string | null =
+    `${apiRoot}/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=set`;
 
   while (url && (!limit || cards.length < limit)) {
     if (requestDelayMs > 0) {
@@ -302,7 +317,7 @@ async function fetchMagicCards(
     const response = await fetch(url);
     if (!response.ok) break;
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       data: Array<{
         id: string;
         name: string;
@@ -318,9 +333,7 @@ async function fetchMagicCards(
 
     for (const card of data.data) {
       // Get image URL (handle double-faced cards)
-      const imageUrl =
-        card.image_uris?.normal ??
-        card.card_faces?.[0]?.image_uris?.normal;
+      const imageUrl = card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal;
 
       if (!imageUrl) continue;
 
@@ -345,10 +358,7 @@ async function fetchMagicCards(
 /**
  * Fetch Pokemon cards from Pokemon TCG API.
  */
-async function fetchPokemonCards(
-  setCode?: string,
-  limit?: number
-): Promise<CardImageEntry[]> {
+async function fetchPokemonCards(setCode?: string, limit?: number): Promise<CardImageEntry[]> {
   const apiRoot = env.POKEMON_API_BASE_URL.replace(/\/+$/, '');
   const requestDelayMs = isLocalUrl(apiRoot) ? 0 : 200;
   const isTcgdex = /tcgdex/i.test(apiRoot);
@@ -393,7 +403,8 @@ async function fetchPokemonCards(
       };
 
       for (const card of data.data) {
-        const matchesSet = !setCode || card.id.toLowerCase().startsWith(`${setCode.toLowerCase()}-`);
+        const matchesSet =
+          !setCode || card.id.toLowerCase().startsWith(`${setCode.toLowerCase()}-`);
         const imageUrl = card.image ? `${card.image}/high.webp` : null;
         if (!matchesSet || !imageUrl) continue;
 

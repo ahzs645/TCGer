@@ -8,6 +8,7 @@ import {
   json,
   noContent,
   parseJsonBody,
+  requireBridgeAdmin,
   requireBridgeIdentity,
 } from "./lib/httpBridge";
 
@@ -105,6 +106,45 @@ export function registerSealedRoutes(http: HttpRouter) {
         return json(products);
       } catch (error) {
         return handleConvexError(error, "Failed to fetch sealed products");
+      }
+    }),
+  });
+
+  http.route({
+    path: "/sealed/products/catalog",
+    method: "POST",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        await requireBridgeAdmin(ctx, identity);
+        const body = asRecord(await parseJsonBody(request));
+        if (!Array.isArray(body.products)) {
+          return errorJson(400, "VALIDATION_ERROR", "products must be an array");
+        }
+        return json(await ctx.runMutation(internal.sealed.upsertCatalogProducts, {
+          subject: identity.subject,
+          products: body.products as any,
+        }));
+      } catch (error) {
+        return handleConvexError(error, "Failed to ingest sealed product contents");
+      }
+    }),
+  });
+
+  http.route({
+    pathPrefix: "/sealed/products/",
+    method: "GET",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const productId = singleProductId(request);
+        if (!productId) return errorJson(404, "NOT_FOUND", "Route not found");
+        return json(await ctx.runQuery(internal.sealed.getProduct, {
+          subject: identity.subject,
+          productId: productId as Id<"sealedProducts">,
+        }));
+      } catch (error) {
+        return handleConvexError(error, "Failed to fetch sealed product contents");
       }
     }),
   });

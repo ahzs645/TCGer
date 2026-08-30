@@ -17,6 +17,7 @@ import type {
   ScanResult,
   ScanTimingMetrics,
 } from './scan.service';
+import { evaluateCatalogMatchSafety } from './scan.service';
 
 const MODEL_INPUT_SIZE = 224;
 const MAX_CANDIDATES = 5;
@@ -82,7 +83,10 @@ function resolveEmbeddingPaths() {
 }
 
 function normalizeExternalId(value: string): string {
-  const trimmed = value.trim().toLowerCase().replace(/\.png$/i, '');
+  const trimmed = value
+    .trim()
+    .toLowerCase()
+    .replace(/\.png$/i, '');
   const [setCode, collectorNumber] = trimmed.split('-');
 
   if (!setCode || !collectorNumber) {
@@ -153,7 +157,11 @@ class TradingCardEmbeddingRuntime {
   private indexPromise: Promise<LoadedEmbeddingIndex> | null = null;
   private cardLookupPromise: Promise<Map<string, CardHashEntry>> | null = null;
 
-  async nearestMatches(imageBuffer: Buffer, limit = MAX_CANDIDATES): Promise<VariantMatchResult> {
+  async nearestMatches(
+    imageBuffer: Buffer,
+    limit = MAX_CANDIDATES,
+    allowedExternalIds?: ReadonlySet<string>,
+  ): Promise<VariantMatchResult> {
     const [session, index] = await Promise.all([this.loadSession(), this.loadIndex()]);
 
     const tensorData = await this.prepareInputTensor(imageBuffer);
@@ -190,6 +198,14 @@ class TradingCardEmbeddingRuntime {
     const searchStartedAt = performance.now();
 
     for (let entryIndex = 0; entryIndex < index.meta.entries.length; entryIndex += 1) {
+      const externalId = index.meta.entries[entryIndex]!.externalId;
+      if (
+        allowedExternalIds &&
+        !allowedExternalIds.has(externalId) &&
+        !allowedExternalIds.has(normalizeExternalId(externalId))
+      ) {
+        continue;
+      }
       let similarity = 0;
       const baseOffset = entryIndex * index.meta.dimension;
 
@@ -272,7 +288,9 @@ class TradingCardEmbeddingRuntime {
       .toBuffer({ resolveWithObject: true });
 
     if (info.channels !== 3) {
-      throw new Error(`Expected 3-channel RGB input for embedding model, received ${info.channels}.`);
+      throw new Error(
+        `Expected 3-channel RGB input for embedding model, received ${info.channels}.`,
+      );
     }
 
     const pixelCount = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE;
@@ -407,6 +425,7 @@ export function isEmbeddingScanConfigured(): boolean {
 export async function scanCardImageWithEmbedding(
   imageBuffer: Buffer,
   tcgFilter?: string,
+  options?: { setCodeHint?: string },
 ): Promise<ScanResult> {
   if (tcgFilter && tcgFilter !== SUPPORTED_TCG) {
     throw new Error(`Embedding scan mode currently supports only ${SUPPORTED_TCG}.`);
@@ -421,6 +440,15 @@ export async function scanCardImageWithEmbedding(
     runtimeScan.artifacts.correctedSourceImage,
   );
   const [cardLookup] = await Promise.all([runtime.getCardLookup()]);
+  const setCodeHint = options?.setCodeHint?.trim().toLowerCase();
+  const scopedCards = Array.from(
+    new Map(Array.from(cardLookup.values()).map((entry) => [entry.externalId, entry])).values(),
+  ).filter((entry) => !setCodeHint || entry.setCode?.trim().toLowerCase() === setCodeHint);
+  const allowedExternalIds = setCodeHint
+    ? new Set(
+        scopedCards.flatMap((entry) => [entry.externalId, normalizeExternalId(entry.externalId)]),
+      )
+    : undefined;
 
   const aggregatedCandidates = new Map<string, RankedEmbeddingCandidate>();
   const attempts: ScanAttemptDiagnostic[] = [];
@@ -431,7 +459,11 @@ export async function scanCardImageWithEmbedding(
   let bestSimilarity = Number.NEGATIVE_INFINITY;
 
   for (const variant of rawVariants) {
-    const variantResult = await runtime.nearestMatches(variant.image, MAX_CANDIDATES);
+    const variantResult = await runtime.nearestMatches(
+      variant.image,
+      MAX_CANDIDATES,
+      allowedExternalIds,
+    );
     totalInferenceMs += variantResult.inferenceMs;
     totalRankingMs += variantResult.searchMs;
 
@@ -492,9 +524,10 @@ export async function scanCardImageWithEmbedding(
     totalMs,
   );
   const executionEngine: ScanExecutionEngine = 'embedding';
+  const catalogDecision = evaluateCatalogMatchSafety(candidates);
 
   return {
-    bestMatch: candidates[0] ?? null,
+    bestMatch: catalogDecision.accepted ? (candidates[0] ?? null) : null,
     candidates,
     hashGenerated: await computeRGBHash(runtimeScan.primaryVariant.image),
     meta: {
@@ -515,6 +548,11 @@ export async function scanCardImageWithEmbedding(
       maskVariant: runtimeScan.perspectiveCorrection.maskVariant,
       rerankUsed: false,
       shortlistSize: candidates.length,
+      catalogScope: {
+        ...(setCodeHint ? { setCode: setCodeHint } : {}),
+        indexedCandidates: scopedCards.length,
+      },
+      catalogDecision,
       timings,
     },
     debug: emptyDebugArtifacts(

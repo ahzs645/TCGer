@@ -38,6 +38,18 @@ interface CatalogSealedProduct {
   imageUrl?: string;
   marketPrice?: number;
   upc?: string;
+  contentMode?: 'fixed' | 'pool';
+  contentCount?: number;
+  contents?: Array<{
+    externalId?: string;
+    name: string;
+    quantity?: number;
+    setCode?: string;
+    rarity?: string;
+    imageUrl?: string;
+  }>;
+  contentSource?: string;
+  contentUpdatedAt?: string;
 }
 
 interface SealedCatalogPack {
@@ -77,6 +89,7 @@ interface CatalogManifest {
 const REPO_ROOT = resolve(__dirname, '../../..');
 const DEFAULT_OUT_DIR = resolve(REPO_ROOT, 'data/catalog');
 const TCGCSV_ROOT = 'https://tcgcsv.com/tcgplayer';
+const YGOPRO_ROOT = 'https://db.ygoprodeck.com/api/v7';
 const USER_AGENT = 'TCGer-sealed-catalog-builder/1.0';
 const REQUEST_DELAY_MS = 110;
 
@@ -231,6 +244,10 @@ async function fetchText(url: string, label: string): Promise<string> {
   throw new Error(`${label} failed after ${attempts} attempts`);
 }
 
+async function fetchJson<T>(url: string, label: string): Promise<T> {
+  return JSON.parse(await fetchText(url, label)) as T;
+}
+
 async function fetchGroups(categoryId: number): Promise<TcgCsvGroup[]> {
   const text = await fetchText(`${TCGCSV_ROOT}/${categoryId}/groups`, `TCGCSV category ${categoryId}`);
   const payload = JSON.parse(text) as { results?: TcgCsvGroup[] };
@@ -347,6 +364,98 @@ function rowToProduct(
   };
 }
 
+interface YgoSetRow {
+  set_name?: string;
+  set_code?: string;
+  num_of_cards?: number;
+  tcg_date?: string;
+}
+
+interface YgoCardRow {
+  id?: number;
+  name?: string;
+  card_sets?: Array<{
+    set_name?: string;
+    set_code?: string;
+    set_rarity?: string;
+  }>;
+  card_images?: Array<{ image_url_small?: string; image_url?: string }>;
+}
+
+function normalizedProductName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+export function isYugiohFixedDeckSet(name: string): boolean {
+  return /\b(?:structure|starter) deck\b/i.test(name.trim());
+}
+
+async function enrichYugiohDeckContents(
+  products: Map<string, CatalogSealedProduct>,
+  updatedAt: string,
+): Promise<void> {
+  const [setRows, cardsPayload] = await Promise.all([
+    fetchJson<YgoSetRow[]>(`${YGOPRO_ROOT}/cardsets.php`, 'YGOPRODeck card sets'),
+    fetchJson<{ data?: YgoCardRow[] }>(`${YGOPRO_ROOT}/cardinfo.php?format=tcg`, 'YGOPRODeck cards'),
+  ]);
+  const deckSets = setRows.filter((row) => row.set_name && isYugiohFixedDeckSet(row.set_name));
+  const deckNames = new Set(deckSets.map((row) => row.set_name!));
+  const contentsBySet = new Map<string, NonNullable<CatalogSealedProduct['contents']>>();
+  for (const card of cardsPayload.data ?? []) {
+    if (!card.name) continue;
+    for (const printing of card.card_sets ?? []) {
+      if (!printing.set_name || !deckNames.has(printing.set_name)) continue;
+      const contents = contentsBySet.get(printing.set_name) ?? [];
+      contents.push({
+        externalId: card.id === undefined ? undefined : String(card.id),
+        name: card.name,
+        setCode: printing.set_code,
+        rarity: printing.set_rarity,
+        imageUrl: card.card_images?.[0]?.image_url_small ?? card.card_images?.[0]?.image_url,
+      });
+      contentsBySet.set(printing.set_name, contents);
+    }
+  }
+
+  const existingProducts = [...products.values()];
+  for (const set of deckSets) {
+    const setName = set.set_name!;
+    const contents = contentsBySet.get(setName);
+    if (!contents?.length) continue;
+    const uniqueContents = [...new Map(
+      contents.map((content) => [
+        `${content.externalId ?? content.name}:${content.setCode ?? ''}`,
+        content,
+      ]),
+    ).values()];
+    const normalizedSet = normalizedProductName(setName);
+    const matches = existingProducts.filter((product) => {
+      if (product.productType !== 'deck') return false;
+      const normalizedProduct = normalizedProductName(product.name);
+      return normalizedProduct.includes(normalizedSet) || normalizedSet.includes(normalizedProduct);
+    });
+    const targets = matches.length ? matches : [{
+      id: `ygoprodeck:set:${set.set_code ?? normalizedSet.replace(/ /g, '-')}`,
+      tcg: 'yugioh' as const,
+      name: setName,
+      productType: 'deck',
+      setCode: set.set_code,
+      releaseDate: set.tcg_date,
+    }];
+    for (const product of targets) {
+      const enriched: CatalogSealedProduct = {
+        ...product,
+        contentMode: 'fixed',
+        contentCount: uniqueContents.length,
+        contents: uniqueContents,
+        contentSource: `${YGOPRO_ROOT}/cardinfo.php?cardset=${encodeURIComponent(setName)}`,
+        contentUpdatedAt: updatedAt,
+      };
+      products.set(enriched.id, enriched);
+    }
+  }
+}
+
 async function buildPack(
   game: SupportedGame,
   updatedAt: string,
@@ -377,6 +486,10 @@ async function buildPack(
       await sleep(REQUEST_DELAY_MS);
     }
     if (maxGroups && processedGroups >= maxGroups) break;
+  }
+
+  if (game === 'yugioh') {
+    await enrichYugiohDeckContents(products, updatedAt);
   }
 
   return {

@@ -6,7 +6,11 @@
 import { performance } from 'node:perf_hooks';
 
 import { computeRGBHash, hammingDistance, type RGBHash } from './phash';
-import { computeCardFeatureHashes, getStoredCardFeatureHashes, type CardFeatureHashes } from './feature-hashes';
+import {
+  computeCardFeatureHashes,
+  getStoredCardFeatureHashes,
+  type CardFeatureHashes,
+} from './feature-hashes';
 import { countCardHashes, getAllCardHashes, getCardHashPage } from './hash-store';
 import { scanCardImageWithEmbedding } from './embedding-scan.service';
 import {
@@ -33,8 +37,8 @@ export interface ScanMatch {
   setName: string | null;
   rarity: string | null;
   imageUrl: string | null;
-  confidence: number;        // 0..1 overall similarity score
-  distance: number;          // raw combined Hamming distance
+  confidence: number; // 0..1 overall similarity score
+  distance: number; // raw combined Hamming distance
   fullDistance?: number;
   titleDistance?: number | null;
   footerDistance?: number | null;
@@ -60,6 +64,13 @@ export interface ScanTimingMetrics {
 
 export type ScanEngine = 'automatic' | 'phash' | 'embedding';
 export type ScanExecutionEngine = 'phash' | 'embedding';
+
+export interface CatalogMatchDecision {
+  accepted: boolean;
+  reason: 'accepted' | 'no-catalog-match' | 'low-confidence' | 'ambiguous';
+  topConfidence?: number;
+  runnerUpConfidence?: number;
+}
 
 export interface ScanAttemptDiagnostic {
   variant: string;
@@ -115,6 +126,8 @@ export interface ScanResult {
     maskVariant?: string | null;
     rerankUsed: boolean;
     shortlistSize: number;
+    catalogScope: { setCode?: string; indexedCandidates: number };
+    catalogDecision: CatalogMatchDecision;
     timings?: ScanTimingMetrics;
   };
   debug?: ScanDebugData;
@@ -147,10 +160,17 @@ const MAX_CANDIDATES = 5;
 export async function scanCardImage(
   imageBuffer: Buffer,
   tcgFilter?: string,
-  options?: { maxDistanceOverride?: number; ocrNameHint?: string; engine?: ScanEngine }
+  options?: {
+    maxDistanceOverride?: number;
+    ocrNameHint?: string;
+    setCodeHint?: string;
+    engine?: ScanEngine;
+  },
 ): Promise<ScanResult> {
   if (options?.engine === 'embedding') {
-    return scanCardImageWithEmbedding(imageBuffer, tcgFilter);
+    return scanCardImageWithEmbedding(imageBuffer, tcgFilter, {
+      setCodeHint: options.setCodeHint,
+    });
   }
 
   const scanStartedAt = performance.now();
@@ -172,6 +192,16 @@ export async function scanCardImage(
   let artworkPrefilterApplied = false;
   let artworkPrefilterTopMatches: ArtworkMatch[] = [];
   let artworkRerankTopMatches: ArtworkMatch[] = [];
+
+  // A pinned set is a hard catalog mask. It is applied before artwork or hash
+  // scoring so a visually similar card from another set cannot win the ranker.
+  const setCodeHint = options?.setCodeHint?.trim().toLowerCase();
+  if (setCodeHint) {
+    hashEntries = hashEntries.filter(
+      (entry) => entry.setCode?.trim().toLowerCase() === setCodeHint,
+    );
+  }
+  const indexedCandidates = hashEntries.length;
 
   // OCR name hint: fuzzy-filter hash entries to matching card names
   if (options?.ocrNameHint) {
@@ -196,7 +226,9 @@ export async function scanCardImage(
       const artIds = new Set(artTop.map((m) => m.externalId));
       hashEntries = hashEntries.filter((entry) => artIds.has(entry.externalId));
       artworkPrefilterApplied = true;
-    } catch { /* fall through to full scan */ }
+    } catch {
+      /* fall through to full scan */
+    }
     timings.artworkPrefilterMs = performance.now() - artworkPrefilterStartedAt;
   }
 
@@ -256,8 +288,14 @@ export async function scanCardImage(
         rankingMs,
         rerankUsed: rankedCandidates.accepted.some(({ reranked }) => reranked),
         shortlistSize: rankedCandidates.diagnostics.shortlistedCandidates.length,
-        acceptedCandidates: rankedCandidates.diagnostics.acceptedCandidates.slice(0, MAX_CANDIDATES),
-        rejectedNearMisses: rankedCandidates.diagnostics.rejectedNearMisses.slice(0, MAX_CANDIDATES),
+        acceptedCandidates: rankedCandidates.diagnostics.acceptedCandidates.slice(
+          0,
+          MAX_CANDIDATES,
+        ),
+        rejectedNearMisses: rankedCandidates.diagnostics.rejectedNearMisses.slice(
+          0,
+          MAX_CANDIDATES,
+        ),
       });
 
       for (const match of matches) {
@@ -299,7 +337,9 @@ export async function scanCardImage(
   if (isArtworkDatabaseLoaded() && !options?.ocrNameHint) {
     const artworkRerankStartedAt = performance.now();
     try {
-      const artFp = artworkFingerprint ?? await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon');
+      const artFp =
+        artworkFingerprint ??
+        (await computeArtworkFingerprint(imageBuffer, tcgFilter ?? 'pokemon'));
       // HSV disabled: adds noise on video crops even at low weight.
       // Artwork color grid alone produces better results (79% vs 71% with HSV).
       const artMatches = matchArtwork(artFp, 5, tcgFilter);
@@ -313,7 +353,9 @@ export async function scanCardImage(
         // Only inject the artwork top-1 as a candidate when:
         // - pHash found no match, OR
         // - artwork has a meaningful similarity margin over #2
-        const pHashBest = Array.from(allMatches.values()).sort((a, b) => a.distance - b.distance)[0];
+        const pHashBest = Array.from(allMatches.values()).sort(
+          (a, b) => a.distance - b.distance,
+        )[0];
         const shouldInject = !pHashBest || margin >= 0.005;
 
         if (shouldInject) {
@@ -341,7 +383,9 @@ export async function scanCardImage(
           }
         }
       }
-    } catch { /* artwork matching unavailable, continue without */ }
+    } catch {
+      /* artwork matching unavailable, continue without */
+    }
     timings.artworkRerankMs = performance.now() - artworkRerankStartedAt;
   }
 
@@ -349,17 +393,20 @@ export async function scanCardImage(
   if (!isArtworkDatabaseLoaded()) {
     const dataDir = process.env.CARD_SCAN_DATA_DIR;
     if (dataDir) {
-      loadArtworkDatabase(dataDir).catch(() => { /* not available */ });
+      loadArtworkDatabase(dataDir).catch(() => {
+        /* not available */
+      });
     }
   }
 
   const candidates = Array.from(allMatches.values())
     .sort((left, right) => left.distance - right.distance)
     .slice(0, MAX_CANDIDATES);
+  const catalogDecision = evaluateCatalogMatchSafety(candidates);
   timings.totalMs = performance.now() - scanStartedAt;
 
   return {
-    bestMatch: candidates[0] ?? null,
+    bestMatch: catalogDecision.accepted ? (candidates[0] ?? null) : null,
     candidates,
     hashGenerated: bestAttempt?.hash ?? (await computeRGBHash(runtimeScan.primaryVariant.image)),
     meta: {
@@ -380,6 +427,11 @@ export async function scanCardImage(
       maskVariant: runtimeScan.perspectiveCorrection.maskVariant,
       rerankUsed: bestAttempt?.rerankUsed ?? false,
       shortlistSize: bestAttempt?.shortlistSize ?? 0,
+      catalogScope: {
+        ...(setCodeHint ? { setCode: setCodeHint } : {}),
+        indexedCandidates,
+      },
+      catalogDecision,
       timings,
     },
     debug: {
@@ -389,7 +441,8 @@ export async function scanCardImage(
       },
       timings,
       attempts: attemptDiagnostics,
-      rejectedNearMisses: bestAttempt?.diagnostics.rejectedNearMisses.slice(0, MAX_CANDIDATES) ?? [],
+      rejectedNearMisses:
+        bestAttempt?.diagnostics.rejectedNearMisses.slice(0, MAX_CANDIDATES) ?? [],
       artwork: {
         prefilterApplied: artworkPrefilterApplied,
         prefilterTopMatches: artworkPrefilterTopMatches,
@@ -401,6 +454,30 @@ export async function scanCardImage(
         candidates: [],
       },
     },
+  };
+}
+
+/** Reject unknown or ambiguous captures instead of accepting the nearest row. */
+export function evaluateCatalogMatchSafety(candidates: ScanMatch[]): CatalogMatchDecision {
+  const top = candidates[0];
+  const runnerUp = candidates[1];
+  if (!top) return { accepted: false, reason: 'no-catalog-match' };
+  if (top.confidence < 0.68) {
+    return { accepted: false, reason: 'low-confidence', topConfidence: top.confidence };
+  }
+  if (runnerUp && Math.abs(top.confidence - runnerUp.confidence) < 0.005) {
+    return {
+      accepted: false,
+      reason: 'ambiguous',
+      topConfidence: top.confidence,
+      runnerUpConfidence: runnerUp.confidence,
+    };
+  }
+  return {
+    accepted: true,
+    reason: 'accepted',
+    topConfidence: top.confidence,
+    ...(runnerUp ? { runnerUpConfidence: runnerUp.confidence } : {}),
   };
 }
 
@@ -431,19 +508,28 @@ export async function getCardHashes(tcg?: string, page = 1, pageSize = 500) {
 function buildScanPasses(variants: ScanRuntimeVariant[], maxDistanceOverride?: number) {
   const uprightVariants = variants.filter((variant) => !variant.rotated180);
   const correctedVariants = variants.filter((variant) => variant.perspectiveCorrected);
-  const fallbackVariants = Array.from(new Set([
-    ...uprightVariants,
-    ...correctedVariants.filter((variant) => variant.rotated180),
-    ...variants.filter((variant) => variant.rotated180),
-  ]));
+  const fallbackVariants = Array.from(
+    new Set([
+      ...uprightVariants,
+      ...correctedVariants.filter((variant) => variant.rotated180),
+      ...variants.filter((variant) => variant.rotated180),
+    ]),
+  );
 
   const maxDist = maxDistanceOverride ?? MAX_COMBINED_DISTANCE;
-  const medDist = maxDistanceOverride ? Math.round(maxDistanceOverride * 0.83) : MEDIUM_COMBINED_DISTANCE;
-  const strictDist = maxDistanceOverride ? Math.round(maxDistanceOverride * 0.67) : STRICT_COMBINED_DISTANCE;
+  const medDist = maxDistanceOverride
+    ? Math.round(maxDistanceOverride * 0.83)
+    : MEDIUM_COMBINED_DISTANCE;
+  const strictDist = maxDistanceOverride
+    ? Math.round(maxDistanceOverride * 0.67)
+    : STRICT_COMBINED_DISTANCE;
 
   return [
     { maxDistance: strictDist, variants: variants.slice(0, 1) },
-    { maxDistance: medDist, variants: fallbackVariants.slice(0, Math.max(2, fallbackVariants.length)) },
+    {
+      maxDistance: medDist,
+      variants: fallbackVariants.slice(0, Math.max(2, fallbackVariants.length)),
+    },
     { maxDistance: maxDist, variants },
   ];
 }
@@ -468,7 +554,7 @@ function rankMatches(
   hashEntries: Awaited<ReturnType<typeof getAllCardHashes>>,
   hashGenerated: RGBHash,
   featureHashesByTcg: Partial<Record<SupportedTcg, CardFeatureHashes>>,
-  maxDistance: number
+  maxDistance: number,
 ): RankMatchesResult {
   const shortlist: Array<{
     entry: Awaited<ReturnType<typeof getAllCardHashes>>[number];
@@ -583,7 +669,7 @@ function isStrongEnough(match: ScanMatch, maxDistance: number): boolean {
 async function computeFeatureHashesByTcg(
   imageBuffer: Buffer,
   hashEntries: Awaited<ReturnType<typeof getAllCardHashes>>,
-  tcgFilter?: string
+  tcgFilter?: string,
 ): Promise<Partial<Record<SupportedTcg, CardFeatureHashes>>> {
   const tcgs = new Set<SupportedTcg>();
 
@@ -601,7 +687,9 @@ async function computeFeatureHashesByTcg(
   }
 
   const entries = await Promise.all(
-    Array.from(tcgs).map(async (tcg) => [tcg, await computeCardFeatureHashes(tcg, imageBuffer)] as const)
+    Array.from(tcgs).map(
+      async (tcg) => [tcg, await computeCardFeatureHashes(tcg, imageBuffer)] as const,
+    ),
   );
 
   return Object.fromEntries(entries) as Partial<Record<SupportedTcg, CardFeatureHashes>>;
@@ -618,7 +706,7 @@ function rgbDistance(left: RGBHash, right: RGBHash): number {
 function computeFeatureScore(
   fullDistance: number,
   titleDistance: number | null,
-  footerDistance: number | null
+  footerDistance: number | null,
 ): number {
   let score = fullDistance * 0.72;
   let weights = 0.72;
@@ -701,7 +789,7 @@ function pushShortlist(
     footerDistance: number | null;
     scoreDistance: number;
     reranked: boolean;
-  }
+  },
 ): void {
   shortlist.push(candidate);
   shortlist.sort((left, right) => {
@@ -719,7 +807,7 @@ function pushShortlist(
 
 function readFeatureHashesForEntry(
   tcg: string,
-  featureHashesByTcg: Partial<Record<SupportedTcg, CardFeatureHashes>>
+  featureHashesByTcg: Partial<Record<SupportedTcg, CardFeatureHashes>>,
 ): CardFeatureHashes {
   if (tcg === 'magic' || tcg === 'pokemon' || tcg === 'yugioh') {
     return featureHashesByTcg[tcg] ?? { title: null, footer: null };

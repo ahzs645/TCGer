@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import {
+  discoverCardsQuerySchema,
   exhaustiveSearchQuerySchema,
   artistSearchQuerySchema,
   collectionTagSearchQuerySchema,
   type ArtistSearchQueryInput,
   type CollectionTagSearchQueryInput,
   type ExhaustiveSearchQueryInput,
+  type DiscoverCardsQuery,
   type TcgSet
 } from '@tcg/api-types';
 
@@ -77,6 +79,60 @@ export async function searchCards(input: CardSearchInput) {
     );
     return [];
   });
+}
+
+export async function discoverCards(
+  input: DiscoverCardsQuery,
+  random: () => number = Math.random
+) {
+  const { tcg, count } = discoverCardsQuerySchema.parse(input);
+  const candidates = adapterRegistry
+    .list()
+    .filter(
+      (adapter) =>
+        (tcg === 'all' || adapter.game === tcg) &&
+        adapter.fetchSets !== undefined &&
+        adapter.fetchSetCards !== undefined
+    );
+  if (!candidates.length) return { cards: [], total: 0 };
+
+  // Randomize the adapter and set order, then try a few candidates so one
+  // temporarily empty provider does not make Discover look broken.
+  const adapterStart = Math.floor(random() * candidates.length);
+  for (let offset = 0; offset < candidates.length; offset += 1) {
+    const adapter = candidates[(adapterStart + offset) % candidates.length]!;
+    try {
+      const sets = await withProviderTimeout(adapter.game, 'discover sets', adapter.fetchSets!());
+      if (!sets.length) continue;
+      const setStart = Math.floor(random() * sets.length);
+      for (let setOffset = 0; setOffset < Math.min(sets.length, 4); setOffset += 1) {
+        const set = sets[(setStart + setOffset) % sets.length]!;
+        const setCards = await withProviderTimeout(
+          adapter.game,
+          'discover cards',
+          adapter.fetchSetCards!(set.code)
+        );
+        if (!setCards.length) continue;
+        const available = [...setCards];
+        const cards = [];
+        while (available.length && cards.length < count) {
+          const index = Math.floor(random() * available.length);
+          cards.push(available.splice(index, 1)[0]!);
+        }
+        return {
+          cards,
+          total: cards.length,
+          sampledFrom: { tcg: adapter.game, setCode: set.code, setName: set.name }
+        };
+      }
+    } catch (error) {
+      logger.warn(
+        { provider: adapter.game, error: error instanceof Error ? error.message : String(error) },
+        'Card discovery provider failed; trying another game'
+      );
+    }
+  }
+  return { cards: [], total: 0 };
 }
 
 async function searchAdapterWithFallback(adapter: TcgAdapter, query: string): Promise<CardDTO[]> {

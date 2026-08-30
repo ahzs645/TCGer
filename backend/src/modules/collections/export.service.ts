@@ -39,6 +39,7 @@ export async function exportCollectionAsJson(userId: string) {
     const metadata = asJsonObject(entry.card.tcgSpecific);
     return {
       binderName: entry.binder?.name ?? 'Unsorted',
+      quantity: entry.quantity,
       cardName: entry.card.name,
       tcg: entry.card.tcgGame.code,
       setCode: entry.card.setCode,
@@ -117,6 +118,7 @@ export async function exportCollectionAsCsv(userId: string): Promise<string> {
 
   const headers = [
     'Binder',
+    'Quantity',
     'Card Name',
     'TCG',
     'Set Code',
@@ -170,6 +172,7 @@ export async function exportCollectionAsCsv(userId: string): Promise<string> {
   const rows = data.map((entry) =>
     [
       escapeCsvField(entry.binderName),
+      String(entry.quantity),
       escapeCsvField(entry.cardName),
       escapeCsvField(entry.tcg),
       escapeCsvField(entry.setCode),
@@ -222,4 +225,34 @@ export async function exportCollectionAsCsv(userId: string): Promise<string> {
   );
 
   return [headers.join(','), ...rows].join('\n');
+}
+
+export async function exportCollectionForMarketplace(
+  userId: string,
+  format: 'manabox' | 'moxfield' | 'tcgplayer' | 'collectr',
+) {
+  const data = await exportCollectionAsJson(userId);
+  const profiles = {
+    manabox: {
+      headers: ['Name', 'Set code', 'Set name', 'Collector number', 'Foil', 'Rarity', 'Quantity', 'Scryfall ID', 'Purchase price', 'Condition', 'Language', 'Binder Name'],
+      values: (row: (typeof data)[number]) => [row.cardName, row.setCode, row.setName, row.collectorNumber, row.isFoil ? 'foil' : 'normal', row.rarity, row.quantity, row.tcg === 'magic' ? row.externalId : '', row.acquisitionPrice, row.condition, row.language, row.binderName],
+    },
+    moxfield: {
+      headers: ['Count', 'Name', 'Edition', 'Condition', 'Language', 'Foil', 'Tags', 'Collector Number', 'Purchase Price', 'Scryfall ID'],
+      values: (row: (typeof data)[number]) => [row.quantity, row.cardName, row.setCode, row.condition, row.language, row.isFoil ? 'foil' : '', row.tags.join(';'), row.collectorNumber, row.acquisitionPrice, row.tcg === 'magic' ? row.externalId : ''],
+    },
+    tcgplayer: {
+      headers: ['TCGplayer Id', 'Product Line', 'Set Name', 'Product Name', 'Rarity', 'Condition', 'TCG Market Price', 'Total Quantity'],
+      values: (row: (typeof data)[number]) => [row.externalId.startsWith('tcgplayer:') ? row.externalId.slice(10) : '', row.tcg, row.setName, row.cardName, row.rarity, row.condition, row.price, row.quantity],
+    },
+    collectr: {
+      headers: ['Card', 'Game', 'Set', 'Set Code', 'Number', 'Rarity', 'Variant', 'Condition', 'Quantity', 'Market Price', 'External ID'],
+      values: (row: (typeof data)[number]) => [row.cardName, row.tcg, row.setName, row.setCode, row.collectorNumber, row.rarity, row.finishLabel ?? (row.isFoil ? 'Foil' : 'Normal'), row.condition, row.quantity, row.price, row.externalId],
+    },
+  } as const;
+  const profile = profiles[format];
+  return [
+    profile.headers.map(escapeCsvJson).join(','),
+    ...data.map((row) => profile.values(row).map(escapeCsvJson).join(',')),
+  ].join('\n');
 }

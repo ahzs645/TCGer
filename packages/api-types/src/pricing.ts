@@ -34,6 +34,7 @@ export type TrackedPriceItem = z.infer<typeof trackedPriceItemSchema>;
 export const priceSourceSchema = z.enum([
   "automatic",
   "justtcg",
+  "tcgcsv",
   "tcgdex-cardmarket",
   "scryfall",
   "lorcast",
@@ -44,6 +45,35 @@ export const priceSourceSchema = z.enum([
   "ebay-active",
 ]);
 export type PriceSource = z.infer<typeof priceSourceSchema>;
+
+export const priceOriginalQuoteSchema = z.object({
+  amount: z.number().nonnegative(),
+  currency: z.string().regex(/^[A-Za-z]{3}$/),
+  source: z.string().min(1),
+  asOf: z.string().datetime().optional(),
+});
+export const priceFxProvenanceSchema = z.object({
+  fromCurrency: z.string().regex(/^[A-Za-z]{3}$/),
+  toCurrency: z.string().regex(/^[A-Za-z]{3}$/),
+  rate: z.number().positive(),
+  source: z.string().min(1),
+  asOf: z.string().datetime(),
+});
+export const priceMatchProvenanceSchema = z.object({
+  method: z.enum(["exact-id", "exact-set-number", "exact-name", "fuzzy"]),
+  confidence: z.number().min(0).max(1),
+  ambiguous: z.boolean().optional(),
+  providerProductId: z.string().optional(),
+  providerGroupId: z.string().optional(),
+});
+export const priceResultProvenanceSchema = z.object({
+  provider: z.string().min(1),
+  retrievedAt: z.string().datetime(),
+  originalQuotes: z.array(priceOriginalQuoteSchema),
+  fx: priceFxProvenanceSchema.optional(),
+  match: priceMatchProvenanceSchema.optional(),
+});
+export type PriceResultProvenance = z.infer<typeof priceResultProvenanceSchema>;
 
 export const trackedPricesRequestSchema = z.object({
   items: z.array(trackedPriceItemSchema).min(1).max(100),
@@ -60,12 +90,92 @@ export interface TrackedPriceResult extends TrackedPriceItem {
   updatedAt?: string;
   cached: boolean;
   error?: string;
+  provenance?: PriceResultProvenance;
 }
+
+export const psaCertLookupInputSchema = z.object({
+  certNumber: z
+    .string()
+    .trim()
+    .regex(/^\d{6,12}$/),
+  force: z.boolean().optional(),
+});
+export type PsaCertLookupInput = z.infer<typeof psaCertLookupInputSchema>;
+export const psaCertLookupResponseSchema = z.object({
+  certNumber: z.string(),
+  grader: z.literal("PSA").default("PSA"),
+  grade: z.number().optional(),
+  gradeLabel: z.string().optional(),
+  labelType: z.string().optional(),
+  year: z.string().optional(),
+  brand: z.string().optional(),
+  subject: z.string().optional(),
+  searchableName: z.string().optional(),
+  cardNumber: z.string().optional(),
+  variety: z.string().optional(),
+  category: z.string().optional(),
+  population: z.number().int().nonnegative().optional(),
+  populationHigher: z.number().int().nonnegative().optional(),
+  specId: z.string().optional(),
+  cardId: z.string().optional(),
+  providerResponseHash: z.string(),
+  retrievedAt: z.string().datetime(),
+  refreshAfter: z.string().datetime(),
+  cached: z.boolean(),
+});
+export type PsaCertLookupResponse = z.infer<typeof psaCertLookupResponseSchema>;
+
+export const gradedPriceEstimateInputSchema = z.object({
+  game: z.string().min(1),
+  name: z.string().min(1),
+  setName: z.string().optional(),
+  collectorNumber: z.string().optional(),
+  grader: z.string().min(1),
+  grade: z.number().nonnegative(),
+  tcgPlayerId: z.string().optional(),
+  currency: z
+    .string()
+    .regex(/^[A-Za-z]{3}$/)
+    .optional(),
+});
+export type GradedPriceEstimateInput = z.infer<
+  typeof gradedPriceEstimateInputSchema
+>;
+export const gradedPriceEstimateResponseSchema = z.object({
+  price: z.number().nonnegative(),
+  currency: z.string(),
+  basis: z.string(),
+  count: z.number().int().nonnegative().optional(),
+  source: z.string(),
+  retrievedAt: z.string().datetime(),
+  userTriggered: z.boolean(),
+  provenance: priceResultProvenanceSchema.optional(),
+});
+export type GradedPriceEstimateResponse = z.infer<
+  typeof gradedPriceEstimateResponseSchema
+>;
 
 export interface TrackedPricesResponse {
   prices: TrackedPriceResult[];
   refreshedAt: string;
   refreshAfter: string;
+  health: PricingHealthSummary;
+}
+
+export type PricingHealthStatus = "healthy" | "degraded" | "unsafe";
+
+export interface PricingHealthSummary {
+  status: PricingHealthStatus;
+  total: number;
+  priced: number;
+  fresh: number;
+  stale: number;
+  missing: number;
+  failed: number;
+  lowConfidence: number;
+  coverage: number;
+  freshnessHours: number;
+  message: string;
 }
 
 export interface PriceSourceOption {
@@ -90,8 +200,11 @@ export const createPriceAlertSchema = z.object({
   tcg: z.string().min(1),
   cardName: z.string().min(1),
   imageUrl: z.string().optional(),
+  finishCode: z.string().trim().min(1).optional(),
   targetPrice: z.number().positive(),
   direction: z.enum(["below", "above"]),
+  currency: z.string().trim().regex(/^[A-Za-z]{3}$/).optional(),
+  cooldownHours: z.number().int().min(1).max(24 * 30).optional(),
 });
 export type CreatePriceAlertInput = z.infer<typeof createPriceAlertSchema>;
 
@@ -99,6 +212,7 @@ export const updatePriceAlertSchema = z.object({
   targetPrice: z.number().positive().optional(),
   direction: z.enum(["below", "above"]).optional(),
   isActive: z.boolean().optional(),
+  cooldownHours: z.number().int().min(1).max(24 * 30).optional(),
 });
 export type UpdatePriceAlertInput = z.infer<typeof updatePriceAlertSchema>;
 
@@ -155,6 +269,37 @@ export const updateTransactionSchema = z.object({
 });
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 
+export const acquisitionCostSplitSchema = z.object({
+  totalCents: z.number().int().positive(),
+  currency: z.string().regex(/^[A-Za-z]{3}$/),
+  mode: z.enum(["equal", "weighted"]),
+  lines: z
+    .array(
+      z.object({
+        collectionEntryId: z.string(),
+        weight: z.number().positive().optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
+  notes: z.string().optional(),
+});
+export type AcquisitionCostSplitInput = z.infer<
+  typeof acquisitionCostSplitSchema
+>;
+export interface AcquisitionCostSplitResult {
+  allocationGroupId: string;
+  totalCents: number;
+  currency: string;
+  auditId: string;
+  allocations: Array<{
+    collectionEntryId: string;
+    allocatedCents: number;
+    acquisitionPrice: number;
+    transactionId: string;
+  }>;
+}
+
 // ---------------------------------------------------------------------------
 // Shop Connections
 // ---------------------------------------------------------------------------
@@ -179,10 +324,18 @@ export interface PriceAlertResponse {
   tcg: string;
   cardName: string;
   imageUrl?: string;
+  finishCode?: string;
   targetPrice: number;
   direction: string;
+  currency: string;
+  cooldownHours: number;
   isActive: boolean;
   lastTriggered?: string;
+  lastTriggeredPrice?: number;
+  lastObservedPrice?: number;
+  lastObservedAt?: string;
+  state: "unknown" | "matched" | "unmatched";
+  cooldownUntil?: string;
   createdAt: string;
 }
 
@@ -293,9 +446,14 @@ export interface PriceResult {
   source: string;
   price: number;
   currency: string;
+  basePrice?: number;
   foilPrice?: number;
+  etchedPrice?: number;
+  reverseHoloPrice?: number;
+  finishCode?: string;
   url?: string;
   updatedAt: string;
+  provenance?: PriceResultProvenance;
 }
 
 export interface PriceAnalyticsMovers {

@@ -7,7 +7,11 @@ export async function createUniqueShareToken(ctx: MutationCtx): Promise<string> 
       .query("binders")
       .withIndex("by_share_token", (q) => q.eq("shareToken", token))
       .unique();
-    if (!existing) return token;
+    const managed = await ctx.db
+      .query("binderShareLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (!existing && !managed) return token;
   }
   throw new Error("Failed to generate a unique collection share token");
 }

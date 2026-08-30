@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   searchQuerySchema,
+  discoverCardsQuerySchema,
   cardParamsSchema,
   exhaustiveSearchQuerySchema,
   artistSearchQuerySchema,
@@ -11,6 +12,7 @@ import { adapterRegistry } from '../../modules/adapters/adapter-registry';
 import {
   getCardPrints,
   searchCards,
+  discoverCards,
   searchAllCards,
   searchCardsByArtist,
   searchCardsByCollectionTag,
@@ -22,6 +24,14 @@ import { requireAuth } from '../middleware/auth';
 
 export const cardsRouter = Router();
 cardsRouter.use(requireAuth);
+
+cardsRouter.get(
+  '/discover',
+  asyncHandler(async (req, res) => {
+    const input = discoverCardsQuerySchema.parse(req.query);
+    res.json(await discoverCards(input));
+  })
+);
 
 cardsRouter.get(
   '/search',

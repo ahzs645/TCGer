@@ -118,8 +118,17 @@ Express backend (see `backend/src/config/env.ts`):
 - `JUSTTCG_API_BASE_URL` (default `https://api.justtcg.com/v1`) and
   `JUSTTCG_API_KEY` (paid commercial pricing; server-side only).
 - `POKEWALLET_API_BASE_URL` plus either `POKEWALLET_API_KEY` or
-  `POKEWALLET_PROXY_SECRET` enables server-only Pokémon Cardmarket, TCGPlayer,
-  and blended references. `PRICE_USD_TO_EUR` controls the blended conversion.
+  `POKEWALLET_PROXY_SECRET` enables server-only Pokémon Cardmarket and TCGPlayer
+  references. Blending is enabled only when `PRICE_USD_TO_EUR`, `PRICE_FX_SOURCE`,
+  and the ISO timestamp `PRICE_FX_AS_OF` are all configured; native quotes and the
+  dated conversion provenance are retained.
+- `TCGCSV_API_BASE_URL` enables the no-key Pokémon singles fallback. Matching is
+  language-scoped and refuses ambiguous set or collector-number results.
+- `PSA_API_TOKEN` enables certification-number intake through PSA's public API.
+  Only normalized certificate fields and a response hash are cached.
+- `POKEMON_PRICE_TRACKER_API_KEY` remains disabled until
+  `POKEMON_PRICE_TRACKER_LICENSE_ACK=true` explicitly records that the deployment's
+  commercial-use and redistribution obligations have been reviewed.
 - `EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET` enable the server-only eBay Browse
   active-listing median; `EBAY_MARKETPLACE_ID` selects its marketplace.
 - `PRICE_REFRESH_INTERVAL_MS` controls the tracked-card quote cache and client refresh guidance (default 12 hours).

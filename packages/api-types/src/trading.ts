@@ -10,7 +10,8 @@ const tradeCardSchema = z.object({
   name: z.string().min(1),
   quantity: z.number().int().positive().default(1),
   imageUrl: z.string().optional(),
-  estimatedValue: z.number().optional()
+  estimatedValue: z.number().optional(),
+  collectionEntryId: z.string().optional()
 });
 
 export const createTradeSchema = z.object({
@@ -34,6 +35,8 @@ export interface TradeCardResponse {
   quantity: number;
   imageUrl?: string;
   estimatedValue?: number;
+  collectionEntryId?: string;
+  reservedQuantity: number;
 }
 
 export interface TradeResponse {
@@ -42,6 +45,9 @@ export interface TradeResponse {
   receiverId: string;
   status: string;
   message?: string;
+  settlementStatus: "unreserved" | "reserved" | "settled" | "released";
+  settledAt?: string;
+  settlementId?: string;
   cards: TradeCardResponse[];
   createdAt: string;
   updatedAt: string;

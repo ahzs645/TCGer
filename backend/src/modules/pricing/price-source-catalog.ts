@@ -46,7 +46,8 @@ export function getPriceSourceCatalog(): PriceSourcesResponse {
     sources.push({
       id: 'justtcg',
       label: 'JustTCG',
-      description: 'Condition, language, and printing-aware prices from the server-held JustTCG key.',
+      description:
+        'Condition, language, and printing-aware prices from the server-held JustTCG key.',
       games: ['magic', 'pokemon', 'yugioh', 'onepiece', 'lorcana', 'dragonball'],
       requiresServer: true,
     });
@@ -68,15 +69,26 @@ export function getPriceSourceCatalog(): PriceSourcesResponse {
         games: ['pokemon'],
         requiresServer: true,
       },
-      {
+    );
+    if (env.PRICE_USD_TO_EUR && env.PRICE_FX_SOURCE && env.PRICE_FX_AS_OF) {
+      sources.push({
         id: 'pokewallet-blended',
         label: 'PokéWallet · Blended',
-        description: 'Average of Cardmarket EUR and TCGPlayer converted to EUR.',
+        description: `Average of native EUR and USD quotes using ${env.PRICE_FX_SOURCE} FX dated ${env.PRICE_FX_AS_OF}.`,
         games: ['pokemon'],
         requiresServer: true,
-      },
-    );
+      });
+    }
   }
+
+  sources.push({
+    id: 'tcgcsv',
+    label: 'TCGCSV · TCGplayer',
+    description:
+      'Daily no-key Pokémon singles prices with language-scoped, ambiguity-safe matching.',
+    games: ['pokemon'],
+    requiresServer: true,
+  });
 
   if (env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET) {
     sources.push({

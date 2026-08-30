@@ -34,6 +34,7 @@ type ImportedCard = {
 };
 
 const deckFunctions = internal.decks;
+const checkoutFunctions = internal.deckCheckouts;
 const TCG_CODES: readonly TcgCode[] = [
   "yugioh",
   "magic",
@@ -560,6 +561,12 @@ export function registerDecksRoutes(http: HttpRouter) {
             }),
           );
         }
+        if (segments.length === 2 && segments[1] === "checkout") {
+          return json(await ctx.runQuery(checkoutFunctions.active, {
+            subject: identity.subject,
+            deckId: asDeckId(segments[0]!),
+          }));
+        }
         if (segments.length === 2 && segments[1] === "ydk") {
           return json(
             await ctx.runQuery(deckFunctions.exportYdk, {
@@ -619,6 +626,20 @@ export function registerDecksRoutes(http: HttpRouter) {
               banlist: banlist ?? undefined,
             }),
           );
+        }
+        if (segments.length === 2 && segments[1] === "checkout") {
+          if (!isOptionalString(body, "note")) return invalidPayload();
+          return json(await ctx.runMutation(checkoutFunctions.checkout, {
+            subject: identity.subject,
+            deckId: asDeckId(segments[0]!),
+            note: body.note as string | undefined,
+          }), 201);
+        }
+        if (segments.length === 2 && segments[1] === "checkin") {
+          return json(await ctx.runMutation(checkoutFunctions.checkin, {
+            subject: identity.subject,
+            deckId: asDeckId(segments[0]!),
+          }));
         }
 
         return errorJson(404, "NOT_FOUND", "Route not found");

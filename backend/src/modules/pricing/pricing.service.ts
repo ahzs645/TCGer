@@ -31,6 +31,7 @@ export async function fetchCardPrices(
   finishCode?: string,
   source: PriceSource = 'automatic',
   item?: TrackedPriceItem,
+  comparison = false,
 ) {
   const card = await prisma.card.findFirst({
     where: { externalId, tcgGame: { code: tcg } },
@@ -49,7 +50,7 @@ export async function fetchCardPrices(
     isFallback?: boolean;
   }> = [];
 
-  const liveResults = await fetchLiveCardPrices(tcg, externalId, finishCode, source, item);
+  const liveResults = await fetchLiveCardPrices(tcg, externalId, finishCode, source, item, comparison);
   for (const result of liveResults) {
     results.push(result);
     if (card) {

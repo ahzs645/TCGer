@@ -1,8 +1,20 @@
 import type { TrackedPriceItem } from '@tcg/api-types';
-import { createTrackedPricingService } from './tracked-pricing.service';
+import { createTrackedPricingService, summarizePricingHealth } from './tracked-pricing.service';
 import type { LivePriceResult } from './pricing.types';
 
 describe('tracked pricing cache', () => {
+  it('separates fresh, stale, missing, failed, and low-confidence quotes', () => {
+    const now = Date.parse('2026-08-15T00:00:00.000Z');
+    const health = summarizePricingHealth([
+      { key: 'a', tcg: 'magic', externalId: 'a', price: 2, currency: 'USD', cached: false, updatedAt: '2026-08-14T00:00:00.000Z' },
+      { key: 'b', tcg: 'magic', externalId: 'b', price: 3, currency: 'USD', cached: false, updatedAt: '2026-08-10T00:00:00.000Z' },
+      { key: 'c', tcg: 'magic', externalId: 'c', cached: false },
+      { key: 'd', tcg: 'magic', externalId: 'd', cached: false, error: 'provider failed' },
+      { key: 'e', tcg: 'magic', externalId: 'e', price: 4, currency: 'USD', cached: false, updatedAt: '2026-08-14T00:00:00.000Z', provenance: { provider: 'test', retrievedAt: '2026-08-14T00:00:00.000Z', originalQuotes: [], match: { method: 'fuzzy', confidence: 0.5 } } },
+    ], now);
+    expect(health).toMatchObject({ status: 'unsafe', total: 5, fresh: 2, stale: 1, missing: 1, failed: 1, lowConfidence: 1, coverage: 40 });
+  });
+
   it('deduplicates cards and reuses a fresh cached quote', async () => {
     let timestamp = Date.parse('2026-08-15T00:00:00.000Z');
     const fetcher = jest

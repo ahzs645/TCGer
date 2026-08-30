@@ -69,7 +69,12 @@ Open `http://localhost:3003`. Browser-facing REST requests use Express. Never ca
 - `JUSTTCG_API_KEY` (paid commercial pricing; keep server-side and never bundle in a client)
 - `POKEWALLET_API_BASE_URL` plus `POKEWALLET_API_KEY` or `POKEWALLET_PROXY_SECRET`
   (adds server-only Cardmarket, TCGPlayer, and blended Pokémon sources)
-- `PRICE_USD_TO_EUR` (conversion used only by the PokéWallet blended source; default `0.92`)
+- `PRICE_USD_TO_EUR`, `PRICE_FX_SOURCE`, and `PRICE_FX_AS_OF` (all required to
+  enable the PokéWallet blended source; there is no default FX rate)
+- `TCGCSV_API_BASE_URL` and `TCGCSV_MIN_INTERVAL_MS` (no-key Pokémon singles fallback)
+- `PSA_API_TOKEN` (certification-number intake)
+- `POKEMON_PRICE_TRACKER_API_KEY` plus `POKEMON_PRICE_TRACKER_LICENSE_ACK=true`
+  (user-triggered graded estimates, only after the deployment's license review)
 - `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, and `EBAY_MARKETPLACE_ID`
   (adds the server-only eBay active-listing source)
 - `PRICE_REFRESH_INTERVAL_MS` (default `43200000`, or 12 hours)

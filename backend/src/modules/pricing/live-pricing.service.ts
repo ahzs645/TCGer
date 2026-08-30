@@ -15,6 +15,7 @@ import {
 import type { PriceSource } from '@tcg/api-types';
 import type { TrackedPriceItem } from '@tcg/api-types';
 import { EbayActivePriceProvider, PokeWalletPriceProvider } from './server-market-price-providers';
+import { TcgCsvPriceProvider } from './tcgcsv-price-provider';
 
 export * from './pricing.types';
 export * from './collectr-test-price-provider';
@@ -67,6 +68,7 @@ const justTcgProvider = new JustTcgPriceProvider();
 const providers: PriceProvider[] = [
   justTcgProvider,
   new TcgDexPriceProvider(),
+  new TcgCsvPriceProvider(),
   new ScryfallPriceProvider(),
   new LorcastPriceProvider(),
   new AdapterPriceProvider(),
@@ -103,6 +105,7 @@ export async function fetchJustTcgTrackedPrices(
       reverseHoloPrice: quote.reverseHoloPrice,
       finishCode: item.finishCode,
       updatedAt: new Date().toISOString(),
+      provenance: quote.provenance,
     });
   }
   return results;
@@ -123,10 +126,15 @@ export async function fetchLiveCardPrices(
     TrackedPriceItem,
     'finishCode' | 'condition' | 'language' | 'identifiers' | 'lookupHint'
   >,
+  comparison = false,
 ): Promise<LivePriceResult[]> {
   const results: LivePriceResult[] = [];
   const selectedProviders = providers.filter((provider) =>
-    source === 'automatic' ? provider.includeInAutomatic !== false : provider.name === source,
+    comparison
+      ? true
+      : source === 'automatic'
+        ? provider.includeInAutomatic !== false
+        : provider.name === source,
   );
   for (const provider of selectedProviders) {
     try {
@@ -144,6 +152,7 @@ export async function fetchLiveCardPrices(
         reverseHoloPrice: quote.reverseHoloPrice,
         finishCode,
         updatedAt: new Date().toISOString(),
+        provenance: quote.provenance,
       });
     } catch (error) {
       console.error(`[pricing] Provider ${provider.name} failed for ${tcg}/${externalId}:`, error);

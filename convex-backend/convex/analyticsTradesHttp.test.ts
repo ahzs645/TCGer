@@ -237,6 +237,10 @@ describe("analytics and trades Convex HTTP routes", () => {
         name: "Sol Ring"
       }
     });
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("cardPriceSnapshots", { userId: user.id, tcg: "magic", externalId: "history-sol-ring", source: "test", capturedAt: now, day: utcDayOffset(0), nativePrice: 12.5, nativeCurrency: "USD", matchMethod: "exact-id", matchConfidence: 1, createdAt: now });
+    });
     const headers = bridgeHeaders("history_avery", "history-avery");
 
     const firstResponse = await t.fetch("/analytics/value?period=30d", { headers });
@@ -287,8 +291,10 @@ describe("analytics and trades Convex HTTP routes", () => {
     );
     expect(updatedSnapshots).toHaveLength(1);
     expect(updatedSnapshots[0]).toMatchObject({
-      totalValue: 20,
-      byTcg: { magic: 20 }
+      totalValue: 12.5,
+      byTcg: { magic: 12.5 },
+      qualityStatus: "healthy",
+      priceCoverage: 100
     });
   });
 
@@ -439,17 +445,36 @@ describe("analytics and trades Convex HTTP routes", () => {
     const senderHeaders = bridgeHeaders("user_sender", "sender");
     const receiverHeaders = bridgeHeaders("user_receiver", "receiver");
     const outsiderHeaders = bridgeHeaders("user_outsider", "outsider");
+    const [senderBinder, receiverBinder] = await t.run(async (ctx) => {
+      const senderUser = await ctx.db.query("users").withIndex("by_auth_subject", (q) => q.eq("authSubject", "user_sender")).unique();
+      const receiverUser = await ctx.db.query("users").withIndex("by_auth_subject", (q) => q.eq("authSubject", "user_receiver")).unique();
+      return await Promise.all([
+        ctx.db.query("binders").withIndex("by_user_kind", (q) => q.eq("userId", senderUser!._id).eq("kind", "library")).unique(),
+        ctx.db.query("binders").withIndex("by_user_kind", (q) => q.eq("userId", receiverUser!._id).eq("kind", "library")).unique(),
+      ]);
+    });
+    const senderEntry = await t.withIdentity({ subject: "user_sender" }).mutation(api.collections.addToBinder, { binderId: senderBinder!._id, quantity: 4, card: { externalId: "sol-ring", tcg: "magic", name: "Sol Ring" } });
+    const receiverEntry = await t.withIdentity({ subject: "user_receiver" }).mutation(api.collections.addToBinder, { binderId: receiverBinder!._id, quantity: 4, card: { externalId: "sv1-001", tcg: "pokemon", name: "Bulbasaur" } });
 
-    async function createTrade() {
+    async function createTrade(exactCopies = false) {
       const response = await t.fetch("/trades", {
         method: "POST",
         headers: senderHeaders,
         body: JSON.stringify({
           receiverId: "user_receiver",
           message: "Interested?",
-          senderCards: [senderCard],
+          senderCards: [{
+            ...senderCard,
+            ...(exactCopies ? { collectionEntryId: senderEntry.id } : {})
+          }],
           receiverCards: [
-            { externalId: "sv1-001", tcg: "pokemon", name: "Bulbasaur", quantity: 1 }
+            {
+              externalId: "sv1-001",
+              tcg: "pokemon",
+              name: "Bulbasaur",
+              quantity: 1,
+              ...(exactCopies ? { collectionEntryId: receiverEntry.id } : {})
+            }
           ]
         })
       });
@@ -457,7 +482,7 @@ describe("analytics and trades Convex HTTP routes", () => {
       return await response.json();
     }
 
-    const acceptedTrade = await createTrade();
+    const acceptedTrade = await createTrade(true);
     const outsiderGet = await t.fetch(`/trades/${acceptedTrade.id}`, {
       headers: outsiderHeaders
     });
@@ -475,7 +500,44 @@ describe("analytics and trades Convex HTTP routes", () => {
     });
     expect(senderAccept.status).toBe(403);
     expect(receiverAccept.status).toBe(200);
-    expect((await receiverAccept.json()).status).toBe("accepted");
+    expect(await receiverAccept.json()).toMatchObject({ status: "accepted", settlementStatus: "settled" });
+    const settlement = await t.run(async (ctx) => {
+      const sender = await ctx.db.query("users").withIndex("by_auth_subject", (q) => q.eq("authSubject", "user_sender")).unique();
+      const receiver = await ctx.db.query("users").withIndex("by_auth_subject", (q) => q.eq("authSubject", "user_receiver")).unique();
+      const cards = await ctx.db.query("cards").collect();
+      const entries = await ctx.db.query("collectionEntries").collect();
+      const total = (userId: string, externalId: string) => entries.filter((entry) => entry.userId === userId && cards.find((card) => card._id === entry.cardId)?.externalId === externalId).reduce((sum, entry) => sum + entry.quantity, 0);
+      return {
+        senderSol: total(sender!._id, "sol-ring"), senderBulbasaur: total(sender!._id, "sv1-001"),
+        receiverSol: total(receiver!._id, "sol-ring"), receiverBulbasaur: total(receiver!._id, "sv1-001"),
+        transactions: (await ctx.db.query("transactions").collect()).filter((row) => row.relatedTradeId === acceptedTrade.id).length,
+        audits: (await ctx.db.query("collectionMutationAudits").collect()).filter((row) => row.operationKind === "trade_settlement").length,
+      };
+    });
+    expect(settlement).toEqual({ senderSol: 3, senderBulbasaur: 1, receiverSol: 1, receiverBulbasaur: 3, transactions: 2, audits: 2 });
+    const historyResponse = await t.fetch("/collections/history", {
+      headers: senderHeaders
+    });
+    const history = await historyResponse.json();
+    const settlementAudit = history.entries.find(
+      (entry: { operationKind: string }) => entry.operationKind === "trade_settlement"
+    );
+    expect(historyResponse.status).toBe(200);
+    expect(settlementAudit).toMatchObject({ canUndo: false });
+    const undoSettlement = await t.fetch(
+      `/collections/history/${settlementAudit.id}/undo`,
+      {
+        method: "POST",
+        headers: senderHeaders,
+        body: JSON.stringify({ idempotencyKey: "undo-settled-trade" })
+      }
+    );
+    expect(undoSettlement.status).toBe(400);
+    const deleteSettlement = await t.fetch(`/trades/${acceptedTrade.id}`, {
+      method: "DELETE",
+      headers: senderHeaders
+    });
+    expect(deleteSettlement.status).toBe(400);
 
     const declinedTrade = await createTrade();
     const decline = await t.fetch(`/trades/${declinedTrade.id}/decline`, {

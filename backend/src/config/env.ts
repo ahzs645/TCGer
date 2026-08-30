@@ -16,6 +16,11 @@ const optionalSecretEnv = z.preprocess(
   z.string().trim().min(1).optional(),
 );
 
+const optionalPositiveNumberEnv = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim().length === 0 ? undefined : value),
+  z.coerce.number().positive().optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -26,6 +31,9 @@ const envSchema = z.object({
   CARD_SCAN_EMBEDDING_MODEL_PATH: z.string().optional(),
   CARD_SCAN_EMBEDDING_INDEX_PATH: z.string().optional(),
   CARD_SCAN_EMBEDDING_META_PATH: z.string().optional(),
+  CARD_SCAN_CATALOG_TOTAL_MAGIC: z.coerce.number().int().nonnegative().optional(),
+  CARD_SCAN_CATALOG_TOTAL_POKEMON: z.coerce.number().int().nonnegative().optional(),
+  CARD_SCAN_CATALOG_TOTAL_YUGIOH: z.coerce.number().int().nonnegative().optional(),
   APP_ORIGIN: z.string().url().optional(),
   COLLECTIONS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),
   WISHLISTS_BACKEND: z.enum(['prisma', 'convex']).default('prisma'),
@@ -42,7 +50,30 @@ const envSchema = z.object({
   POKEWALLET_API_BASE_URL: z.string().url().default('https://api.pokewallet.io'),
   POKEWALLET_API_KEY: optionalSecretEnv,
   POKEWALLET_PROXY_SECRET: optionalSecretEnv,
-  PRICE_USD_TO_EUR: z.coerce.number().positive().default(0.92),
+  // FX conversion is deliberately disabled unless the rate, source and date are
+  // all supplied. Quotes must never silently depend on a timeless default rate.
+  PRICE_USD_TO_EUR: optionalPositiveNumberEnv,
+  PRICE_FX_SOURCE: z.string().trim().min(1).optional(),
+  PRICE_FX_AS_OF: z.string().datetime({ offset: true }).optional(),
+  PROVIDER_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+  SCRYFALL_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(120),
+  TCGCSV_API_BASE_URL: z.string().url().default('https://tcgcsv.com/tcgplayer'),
+  TCGCSV_MIN_INTERVAL_MS: z.coerce.number().int().min(100).default(100),
+  PSA_API_BASE_URL: z.string().url().default('https://api.psacard.com/publicapi'),
+  PSA_API_TOKEN: optionalSecretEnv,
+  PSA_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(350),
+  PSA_CACHE_TTL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(7 * 24 * 60 * 60 * 1000),
+  POKEMON_PRICE_TRACKER_API_BASE_URL: z
+    .string()
+    .url()
+    .default('https://www.pokemonpricetracker.com/api/v2'),
+  POKEMON_PRICE_TRACKER_API_KEY: optionalSecretEnv,
+  POKEMON_PRICE_TRACKER_LICENSE_ACK: booleanEnv,
+  POKEMON_PRICE_TRACKER_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(250),
   EBAY_CLIENT_ID: optionalSecretEnv,
   EBAY_CLIENT_SECRET: optionalSecretEnv,
   EBAY_MARKETPLACE_ID: z.string().trim().min(1).default('EBAY_US'),

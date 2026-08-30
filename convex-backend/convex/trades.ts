@@ -7,6 +7,9 @@ import {
   type QueryCtx
 } from "./_generated/server";
 import { tcgCodeValidator } from "./lib/validators";
+import { internal } from "./_generated/api";
+import { appendCollectionAudit, snapshotAuditEntries } from "./lib/collectionAudit";
+import { insertNotification } from "./notifications";
 
 const tradeStatusValidator = v.union(
   v.literal("pending"),
@@ -21,7 +24,8 @@ const tradeCardInputValidator = v.object({
   name: v.string(),
   quantity: v.number(),
   imageUrl: v.optional(v.string()),
-  estimatedValue: v.optional(v.number())
+  estimatedValue: v.optional(v.number()),
+  collectionEntryId: v.optional(v.id("collectionEntries"))
 });
 
 const tradeCardResponseValidator = v.object({
@@ -32,7 +36,9 @@ const tradeCardResponseValidator = v.object({
   name: v.string(),
   quantity: v.number(),
   imageUrl: v.optional(v.string()),
-  estimatedValue: v.optional(v.number())
+  estimatedValue: v.optional(v.number()),
+  collectionEntryId: v.optional(v.string()),
+  reservedQuantity: v.number()
 });
 
 const tradeResponseValidator = v.object({
@@ -41,6 +47,14 @@ const tradeResponseValidator = v.object({
   receiverId: v.string(),
   status: tradeStatusValidator,
   message: v.optional(v.string()),
+  settlementStatus: v.union(
+    v.literal("unreserved"),
+    v.literal("reserved"),
+    v.literal("settled"),
+    v.literal("released")
+  ),
+  settledAt: v.optional(v.string()),
+  settlementId: v.optional(v.string()),
   cards: v.array(tradeCardResponseValidator),
   createdAt: v.string(),
   updatedAt: v.string()
@@ -59,6 +73,9 @@ const tradeMatchValidator = v.object({
   youHave: v.array(matchCardValidator),
   matchScore: v.number()
 });
+
+const MAX_TRADE_CARD_LINES = 100;
+const MAX_TRADE_COPIES = 200;
 
 type ReaderCtx = QueryCtx | MutationCtx;
 type MatchCard = { externalId: string; tcg: string; name: string };
@@ -96,13 +113,17 @@ async function tradeByStringId(ctx: ReaderCtx, tradeId: string) {
 }
 
 async function hydrateTrade(ctx: ReaderCtx, trade: Doc<"trades">) {
-  const [sender, receiver, cards] = await Promise.all([
+  const [sender, receiver, cards, reservations] = await Promise.all([
     ctx.db.get(trade.senderId),
     ctx.db.get(trade.receiverId),
     ctx.db
       .query("tradeCards")
       .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
-      .take(100)
+      .take(100),
+    ctx.db
+      .query("tradeReservations")
+      .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
+      .take(200)
   ]);
   if (!sender || !receiver) {
     throw new ConvexError({
@@ -124,8 +145,17 @@ async function hydrateTrade(ctx: ReaderCtx, trade: Doc<"trades">) {
       name: card.name,
       quantity: card.quantity,
       imageUrl: card.imageUrl,
-      estimatedValue: card.estimatedValue
+      estimatedValue: card.estimatedValue,
+      collectionEntryId: card.collectionEntryId ? String(card.collectionEntryId) : undefined,
+      reservedQuantity: reservations
+        .filter((reservation) =>
+          reservation.tradeCardId === card._id && reservation.status === "reserved"
+        )
+        .reduce((sum, reservation) => sum + reservation.quantity, 0)
     })),
+    settlementStatus: trade.settlementStatus ?? "unreserved",
+    settledAt: trade.settledAt ? new Date(trade.settledAt).toISOString() : undefined,
+    settlementId: trade.settlementId,
     createdAt: new Date(trade.createdAt).toISOString(),
     updatedAt: new Date(trade.updatedAt).toISOString()
   };
@@ -133,6 +163,115 @@ async function hydrateTrade(ctx: ReaderCtx, trade: Doc<"trades">) {
 
 function isParticipant(trade: Doc<"trades">, userId: Id<"users">) {
   return trade.senderId === userId || trade.receiverId === userId;
+}
+
+async function allocateOwnedEntries(
+  ctx: MutationCtx,
+  ownerId: Id<"users">,
+  card: {
+    tcg: Doc<"cards">["tcg"];
+    externalId: string;
+    quantity: number;
+    collectionEntryId?: Id<"collectionEntries">;
+  }
+) {
+  const canonical = await ctx.db
+    .query("cards")
+    .withIndex("by_tcg_external", (q) =>
+      q.eq("tcg", card.tcg).eq("externalId", card.externalId)
+    )
+    .unique();
+  if (!canonical) throw badRequest(`Card ${card.externalId} is not in the local catalog`);
+  const entries = await ctx.db
+    .query("collectionEntries")
+    .withIndex("by_user_card", (q) =>
+      q.eq("userId", ownerId).eq("cardId", canonical._id)
+    )
+    .take(1_000);
+  const exactEntry = card.collectionEntryId
+    ? entries.find((entry) => entry._id === card.collectionEntryId)
+    : undefined;
+  if (card.collectionEntryId && !exactEntry) {
+    throw new ConvexError({
+      code: "CONFLICT",
+      message: `The selected copy of ${card.externalId} is not available to this trader`
+    });
+  }
+  const ordered = exactEntry
+    ? [exactEntry]
+    : [...entries].sort((left, right) => left.createdAt - right.createdAt);
+  let remaining = card.quantity;
+  const allocations: Array<{ entry: Doc<"collectionEntries">; quantity: number }> = [];
+  for (const entry of ordered) {
+    const reservations = await ctx.db
+      .query("tradeReservations")
+      .withIndex("by_entry_and_status", (q) =>
+        q.eq("collectionEntryId", entry._id).eq("status", "reserved")
+      )
+      .take(501);
+    if (reservations.length > 500) {
+      throw new ConvexError({
+        code: "LIMIT_EXCEEDED",
+        message: "This collection entry has too many active trade reservations"
+      });
+    }
+    const available = Math.max(
+      0,
+      entry.quantity - reservations.reduce((sum, reservation) => sum + reservation.quantity, 0)
+    );
+    const quantity = Math.min(remaining, available);
+    if (quantity > 0) allocations.push({ entry, quantity });
+    remaining -= quantity;
+    if (remaining === 0) break;
+  }
+  if (remaining > 0) {
+    throw new ConvexError({
+      code: "CONFLICT",
+      message: `Not enough unreserved copies of ${card.externalId} are available`
+    });
+  }
+  return allocations;
+}
+
+async function reserveTradeCard(
+  ctx: MutationCtx,
+  tradeId: Id<"trades">,
+  tradeCardId: Id<"tradeCards">,
+  ownerId: Id<"users">,
+  card: {
+    tcg: Doc<"cards">["tcg"];
+    externalId: string;
+    quantity: number;
+    collectionEntryId?: Id<"collectionEntries">;
+  }
+) {
+  const allocations = await allocateOwnedEntries(ctx, ownerId, card);
+  const now = Date.now();
+  for (const allocation of allocations) {
+    await ctx.db.insert("tradeReservations", {
+      tradeId,
+      tradeCardId,
+      ownerId,
+      collectionEntryId: allocation.entry._id,
+      quantity: allocation.quantity,
+      status: "reserved",
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+}
+
+async function releaseReservations(ctx: MutationCtx, tradeId: Id<"trades">) {
+  const reservations = await ctx.db
+    .query("tradeReservations")
+    .withIndex("by_trade", (q) => q.eq("tradeId", tradeId))
+    .take(200);
+  const now = Date.now();
+  for (const reservation of reservations) {
+    if (reservation.status === "reserved") {
+      await ctx.db.patch(reservation._id, { status: "released", updatedAt: now });
+    }
+  }
 }
 
 export const list = internalQuery({
@@ -192,8 +331,13 @@ export const create = internalMutation({
     }
     if (receiver._id === sender._id) throw badRequest("You cannot trade with yourself");
     if (args.senderCards.length < 1) throw badRequest("At least one sender card is required");
-    if (args.senderCards.length + args.receiverCards.length > 100) {
-      throw badRequest("A trade cannot contain more than 100 card lines");
+    if (args.senderCards.length + args.receiverCards.length > MAX_TRADE_CARD_LINES) {
+      throw badRequest(`A trade cannot contain more than ${MAX_TRADE_CARD_LINES} card lines`);
+    }
+    const totalCopies = [...args.senderCards, ...args.receiverCards]
+      .reduce((sum, card) => sum + card.quantity, 0);
+    if (totalCopies > MAX_TRADE_COPIES) {
+      throw badRequest(`A trade cannot contain more than ${MAX_TRADE_COPIES} total copies`);
     }
     for (const card of [...args.senderCards, ...args.receiverCards]) {
       if (!Number.isInteger(card.quantity) || card.quantity < 1) {
@@ -210,6 +354,7 @@ export const create = internalMutation({
       receiverId: receiver._id,
       status: "pending",
       message: args.message,
+      settlementStatus: "unreserved",
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -218,14 +363,290 @@ export const create = internalMutation({
       ["receiver", args.receiverCards]
     ] as const) {
       for (const card of cards) {
-        await ctx.db.insert("tradeCards", { tradeId, side, ...card });
+        const tradeCardId = await ctx.db.insert("tradeCards", { tradeId, side, ...card });
+        if (side === "sender") {
+          await reserveTradeCard(ctx, tradeId, tradeCardId, sender._id, card);
+        }
       }
     }
+    await ctx.db.patch(tradeId, { settlementStatus: "reserved", updatedAt: Date.now() });
     const trade = await ctx.db.get(tradeId);
     if (!trade) throw new Error("Created trade is missing");
     return await hydrateTrade(ctx, trade);
   }
 });
+
+async function ensureLibraryBinder(
+  ctx: MutationCtx,
+  userId: Id<"users">
+) {
+  const existing = await ctx.db
+    .query("binders")
+    .withIndex("by_user_kind", (q) =>
+      q.eq("userId", userId).eq("kind", "library")
+    )
+    .first();
+  if (existing) return existing._id;
+  const now = Date.now();
+  return await ctx.db.insert("binders", {
+    userId,
+    kind: "library",
+    name: "Library",
+    createdAt: now,
+    updatedAt: now
+  });
+}
+
+async function consumeStoragePlacements(
+  ctx: MutationCtx,
+  entryId: Id<"collectionEntries">,
+  quantity: number
+) {
+  const placements = await ctx.db
+    .query("storagePlacements")
+    .withIndex("by_entry", (q) => q.eq("collectionEntryId", entryId))
+    .take(100);
+  let remaining = quantity;
+  for (const placement of placements) {
+    if (remaining <= 0) break;
+    const consumed = Math.min(remaining, placement.quantity);
+    if (consumed === placement.quantity) await ctx.db.delete(placement._id);
+    else {
+      await ctx.db.patch(placement._id, {
+        quantity: placement.quantity - consumed,
+        updatedAt: Date.now()
+      });
+    }
+    remaining -= consumed;
+  }
+}
+
+async function transferReservedEntry(
+  ctx: MutationCtx,
+  reservation: Doc<"tradeReservations">,
+  recipientId: Id<"users">,
+  recipientBinderId: Id<"binders">
+) {
+  const source = await ctx.db.get(reservation.collectionEntryId);
+  if (
+    !source ||
+    source.userId !== reservation.ownerId ||
+    source.quantity < reservation.quantity
+  ) {
+    throw new ConvexError({
+      code: "CONFLICT",
+      message: "A reserved collection copy is no longer available"
+    });
+  }
+  const now = Date.now();
+  await consumeStoragePlacements(ctx, source._id, reservation.quantity);
+  if (source.quantity === reservation.quantity) {
+    const tags = await ctx.db
+      .query("collectionEntryTags")
+      .withIndex("by_entry", (q) => q.eq("entryId", source._id))
+      .take(100);
+    for (const tag of tags) await ctx.db.delete(tag._id);
+    await ctx.db.delete(source._id);
+  } else {
+    await ctx.db.patch(source._id, {
+      quantity: source.quantity - reservation.quantity,
+      updatedAt: now
+    });
+  }
+  const incomingId = await ctx.db.insert("collectionEntries", {
+    userId: recipientId,
+    binderId: recipientBinderId,
+    cardId: source.cardId,
+    quantity: reservation.quantity,
+    condition: source.condition,
+    language: source.language,
+    notes: source.notes,
+    price: source.price,
+    serialNumber: reservation.quantity === 1 ? source.serialNumber : undefined,
+    acquiredAt: new Date(now).toISOString(),
+    isFoil: source.isFoil,
+    finishCode: source.finishCode,
+    finishLabel: source.finishLabel,
+    edition: source.edition,
+    stamp: source.stamp,
+    isSealedPromo: source.isSealedPromo,
+    isOversized: source.isOversized,
+    isPeelOff: source.isPeelOff,
+    isSigned: source.isSigned,
+    isAltered: source.isAltered,
+    gradingCompany: source.gradingCompany,
+    gradingScore: source.gradingScore,
+    certNumber: reservation.quantity === 1 ? source.certNumber : undefined,
+    imageUrls: source.imageUrls,
+    imageStorageIds: source.imageStorageIds,
+    createdAt: now,
+    updatedAt: now
+  });
+  await ctx.db.patch(reservation._id, { status: "settled", updatedAt: now });
+  return incomingId;
+}
+
+async function incrementTradeSummary(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  now: number
+) {
+  const summary = await ctx.db
+    .query("financeSummaries")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (summary) {
+    await ctx.db.patch(summary._id, {
+      transactionCount: summary.transactionCount + 1,
+      updatedAt: now
+    });
+  } else {
+    await ctx.db.insert("financeSummaries", {
+      userId,
+      totalSpent: 0,
+      totalEarned: 0,
+      transactionCount: 1,
+      updatedAt: now
+    });
+  }
+}
+
+async function settleTrade(
+  ctx: MutationCtx,
+  trade: Doc<"trades">,
+  actorSubject: string
+) {
+  const cards = await ctx.db
+    .query("tradeCards")
+    .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
+    .take(100);
+  for (const card of cards.filter((item) => item.side === "receiver")) {
+    await reserveTradeCard(ctx, trade._id, card._id, trade.receiverId, card);
+  }
+  const reservations = await ctx.db
+    .query("tradeReservations")
+    .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
+    .take(200);
+  const active = reservations.filter((reservation) => reservation.status === "reserved");
+  const senderEntryIds = active
+    .filter((reservation) => reservation.ownerId === trade.senderId)
+    .map((reservation) => reservation.collectionEntryId);
+  const receiverEntryIds = active
+    .filter((reservation) => reservation.ownerId === trade.receiverId)
+    .map((reservation) => reservation.collectionEntryId);
+  const [senderBefore, receiverBefore, senderBinderId, receiverBinderId] = await Promise.all([
+    snapshotAuditEntries(ctx, trade.senderId, senderEntryIds),
+    snapshotAuditEntries(ctx, trade.receiverId, receiverEntryIds),
+    ensureLibraryBinder(ctx, trade.senderId),
+    ensureLibraryBinder(ctx, trade.receiverId)
+  ]);
+  const senderIncoming: Id<"collectionEntries">[] = [];
+  const receiverIncoming: Id<"collectionEntries">[] = [];
+  for (const reservation of active) {
+    if (reservation.ownerId === trade.senderId) {
+      receiverIncoming.push(
+        await transferReservedEntry(ctx, reservation, trade.receiverId, receiverBinderId)
+      );
+    } else {
+      senderIncoming.push(
+        await transferReservedEntry(ctx, reservation, trade.senderId, senderBinderId)
+      );
+    }
+  }
+  const [senderAfter, receiverAfter] = await Promise.all([
+    snapshotAuditEntries(ctx, trade.senderId, [
+      ...new Set([...senderEntryIds, ...senderIncoming])
+    ]),
+    snapshotAuditEntries(ctx, trade.receiverId, [
+      ...new Set([...receiverEntryIds, ...receiverIncoming])
+    ])
+  ]);
+  const settlementId = `trade_${trade._id}_${Date.now()}`;
+  const now = Date.now();
+  const senderReceivedValue = cards
+    .filter((card) => card.side === "receiver")
+    .reduce((sum, card) => sum + (card.estimatedValue ?? 0) * card.quantity, 0);
+  const receiverReceivedValue = cards
+    .filter((card) => card.side === "sender")
+    .reduce((sum, card) => sum + (card.estimatedValue ?? 0) * card.quantity, 0);
+  const senderReceivedQuantity = cards
+    .filter((card) => card.side === "receiver")
+    .reduce((sum, card) => sum + card.quantity, 0);
+  const receiverReceivedQuantity = cards
+    .filter((card) => card.side === "sender")
+    .reduce((sum, card) => sum + card.quantity, 0);
+  await ctx.db.insert("transactions", {
+    userId: trade.senderId,
+    type: "trade",
+    quantity: Math.max(1, senderReceivedQuantity),
+    amount: senderReceivedValue,
+    currency: "USD",
+    allocationGroupId: settlementId,
+    relatedTradeId: trade._id,
+    notes: `Atomic settlement for trade ${trade._id}`,
+    date: now,
+    createdAt: now,
+    updatedAt: now
+  });
+  await ctx.db.insert("transactions", {
+    userId: trade.receiverId,
+    type: "trade",
+    quantity: Math.max(1, receiverReceivedQuantity),
+    amount: receiverReceivedValue,
+    currency: "USD",
+    allocationGroupId: settlementId,
+    relatedTradeId: trade._id,
+    notes: `Atomic settlement for trade ${trade._id}`,
+    date: now,
+    createdAt: now,
+    updatedAt: now
+  });
+  await Promise.all([
+    incrementTradeSummary(ctx, trade.senderId, now),
+    incrementTradeSummary(ctx, trade.receiverId, now),
+    appendCollectionAudit(ctx, {
+      userId: trade.senderId,
+      actorId: actorSubject,
+      operationKind: "trade_settlement",
+      summary: `Settled trade ${trade._id}`,
+      before: senderBefore,
+      after: senderAfter,
+      idempotencyKey: `${settlementId}:sender`
+    }),
+    appendCollectionAudit(ctx, {
+      userId: trade.receiverId,
+      actorId: actorSubject,
+      operationKind: "trade_settlement",
+      summary: `Settled trade ${trade._id}`,
+      before: receiverBefore,
+      after: receiverAfter,
+      idempotencyKey: `${settlementId}:receiver`
+    })
+  ]);
+  await ctx.db.patch(trade._id, {
+    status: "accepted",
+    settlementStatus: "settled",
+    settlementId,
+    settledAt: now,
+    updatedAt: now
+  });
+  for (const [userId, title] of [
+    [trade.senderId, "Trade settled"],
+    [trade.receiverId, "Trade accepted and settled"]
+  ] as const) {
+    const notificationId = await insertNotification(ctx, {
+      userId,
+      type: "trade_settlement",
+      title,
+      body: "Reserved copies were moved and finance activity was recorded.",
+      data: { tradeId: String(trade._id), settlementId }
+    });
+    await ctx.scheduler.runAfter(0, internal.notifications.dispatchNotification, {
+      notificationId
+    });
+  }
+  return (await ctx.db.get(trade._id))!;
+}
 
 export const setStatus = internalMutation({
   args: {
@@ -247,8 +668,17 @@ export const setStatus = internalMutation({
     if (args.status !== "cancelled" && trade.receiverId !== user._id) {
       throw forbidden(`Only the receiver can ${args.status === "accepted" ? "accept" : "decline"} a trade`);
     }
-    await ctx.db.patch(trade._id, { status: args.status, updatedAt: Date.now() });
-    const updated = await ctx.db.get(trade._id);
+    const updated = args.status === "accepted"
+      ? await settleTrade(ctx, trade, user.authSubject)
+      : await (async () => {
+          await releaseReservations(ctx, trade._id);
+          await ctx.db.patch(trade._id, {
+            status: args.status,
+            settlementStatus: "released",
+            updatedAt: Date.now()
+          });
+          return await ctx.db.get(trade._id);
+        })();
     if (!updated) throw notFound();
     return await hydrateTrade(ctx, updated);
   }
@@ -261,10 +691,19 @@ export const remove = internalMutation({
     const user = await requireUserBySubject(ctx, args.subject);
     const trade = await tradeByStringId(ctx, args.tradeId);
     if (!trade || trade.senderId !== user._id) throw notFound();
+    if (trade.settlementStatus === "settled") {
+      throw badRequest("Settled trades are retained as immutable audit records");
+    }
     const cards = await ctx.db
       .query("tradeCards")
       .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
       .take(100);
+    await releaseReservations(ctx, trade._id);
+    const reservations = await ctx.db
+      .query("tradeReservations")
+      .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
+      .take(200);
+    for (const reservation of reservations) await ctx.db.delete(reservation._id);
     for (const card of cards) await ctx.db.delete(card._id);
     await ctx.db.delete(trade._id);
     return null;

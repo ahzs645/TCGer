@@ -188,9 +188,24 @@ model Binder {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   collections Collection[]
   pages       BinderPage[]
+  shareLinks  BinderShareLink[]
 
   @@index([userId, containerType])
   @@index([userId, associatedTcg, associatedSetCode])
+}
+
+model BinderShareLink {
+  id         String    @id @default(uuid())
+  binderId   String
+  label      String
+  token      String    @unique
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  binder Binder @relation(fields: [binderId], references: [id], onDelete: Cascade)
+
+  @@index([binderId, createdAt])
 }
 
 model BinderPage {

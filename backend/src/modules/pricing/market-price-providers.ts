@@ -2,24 +2,9 @@ import { env } from '../../config/env';
 import type { PriceProvider, PriceProviderQuote } from './pricing.types';
 import { normalizePriceQuote, parsePrice } from './pricing.types';
 import type { TrackedPriceItem } from '@tcg/api-types';
+import { fetchWithProviderPolicy } from '../providers/provider-request-queue';
 
 const REQUEST_TIMEOUT_MS = 8_000;
-const SCRYFALL_REQUEST_DELAY_MS = 120;
-
-let scryfallRateLimitChain: Promise<void> = Promise.resolve();
-let nextScryfallRequestAt = 0;
-
-async function waitForScryfallRateLimit(): Promise<void> {
-  const waitPromise = scryfallRateLimitChain.then(async () => {
-    const wait = Math.max(0, nextScryfallRequestAt - Date.now());
-    if (wait > 0) {
-      await new Promise((resolve) => setTimeout(resolve, wait));
-    }
-    nextScryfallRequestAt = Date.now() + SCRYFALL_REQUEST_DELAY_MS;
-  });
-  scryfallRateLimitChain = waitPromise.catch(() => {});
-  await waitPromise;
-}
 
 function cardUrl(baseUrl: string, externalId: string): string {
   return `${baseUrl.replace(/\/$/, '')}/cards/${encodeURIComponent(externalId)}`;
@@ -63,25 +48,31 @@ function firstPrice(...values: unknown[]): number | undefined {
   return undefined;
 }
 
-async function fetchCardJson(url: string): Promise<Record<string, unknown> | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
+async function fetchCardJson(
+  provider: string,
+  url: string,
+  minIntervalMs = 0,
+): Promise<Record<string, unknown> | null> {
+  const response = await fetchWithProviderPolicy(
+    provider,
+    url,
+    {
       headers: {
         Accept: 'application/json',
         'User-Agent': 'TCGer/0.1 (pricing integration)',
       },
-      signal: controller.signal,
-    });
-    if (response.status === 404) return null;
-    if (!response.ok) {
-      throw new Error(`Pricing request failed with HTTP ${response.status}`);
-    }
-    return unwrapRecord(await response.json());
-  } finally {
-    clearTimeout(timeout);
+    },
+    {
+      minIntervalMs,
+      maxRetries: env.PROVIDER_MAX_RETRIES,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+    },
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Pricing request failed with HTTP ${response.status}`);
   }
+  return unwrapRecord(await response.json());
 }
 
 function justTcgCards(payload: unknown): Array<Record<string, unknown>> {
@@ -94,7 +85,9 @@ function justTcgCards(payload: unknown): Array<Record<string, unknown>> {
   );
 }
 
-function justTcgVariants(card: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
+function justTcgVariants(
+  card: Record<string, unknown> | undefined,
+): Array<Record<string, unknown>> {
   const variants = card?.variants;
   return Array.isArray(variants)
     ? variants.filter(
@@ -129,7 +122,10 @@ function justTcgLookup(
   return tcg.toLowerCase() === 'magic' ? { name: 'scryfallId', value: externalId } : null;
 }
 
-function justTcgCardMatches(card: Record<string, unknown>, lookup: { name: string; value: string }) {
+function justTcgCardMatches(
+  card: Record<string, unknown>,
+  lookup: { name: string; value: string },
+) {
   const fieldByLookup: Record<string, string[]> = {
     cardId: ['uuid', 'id'],
     variantId: [],
@@ -208,14 +204,19 @@ export class JustTcgPriceProvider implements PriceProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(url, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'TCGer/0.1 (pricing integration)',
-          'x-api-key': env.JUSTTCG_API_KEY,
+      const response = await fetchWithProviderPolicy(
+        'justtcg',
+        url,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'TCGer/0.1 (pricing integration)',
+            'x-api-key': env.JUSTTCG_API_KEY,
+          },
+          signal: controller.signal,
         },
-        signal: controller.signal,
-      });
+        { maxRetries: env.PROVIDER_MAX_RETRIES, timeoutMs: REQUEST_TIMEOUT_MS },
+      );
       if (response.status === 404) return null;
       if (!response.ok) {
         throw new Error(`Pricing request failed with HTTP ${response.status}`);
@@ -239,22 +240,34 @@ export class JustTcgPriceProvider implements PriceProvider {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
-        const response = await fetch(`${env.JUSTTCG_API_BASE_URL.replace(/\/$/, '')}/cards`, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'TCGer/0.1 (pricing integration)',
-            'x-api-key': env.JUSTTCG_API_KEY,
+        const response = await fetchWithProviderPolicy(
+          'justtcg',
+          `${env.JUSTTCG_API_BASE_URL.replace(/\/$/, '')}/cards`,
+          {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+              'User-Agent': 'TCGer/0.1 (pricing integration)',
+              'x-api-key': env.JUSTTCG_API_KEY,
+            },
+            body: JSON.stringify(chunk.map(({ lookup }) => ({ [lookup.name]: lookup.value }))),
+            signal: controller.signal,
           },
-          body: JSON.stringify(chunk.map(({ lookup }) => ({ [lookup.name]: lookup.value }))),
-          signal: controller.signal,
-        });
+          { maxRetries: env.PROVIDER_MAX_RETRIES, timeoutMs: REQUEST_TIMEOUT_MS },
+        );
         if (!response.ok) throw new Error(`Pricing request failed with HTTP ${response.status}`);
         const cards = justTcgCards(await response.json());
         for (const { item, lookup } of chunk) {
-          const quote = justTcgQuote(cards.find((card) => justTcgCardMatches(card, lookup)), item);
-          if (quote) quotes.set(`${item.tcg}:${item.externalId}:${item.finishCode ?? ''}:${item.condition ?? ''}:${item.language ?? ''}`, quote);
+          const quote = justTcgQuote(
+            cards.find((card) => justTcgCardMatches(card, lookup)),
+            item,
+          );
+          if (quote)
+            quotes.set(
+              `${item.tcg}:${item.externalId}:${item.finishCode ?? ''}:${item.condition ?? ''}:${item.language ?? ''}`,
+              quote,
+            );
         }
       } finally {
         clearTimeout(timeout);
@@ -269,7 +282,7 @@ export class TcgDexPriceProvider implements PriceProvider {
 
   async fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null> {
     if (tcg.toLowerCase() !== 'pokemon') return null;
-    const card = await fetchCardJson(cardUrl(env.TCGDEX_API_BASE_URL, externalId));
+    const card = await fetchCardJson('tcgdex', cardUrl(env.TCGDEX_API_BASE_URL, externalId));
     const cardmarket = childRecord(childRecord(card, 'pricing'), 'cardmarket');
     if (!cardmarket) return null;
 
@@ -286,10 +299,11 @@ export class ScryfallPriceProvider implements PriceProvider {
 
   async fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null> {
     if (tcg.toLowerCase() !== 'magic') return null;
-    if (/scryfall\.(io|com)$/i.test(new URL(env.SCRYFALL_API_BASE_URL).hostname)) {
-      await waitForScryfallRateLimit();
-    }
-    const card = await fetchCardJson(cardUrl(env.SCRYFALL_API_BASE_URL, externalId));
+    const card = await fetchCardJson(
+      'scryfall',
+      cardUrl(env.SCRYFALL_API_BASE_URL, externalId),
+      env.SCRYFALL_MIN_INTERVAL_MS,
+    );
     const prices = childRecord(card, 'prices');
     if (!prices) return null;
 
@@ -330,7 +344,7 @@ export class LorcastPriceProvider implements PriceProvider {
 
   async fetchPrice(tcg: string, externalId: string): Promise<PriceProviderQuote | null> {
     if (tcg.toLowerCase() !== 'lorcana') return null;
-    const card = await fetchCardJson(lorcastCardUrl(externalId));
+    const card = await fetchCardJson('lorcast', lorcastCardUrl(externalId));
     const prices = childRecord(card, 'prices');
     if (!prices) return null;
 

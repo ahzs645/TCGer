@@ -142,11 +142,7 @@ function serializeDebugCapture(
 ) {
   const origin = resolveRequestOrigin(req);
   const resolvePublicUrl = (publicPath: string | null) =>
-    publicPath
-      ? origin
-        ? new URL(publicPath, `${origin}/`).toString()
-        : publicPath
-      : null;
+    publicPath ? (origin ? new URL(publicPath, `${origin}/`).toString() : publicPath) : null;
   const sourceImageUrl = origin
     ? new URL(capture.sourceImagePath, `${origin}/`).toString()
     : capture.sourceImagePath;
@@ -195,9 +191,7 @@ function serializeDebugCapture(
     pipeline: payloadPipeline,
     diagnostics: {
       timings: payloadDiagnostics?.timings ?? null,
-      attempts: Array.isArray(payloadDiagnostics?.attempts)
-        ? payloadDiagnostics?.attempts
-        : [],
+      attempts: Array.isArray(payloadDiagnostics?.attempts) ? payloadDiagnostics?.attempts : [],
       rejectedNearMisses: Array.isArray(payloadDiagnostics?.rejectedNearMisses)
         ? payloadDiagnostics?.rejectedNearMisses
         : [],
@@ -269,6 +263,10 @@ scanRouter.post(
       const saveDebugCapture = parseBooleanLike(body.saveDebugCapture);
       const captureSource = typeof body.captureSource === 'string' ? body.captureSource : undefined;
       const captureNotes = typeof body.captureNotes === 'string' ? body.captureNotes : undefined;
+      const setCodeHint =
+        typeof body.setCodeHint === 'string' && body.setCodeHint.trim()
+          ? body.setCodeHint.trim()
+          : undefined;
       const scanEngine = parseScanEngine(body.scanEngine);
 
       if (body.scanEngine !== undefined && !scanEngine) {
@@ -300,7 +298,10 @@ scanRouter.post(
 
       let result;
       try {
-        result = await scanCardImage(imageBuffer, tcg, { engine: scanEngine ?? 'automatic' });
+        result = await scanCardImage(imageBuffer, tcg, {
+          engine: scanEngine ?? 'automatic',
+          setCodeHint,
+        });
       } catch (error) {
         if (
           error instanceof Error &&

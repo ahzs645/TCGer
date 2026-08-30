@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createBinderSchema,
   updateBinderSchema,
+  deleteBinderQuerySchema,
   addCardSchema,
   addLibraryCardSchema,
   updateCardSchema,
@@ -11,7 +12,8 @@ import {
   collectionMutationHistoryQuerySchema,
   undoCollectionMutationSchema,
   bulkAddRequestSchema,
-  upsertBinderPageSchema
+  upsertBinderPageSchema,
+  createBinderShareLinkSchema
 } from '@tcg/api-types';
 
 import { requireAuth, type AuthRequest } from '../middleware/auth';
@@ -28,9 +30,12 @@ import {
   getUserTags,
   createUserTag,
   addImageToCollection,
-  removeImageFromCollection
+  removeImageFromCollection,
+  listBinderShareLinks,
+  createBinderShareLink,
+  revokeBinderShareLink
 } from '../../modules/collections/collections.service';
-import { exportCollectionAsJson, exportCollectionAsCsv } from '../../modules/collections/export.service';
+import { exportCollectionAsJson, exportCollectionAsCsv, exportCollectionForMarketplace } from '../../modules/collections/export.service';
 import {
   collectionImportTemplate,
   commitCollectionImportSource,
@@ -266,11 +271,16 @@ collectionsRouter.get(
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="collection-export.csv"');
       res.send(csv);
-    } else {
+    } else if (format === 'json') {
       const data = await exportCollectionAsJson(userId);
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', 'attachment; filename="collection-export.json"');
       res.json(data);
+    } else {
+      const csv = await exportCollectionForMarketplace(userId, format);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="collection-${format}-export.csv"`);
+      res.send(csv);
     }
   })
 );
@@ -302,6 +312,56 @@ collectionsRouter.patch(
     } catch (error) {
       if (error instanceof Error && error.message === 'Binder not found') {
         return res.status(404).json({ error: 'NOT_FOUND', message: 'Binder not found' });
+      }
+      throw error;
+    }
+  })
+);
+
+collectionsRouter.post(
+  '/:binderId/share-links',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    const input = createBinderShareLinkSchema.parse(req.body);
+    try {
+      res.status(201).json(await createBinderShareLink(userId, req.params.binderId, input));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Binder not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+      }
+      throw error;
+    }
+  })
+);
+
+collectionsRouter.get(
+  '/:binderId/share-links',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    try {
+      res.json(await listBinderShareLinks(userId, req.params.binderId));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Binder not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+      }
+      throw error;
+    }
+  })
+);
+
+collectionsRouter.delete(
+  '/:binderId/share-links/:linkId',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = (req as AuthRequest).user!.id;
+    try {
+      await revokeBinderShareLink(userId, req.params.binderId, req.params.linkId);
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Share link not found') {
+        return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
       }
       throw error;
     }
@@ -357,9 +417,10 @@ collectionsRouter.delete(
   asyncHandler(async (req, res) => {
     const userId = (req as AuthRequest).user!.id;
     const { binderId } = req.params;
+    const { cardDisposition } = deleteBinderQuerySchema.parse(req.query);
 
     try {
-      await deleteBinder(userId, binderId);
+      await deleteBinder(userId, binderId, cardDisposition);
       res.status(204).send();
     } catch (error) {
       if (error instanceof Error && error.message === 'Binder not found') {

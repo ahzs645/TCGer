@@ -7,6 +7,15 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 
+const productContentValidator = v.object({
+  externalId: v.optional(v.string()),
+  name: v.string(),
+  quantity: v.optional(v.number()),
+  setCode: v.optional(v.string()),
+  rarity: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+});
+
 const sealedProductResponseValidator = v.object({
   id: v.id("sealedProducts"),
   tcg: v.string(),
@@ -19,6 +28,11 @@ const sealedProductResponseValidator = v.object({
   imageUrl: v.optional(v.string()),
   msrp: v.optional(v.number()),
   upc: v.optional(v.string()),
+  contentMode: v.optional(v.union(v.literal("fixed"), v.literal("pool"))),
+  contentCount: v.optional(v.number()),
+  contents: v.optional(v.array(productContentValidator)),
+  contentSource: v.optional(v.string()),
+  contentUpdatedAt: v.optional(v.string()),
   isCustom: v.boolean(),
 });
 
@@ -198,7 +212,7 @@ function parseIsoDate(value: string, fieldName: string): number {
   return timestamp;
 }
 
-function toSealedProductResponse(product: Doc<"sealedProducts">) {
+function toSealedProductResponse(product: Doc<"sealedProducts">, includeContents = false) {
   return {
     id: product._id,
     tcg: product.tcg,
@@ -214,6 +228,13 @@ function toSealedProductResponse(product: Doc<"sealedProducts">) {
     imageUrl: product.imageUrl,
     msrp: product.msrp,
     upc: product.upc,
+    contentMode: product.contentMode,
+    contentCount: product.contents?.length,
+    contents: includeContents ? product.contents : undefined,
+    contentSource: product.contentSource,
+    contentUpdatedAt: product.contentUpdatedAt === undefined
+      ? undefined
+      : new Date(product.contentUpdatedAt).toISOString(),
     isCustom: product.isCustom === true,
   };
 }
@@ -385,7 +406,100 @@ export const listProducts = internalQuery({
             .order("desc")
             .take(1_000),
     ]);
-    return [...customProducts, ...globalProducts].map(toSealedProductResponse);
+    return [...customProducts, ...globalProducts].map((product) =>
+      toSealedProductResponse(product),
+    );
+  },
+});
+
+export const getProduct = internalQuery({
+  args: { subject: v.string(), productId: v.id("sealedProducts") },
+  returns: sealedProductResponseValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const product = await ctx.db.get(args.productId);
+    if (!product || (product.ownerId !== undefined && product.ownerId !== viewer._id)) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Sealed product not found" });
+    }
+    return toSealedProductResponse(product, true);
+  },
+});
+
+const catalogProductValidator = v.object({
+  catalogKey: v.string(),
+  tcg: v.string(),
+  name: v.string(),
+  productType: v.string(),
+  setCode: v.optional(v.string()),
+  cardsPerPack: v.optional(v.number()),
+  packsPerBox: v.optional(v.number()),
+  releaseDate: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  msrp: v.optional(v.number()),
+  upc: v.optional(v.string()),
+  contentMode: v.optional(v.union(v.literal("fixed"), v.literal("pool"))),
+  contents: v.optional(v.array(productContentValidator)),
+  contentSource: v.optional(v.string()),
+  contentUpdatedAt: v.optional(v.string()),
+});
+
+export const upsertCatalogProducts = internalMutation({
+  args: { subject: v.string(), products: v.array(catalogProductValidator) },
+  returns: v.object({ inserted: v.number(), updated: v.number() }),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    if (!viewer.isAdmin) throw new ConvexError({ code: "FORBIDDEN", message: "Admin access required" });
+    if (!args.products.length || args.products.length > 100) {
+      throw new ConvexError({ code: "BAD_REQUEST", message: "Import 1 to 100 sealed products per request" });
+    }
+    let inserted = 0;
+    let updated = 0;
+    const timestamp = Date.now();
+    for (const product of args.products) {
+      if ((product.contents?.length ?? 0) > 1_000) {
+        throw new ConvexError({ code: "BAD_REQUEST", message: `${product.name} exceeds 1,000 content rows` });
+      }
+      const catalogKey = cleanRequiredText(product.catalogKey, "catalogKey", 200);
+      const existing = await ctx.db
+        .query("sealedProducts")
+        .withIndex("by_catalog_key", (query) => query.eq("catalogKey", catalogKey))
+        .unique();
+      const values = {
+        catalogKey,
+        ownerId: undefined,
+        isCustom: false,
+        tcg: cleanRequiredText(product.tcg, "tcg", 40).toLowerCase(),
+        name: cleanRequiredText(product.name, "name"),
+        productType: cleanRequiredText(product.productType, "productType", 80),
+        setCode: cleanOptionalText(product.setCode, 80),
+        cardsPerPack: optionalPositiveInteger(product.cardsPerPack, "cardsPerPack"),
+        packsPerBox: optionalPositiveInteger(product.packsPerBox, "packsPerBox"),
+        releaseDate: product.releaseDate ? parseIsoDate(product.releaseDate, "releaseDate") : undefined,
+        imageUrl: cleanOptionalText(product.imageUrl, 2_000),
+        msrp: optionalNonnegativeNumber(product.msrp, "msrp"),
+        upc: cleanOptionalText(product.upc, 80),
+        contentMode: product.contentMode,
+        contents: product.contents,
+        contentSource: cleanOptionalText(product.contentSource, 2_000),
+        contentUpdatedAt: product.contentUpdatedAt
+          ? parseIsoDate(product.contentUpdatedAt, "contentUpdatedAt")
+          : product.contents
+            ? timestamp
+            : undefined,
+        updatedAt: timestamp,
+      };
+      if (existing) {
+        if (existing.ownerId !== undefined) {
+          throw new ConvexError({ code: "CONFLICT", message: `${catalogKey} belongs to a custom product` });
+        }
+        await ctx.db.patch(existing._id, values);
+        updated += 1;
+      } else {
+        await ctx.db.insert("sealedProducts", { ...values, createdAt: timestamp });
+        inserted += 1;
+      }
+    }
+    return { inserted, updated };
   },
 });
 

@@ -106,6 +106,8 @@ export type CardFunctionalIdentity = z.infer<typeof cardFunctionalIdentitySchema
 
 export const pokemonFunctionalAttackSchema = z.object({
   name: z.string(),
+  printedName: z.string().optional(),
+  searchAliases: z.array(z.string()).optional(),
   cost: z.array(z.string()).optional(),
   text: z.string().nullish(),
   damage: z.string().nullish(),
@@ -190,6 +192,23 @@ export const searchCardsResponseSchema = z.object({
   total: z.number()
 });
 export type SearchCardsResponse = z.infer<typeof searchCardsResponseSchema>;
+
+export const discoverCardsQuerySchema = z.object({
+  tcg: z.union([tcgCodeSchema, z.literal('all')]).optional().default('all'),
+  count: z.coerce.number().int().min(1).max(24).optional().default(1)
+});
+export type DiscoverCardsQuery = z.infer<typeof discoverCardsQuerySchema>;
+
+export const discoverCardsResponseSchema = z.object({
+  cards: z.array(cardSchema),
+  total: z.number(),
+  sampledFrom: z.object({
+    tcg: tcgCodeSchema,
+    setCode: z.string(),
+    setName: z.string().optional()
+  }).optional()
+});
+export type DiscoverCardsResponse = z.infer<typeof discoverCardsResponseSchema>;
 
 export const simpleCardPrintsResultSchema = z.object({
   mode: z.literal('simple'),

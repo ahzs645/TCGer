@@ -78,6 +78,18 @@ export default defineSchema({
     .index("by_user_name", ["userId", "name"])
     .index("by_share_token", ["shareToken"]),
 
+  binderShareLinks: defineTable({
+    userId: v.id("users"),
+    binderId: v.id("binders"),
+    label: v.string(),
+    token: v.string(),
+    expiresAt: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+    createdAt: v.number()
+  })
+    .index("by_binder", ["binderId", "createdAt"])
+    .index("by_token", ["token"]),
+
   binderPages: defineTable({
     userId: v.id("users"),
     binderId: v.id("binders"),
@@ -163,6 +175,8 @@ export default defineSchema({
     printingKey: v.optional(v.string()),
     artworkId: v.optional(v.string()),
     name: v.string(),
+    printedName: v.optional(v.string()),
+    searchAliases: v.optional(v.array(v.string())),
     setCode: v.optional(v.string()),
     setName: v.optional(v.string()),
     rarity: v.optional(v.string()),
@@ -180,6 +194,223 @@ export default defineSchema({
     .index("by_tcg_base_external", ["tcg", "baseExternalId"])
     .index("by_tcg_printing_key", ["tcg", "printingKey"])
     .index("by_name", ["name"]),
+
+  // Append-only overlays for correcting provider catalog data. Provider rows
+  // and card identity keys remain untouched; the newest revision is resolved
+  // at read time by clients that opt into corrected presentation.
+  catalogCorrections: defineTable({
+    tcg: tcgCode,
+    targetType: v.union(v.literal("identity"), v.literal("printing")),
+    targetKey: v.string(),
+    revision: v.number(),
+    action: v.union(v.literal("upsert"), v.literal("remove")),
+    patch: v.optional(v.object({
+      name: v.optional(v.string()),
+      printedName: v.optional(v.union(v.string(), v.null())),
+      searchAliases: v.optional(v.array(v.string())),
+      setCode: v.optional(v.union(v.string(), v.null())),
+      setName: v.optional(v.union(v.string(), v.null())),
+      rarity: v.optional(v.union(v.string(), v.null())),
+      collectorNumber: v.optional(v.union(v.string(), v.null())),
+      releasedAt: v.optional(v.union(v.string(), v.null())),
+      imageUrl: v.optional(v.union(v.string(), v.null())),
+      imageUrlSmall: v.optional(v.union(v.string(), v.null())),
+      language: v.optional(v.union(v.string(), v.null())),
+      artist: v.optional(v.union(v.string(), v.null())),
+      attributes: v.optional(v.record(v.string(), v.any()))
+    })),
+    reason: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number()
+  })
+    .index("by_tcg_and_created_at", ["tcg", "createdAt"])
+    .index("by_tcg_target_and_revision", ["tcg", "targetType", "targetKey", "revision"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Banlists are immutable snapshots. A sync only flips the current pointer;
+  // old snapshots remain available for decks tied to an earlier format date.
+  banlistSnapshots: defineTable({
+    tcg: tcgCode,
+    format: v.string(),
+    name: v.string(),
+    effectiveDate: v.optional(v.string()),
+    sourceUrl: v.string(),
+    identitySourceUrl: v.optional(v.string()),
+    contentHash: v.string(),
+    isCurrent: v.boolean(),
+    syncedAt: v.number()
+  })
+    .index("by_tcg_format_and_is_current", ["tcg", "format", "isCurrent"])
+    .index("by_tcg_format_and_content_hash", ["tcg", "format", "contentHash"])
+    .index("by_synced_at", ["syncedAt"]),
+
+  banlistEntries: defineTable({
+    snapshotId: v.id("banlistSnapshots"),
+    tcg: tcgCode,
+    format: v.string(),
+    externalId: v.optional(v.string()),
+    cardName: v.string(),
+    normalizedName: v.string(),
+    status: v.union(
+      v.literal("forbidden"),
+      v.literal("limited"),
+      v.literal("semi-limited")
+    ),
+    limit: v.number(),
+    remarks: v.optional(v.string())
+  })
+    .index("by_snapshot", ["snapshotId"])
+    .index("by_snapshot_and_external_id", ["snapshotId", "externalId"])
+    .index("by_snapshot_and_normalized_name", ["snapshotId", "normalizedName"]),
+
+  providerProductCrosswalks: defineTable({
+    provider: v.string(),
+    providerId: v.string(),
+    cardId: v.id("cards"),
+    language: v.optional(v.string()),
+    matchMethod: v.union(
+      v.literal("exact"),
+      v.literal("normalized"),
+      v.literal("fuzzy"),
+      v.literal("manual")
+    ),
+    confidence: v.number(),
+    reviewedAt: v.optional(v.number()),
+    sourceUpdatedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_provider_and_provider_id", ["provider", "providerId"])
+    .index("by_card_and_provider", ["cardId", "provider"]),
+
+  psaCertCache: defineTable({
+    certNumber: v.string(),
+    cardId: v.optional(v.id("cards")),
+    labelType: v.optional(v.string()),
+    year: v.optional(v.string()),
+    brand: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    category: v.optional(v.string()),
+    grade: v.optional(v.number()),
+    gradeLabel: v.optional(v.string()),
+    specId: v.optional(v.string()),
+    searchableName: v.optional(v.string()),
+    cardNumber: v.optional(v.string()),
+    variety: v.optional(v.string()),
+    population: v.optional(v.number()),
+    populationHigher: v.optional(v.number()),
+    providerResponseHash: v.string(),
+    retrievedAt: v.number(),
+    refreshAfter: v.number()
+  })
+    .index("by_cert_number", ["certNumber"])
+    .index("by_refresh_after", ["refreshAfter"]),
+
+  cardPriceSnapshots: defineTable({
+    userId: v.optional(v.id("users")),
+    tcg: tcgCode,
+    externalId: v.string(),
+    finishCode: v.optional(v.string()),
+    source: v.string(),
+    capturedAt: v.number(),
+    day: v.string(),
+    nativePrice: v.number(),
+    nativeCurrency: v.string(),
+    convertedPrice: v.optional(v.number()),
+    convertedCurrency: v.optional(v.string()),
+    fxRate: v.optional(v.number()),
+    fxSource: v.optional(v.string()),
+    fxAsOf: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    sourceUpdatedAt: v.optional(v.number()),
+    matchMethod: v.optional(v.string()),
+    matchConfidence: v.optional(v.number()),
+    createdAt: v.number()
+  })
+    .index("by_card_source_and_captured_at", ["tcg", "externalId", "finishCode", "source", "capturedAt"])
+    .index("by_card_source_and_day", ["tcg", "externalId", "finishCode", "source", "day"])
+    .index("by_user_card_source_and_day", ["userId", "tcg", "externalId", "finishCode", "source", "day"])
+    .index("by_user_card_and_captured_at", ["userId", "tcg", "externalId", "finishCode", "capturedAt"])
+    .index("by_user_and_captured_at", ["userId", "capturedAt"]),
+
+  priceAlerts: defineTable({
+    userId: v.id("users"),
+    tcg: tcgCode,
+    externalId: v.string(),
+    finishCode: v.optional(v.string()),
+    cardName: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    direction: v.union(v.literal("above"), v.literal("below")),
+    threshold: v.number(),
+    currency: v.string(),
+    enabled: v.boolean(),
+    lastTriggeredAt: v.optional(v.number()),
+    lastTriggeredPrice: v.optional(v.number()),
+    lastObservedPrice: v.optional(v.number()),
+    lastObservedAt: v.optional(v.number()),
+    lastState: v.optional(v.union(
+      v.literal("unknown"),
+      v.literal("matched"),
+      v.literal("unmatched")
+    )),
+    cooldownHours: v.optional(v.number()),
+    cooldownUntil: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_card_finish", ["userId", "tcg", "externalId", "finishCode"])
+    .index("by_user_and_enabled", ["userId", "enabled"])
+    .index("by_enabled", ["enabled"])
+    .index("by_card_and_enabled", ["tcg", "externalId", "enabled"]),
+
+  notifications: defineTable({
+    userId: v.id("users"),
+    type: v.string(),
+    title: v.string(),
+    body: v.string(),
+    read: v.boolean(),
+    data: v.optional(v.record(v.string(), v.any())),
+    deliveryStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("delivered"),
+      v.literal("partial"),
+      v.literal("failed"),
+      v.literal("in_app_only")
+    )),
+    deliveryError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user_and_created_at", ["userId", "createdAt"])
+    .index("by_user_read_and_created_at", ["userId", "read", "createdAt"]),
+
+  notificationChannels: defineTable({
+    userId: v.id("users"),
+    type: v.union(v.literal("discord"), v.literal("telegram")),
+    config: v.record(v.string(), v.string()),
+    enabled: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_enabled", ["userId", "enabled"]),
+
+  automations: defineTable({
+    userId: v.id("users"),
+    kind: v.string(),
+    name: v.string(),
+    enabled: v.boolean(),
+    configuration: v.record(v.string(), v.any()),
+    lastRunAt: v.optional(v.number()),
+    nextRunAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_enabled", ["userId", "enabled"])
+    .index("by_enabled_and_next_run_at", ["enabled", "nextRunAt"]),
 
   tags: defineTable({
     userId: v.id("users"),
@@ -365,6 +596,101 @@ export default defineSchema({
     .index("by_binder_and_card", ["binderId", "cardId"])
     .index("by_user_card", ["userId", "cardId"]),
 
+  storageContainers: defineTable({
+    userId: v.id("users"),
+    binderId: v.optional(v.id("binders")),
+    name: v.string(),
+    kind: v.union(
+      v.literal("binder"),
+      v.literal("box"),
+      v.literal("case"),
+      v.literal("other")
+    ),
+    order: v.number(),
+    isUnsorted: v.boolean(),
+    locked: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user_and_order", ["userId", "order"])
+    .index("by_user_and_unsorted", ["userId", "isUnsorted"])
+    .index("by_binder", ["binderId"]),
+
+  storageCompartments: defineTable({
+    userId: v.id("users"),
+    containerId: v.id("storageContainers"),
+    label: v.string(),
+    order: v.number(),
+    pageNumber: v.optional(v.number()),
+    rows: v.number(),
+    columns: v.number(),
+    capacity: v.number(),
+    locked: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_container_and_order", ["containerId", "order"])
+    .index("by_container_and_page", ["containerId", "pageNumber"]),
+
+  storagePlacements: defineTable({
+    userId: v.id("users"),
+    containerId: v.id("storageContainers"),
+    compartmentId: v.id("storageCompartments"),
+    collectionEntryId: v.id("collectionEntries"),
+    slotIndex: v.number(),
+    quantity: v.number(),
+    stackKey: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_compartment_and_slot", ["compartmentId", "slotIndex"])
+    .index("by_entry", ["collectionEntryId"])
+    .index("by_user_and_entry", ["userId", "collectionEntryId"]),
+
+  storageAudits: defineTable({
+    userId: v.id("users"),
+    containerId: v.id("storageContainers"),
+    compartmentId: v.optional(v.id("storageCompartments")),
+    source: v.union(
+      v.literal("manual"),
+      v.literal("latest-binder-scan"),
+      v.literal("import")
+    ),
+    status: v.union(v.literal("reviewed"), v.literal("applied")),
+    capturedAt: v.number(),
+    scanRevision: v.optional(v.number()),
+    correctCount: v.number(),
+    missingCount: v.number(),
+    wrongCount: v.number(),
+    extraCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user_and_created_at", ["userId", "createdAt"])
+    .index("by_container_and_created_at", ["containerId", "createdAt"]),
+
+  storageAuditItems: defineTable({
+    auditId: v.id("storageAudits"),
+    compartmentId: v.id("storageCompartments"),
+    slotIndex: v.number(),
+    status: v.union(
+      v.literal("correct"),
+      v.literal("missing"),
+      v.literal("wrong"),
+      v.literal("extra")
+    ),
+    expectedCollectionEntryId: v.optional(v.id("collectionEntries")),
+    expectedExternalId: v.optional(v.string()),
+    expectedName: v.optional(v.string()),
+    observedCollectionEntryId: v.optional(v.id("collectionEntries")),
+    observedExternalId: v.optional(v.string()),
+    observedName: v.optional(v.string()),
+    expectedQuantity: v.number(),
+    observedQuantity: v.number()
+  })
+    .index("by_audit", ["auditId"])
+    .index("by_compartment_and_slot", ["compartmentId", "slotIndex"]),
+
   collectionEntryTags: defineTable({
     entryId: v.id("collectionEntries"),
     tagId: v.id("tags"),
@@ -456,6 +782,35 @@ export default defineSchema({
     .index("by_deck", ["deckId"])
     .index("by_deck_and_external_id_and_zone", ["deckId", "externalId", "zone"]),
 
+  deckCheckoutSessions: defineTable({
+    userId: v.id("users"),
+    deckId: v.id("decks"),
+    status: v.union(v.literal("checked_out"), v.literal("checked_in")),
+    note: v.optional(v.string()),
+    checkedOutAt: v.number(),
+    checkedInAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_deck_and_status", ["deckId", "status"])
+    .index("by_user_and_status", ["userId", "status"]),
+
+  deckCheckoutAllocations: defineTable({
+    userId: v.id("users"),
+    sessionId: v.id("deckCheckoutSessions"),
+    deckCardId: v.id("deckCards"),
+    collectionEntryId: v.id("collectionEntries"),
+    quantity: v.number(),
+    containerId: v.optional(v.id("storageContainers")),
+    compartmentId: v.optional(v.id("storageCompartments")),
+    slotIndex: v.optional(v.number()),
+    refilledAt: v.optional(v.number()),
+    createdAt: v.number()
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_entry", ["collectionEntryId"])
+    .index("by_user_and_entry", ["userId", "collectionEntryId"]),
+
   // Finance + Sealed (convex-native)
   transactions: defineTable({
     userId: v.id("users"),
@@ -467,6 +822,9 @@ export default defineSchema({
     cardName: v.optional(v.string()),
     quantity: v.number(),
     amount: v.number(),
+    amountCents: v.optional(v.number()),
+    allocationGroupId: v.optional(v.string()),
+    relatedTradeId: v.optional(v.id("trades")),
     currency: v.string(),
     platform: v.optional(v.string()),
     sourceUrl: v.optional(v.string()),
@@ -504,6 +862,17 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     msrp: v.optional(v.number()),
     upc: v.optional(v.string()),
+    contentMode: v.optional(v.union(v.literal("fixed"), v.literal("pool"))),
+    contents: v.optional(v.array(v.object({
+      externalId: v.optional(v.string()),
+      name: v.string(),
+      quantity: v.optional(v.number()),
+      setCode: v.optional(v.string()),
+      rarity: v.optional(v.string()),
+      imageUrl: v.optional(v.string())
+    }))),
+    contentSource: v.optional(v.string()),
+    contentUpdatedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number()
   })
@@ -568,6 +937,14 @@ export default defineSchema({
       v.literal("cancelled")
     ),
     message: v.optional(v.string()),
+    settlementStatus: v.optional(v.union(
+      v.literal("unreserved"),
+      v.literal("reserved"),
+      v.literal("settled"),
+      v.literal("released")
+    )),
+    settlementId: v.optional(v.string()),
+    settledAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number()
   })
@@ -582,8 +959,28 @@ export default defineSchema({
     name: v.string(),
     quantity: v.number(),
     imageUrl: v.optional(v.string()),
-    estimatedValue: v.optional(v.number())
+    estimatedValue: v.optional(v.number()),
+    collectionEntryId: v.optional(v.id("collectionEntries"))
   }).index("by_trade", ["tradeId"]),
+
+  tradeReservations: defineTable({
+    tradeId: v.id("trades"),
+    tradeCardId: v.id("tradeCards"),
+    ownerId: v.id("users"),
+    collectionEntryId: v.id("collectionEntries"),
+    quantity: v.number(),
+    status: v.union(
+      v.literal("reserved"),
+      v.literal("released"),
+      v.literal("settled")
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_trade", ["tradeId"])
+    .index("by_trade_card", ["tradeCardId"])
+    .index("by_entry_and_status", ["collectionEntryId", "status"])
+    .index("by_owner_and_status", ["ownerId", "status"]),
 
   // Analytics history (convex-native)
   // `day` is the UTC calendar day formatted as YYYY-MM-DD.
@@ -592,6 +989,16 @@ export default defineSchema({
     day: v.string(),
     capturedAt: v.number(),
     totalValue: v.number(),
-    byTcg: v.record(v.string(), v.number())
+    byTcg: v.record(v.string(), v.number()),
+    totalCopies: v.optional(v.number()),
+    pricedCopies: v.optional(v.number()),
+    freshCopies: v.optional(v.number()),
+    lowConfidenceCopies: v.optional(v.number()),
+    priceCoverage: v.optional(v.number()),
+    qualityStatus: v.optional(v.union(
+      v.literal("healthy"),
+      v.literal("degraded"),
+      v.literal("unsafe")
+    ))
   }).index("by_user_and_day", ["userId", "day"])
 });

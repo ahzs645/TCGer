@@ -86,6 +86,8 @@ export type TagPayload = z.infer<typeof tagPayloadSchema>;
 
 export const cardDataPayloadSchema = z.object({
   name: z.string(),
+  printedName: z.string().optional(),
+  searchAliases: z.array(z.string().trim().min(1)).optional(),
   tcg: tcgCodeSchema,
   externalId: z.string().trim().min(1),
   baseExternalId: z.string().trim().min(1).optional(),
@@ -154,6 +156,31 @@ export const updateBinderSchema = z.object({
   rotateShareToken: z.boolean().optional(),
 });
 export type UpdateBinderInput = z.infer<typeof updateBinderSchema>;
+
+export const deleteBinderQuerySchema = z.object({
+  cardDisposition: z
+    .enum(["move_to_unsorted", "delete"])
+    .optional()
+    .default("move_to_unsorted"),
+});
+export type DeleteBinderQuery = z.infer<typeof deleteBinderQuerySchema>;
+
+export const createBinderShareLinkSchema = z.object({
+  label: z.string().trim().min(1).max(80).default("Shared binder"),
+  expiresAt: z.string().datetime().nullable().optional(),
+});
+export type CreateBinderShareLinkInput = z.infer<
+  typeof createBinderShareLinkSchema
+>;
+
+export interface BinderShareLink {
+  id: string;
+  label: string;
+  token: string;
+  expiresAt?: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Persistent binder pages
@@ -305,6 +332,7 @@ export const collectionMutationKindSchema = z.enum([
   "move",
   "bulk",
   "import",
+  "trade_settlement",
   "undo",
 ]);
 export type CollectionMutationKind = z.infer<
@@ -476,6 +504,24 @@ export interface BulkAddResult {
   entryIds: string[];
 }
 
+export const rapidSetEntrySchema = z.object({
+  binderId: z.string(),
+  tcg: tcgCodeSchema,
+  setCode: z.string().min(1),
+  entries: z.array(z.object({
+    rowId: z.string().min(1), collectorNumber: z.string().min(1),
+    card: cardDataPayloadSchema, quantity: z.number().int().positive().max(100).optional(),
+    condition: conditionValueSchema.optional(), language: z.string().optional(),
+  })).min(1).max(100),
+});
+export type RapidSetEntryInput = z.infer<typeof rapidSetEntrySchema>;
+export interface RapidSetEntryReceipt {
+  receiptId: string;
+  addedRows: number;
+  addedCopies: number;
+  items: Array<{ rowId: string; collectorNumber: string; entryId: string; auditId: string; quantity: number }>;
+}
+
 // ---------------------------------------------------------------------------
 // Bulk collection import
 // ---------------------------------------------------------------------------
@@ -493,6 +539,10 @@ export const collectionImportSourceFormatSchema = z.enum([
   "csv",
   "json",
   "cardmarket-text",
+  "manabox-csv",
+  "moxfield-csv",
+  "tcgplayer-csv",
+  "collectr-csv",
   "pdf",
 ]);
 export type CollectionImportSourceFormat = z.infer<
@@ -612,7 +662,7 @@ export interface CollectionImportResult extends CollectionImportPreview {
 // Tag request schemas
 // ---------------------------------------------------------------------------
 
-export const exportFormatSchema = z.enum(["json", "csv"]);
+export const exportFormatSchema = z.enum(["json", "csv", "manabox", "moxfield", "tcgplayer", "collectr"]);
 export type ExportFormat = z.infer<typeof exportFormatSchema>;
 
 export const createTagSchema = tagPayloadSchema;
@@ -723,6 +773,7 @@ export interface Binder {
   associatedSetName?: string;
   shareToken?: string;
   isPublic?: boolean;
+  shareLinks?: BinderShareLink[];
   cards: CollectionCard[];
   createdAt: string;
   updatedAt: string;

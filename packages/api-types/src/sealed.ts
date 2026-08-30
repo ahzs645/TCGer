@@ -51,6 +51,19 @@ export const customSealedProductSchema = z.object({
 });
 export type CustomSealedProductInput = z.infer<typeof customSealedProductSchema>;
 
+export const sealedProductContentModeSchema = z.enum(['fixed', 'pool']);
+export type SealedProductContentMode = z.infer<typeof sealedProductContentModeSchema>;
+
+export const sealedProductContentSchema = z.object({
+  externalId: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1),
+  quantity: z.number().int().positive().optional(),
+  setCode: z.string().trim().min(1).optional(),
+  rarity: z.string().trim().min(1).optional(),
+  imageUrl: z.string().url().optional(),
+});
+export type SealedProductContent = z.infer<typeof sealedProductContentSchema>;
+
 // ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
@@ -67,6 +80,11 @@ export interface SealedProductResponse {
   imageUrl?: string;
   msrp?: number;
   upc?: string;
+  contentMode?: SealedProductContentMode;
+  contentCount?: number;
+  contents?: SealedProductContent[];
+  contentSource?: string;
+  contentUpdatedAt?: string;
   isCustom: boolean;
 }
 

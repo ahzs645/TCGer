@@ -2,6 +2,7 @@ import type { Card } from '@tcg/api-types';
 import { env } from '../../config/env';
 import type { PriceProvider, PriceProviderQuote } from './pricing.types';
 import { normalizePriceQuote, parsePrice } from './pricing.types';
+import { fetchWithProviderPolicy } from '../providers/provider-request-queue';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -25,20 +26,21 @@ function firstPositive(...values: unknown[]): number | undefined {
   return undefined;
 }
 
-async function fetchJson(url: string, init: RequestInit): Promise<JsonRecord> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, { ...init, signal: controller.signal });
-    if (!response.ok) {
-      throw new Error(`Pricing request failed with HTTP ${response.status}`);
-    }
-    const payload = record(await response.json());
-    if (!payload) throw new Error('Pricing response was not a JSON object');
-    return payload;
-  } finally {
-    clearTimeout(timeout);
+async function fetchJson(
+  url: string,
+  init: RequestInit,
+  provider = 'server-pricing',
+): Promise<JsonRecord> {
+  const response = await fetchWithProviderPolicy(provider, url, init, {
+    maxRetries: env.PROVIDER_MAX_RETRIES,
+    timeoutMs: REQUEST_TIMEOUT_MS,
+  });
+  if (!response.ok) {
+    throw new Error(`Pricing request failed with HTTP ${response.status}`);
   }
+  const payload = record(await response.json());
+  if (!payload) throw new Error('Pricing response was not a JSON object');
+  return payload;
 }
 
 interface PokeWalletReferences {
@@ -69,12 +71,16 @@ async function resolvePokeWalletSetCode(tcgdexSetId: string): Promise<string> {
   const request = (async () => {
     try {
       const base = env.TCGDEX_API_BASE_URL.replace(/\/$/, '');
-      const payload = await fetchJson(`${base}/sets/${encodeURIComponent(tcgdexSetId)}`, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'TCGer/0.1 (pricing integration)',
+      const payload = await fetchJson(
+        `${base}/sets/${encodeURIComponent(tcgdexSetId)}`,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'TCGer/0.1 (pricing integration)',
+          },
         },
-      });
+        'tcgdex',
+      );
       const set = record(payload.data) ?? payload;
       const official = record(set.abbreviation)?.official;
       const candidate =
@@ -140,7 +146,7 @@ async function fetchPokeWalletReferences(externalId: string): Promise<PokeWallet
       headers['X-API-Key'] = env.POKEWALLET_API_KEY;
     }
 
-    const payload = await fetchJson(url.toString(), { headers });
+    const payload = await fetchJson(url.toString(), { headers }, 'pokewallet');
     const hit = pickPokeWalletHit(
       records(payload.results),
       pokeWalletSetCode,
@@ -196,11 +202,36 @@ export class PokeWalletPriceProvider implements PriceProvider {
     }
     const references = await fetchPokeWalletReferences(externalId);
     if (this.mode === 'cardmarket') {
-      return normalizePriceQuote({ currency: 'EUR', price: references.cardmarketEur });
+      const quote = normalizePriceQuote({ currency: 'EUR', price: references.cardmarketEur });
+      return quote
+        ? {
+            ...quote,
+            provenance: {
+              provider: this.name,
+              retrievedAt: new Date().toISOString(),
+              originalQuotes: quote.price
+                ? [{ amount: quote.price, currency: 'EUR', source: this.name }]
+                : [],
+            },
+          }
+        : null;
     }
     if (this.mode === 'tcgplayer') {
-      return normalizePriceQuote({ currency: 'USD', price: references.tcgplayerUsd });
+      const quote = normalizePriceQuote({ currency: 'USD', price: references.tcgplayerUsd });
+      return quote
+        ? {
+            ...quote,
+            provenance: {
+              provider: this.name,
+              retrievedAt: new Date().toISOString(),
+              originalQuotes: quote.price
+                ? [{ amount: quote.price, currency: 'USD', source: this.name }]
+                : [],
+            },
+          }
+        : null;
     }
+    if (!env.PRICE_USD_TO_EUR || !env.PRICE_FX_SOURCE || !env.PRICE_FX_AS_OF) return null;
     const convertedTcgplayer = references.tcgplayerUsd
       ? references.tcgplayerUsd * env.PRICE_USD_TO_EUR
       : undefined;
@@ -210,7 +241,43 @@ export class PokeWalletPriceProvider implements PriceProvider {
     const blended = values.length
       ? values.reduce((sum, value) => sum + value, 0) / values.length
       : undefined;
-    return normalizePriceQuote({ currency: 'EUR', price: blended });
+    const quote = normalizePriceQuote({ currency: 'EUR', price: blended });
+    return quote
+      ? {
+          ...quote,
+          provenance: {
+            provider: this.name,
+            retrievedAt: new Date().toISOString(),
+            originalQuotes: [
+              ...(references.cardmarketEur
+                ? [
+                    {
+                      amount: references.cardmarketEur,
+                      currency: 'EUR',
+                      source: 'pokewallet-cardmarket',
+                    },
+                  ]
+                : []),
+              ...(references.tcgplayerUsd
+                ? [
+                    {
+                      amount: references.tcgplayerUsd,
+                      currency: 'USD',
+                      source: 'pokewallet-tcgplayer',
+                    },
+                  ]
+                : []),
+            ],
+            fx: {
+              fromCurrency: 'USD',
+              toCurrency: 'EUR',
+              rate: env.PRICE_USD_TO_EUR,
+              source: env.PRICE_FX_SOURCE,
+              asOf: env.PRICE_FX_AS_OF,
+            },
+          },
+        }
+      : null;
   }
 }
 
@@ -226,15 +293,19 @@ async function getEbayAppToken(): Promise<string> {
     grant_type: 'client_credentials',
     scope: 'https://api.ebay.com/oauth/api_scope',
   });
-  const payload = await fetchJson(`https://${host}/identity/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Basic ${Buffer.from(`${env.EBAY_CLIENT_ID}:${env.EBAY_CLIENT_SECRET}`).toString('base64')}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+  const payload = await fetchJson(
+    `https://${host}/identity/v1/oauth2/token`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Basic ${Buffer.from(`${env.EBAY_CLIENT_ID}:${env.EBAY_CLIENT_SECRET}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
     },
-    body,
-  });
+    'ebay',
+  );
   const value = typeof payload.access_token === 'string' ? payload.access_token : '';
   if (!value) throw new Error('eBay token response did not include an access token');
   const expiresIn = Number(payload.expires_in) || 7_200;
@@ -292,13 +363,17 @@ export class EbayActivePriceProvider implements PriceProvider {
     url.searchParams.set('q', query);
     url.searchParams.set('limit', '50');
     const token = await getEbayAppToken();
-    const payload = await fetchJson(url.toString(), {
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-        'X-EBAY-C-MARKETPLACE-ID': env.EBAY_MARKETPLACE_ID,
+    const payload = await fetchJson(
+      url.toString(),
+      {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+          'X-EBAY-C-MARKETPLACE-ID': env.EBAY_MARKETPLACE_ID,
+        },
       },
-    });
+      'ebay',
+    );
     const listings = filteredListingPrices(payload);
     return normalizePriceQuote({ currency: listings.currency, price: median(listings.prices) });
   }

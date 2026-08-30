@@ -7,6 +7,9 @@ export const collectionMutationKindValidator = v.union(
   v.literal("move"),
   v.literal("bulk"),
   v.literal("import"),
+  v.literal("rapid_entry"),
+  v.literal("acquisition_split"),
+  v.literal("trade_settlement"),
   v.literal("undo")
 );
 

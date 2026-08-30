@@ -16,11 +16,17 @@ describe('server market price providers', () => {
   const originalPokeWalletProxy = env.POKEWALLET_PROXY_SECRET;
   const originalEbayClientId = env.EBAY_CLIENT_ID;
   const originalEbayClientSecret = env.EBAY_CLIENT_SECRET;
+  const originalFxRate = env.PRICE_USD_TO_EUR;
+  const originalFxSource = env.PRICE_FX_SOURCE;
+  const originalFxAsOf = env.PRICE_FX_AS_OF;
 
   beforeEach(() => {
     fetchMock.mockReset();
     env.POKEWALLET_API_KEY = 'test-key';
     env.POKEWALLET_PROXY_SECRET = undefined;
+    env.PRICE_USD_TO_EUR = undefined;
+    env.PRICE_FX_SOURCE = undefined;
+    env.PRICE_FX_AS_OF = undefined;
   });
 
   afterAll(() => {
@@ -29,6 +35,9 @@ describe('server market price providers', () => {
     env.POKEWALLET_PROXY_SECRET = originalPokeWalletProxy;
     env.EBAY_CLIENT_ID = originalEbayClientId;
     env.EBAY_CLIENT_SECRET = originalEbayClientSecret;
+    env.PRICE_USD_TO_EUR = originalFxRate;
+    env.PRICE_FX_SOURCE = originalFxSource;
+    env.PRICE_FX_AS_OF = originalFxAsOf;
   });
 
   it('matches the exact set and number before choosing PokéWallet prices', async () => {
@@ -79,8 +88,49 @@ describe('server market price providers', () => {
     env.POKEWALLET_API_KEY = 'configured';
     env.EBAY_CLIENT_ID = 'configured';
     env.EBAY_CLIENT_SECRET = 'configured';
+    expect(getPriceSourceCatalog().sources.map((source) => source.id)).not.toContain(
+      'pokewallet-blended',
+    );
+    env.PRICE_USD_TO_EUR = 0.9;
+    env.PRICE_FX_SOURCE = 'ECB';
+    env.PRICE_FX_AS_OF = '2026-08-29T00:00:00.000Z';
     const configured = getPriceSourceCatalog().sources.map((source) => source.id);
     expect(configured).toContain('pokewallet-blended');
     expect(configured).toContain('ebay-active');
+  });
+
+  it('retains both native quotes and dated FX provenance when blending', async () => {
+    env.PRICE_USD_TO_EUR = 0.9;
+    env.PRICE_FX_SOURCE = 'ECB';
+    env.PRICE_FX_AS_OF = '2026-08-29T00:00:00.000Z';
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ data: { id: 'sv5', abbreviation: { official: 'TEF' } } }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          results: [
+            {
+              card_info: { set_code: 'TEF', card_number: '1' },
+              cardmarket: { prices: [{ variant_type: 'normal', avg1: 4 }] },
+              tcgplayer: { prices: [{ market_price: 10 }] },
+            },
+          ],
+        }),
+      );
+
+    const quote = await new PokeWalletPriceProvider('blended').fetchPrice('pokemon', 'sv5-1');
+    expect(quote).toMatchObject({
+      currency: 'EUR',
+      price: 6.5,
+      provenance: {
+        provider: 'pokewallet-blended',
+        originalQuotes: [
+          { amount: 4, currency: 'EUR' },
+          { amount: 10, currency: 'USD' },
+        ],
+        fx: { rate: 0.9, source: 'ECB', asOf: '2026-08-29T00:00:00.000Z' },
+      },
+    });
   });
 });

@@ -176,6 +176,8 @@ export type RichCardSnapshot = RichCardMetadata & {
   printingKey?: string;
   artworkId?: string;
   name: string;
+  printedName?: string;
+  searchAliases?: string[];
   setCode?: string;
   setName?: string;
   rarity?: string;

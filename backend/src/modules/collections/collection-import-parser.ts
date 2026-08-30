@@ -4,7 +4,11 @@ export type CollectionImportSourceFormat =
   | "csv"
   | "json"
   | "cardmarket-text"
-  | "pdf";
+  | "pdf"
+  | "manabox-csv"
+  | "moxfield-csv"
+  | "tcgplayer-csv"
+  | "collectr-csv";
 
 export interface CollectionImportResolution {
   externalId: string;
@@ -38,6 +42,7 @@ export interface NormalizedCollectionImportRow {
   edition?: string;
   notes?: string;
   price?: number;
+  acquisitionPrice?: number;
   currency?: string;
   binderName?: string;
   isFoil?: boolean;
@@ -157,6 +162,10 @@ function detectFormat(content: string, fileName?: string): CollectionImportSourc
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) return "json";
   if (/yugioh singles:/i.test(content)) return "cardmarket-text";
   const firstLine = content.split(/\r?\n/, 1)[0]?.toLowerCase() ?? "";
+  if (firstLine.includes("manabox id") || firstLine.includes("purchase price currency")) return "manabox-csv";
+  if (firstLine.includes("tradelist count") || firstLine.includes("last modified")) return "moxfield-csv";
+  if (firstLine.includes("tcgplayer id") || firstLine.includes("tcg market price")) return "tcgplayer-csv";
+  if (firstLine.includes("market price") && firstLine.includes("variant")) return "collectr-csv";
   if (
     firstLine.includes(",") &&
     (firstLine.includes("external_id") || firstLine.includes("external id"))
@@ -167,6 +176,78 @@ function detectFormat(content: string, fileName?: string): CollectionImportSourc
     return "cardmarket-text";
   }
   return "csv";
+}
+
+function parseProfileCsv(content: string) {
+  const records: string[][] = [];
+  let row: string[] = []; let field = ""; let quoted = false;
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+    if (quoted) {
+      if (character === '"' && content[index + 1] === '"') { field += '"'; index += 1; }
+      else if (character === '"') quoted = false;
+      else field += character;
+    } else if (character === '"') quoted = true;
+    else if (character === ',') { row.push(field); field = ""; }
+    else if (character === '\n') { row.push(field); records.push(row); row = []; field = ""; }
+    else if (character !== '\r') field += character;
+  }
+  if (field || row.length) { row.push(field); records.push(row); }
+  return records;
+}
+
+function profileTcg(format: CollectionImportSourceFormat, source: Record<string, string>): TcgCode | undefined {
+  if (format === "manabox-csv" || format === "moxfield-csv") return "magic";
+  const game = `${source.tcg ?? ""} ${source.game ?? ""} ${source.product_line ?? ""}`.toLowerCase();
+  if (game.includes("magic")) return "magic";
+  if (game.includes("pokemon")) return "pokemon";
+  if (game.includes("yu-gi-oh") || game.includes("yugioh")) return "yugioh";
+  if (game.includes("one piece")) return "onepiece";
+  if (game.includes("lorcana")) return "lorcana";
+  if (game.includes("dragon ball")) return "dragonball";
+  return undefined;
+}
+
+function parseMarketplaceCsv(
+  content: string,
+  format: Extract<CollectionImportSourceFormat, `${string}-csv`>,
+  resolutions: Record<number, CollectionImportResolution> = {},
+): ParsedCollectionImportSource {
+  const parsed = parseProfileCsv(content);
+  const normalize = (value: string) => value.replace(/^\uFEFF/, "").trim().toLowerCase().replace(/\s+/g, "_");
+  const headers = (parsed[0] ?? []).map(normalize);
+  const values = parsed.slice(1).filter((row) => row.some((field) => field.trim()));
+  const rows: NormalizedCollectionImportRow[] = [];
+  const failures: CollectionImportFailure[] = [];
+  const ambiguities: CollectionImportAmbiguity[] = [];
+  const get = (source: Record<string, string>, ...keys: string[]) => keys.map((key) => source[key]?.trim()).find(Boolean);
+  values.forEach((fields, offset) => {
+    const sourceRow = offset + 2;
+    const source = Object.fromEntries(headers.map((header, index) => [header, fields[index] ?? ""]));
+    const tcg = profileTcg(format, source);
+    const cardName = get(source, "card_name", "name", "card", "product_name");
+    const quantity = integer(get(source, "quantity", "count", "total_quantity", "add_to_quantity") ?? 1);
+    if (!tcg || !cardName || !quantity) {
+      failures.push({ sourceRow, code: "INVALID_FIELD", message: "Marketplace row requires a supported game, card name, and positive quantity", original: fields.join(",") });
+      return;
+    }
+    const scryfallId = get(source, "scryfall_id", "scryfallid");
+    const tcgplayerId = get(source, "tcgplayer_id", "tcgplayerid", "product_id");
+    const foilText = (get(source, "foil", "variant", "printing") ?? "").toLowerCase();
+    const normalized = applyResolution({
+      sourceRow, tcg, externalId: scryfallId ?? get(source, "external_id") ?? (tcgplayerId ? `tcgplayer:${tcgplayerId}` : undefined), cardName,
+      collectorNumber: get(source, "collector_number", "card_number", "number"), setCode: get(source, "set_code", "edition"),
+      setName: get(source, "set_name", "set"), rarity: get(source, "rarity"), quantity,
+      condition: get(source, "condition"), language: get(source, "language"), binderName: get(source, "binder_name", "binder", "folder"),
+      price: money(get(source, "market_price", "tcg_market_price") ?? ""), isFoil: foilText.includes("foil") || foilText === "true" || foilText === "yes",
+      acquisitionPrice: money(get(source, "purchase_price", "acquisition_price", "cost") ?? ""),
+      isSigned: boolean(get(source, "signed")), isAltered: boolean(get(source, "altered", "alter")),
+      tags: get(source, "tags")?.split(";").map((tag) => tag.trim()).filter(Boolean), original: fields.join(","),
+    }, resolutions[sourceRow] ?? resolutions[offset + 1]);
+    rows.push(normalized);
+    if (!normalized.externalId) ambiguities.push({ sourceRow, code: "PRINTING_RESOLUTION_REQUIRED", message: "Select the exact printing before committing this marketplace row", query: { tcg, name: cardName, collectorNumber: normalized.collectorNumber, setCode: normalized.setCode, rarity: normalized.rarity } });
+  });
+  return { format, rows, failures, ambiguities, sourceRows: values.length };
 }
 
 function applyResolution(
@@ -431,6 +512,9 @@ export function parseCollectionImportSource(
   if (format === "json") return parseCollectionJson(input.content, input.resolutions);
   if (format === "cardmarket-text") {
     return parseCardmarketSinglesText(input.content, input.resolutions);
+  }
+  if (format === "manabox-csv" || format === "moxfield-csv" || format === "tcgplayer-csv" || format === "collectr-csv") {
+    return parseMarketplaceCsv(input.content, format, input.resolutions);
   }
   if (format === "pdf") {
     return {

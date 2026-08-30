@@ -85,6 +85,8 @@ type BridgeIdentity = {
 
 const cardSnapshotInput = v.object({
   name: v.string(),
+  printedName: v.optional(v.string()),
+  searchAliases: v.optional(v.array(v.string())),
   tcg: tcgCodeValidator,
   externalId: v.string(),
   baseExternalId: v.optional(v.string()),
@@ -104,7 +106,11 @@ const collectionImportRowInput = v.object({
   row: v.number(),
   tcg: tcgCodeValidator,
   externalId: v.string(),
+  baseExternalId: v.optional(v.string()),
+  printingKey: v.optional(v.string()),
+  artworkId: v.optional(v.string()),
   cardName: v.string(),
+  collectorNumber: v.optional(v.string()),
   setCode: v.optional(v.string()),
   setName: v.optional(v.string()),
   rarity: v.optional(v.string()),
@@ -1146,7 +1152,8 @@ export const updateBinder = internalMutation({
 export const deleteBinder = internalMutation({
   args: {
     subject: v.string(),
-    binderId: v.id("binders")
+    binderId: v.id("binders"),
+    cardDisposition: v.optional(v.union(v.literal("move_to_unsorted"), v.literal("delete")))
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1164,10 +1171,114 @@ export const deleteBinder = internalMutation({
       .withIndex("by_binder", (q) => q.eq("binderId", binder._id))
       .collect();
 
-    for (const entry of entries) {
-      await removeEntryForViewer(ctx, viewer._id, entry._id);
+    if (args.cardDisposition === "delete") {
+      for (const entry of entries) {
+        await removeEntryForViewer(ctx, viewer._id, entry._id);
+      }
+    } else {
+      const library = await ctx.db
+        .query("binders")
+        .withIndex("by_user_kind", (q) => q.eq("userId", viewer._id).eq("kind", "library"))
+        .unique();
+      if (!library) {
+        throw new ConvexError({ code: "NOT_FOUND", message: "Unsorted library not found" });
+      }
+      const timestamp = now();
+      for (const entry of entries) {
+        await ctx.db.patch(entry._id, { binderId: library._id, updatedAt: timestamp });
+      }
     }
+    const shareLinks = await ctx.db
+      .query("binderShareLinks")
+      .withIndex("by_binder", (q) => q.eq("binderId", binder._id))
+      .collect();
+    for (const link of shareLinks) await ctx.db.delete(link._id);
     await ctx.db.delete(binder._id);
+    return null;
+  }
+});
+
+const binderShareLinkValidator = v.object({
+  id: v.id("binderShareLinks"),
+  label: v.string(),
+  token: v.string(),
+  expiresAt: v.optional(v.string()),
+  lastUsedAt: v.optional(v.string()),
+  createdAt: v.string()
+});
+
+function formatBinderShareLink(link: Doc<"binderShareLinks">) {
+  return {
+    id: link._id,
+    label: link.label,
+    token: link.token,
+    expiresAt: link.expiresAt === undefined ? undefined : new Date(link.expiresAt).toISOString(),
+    lastUsedAt: link.lastUsedAt === undefined ? undefined : new Date(link.lastUsedAt).toISOString(),
+    createdAt: new Date(link.createdAt).toISOString()
+  };
+}
+
+export const listBinderShareLinks = internalQuery({
+  args: { subject: v.string(), binderId: v.id("binders") },
+  returns: v.array(binderShareLinkValidator),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    await requireBinderForUser(ctx, args.binderId, viewer._id);
+    const links = await ctx.db
+      .query("binderShareLinks")
+      .withIndex("by_binder", (q) => q.eq("binderId", args.binderId))
+      .order("desc")
+      .collect();
+    return links.map(formatBinderShareLink);
+  }
+});
+
+export const createBinderShareLink = internalMutation({
+  args: {
+    subject: v.string(),
+    binderId: v.id("binders"),
+    label: v.string(),
+    expiresAt: v.optional(v.number())
+  },
+  returns: binderShareLinkValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const binder = await requireBinderForUser(ctx, args.binderId, viewer._id);
+    if (binder.kind === "library") {
+      throw new ConvexError({ code: "BAD_REQUEST", message: "The Unsorted Library cannot be shared" });
+    }
+    const label = args.label.trim();
+    if (!label || label.length > 80) {
+      throw new ConvexError({ code: "BAD_REQUEST", message: "Share-link label is required" });
+    }
+    const createdAt = now();
+    const id = await ctx.db.insert("binderShareLinks", {
+      userId: viewer._id,
+      binderId: binder._id,
+      label,
+      token: await createUniqueShareToken(ctx),
+      expiresAt: args.expiresAt,
+      createdAt
+    });
+    return formatBinderShareLink((await ctx.db.get(id))!);
+  }
+});
+
+export const revokeBinderShareLink = internalMutation({
+  args: {
+    subject: v.string(),
+    binderId: v.id("binders"),
+    linkId: v.id("binderShareLinks")
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    await requireBinderForUser(ctx, args.binderId, viewer._id);
+    const link = await ctx.db.get(args.linkId);
+    if (!link || link.userId !== viewer._id || link.binderId !== args.binderId) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Share link not found" });
+    }
+    await ctx.db.delete(link._id);
     return null;
   }
 });
@@ -1447,7 +1558,11 @@ export const importCollectionRows = internalMutation({
         card: {
           tcg: row.tcg,
           externalId: row.externalId,
+          baseExternalId: row.baseExternalId,
+          printingKey: row.printingKey,
+          artworkId: row.artworkId,
           name: row.cardName,
+          collectorNumber: row.collectorNumber,
           setCode: row.setCode,
           setName: row.setName,
           rarity: row.rarity
@@ -1525,6 +1640,8 @@ export const updateEntry = internalMutation({
     gradingScore: v.optional(nullableString),
     certNumber: v.optional(nullableString),
     storageLocation: v.optional(nullableString),
+    printedName: v.optional(nullableString),
+    searchAliases: v.optional(v.array(v.string())),
     tagIds: v.optional(v.array(v.id("tags"))),
     newTags: v.optional(v.array(v.object({ label: v.string(), colorHex: v.optional(v.string()) }))),
     cardOverride: v.optional(
@@ -1604,6 +1721,18 @@ export const updateEntry = internalMutation({
     }
 
     const timestamp = now();
+    if (args.printedName !== undefined || args.searchAliases !== undefined) {
+      const card = await ctx.db.get(nextCardId);
+      if (!card) throw new ConvexError({ code: "INVARIANT", message: "Card is missing" });
+      const aliases = args.searchAliases === undefined
+        ? card.searchAliases
+        : Array.from(new Set(args.searchAliases.map(value => value.trim()).filter(Boolean))).slice(0, 50);
+      await ctx.db.patch(card._id, {
+        printedName: args.printedName === undefined ? card.printedName : args.printedName?.trim() || undefined,
+        searchAliases: aliases,
+        updatedAt: timestamp,
+      });
+    }
     // A card-scoped move takes the rest of the group with it. Read before the
     // patch below, while every copy is still in the source binder.
     const groupToMove = movesWholeCard
@@ -1878,7 +2007,7 @@ export const listCollectionMutationHistory = internalQuery({
       cardName: entry.cardName,
       summary: entry.summary,
       sourceAuditId: entry.sourceAuditId,
-      canUndo: entry.operationKind !== "undo" && undoRows[index] === null,
+      canUndo: entry.operationKind !== "undo" && entry.operationKind !== "trade_settlement" && undoRows[index] === null,
       createdAt: toIso(entry.createdAt)
     }));
   }

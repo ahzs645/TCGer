@@ -6,6 +6,7 @@ import { internalMutation } from "./_generated/server";
 
 const phaseValidator = v.union(
   v.literal("collectionEntries"),
+  v.literal("storage"),
   v.literal("binders"),
   v.literal("tags"),
   v.literal("wishlists"),
@@ -22,11 +23,13 @@ const phaseValidator = v.union(
   v.literal("trades"),
   v.literal("audits"),
   v.literal("snapshots"),
+  v.literal("preferences"),
   v.literal("user"),
 );
 
 type DeletionPhase =
   | "collectionEntries"
+  | "storage"
   | "binders"
   | "tags"
   | "wishlists"
@@ -43,10 +46,12 @@ type DeletionPhase =
   | "trades"
   | "audits"
   | "snapshots"
+  | "preferences"
   | "user";
 
 const nextPhase: Record<DeletionPhase, DeletionPhase | null> = {
-  collectionEntries: "binders",
+  collectionEntries: "storage",
+  storage: "binders",
   binders: "tags",
   tags: "wishlists",
   wishlists: "follows",
@@ -62,7 +67,8 @@ const nextPhase: Record<DeletionPhase, DeletionPhase | null> = {
   financeSummaries: "trades",
   trades: "audits",
   audits: "snapshots",
-  snapshots: "user",
+  snapshots: "preferences",
+  preferences: "user",
   user: null,
 };
 
@@ -129,10 +135,20 @@ export const deleteBatch = internalMutation({
         .query("sealedOpenedCards")
         .withIndex("by_collection", (q) => q.eq("collectionId", entry._id))
         .take(batchSize);
-      if (assignments.length > 0 || openedCards.length > 0) {
+      const placements = await ctx.db
+        .query("storagePlacements")
+        .withIndex("by_entry", (q) => q.eq("collectionEntryId", entry._id))
+        .take(batchSize);
+      const allocations = await ctx.db
+        .query("deckCheckoutAllocations")
+        .withIndex("by_entry", (q) => q.eq("collectionEntryId", entry._id))
+        .take(batchSize);
+      if (assignments.length > 0 || openedCards.length > 0 || placements.length > 0 || allocations.length > 0) {
         await Promise.all([
           ...assignments.map((assignment) => ctx.db.delete(assignment._id)),
           ...openedCards.map((card) => ctx.db.delete(card._id)),
+          ...placements.map((placement) => ctx.db.delete(placement._id)),
+          ...allocations.map((allocation) => ctx.db.delete(allocation._id)),
         ]);
         await schedule(args.phase);
         return null;
@@ -144,6 +160,37 @@ export const deleteBatch = internalMutation({
         }
       }
       await ctx.db.delete(entry._id);
+      await schedule(args.phase);
+      return null;
+    }
+
+    if (args.phase === "storage") {
+      const audit = await ctx.db
+        .query("storageAudits")
+        .withIndex("by_user_and_created_at", (q) => q.eq("userId", args.userId))
+        .first();
+      if (audit) {
+        const items = await ctx.db.query("storageAuditItems").withIndex("by_audit", (q) => q.eq("auditId", audit._id)).take(batchSize);
+        if (items.length) await Promise.all(items.map((item) => ctx.db.delete(item._id)));
+        else await ctx.db.delete(audit._id);
+        await schedule(args.phase);
+        return null;
+      }
+      const container = await ctx.db
+        .query("storageContainers")
+        .withIndex("by_user_and_order", (q) => q.eq("userId", args.userId))
+        .first();
+      if (!container) { await advance(); return null; }
+      const compartments = await ctx.db.query("storageCompartments")
+        .withIndex("by_container_and_order", (q) => q.eq("containerId", container._id)).take(batchSize);
+      if (compartments.length) {
+        for (const compartment of compartments) {
+          const placements = await ctx.db.query("storagePlacements")
+            .withIndex("by_compartment_and_slot", (q) => q.eq("compartmentId", compartment._id)).take(batchSize);
+          if (placements.length) await Promise.all(placements.map(row => ctx.db.delete(row._id)));
+          else await ctx.db.delete(compartment._id);
+        }
+      } else await ctx.db.delete(container._id);
       await schedule(args.phase);
       return null;
     }
@@ -267,12 +314,34 @@ export const deleteBatch = internalMutation({
         .query("deckCards")
         .withIndex("by_deck", (q) => q.eq("deckId", deck._id))
         .take(batchSize);
-      if (cards.length > 0) {
+      const sessions = [
+        ...(await ctx.db.query("deckCheckoutSessions").withIndex("by_deck_and_status", q => q.eq("deckId", deck._id).eq("status", "checked_out")).take(batchSize)),
+        ...(await ctx.db.query("deckCheckoutSessions").withIndex("by_deck_and_status", q => q.eq("deckId", deck._id).eq("status", "checked_in")).take(batchSize)),
+      ].slice(0, batchSize);
+      if (sessions.length > 0) {
+        for (const session of sessions) {
+          const allocations = await ctx.db.query("deckCheckoutAllocations").withIndex("by_session", q => q.eq("sessionId", session._id)).take(batchSize);
+          if (allocations.length) await Promise.all(allocations.map(row => ctx.db.delete(row._id)));
+          else await ctx.db.delete(session._id);
+        }
+      } else if (cards.length > 0) {
         await Promise.all(cards.map((card) => ctx.db.delete(card._id)));
       } else {
         await ctx.db.delete(deck._id);
       }
       await schedule(args.phase);
+      return null;
+    }
+
+    if (args.phase === "preferences") {
+      const alerts = await ctx.db.query("priceAlerts").withIndex("by_user", q => q.eq("userId", args.userId)).take(batchSize);
+      const automations = await ctx.db.query("automations").withIndex("by_user", q => q.eq("userId", args.userId)).take(batchSize);
+      const prices = await ctx.db.query("cardPriceSnapshots").withIndex("by_user_and_captured_at", q => q.eq("userId", args.userId)).take(batchSize);
+      const notifications = await ctx.db.query("notifications").withIndex("by_user_and_created_at", q => q.eq("userId", args.userId)).take(batchSize);
+      const channels = await ctx.db.query("notificationChannels").withIndex("by_user", q => q.eq("userId", args.userId)).take(batchSize);
+      const docs = [...alerts, ...automations, ...prices, ...notifications, ...channels].slice(0, batchSize);
+      if (docs.length) { await Promise.all(docs.map(doc => ctx.db.delete(doc._id))); await schedule(args.phase); }
+      else await advance();
       return null;
     }
 
@@ -416,8 +485,9 @@ export const deleteBatch = internalMutation({
         .query("tradeCards")
         .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
         .take(batchSize);
-      if (cards.length > 0) {
-        await Promise.all(cards.map((card) => ctx.db.delete(card._id)));
+      const reservations = await ctx.db.query("tradeReservations").withIndex("by_trade", (q) => q.eq("tradeId", trade._id)).take(batchSize);
+      if (cards.length > 0 || reservations.length > 0) {
+        await Promise.all([...cards, ...reservations].slice(0, batchSize).map((row) => ctx.db.delete(row._id)));
       } else {
         await ctx.db.delete(trade._id);
       }

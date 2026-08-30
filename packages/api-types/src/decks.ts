@@ -166,3 +166,27 @@ export interface DeckImportResult {
   skippedCount: number;
   skippedCards: string[];
 }
+
+export interface DeckCheckoutAllocation {
+  id: string;
+  deckCardId: string;
+  collectionEntryId: string;
+  quantity: number;
+  containerId?: string;
+  compartmentId?: string;
+  slotIndex?: number;
+  refilledAt?: string;
+}
+
+export interface DeckCheckoutSession {
+  id: string;
+  deckId: string;
+  status: "checked_out" | "checked_in";
+  note?: string;
+  checkedOutAt: string;
+  checkedInAt?: string;
+  allocations: DeckCheckoutAllocation[];
+}
+
+export const deckCheckoutSchema = z.object({ note: z.string().max(500).optional() });
+export type DeckCheckoutInput = z.infer<typeof deckCheckoutSchema>;

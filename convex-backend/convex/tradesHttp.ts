@@ -10,6 +10,7 @@ import {
   requireBridgeIdentity
 } from "./lib/httpBridge";
 import type { TcgCode } from "./lib/validators";
+import type { Id } from "./_generated/dataModel";
 
 const tradesApi = internal.trades;
 const TCG_CODES = new Set<TcgCode>([
@@ -22,6 +23,7 @@ const TCG_CODES = new Set<TcgCode>([
 ]);
 
 type TradeCardInput = {
+  collectionEntryId?: Id<"collectionEntries">;
   externalId: string;
   tcg: TcgCode;
   name: string;
@@ -42,6 +44,7 @@ function parseCardList(value: unknown, required: boolean): TradeCardInput[] | nu
       typeof card.externalId !== "string" || !card.externalId ||
       typeof card.tcg !== "string" || !TCG_CODES.has(card.tcg as TcgCode) ||
       typeof card.name !== "string" || !card.name ||
+      (card.collectionEntryId !== undefined && typeof card.collectionEntryId !== "string") ||
       typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 ||
       (card.imageUrl !== undefined && typeof card.imageUrl !== "string") ||
       (card.estimatedValue !== undefined &&
@@ -50,6 +53,7 @@ function parseCardList(value: unknown, required: boolean): TradeCardInput[] | nu
       return null;
     }
     cards.push({
+      collectionEntryId: card.collectionEntryId as Id<"collectionEntries"> | undefined,
       externalId: card.externalId,
       tcg: card.tcg as TcgCode,
       name: card.name,
