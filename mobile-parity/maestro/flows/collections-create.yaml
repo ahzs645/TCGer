@@ -20,6 +20,7 @@ properties:
 - tapOn:
     id: "input.collections.name"
 - inputText: "Parity Binder"
+- hideKeyboard
 - tapOn:
     id: "action.collections.confirmCreate"
 - assertVisible: "Parity Binder"

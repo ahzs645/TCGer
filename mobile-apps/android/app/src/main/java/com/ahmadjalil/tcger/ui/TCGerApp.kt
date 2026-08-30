@@ -111,6 +111,13 @@ import kotlinx.coroutines.launch
 
 private const val MORE_ROUTE = "bottom-navigation-more"
 private const val CUSTOMIZE_NAVIGATION_ROUTE = "bottom-navigation-customize"
+private val PARITY_BOTTOM_NAVIGATION_ITEMS = listOf(
+    BottomNavigationItem.HOME,
+    BottomNavigationItem.COLLECTIONS,
+    BottomNavigationItem.SEARCH,
+    BottomNavigationItem.WISHLISTS,
+    BottomNavigationItem.SETTINGS,
+)
 
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
@@ -128,8 +135,12 @@ fun TCGerApp(container: AppContainer) {
         val navController = rememberNavController()
         val backStack by navController.currentBackStackEntryAsState()
         val route = backStack?.destination?.route
-        val visibleDestinations = state.preferences.visibleBottomNavigationItems
-            .ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
+        val visibleDestinations = if (ParityTestMode.isEnabled) {
+            PARITY_BOTTOM_NAVIGATION_ITEMS
+        } else {
+            state.preferences.visibleBottomNavigationItems
+                .ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
+        }
         val navigationLayout = BottomNavigationLayout(visibleDestinations)
         val primaryDestinations = navigationLayout.primaryItems
         val overflowDestinations = navigationLayout.overflowItems
