@@ -115,7 +115,8 @@ final class ScannerAssetStore: ObservableObject {
         baseURL: URL? = ScannerAssetConfiguration.baseURL(),
         session: URLSession = .shared,
         fileManager: FileManager = .default,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        rootDirectory: URL? = nil
     ) {
         self.baseURL = baseURL
         self.session = session
@@ -125,14 +126,14 @@ final class ScannerAssetStore: ObservableObject {
             for: .applicationSupportDirectory,
             in: .userDomainMask
         ).first ?? fileManager.temporaryDirectory
-        rootDirectory = applicationSupport
+        self.rootDirectory = rootDirectory ?? applicationSupport
             .appendingPathComponent("TCGer", isDirectory: true)
             .appendingPathComponent("ScannerAssets", isDirectory: true)
 
         for game in Self.downloadableGames {
             let version = defaults.integer(forKey: Self.installKey(for: game))
             guard version > 0 else { continue }
-            let directory = Self.versionDirectory(root: rootDirectory, game: game, version: version)
+            let directory = Self.versionDirectory(root: self.rootDirectory, game: game, version: version)
             if Self.runtime(in: directory, game: game, version: version, fileManager: fileManager) != nil {
                 installedVersions[game] = version
             }

@@ -6,6 +6,9 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val scannerAssetBaseUrl = providers.gradleProperty("tcgerScannerAssetBaseUrl")
+    .orElse("https://assets.tcger.ahmadjalil.com/android/scan-assets")
+
 android {
     namespace = "com.ahmadjalil.tcger"
     compileSdk = 35
@@ -16,6 +19,12 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField(
+            "String",
+            "SCANNER_ASSET_BASE_URL",
+            "\"${scannerAssetBaseUrl.get()}\"",
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

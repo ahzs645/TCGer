@@ -58,12 +58,33 @@ The family-aware browser artifact is generated reproducibly with
 to all 109,546 printings as metadata. R2 gzip delivery is 31.9 MB for the index,
 plus the 14.3 MB encoder; the previous v1 index was roughly 40.0 MB compressed.
 
-Native Magic remains unpublished. The currently released iOS and Android apps
-do not accept the family-aware manifest formats, and the expanded native
-printing metadata still produces 118.0 MB and 125.1 MB candidate downloads.
-Before a native promotion, ship compatible client builds, replay the reference
-set on those builds, and decide whether to split printing metadata from the
-family vector package.
+Native Magic remains unpublished while compatible client builds move through
+TestFlight and Android distribution. Immutable native candidates are staged at
+`ios/scan-assets-candidate-v2` and `android/scan-assets-candidate-v2`; production
+Magic pointers still resolve to version 1.
+
+The staged candidates passed real production-v1-to-candidate-v2 installation
+tests on 2026-08-29. Both clients downloaded production v1, detected the staged
+update, verified every content digest, decoded the 67,849-row index, activated
+v2 atomically, and retained no inactive v1 directory. iOS also compiled the
+downloaded Core ML package. The candidate manifests declare 118.0 MB on iOS and
+125.1 MB on Android as the verified installed byte totals. Cloudflare compresses
+the large JSON metadata in transit; these totals are deliberately not estimates
+of wire transfer size.
+
+The release-gate tests are opt-in and reproducible. Build iOS with
+`TCGER_SCANNER_ASSET_BASE_URL` set to the iOS candidate base, or set
+`TCGER_IOS_SCANNER_CANDIDATE_BASE_URL`. Run the Android test with
+`TCGER_ANDROID_SCANNER_CANDIDATE_BASE_URL`; app builds can select a candidate
+base with `-PtcgerScannerAssetBaseUrl=...`. Normal CI skips external candidate
+downloads but keeps deterministic manifest, index, rollback, and inactive-version
+cleanup coverage.
+
+The final promotion gate is distribution compatibility: confirm the iOS and
+Android builds containing family-manifest support are available to testers,
+then publish the already-validated immutable objects under the production
+prefixes and write each platform's Magic manifest last. Re-run the production
+v1-to-v2 update test against the public pointers immediately after promotion.
 
 ## Publication invariant
 

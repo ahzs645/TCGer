@@ -231,6 +231,7 @@ class ScannerAssetStore internal constructor(
                 atomicMove(staging, destination)
             }
             writeCurrentManifest(game, manifest)
+            removeInactiveVersions(game, keeping = manifest.version)
             manifest
         } catch (error: Throwable) {
             staging.deleteRecursively()
@@ -299,6 +300,12 @@ class ScannerAssetStore internal constructor(
         val temporary = File(directory, "$CURRENT_MANIFEST_FILE.tmp")
         temporary.writeText(json.encodeToString(manifest))
         atomicMove(temporary, File(directory, CURRENT_MANIFEST_FILE))
+    }
+
+    private fun removeInactiveVersions(game: String, keeping: String) {
+        File(gameDirectory(game), "versions").listFiles()
+            ?.filter { it.name != keeping }
+            ?.forEach { it.deleteRecursively() }
     }
 
     private fun gameDirectory(game: String) = File(root, game)
@@ -406,7 +413,7 @@ private fun File.sha256(): String {
     return digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 }
 
-private suspend fun fetchScannerAsset(url: String, destination: File, progress: (Long) -> Unit) =
+internal suspend fun fetchScannerAsset(url: String, destination: File, progress: (Long) -> Unit) =
     withContext(Dispatchers.IO) {
         destination.parentFile?.mkdirs()
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {

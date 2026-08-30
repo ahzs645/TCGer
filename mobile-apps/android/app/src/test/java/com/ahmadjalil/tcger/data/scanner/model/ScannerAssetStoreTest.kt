@@ -10,6 +10,8 @@ import java.security.MessageDigest
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.minutes
+import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -20,6 +22,50 @@ import org.junit.rules.TemporaryFolder
 
 class ScannerAssetStoreTest {
     @get:Rule val temporaryFolder = TemporaryFolder()
+
+    @Test
+    fun `candidate Magic package installs atomically when configured`() = runTest(timeout = 10.minutes) {
+        val environmentKey = "TCGER_ANDROID_SCANNER_CANDIDATE_BASE_URL"
+        val candidateBaseURL = System.getenv(environmentKey)?.trim().orEmpty()
+        assumeTrue("Set $environmentKey to run the native Magic candidate install gate.", candidateBaseURL.isNotEmpty())
+
+        val root = temporaryFolder.newFolder("magic-candidate")
+        val productionStore = ScannerAssetStore(
+            root = root,
+            remoteBaseURL = "https://assets.tcger.ahmadjalil.com/android/scan-assets",
+            fetcher = ScannerAssetFetcher(::fetchScannerAsset),
+        )
+        productionStore.install("magic")
+        assertEquals("1", productionStore.installedRuntime("magic")?.contract?.version)
+
+        val store = ScannerAssetStore(
+            root = root,
+            remoteBaseURL = candidateBaseURL,
+            fetcher = ScannerAssetFetcher(::fetchScannerAsset),
+        )
+
+        assertEquals("1", store.installedRuntime("magic")?.contract?.version)
+        store.refreshManifest("magic")
+        assertTrue(store.isUpdateAvailable("magic"))
+        store.install("magic")
+
+        val installed = store.status("magic")
+        assertTrue(
+            "Candidate install failed: ${(installed as? ScannerAssetInstallStatus.Failed)?.message}",
+            installed is ScannerAssetInstallStatus.Installed,
+        )
+        val manifest = (installed as ScannerAssetInstallStatus.Installed).manifest
+        val runtime = requireNotNull(store.installedRuntime("magic"))
+        assertEquals(2, manifest.formatVersion)
+        assertEquals("2", manifest.version)
+        assertEquals(67_849, manifest.cardCount)
+        assertEquals(109_546, manifest.printingCount)
+        assertEquals("tcger-cards-index-metadata-v3", manifest.metadataSchema)
+        assertEquals("tcger-two-stage-recognition-v2", manifest.recognitionContract)
+        assertEquals(manifest.cardCount, runtime.contract.expectedCardCount)
+        assertEquals(manifest.dimension, runtime.contract.embeddingDimension)
+        assertEquals(listOf("2"), File(root, "magic/versions").list()?.sorted())
+    }
 
     @Test
     fun `complete pack becomes current only after digest and index validation`() = runTest {
@@ -51,6 +97,33 @@ class ScannerAssetStoreTest {
         val failed = store.status("yugioh") as ScannerAssetInstallStatus.Failed
         assertEquals("release-1", failed.installedManifest?.version)
         assertEquals("release-1", store.installedRuntime("yugioh")?.contract?.version)
+    }
+
+    @Test
+    fun `successful update removes the inactive version after activation`() = runTest {
+        val first = fixture("release-1")
+        val responses = first.responses.toMutableMap()
+        val root = temporaryFolder.newFolder("scanner-assets-update")
+        val store = ScannerAssetStore(
+            root = root,
+            remoteBaseURL = BASE,
+            fetcher = ScannerAssetFetcher { url, destination, progress ->
+                val bytes = responses[url] ?: error("missing response for $url")
+                destination.parentFile?.mkdirs()
+                destination.writeBytes(bytes)
+                progress(bytes.size.toLong())
+            },
+        )
+        store.install("yugioh")
+
+        responses.putAll(fixture("release-2").responses)
+        store.install("yugioh")
+
+        assertEquals("release-2", store.installedRuntime("yugioh")?.contract?.version)
+        assertEquals(
+            listOf("release-2"),
+            File(root, "yugioh/versions").list()?.sorted(),
+        )
     }
 
     @Test

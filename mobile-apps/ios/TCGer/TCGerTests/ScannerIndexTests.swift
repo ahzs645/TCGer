@@ -2,6 +2,72 @@ import XCTest
 @testable import TCGer
 
 final class ScannerIndexTests: XCTestCase {
+    @MainActor
+    func testCandidateMagicPackageInstallsAtomicallyWhenConfigured() async throws {
+        let environmentKey = "TCGER_IOS_SCANNER_CANDIDATE_BASE_URL"
+        let environmentURL = ProcessInfo.processInfo.environment[environmentKey].flatMap(URL.init(string:))
+        guard let baseURL = environmentURL ?? ScannerAssetConfiguration.baseURL(),
+              baseURL.path.contains("candidate") else {
+            throw XCTSkip("Set \(environmentKey) or the candidate scanner build setting to run the native Magic install gate.")
+        }
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MagicScannerCandidate-\(UUID().uuidString)", isDirectory: true)
+        let suiteName = "ScannerIndexTests.MagicCandidate.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 120
+        configuration.timeoutIntervalForResource = 600
+        let productionStore = ScannerAssetStore(
+            baseURL: URL(string: "https://assets.tcger.ahmadjalil.com/ios/scan-assets"),
+            session: URLSession(configuration: configuration),
+            defaults: defaults,
+            rootDirectory: root
+        )
+        try await productionStore.install(.magic)
+        XCTAssertEqual(productionStore.installedVersions[.magic], 1)
+
+        let store = ScannerAssetStore(
+            baseURL: baseURL,
+            session: URLSession(configuration: configuration),
+            defaults: defaults,
+            rootDirectory: root
+        )
+
+        XCTAssertEqual(store.installedVersions[.magic], 1)
+        try await store.refreshManifest(for: .magic)
+        XCTAssertTrue(store.isUpdateAvailable(.magic))
+        try await store.install(.magic)
+
+        let manifest = try XCTUnwrap(store.manifests[.magic])
+        let runtime = try XCTUnwrap(store.runtime(for: .magic))
+        XCTAssertEqual(manifest.formatVersion, 3)
+        XCTAssertEqual(manifest.version, 2)
+        XCTAssertEqual(manifest.cardCount, 67_849)
+        XCTAssertEqual(manifest.printingCount, 109_546)
+        XCTAssertEqual(manifest.metadataSchema, "tcger-cards-index-metadata-v3")
+        XCTAssertEqual(manifest.recognitionContract, "tcger-two-stage-recognition-v2")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: runtime.modelURL.path))
+        XCTAssertEqual(
+            try FileManager.default.attributesOfItem(atPath: runtime.vectorsURL.path)[.size] as? Int,
+            manifest.vectors.bytes
+        )
+        XCTAssertEqual(
+            try FileManager.default.attributesOfItem(atPath: runtime.metadataURL.path)[.size] as? Int,
+            manifest.metadata.bytes
+        )
+        let installedDirectories = try FileManager.default.contentsOfDirectory(
+            at: root.appendingPathComponent(TCGGame.magic.rawValue, isDirectory: true),
+            includingPropertiesForKeys: nil
+        )
+        XCTAssertEqual(installedDirectories.map(\.lastPathComponent), ["version-2"])
+    }
+
     func testPackedFileIndexMatchesDequantizedReference() async throws {
         let packed: [[Int8]] = [
             [127, 0, 0, 0],
