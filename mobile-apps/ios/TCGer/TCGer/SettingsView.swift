@@ -269,6 +269,26 @@ struct SettingsView: View {
                         : "Change your TCG Manager server connection, or switch to keeping everything on this phone.")
                 }
 
+                if !isLocalMode, environmentStore.isAuthenticated {
+                    Section("Collection Workflow") {
+                        NavigationLink {
+                            LibraryOperationsView()
+                                .environmentObject(environmentStore)
+                        } label: {
+                            HStack {
+                                Image(systemName: "square.grid.3x3.square")
+                                    .foregroundStyle(.tint)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Library Operations")
+                                    Text("Storage, rapid entry, PSA intake, costs, aliases, and quote provenance")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // TCG Modules Section
                 Section {
                     ForEach(TCGGame.allCases.filter { $0 != .all }) { game in

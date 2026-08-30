@@ -111,6 +111,49 @@ extension APIService {
         let refreshAfter: String
     }
 
+    struct MarketPriceQuote: Codable, Identifiable, Sendable {
+        let source: String
+        let price: Double
+        let currency: String
+        let basePrice: Double?
+        let foilPrice: Double?
+        let etchedPrice: Double?
+        let reverseHoloPrice: Double?
+        let finishCode: String?
+        let updatedAt: String?
+
+        var id: String { "\(source):\(currency):\(finishCode ?? "default")" }
+    }
+
+    func compareCardPrices(
+        config: ServerConfiguration,
+        token: String,
+        tcg: String,
+        externalID: String
+    ) async throws -> [MarketPriceQuote] {
+        guard !config.isOnDevice else { return [] }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "prices/\(tcg)/\(externalID)",
+            queryItems: [
+                URLQueryItem(name: "source", value: "automatic"),
+                URLQueryItem(name: "compare", value: "true")
+            ],
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let quotes = try? JSONDecoder().decode([MarketPriceQuote].self, from: data) else {
+            throw APIError.decodingError
+        }
+        return quotes.sorted {
+            if $0.currency == $1.currency { return $0.price < $1.price }
+            return $0.currency < $1.currency
+        }
+    }
+
     private struct TrackedPricesRequest: Encodable {
         let items: [TrackedPriceItem]
         let force: Bool

@@ -161,6 +161,12 @@ struct CardDetailSheet: View {
     let showCardNumbers: Bool
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @State private var marketQuotes: [APIService.MarketPriceQuote] = []
+    @State private var isLoadingQuotes = false
+    @State private var quoteError: String?
+
+    private let apiService = APIService()
 
     var body: some View {
         NavigationStack {
@@ -180,6 +186,10 @@ struct CardDetailSheet: View {
                     }
 
                     details
+
+                    if showPricing {
+                        priceComparison
+                    }
                 }
                 .padding()
             }
@@ -193,6 +203,75 @@ struct CardDetailSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private var priceComparison: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Compare markets").font(.headline)
+                    Text("See every available provider quote")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    Task { await loadMarketQuotes() }
+                } label: {
+                    if isLoadingQuotes {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label(marketQuotes.isEmpty ? "Compare" : "Refresh", systemImage: "arrow.left.arrow.right")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isLoadingQuotes || environmentStore.serverConfiguration.isOnDevice)
+            }
+
+            if environmentStore.serverConfiguration.isOnDevice {
+                Text("Market comparison is available when connected to a TCGer server.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let quoteError {
+                Text(quoteError).font(.caption).foregroundStyle(.red)
+            }
+            ForEach(marketQuotes) { quote in
+                HStack {
+                    Text(quote.source.replacingOccurrences(of: "-", with: " ").capitalized)
+                    Spacer()
+                    Text(quote.price.formatted(.currency(code: quote.currency)))
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                }
+                if quote.id != marketQuotes.last?.id { Divider() }
+            }
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @MainActor
+    private func loadMarketQuotes() async {
+        guard let token = environmentStore.authToken else {
+            quoteError = "Sign in to compare live market prices."
+            return
+        }
+        isLoadingQuotes = true
+        quoteError = nil
+        defer { isLoadingQuotes = false }
+        do {
+            marketQuotes = try await apiService.compareCardPrices(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                tcg: card.tcg,
+                externalID: card.id
+            )
+            if marketQuotes.isEmpty { quoteError = "No comparable market quotes are available for this card." }
+        } catch {
+            quoteError = error.localizedDescription
+        }
     }
 
     @ViewBuilder

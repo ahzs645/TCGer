@@ -802,14 +802,23 @@ struct CardScannerView: View {
                 ? "Captures and identifies every card on the page"
                 : "Captures the card inside the guide")
         } else {
-            ZStack {
+            Button {
+                if viewModel.automaticCaptureNeedsRearm {
+                    viewModel.rearmAutomaticCapture()
+                }
+            } label: {
+              ZStack {
                 Circle()
                     .fill(Color.white.opacity(0.16))
                     .frame(width: 76, height: 76)
                 Circle()
                     .fill(accentColor(for: viewModel.selectedMode).opacity(0.88))
                     .frame(width: 62, height: 62)
-                if viewModel.isAnalyzingFrame {
+                if viewModel.automaticCaptureNeedsRearm {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.white)
+                } else if viewModel.isAnalyzingFrame {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
@@ -817,10 +826,14 @@ struct CardScannerView: View {
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
                 }
+              }
             }
+            .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Automatic scanning active")
-            .accessibilityHint("Center one card and hold it steady")
+            .accessibilityLabel(viewModel.automaticCaptureNeedsRearm ? "Next card" : "Automatic scanning active")
+            .accessibilityHint(viewModel.automaticCaptureNeedsRearm
+                ? "Remove the current card or activate to scan the next card"
+                : "Center one card and hold it steady")
         }
     }
 

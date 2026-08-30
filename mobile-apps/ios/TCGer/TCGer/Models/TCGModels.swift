@@ -590,7 +590,28 @@ struct CardSearchResponse: Codable, Sendable {
     let total: Int
 }
 
+struct CardDiscoveryResponse: Codable, Sendable {
+    struct SampledFrom: Codable, Sendable {
+        let tcg: String
+        let setCode: String
+        let setName: String?
+    }
+
+    let cards: [Card]
+    let total: Int
+    let sampledFrom: SampledFrom?
+}
+
 // MARK: - Collection Models
+struct BinderShareLink: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let label: String
+    let token: String
+    let expiresAt: String?
+    let createdAt: String
+    let lastUsedAt: String?
+}
+
 struct Collection: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let name: String
@@ -607,6 +628,9 @@ struct Collection: Identifiable, Codable, Hashable, Sendable {
     var associatedTcg: String? = nil
     var associatedSetCode: String? = nil
     var associatedSetName: String? = nil
+    var shareToken: String? = nil
+    var isPublic: Bool? = nil
+    var shareLinks: [BinderShareLink]? = nil
 
     static let unsortedBinderId = "__library__"
 
@@ -1090,6 +1114,15 @@ struct WishlistCard: Identifiable, Codable, Hashable, Sendable {
 
 // MARK: - Sealed Products
 
+struct SealedProductContent: Codable, Hashable, Sendable {
+    let externalId: String?
+    let name: String
+    let quantity: Int?
+    let setCode: String?
+    let rarity: String?
+    let imageUrl: String?
+}
+
 struct SealedProduct: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let tcg: String
@@ -1103,6 +1136,11 @@ struct SealedProduct: Identifiable, Codable, Hashable, Sendable {
     let msrp: Double?
     let upc: String?
     var marketPrice: Double? = nil
+    var contentMode: String? = nil
+    var contentCount: Int? = nil
+    var contents: [SealedProductContent]? = nil
+    var contentSource: String? = nil
+    var contentUpdatedAt: String? = nil
 }
 
 struct SealedInventoryItem: Identifiable, Codable, Hashable, Sendable {

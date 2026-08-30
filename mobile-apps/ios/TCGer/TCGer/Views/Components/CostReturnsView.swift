@@ -14,9 +14,21 @@ struct PurchasePerformanceLot: Identifiable, Sendable {
     let currentCurrency: String
 }
 
+struct CostBasisCoverage: Sendable {
+    let totalCopies: Int
+    let costedCopies: Int
+    let cardsMissingCosts: Int
+    let untrackedMarketValue: Double
+
+    var fraction: Double {
+        totalCopies > 0 ? Double(costedCopies) / Double(totalCopies) : 0
+    }
+}
+
 struct CostReturnsView: View {
     let lots: [PurchasePerformanceLot]
     let displayCurrency: String
+    let coverage: CostBasisCoverage
 
     @State private var rates: [String: Decimal] = [:]
     @State private var isLoadingRates = true
@@ -71,6 +83,18 @@ struct CostReturnsView: View {
 
     var body: some View {
         List {
+            Section("Cost-basis completeness") {
+                ProgressView(value: coverage.fraction) {
+                    Text("\((coverage.fraction * 100).formatted(.number.precision(.fractionLength(0))))% complete")
+                }
+                LabeledContent("Copies costed", value: "\(coverage.costedCopies) of \(coverage.totalCopies)")
+                LabeledContent("Card rows missing costs", value: "\(coverage.cardsMissingCosts)")
+                LabeledContent(
+                    "Value without cost basis",
+                    value: Decimal(coverage.untrackedMarketValue).formatted(.currency(code: "USD"))
+                )
+            }
+
             Section {
                 HStack {
                     CostReturnStat(

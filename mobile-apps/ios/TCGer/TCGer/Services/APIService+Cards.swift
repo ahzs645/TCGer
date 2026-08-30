@@ -1,6 +1,49 @@
 import Foundation
 
 extension APIService {
+    func discoverCards(
+        config: ServerConfiguration,
+        token: String,
+        game: TCGGame = .all,
+        count: Int = 6
+    ) async throws -> CardDiscoveryResponse {
+        if config.isOnDevice {
+            await prepareLocalCatalog(for: game)
+            let sets = await LocalStore.shared.getSets(tcg: game == .all ? nil : game.rawValue)
+            guard let set = sets.randomElement() else {
+                return CardDiscoveryResponse(cards: [], total: 0, sampledFrom: nil)
+            }
+            let cards = await LocalStore.shared.getSetCards(tcg: set.tcg, setCode: set.code)
+                .shuffled()
+                .prefix(max(1, min(24, count)))
+            let sampled = CardDiscoveryResponse.SampledFrom(
+                tcg: set.tcg,
+                setCode: set.code,
+                setName: set.name
+            )
+            return CardDiscoveryResponse(cards: Array(cards), total: cards.count, sampledFrom: sampled)
+        }
+
+        let queryItems = [
+            URLQueryItem(name: "tcg", value: game.rawValue),
+            URLQueryItem(name: "count", value: String(max(1, min(24, count))))
+        ]
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "cards/discover",
+            queryItems: queryItems,
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let result = try? JSONDecoder.tcgCardDecoder.decode(CardDiscoveryResponse.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return result
+    }
+
     func searchCards(
         config: ServerConfiguration,
         token: String,

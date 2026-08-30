@@ -253,6 +253,36 @@ struct PricesView: View {
         }
     }
 
+    private var costBasisCoverage: CostBasisCoverage {
+        let purchasedEntryIDs = Set(
+            transactions.compactMap { transaction in
+                transaction.type == "purchase" ? transaction.collectionEntryId : nil
+            }
+        )
+        var totalCopies = 0
+        var costedCopies = 0
+        var missingRows = 0
+        var untrackedValue = 0.0
+        for card in collections.flatMap(\.cards) {
+            totalCopies += card.quantity
+            let covered = min(card.quantity, card.copies.filter {
+                purchasedEntryIDs.contains($0.id) || $0.acquisitionPrice != nil
+            }.count)
+            costedCopies += covered
+            let missing = max(0, card.quantity - covered)
+            if missing > 0 {
+                missingRows += 1
+                untrackedValue += (card.price ?? 0) * Double(missing)
+            }
+        }
+        return CostBasisCoverage(
+            totalCopies: totalCopies,
+            costedCopies: costedCopies,
+            cardsMissingCosts: missingRows,
+            untrackedMarketValue: untrackedValue
+        )
+    }
+
     var body: some View {
         Group {
             if parentProvidesNavigation { content } else { NavigationStack { content } }
@@ -297,7 +327,8 @@ struct PricesView: View {
                         NavigationLink {
                             CostReturnsView(
                                 lots: purchasePerformanceLots,
-                                displayCurrency: environmentStore.displayCurrencyCode
+                                displayCurrency: environmentStore.displayCurrencyCode,
+                                coverage: costBasisCoverage
                             )
                         } label: {
                             Label("Cost & Returns", systemImage: "chart.line.uptrend.xyaxis")

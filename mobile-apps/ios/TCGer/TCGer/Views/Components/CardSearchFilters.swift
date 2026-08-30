@@ -6,6 +6,10 @@ struct CardSearchFilterState: Equatable {
     var collectorNumber = ""
     var primaryFacet: String?
     var secondaryFacet: String?
+    var artist = ""
+    var rulesText = ""
+    var minimumStat = ""
+    var maximumStat = ""
 
     var activeCount: Int {
         [
@@ -13,7 +17,11 @@ struct CardSearchFilterState: Equatable {
             rarity == nil,
             collectorNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             primaryFacet == nil,
-            secondaryFacet == nil
+            secondaryFacet == nil,
+            artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            rulesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            minimumStat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            maximumStat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         ]
             .filter { !$0 }
             .count
@@ -23,7 +31,11 @@ struct CardSearchFilterState: Equatable {
 
     var hasDetailFilters: Bool {
         !collectorNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-            rarity != nil || primaryFacet != nil || secondaryFacet != nil
+            rarity != nil || primaryFacet != nil || secondaryFacet != nil ||
+            !artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !rulesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !minimumStat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !maximumStat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var summary: String {
@@ -34,7 +46,9 @@ struct CardSearchFilterState: Equatable {
                 : "#\(collectorNumber)",
             rarity,
             primaryFacet,
-            secondaryFacet
+            secondaryFacet,
+            artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : artist,
+            rulesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : "Text: \(rulesText)"
         ]
             .compactMap { $0 }
             .joined(separator: " • ")
@@ -73,7 +87,65 @@ struct CardSearchFilterState: Equatable {
             return false
         }
 
+        let artistQuery = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !artistQuery.isEmpty,
+           card.artist?.localizedCaseInsensitiveContains(artistQuery) != true {
+            return false
+        }
+
+        let rulesQuery = rulesText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !rulesQuery.isEmpty,
+           !Self.rulesValues(card, game: game).contains(where: {
+               $0.localizedCaseInsensitiveContains(rulesQuery)
+           }) {
+            return false
+        }
+
+        if let key = Self.statKey(for: game),
+           let value = card.attributeNumber(for: key) {
+            if let minimum = Double(minimumStat), value < minimum { return false }
+            if let maximum = Double(maximumStat), value > maximum { return false }
+        } else if !minimumStat.isEmpty || !maximumStat.isEmpty {
+            return false
+        }
+
         return true
+    }
+
+    static func statKey(for game: TCGGame) -> String? {
+        switch game {
+        case .pokemon: return "hp"
+        case .magic: return "cmc"
+        case .yugioh: return "atk"
+        case .onepiece, .dragonball: return "power"
+        case .lorcana: return "cost"
+        case .all: return nil
+        }
+    }
+
+    static func statTitle(for game: TCGGame) -> String? {
+        switch game {
+        case .pokemon: return "HP"
+        case .magic: return "Mana Value"
+        case .yugioh: return "ATK"
+        case .onepiece, .dragonball: return "Power"
+        case .lorcana: return "Cost"
+        case .all: return nil
+        }
+    }
+
+    private static func rulesValues(_ card: Card, game: TCGGame) -> [String] {
+        let keys: [String]
+        switch game {
+        case .magic: keys = ["oracle_text"]
+        case .yugioh: keys = ["desc"]
+        case .onepiece: keys = ["effect"]
+        case .lorcana: keys = ["body_text"]
+        case .dragonball: keys = ["skill", "effect"]
+        case .pokemon: keys = ["rules", "attacks", "abilities"]
+        case .all: keys = ["oracle_text", "desc", "effect", "body_text", "skill", "rules"]
+        }
+        return keys.flatMap { card.attributeStrings(for: $0) }
     }
 
     mutating func clearIncompatibleValues(for game: TCGGame) {
@@ -218,6 +290,24 @@ struct CardSearchFilterSheet: View {
                     Text("Set")
                 } footer: {
                     Text("Choose a set to search its complete card list.")
+                }
+
+                Section {
+                    TextField("Artist or illustrator", text: $draftFilters.artist)
+                    TextField("Rules or card text", text: $draftFilters.rulesText, axis: .vertical)
+                        .lineLimit(2...4)
+                    if let title = CardSearchFilterState.statTitle(for: effectiveGame) {
+                        HStack {
+                            TextField("Min \(title)", text: $draftFilters.minimumStat)
+                                .keyboardType(.decimalPad)
+                            TextField("Max \(title)", text: $draftFilters.maximumStat)
+                                .keyboardType(.decimalPad)
+                        }
+                    }
+                } header: {
+                    Text("Advanced")
+                } footer: {
+                    Text("Available fields adapt to the selected game and catalog metadata.")
                 }
 
                 Section {
@@ -543,6 +633,15 @@ private extension Card {
             }
         case .bool, .object, .null:
             return []
+        }
+    }
+
+    func attributeNumber(for key: String) -> Double? {
+        guard let value = attributes?[key] else { return nil }
+        switch value {
+        case .number(let number): return number
+        case .string(let string): return Double(string)
+        case .bool, .object, .array, .null: return nil
         }
     }
 }

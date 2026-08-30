@@ -65,6 +65,13 @@ extension APIService {
     }
 
     struct ScanMetaResponse: Decodable, Sendable {
+        struct CatalogDecision: Decodable, Sendable {
+            let accepted: Bool
+            let reason: String
+            let topConfidence: Double?
+            let runnerUpConfidence: Double?
+        }
+
         let engine: String?
         let quality: ScanQualityResponse?
         let thresholdUsed: Int?
@@ -83,6 +90,7 @@ extension APIService {
         let rerankUsed: Bool?
         let shortlistSize: Int?
         let timings: ScanTimingMetricsResponse?
+        let catalogDecision: CatalogDecision?
     }
 
     struct ScanDiagnosticCandidateResponse: Decodable, Sendable {
@@ -314,7 +322,8 @@ extension APIService {
         scanEngine: String? = nil,
         saveDebugCapture: Bool = false,
         captureSource: String? = nil,
-        captureNotes: String? = nil
+        captureNotes: String? = nil,
+        setCodeHint: String? = nil
     ) async throws -> ScanImageResponse {
         guard tcg == .all || [.pokemon, .magic, .yugioh].contains(tcg) else {
             throw APIError.serverError(
@@ -348,6 +357,12 @@ extension APIService {
             let trimmedNotes = captureNotes.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedNotes.isEmpty {
                 appendMultipartField(named: "captureNotes", value: trimmedNotes, to: &body, boundary: boundary)
+            }
+        }
+        if let setCodeHint {
+            let trimmedSetCode = setCodeHint.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedSetCode.isEmpty {
+                appendMultipartField(named: "setCodeHint", value: trimmedSetCode, to: &body, boundary: boundary)
             }
         }
         appendMultipartFile(

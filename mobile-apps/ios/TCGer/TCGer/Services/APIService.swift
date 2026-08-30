@@ -1454,10 +1454,24 @@ final class LocalStore {
         guard let index = collections.firstIndex(where: { $0.id == id }) else {
             throw APIService.APIError.serverError(status: 404, message: "Collection not found")
         }
+        let removedCollection = collections[index]
         let removedImageURLs = binderPages
             .filter { $0.binderId == id }
             .compactMap(\.imageUrl)
         collections.remove(at: index)
+        if !removedCollection.cards.isEmpty {
+            if let libraryIndex = collections.firstIndex(where: { $0.id == Constants.unsortedBinderId }) {
+                let library = collections[libraryIndex]
+                collections[libraryIndex] = stampUpdatedAt(
+                    library,
+                    cards: library.cards + removedCollection.cards
+                )
+            } else {
+                collections.append(
+                    stampUpdatedAt(LocalStore.makeUnsortedLibrary(), cards: removedCollection.cards)
+                )
+            }
+        }
         binderPages.removeAll { $0.binderId == id }
         try persistOrThrow()
         removedImageURLs.forEach(removeLocalBinderPageImage(at:))

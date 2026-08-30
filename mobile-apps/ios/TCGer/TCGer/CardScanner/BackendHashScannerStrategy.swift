@@ -68,8 +68,23 @@ final class BackendHashScannerStrategy: ScanStrategy {
             scanEngine: context.enginePreference.apiValue,
             saveDebugCapture: context.saveDebugCapture,
             captureSource: "ios-card-scanner",
-            captureNotes: context.captureNotes
+            captureNotes: context.captureNotes,
+            setCodeHint: context.setCode
         )
+
+        if let decision = response.meta?.catalogDecision, !decision.accepted {
+            let message: String
+            switch decision.reason {
+            case "ambiguous": message = "The catalog match was ambiguous. Choose the exact printing instead."
+            case "low-confidence": message = "The card was outside the catalog confidence threshold."
+            case "no-catalog-match": message = "No matching card was found in the selected catalog."
+            default: message = "The catalog rejected this scan (\(decision.reason))."
+            }
+            throw CardScannerError.underlying(
+                NSError(domain: "TCGer.CardScanner.Catalog", code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: message])
+            )
+        }
 
         let orderedMatches: [APIService.ScanMatchResponse] = {
             var seen = Set<String>()

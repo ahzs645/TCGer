@@ -348,6 +348,7 @@ private struct DeckDetailView: View {
     @State private var isChecking = false
     @State private var errorMessage: String?
     @State private var activeSheet: DeckDetailSheet?
+    @State private var yugiohBanlist: YugiohBanlistSnapshot?
 
     private let apiService = APIService()
 
@@ -369,6 +370,14 @@ private struct DeckDetailView: View {
                         }
                         if let description = deck.description, !description.isEmpty {
                             Text(description).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        if let yugiohBanlist {
+                            Label(
+                                [yugiohBanlist.name, yugiohBanlist.effectiveDate].compactMap { $0 }.joined(separator: " · "),
+                                systemImage: "checkmark.shield"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
                     }
 
@@ -403,7 +412,7 @@ private struct DeckDetailView: View {
                         Section("\(group.zone.capitalized) · \(group.cards.reduce(0) { $0 + $1.quantity })") {
                             ForEach(group.cards) { card in
                                 Button { activeSheet = .editCard(card) } label: {
-                                    DeckCardRow(card: card)
+                                    DeckCardRow(card: card, banlistEntry: yugiohBanlist?.entry(for: card))
                                 }
                                 .buttonStyle(.plain)
                                 .swipeActions {
@@ -426,6 +435,9 @@ private struct DeckDetailView: View {
                 }
                 Menu {
                     Button { activeSheet = .addCard } label: { Label("Add Card", systemImage: "plus") }
+                    Button { activeSheet = .checkout } label: {
+                        Label("Checkout / Check In", systemImage: "arrow.up.right.square")
+                    }
                     Button { Task { await runChecks() } } label: {
                         Label("Validate & Check Ownership", systemImage: "checkmark.shield")
                     }
@@ -450,6 +462,13 @@ private struct DeckDetailView: View {
             case .editCard(let card):
                 EditDeckCardSheet(deckID: deckID, card: card) { await load() }
                     .environmentObject(environmentStore)
+            case .checkout:
+                if let deck {
+                    NavigationStack {
+                        DeckCheckoutView(deckId: deck.id, deckName: deck.name)
+                    }
+                    .environmentObject(environmentStore)
+                }
             }
         }
         .alert("Deck", isPresented: Binding(
@@ -470,11 +489,30 @@ private struct DeckDetailView: View {
         guard let token = environmentStore.authToken else { return }
         isLoading = deck == nil
         do {
-            deck = try await apiService.getDeck(
+            let loadedDeck = try await apiService.getDeck(
                 config: environmentStore.serverConfiguration, token: token, deckId: deckID
             )
+            deck = loadedDeck
+            if loadedDeck.tcg.caseInsensitiveCompare("yugioh") == .orderedSame {
+                yugiohBanlist = try? await apiService.getCurrentYugiohBanlist(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    format: banlistFormat(for: loadedDeck.format)
+                )
+            } else {
+                yugiohBanlist = nil
+            }
         } catch { errorMessage = error.localizedDescription }
         isLoading = false
+    }
+
+    private func banlistFormat(for format: String?) -> String {
+        switch format?.lowercased() {
+        case let value? where value.contains("traditional"): return "traditional"
+        case let value? where value.contains("ocg"): return "ocg"
+        case let value? where value.contains("goat"): return "goat"
+        default: return "tcg"
+        }
     }
 
     @MainActor
@@ -524,17 +562,20 @@ private struct DeckDetailView: View {
 private enum DeckDetailSheet: Identifiable {
     case addCard
     case editCard(DeckCard)
+    case checkout
 
     var id: String {
         switch self {
         case .addCard: "add"
         case .editCard(let card): "edit-\(card.id)"
+        case .checkout: "checkout"
         }
     }
 }
 
 private struct DeckCardRow: View {
     let card: DeckCard
+    let banlistEntry: YugiohBanlistEntry?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -551,6 +592,7 @@ private struct DeckCardRow: View {
                 if let set = card.setName ?? card.setCode { Text(set).font(.caption).foregroundStyle(.secondary) }
             }
             Spacer()
+            if let banlistEntry { YugiohLimitBadge(entry: banlistEntry, compact: true) }
             Text("×\(card.quantity)").font(.headline.monospacedDigit())
         }
     }

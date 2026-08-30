@@ -91,6 +91,32 @@ extension APIService {
         return products
     }
 
+    func getSealedProductDetails(
+        config: ServerConfiguration,
+        token: String,
+        productId: String
+    ) async throws -> SealedProduct {
+        if config.isOnDevice {
+            guard let product = LocalStore.shared.getSealedProducts().first(where: { $0.id == productId }) else {
+                throw APIError.serverError(status: 404, message: "Sealed product not found.")
+            }
+            return product
+        }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "sealed/products/\(productId)",
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let product = try? JSONDecoder().decode(SealedProduct.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return product
+    }
+
     func getSealedProduct(
         config: ServerConfiguration,
         token: String,

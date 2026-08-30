@@ -673,6 +673,7 @@ private struct SealedSetCardsSheet: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var resolvedSetName: String?
+    @State private var detailedProduct: SealedProduct?
 
     private let apiService = APIService()
     private let columns = [
@@ -695,11 +696,54 @@ private struct SealedSetCardsSheet: View {
             }
     }
 
+    private var filteredContents: [SealedProductContent] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let values = detailedProduct?.contents ?? product.contents ?? []
+        guard !query.isEmpty else { return values }
+        return values.filter {
+            $0.name.localizedCaseInsensitiveContains(query) ||
+                ($0.setCode?.localizedCaseInsensitiveContains(query) ?? false) ||
+                ($0.rarity?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
                 if isLoading {
                     ProgressView("Loading set cards…")
+                } else if !filteredContents.isEmpty {
+                    List {
+                        Section {
+                            Text((detailedProduct?.contentMode ?? product.contentMode) == "fixed"
+                                ? "Known fixed contents for this product. Quantities are shown when the catalog source provides them."
+                                : "This product draws from the following card pool; an individual opening will contain only part of it.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Section("Contents · \(filteredContents.count)") {
+                            ForEach(Array(filteredContents.enumerated()), id: \.offset) { _, content in
+                                HStack(spacing: 12) {
+                                    if let value = content.imageUrl, let url = URL(string: value) {
+                                        CachedAsyncImage(url: url) { phase in
+                                            if case .success(let image) = phase { image.resizable().scaledToFit() }
+                                            else { Color(.tertiarySystemFill) }
+                                        }
+                                        .frame(width: 34, height: 46)
+                                        .clipShape(.rect(cornerRadius: 3))
+                                    }
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(content.name).font(.subheadline.weight(.medium))
+                                        Text([content.setCode, content.rarity].compactMap { $0 }.joined(separator: " · "))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if let quantity = content.quantity { Text("×\(quantity)").monospacedDigit() }
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.insetGrouped)
                 } else if let errorMessage {
                     ContentUnavailableView {
                         Label("Cards Unavailable", systemImage: "exclamationmark.triangle")
@@ -744,8 +788,10 @@ private struct SealedSetCardsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Name, rarity, or number")
             .safeAreaInset(edge: .bottom) {
-                if !isLoading && errorMessage == nil && !cards.isEmpty {
-                    Text("Showing \(filteredCards.count) of \(cards.count) cards")
+                if !isLoading && errorMessage == nil && (!cards.isEmpty || !(detailedProduct?.contents ?? product.contents ?? []).isEmpty) {
+                    Text(filteredContents.isEmpty
+                        ? "Showing \(filteredCards.count) of \(cards.count) cards"
+                        : "Showing \(filteredContents.count) known contents")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 14)
@@ -769,12 +815,6 @@ private struct SealedSetCardsSheet: View {
 
     @MainActor
     private func loadCards() async {
-        guard let setCode = product.setCode, !setCode.isEmpty else {
-            isLoading = false
-            errorMessage = "This product is not linked to a card set."
-            return
-        }
-
         let token = environmentStore.authToken ?? ""
         guard environmentStore.serverConfiguration.isOnDevice || !token.isEmpty else {
             isLoading = false
@@ -785,6 +825,23 @@ private struct SealedSetCardsSheet: View {
         isLoading = true
         errorMessage = nil
         do {
+            if (product.contentCount ?? product.contents?.count ?? 0) > 0 {
+                detailedProduct = try await apiService.getSealedProductDetails(
+                    config: environmentStore.serverConfiguration,
+                    token: token,
+                    productId: product.id
+                )
+                if !(detailedProduct?.contents ?? []).isEmpty {
+                    isLoading = false
+                    return
+                }
+            }
+            guard let setCode = product.setCode, !setCode.isEmpty else {
+                throw APIService.APIError.serverError(
+                    status: 404,
+                    message: "This product has neither ingested contents nor a linked card set."
+                )
+            }
             let sets = try? await apiService.getSets(
                 config: environmentStore.serverConfiguration,
                 token: token,
@@ -1087,6 +1144,107 @@ private struct RecordOpenedCardSaleSheet: View {
     }
 }
 
+private struct SealedProductDetailSheet: View {
+    let product: SealedProduct
+    let onAdd: (Int, Double?) -> Void
+
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var details: SealedProduct
+    @State private var quantity = 1
+    @State private var purchasePrice = ""
+    @State private var isLoadingContents = false
+    @State private var contentError: String?
+
+    private let apiService = APIService()
+
+    init(product: SealedProduct, onAdd: @escaping (Int, Double?) -> Void) {
+        self.product = product
+        self.onAdd = onAdd
+        _details = State(initialValue: product)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Product") {
+                    Text(product.name).font(.headline)
+                    LabeledContent("Game", value: TCGGame(rawValue: product.tcg.lowercased())?.displayName ?? product.tcg)
+                    LabeledContent("Type", value: product.productType.capitalized)
+                    if let setCode = product.setCode { LabeledContent("Set", value: setCode) }
+                    if let msrp = product.msrp { LabeledContent("MSRP", value: msrp.priceText) }
+                }
+
+                Section("Add to inventory") {
+                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...999)
+                    TextField("Purchase price (optional)", text: $purchasePrice)
+                        .keyboardType(.decimalPad)
+                }
+
+                Section("Contents") {
+                    if isLoadingContents {
+                        ProgressView("Loading known contents…")
+                    } else if let contentError {
+                        Text(contentError).foregroundStyle(.secondary)
+                    } else if let contents = details.contents, !contents.isEmpty {
+                        Text(details.contentMode == "fixed"
+                            ? "Fixed deck contents. A missing quantity means the source confirms inclusion but not duplicate count."
+                            : "Possible card pool; a single product does not necessarily contain every listed card.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        ForEach(Array(contents.enumerated()), id: \.offset) { _, content in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(content.name)
+                                    Text([content.setCode, content.rarity].compactMap { $0 }.joined(separator: " · "))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if let quantity = content.quantity { Text("×\(quantity)").monospacedDigit() }
+                            }
+                        }
+                    } else if let count = details.contentCount, count > 0 {
+                        Text("\(count) catalog contents are known, but details could not be loaded.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("No exact product-content list has been ingested yet.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Product Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { onAdd(quantity, Double(purchasePrice)) }
+                }
+            }
+            .task(id: product.id) { await loadDetails() }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    @MainActor
+    private func loadDetails() async {
+        guard (product.contentCount ?? product.contents?.count ?? 0) > 0 else { return }
+        let token = environmentStore.authToken ?? ""
+        guard environmentStore.serverConfiguration.isOnDevice || !token.isEmpty else { return }
+        isLoadingContents = true
+        defer { isLoadingContents = false }
+        do {
+            details = try await apiService.getSealedProductDetails(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                productId: product.id
+            )
+        } catch {
+            contentError = error.localizedDescription
+        }
+    }
+}
+
 private struct SealedProductCatalogSheet: View {
     let onAdd: (String, Int, Double?) -> Void
     @EnvironmentObject private var environmentStore: EnvironmentStore
@@ -1096,8 +1254,6 @@ private struct SealedProductCatalogSheet: View {
     @State private var searchText = ""
     @State private var selectedGame: TCGGame = .all
     @State private var selectedProduct: SealedProduct?
-    @State private var quantity = 1
-    @State private var priceText = ""
 
     private let apiService = APIService()
 
@@ -1170,6 +1326,11 @@ private struct SealedProductCatalogSheet: View {
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
                                             }
+                                            if let count = product.contentCount, count > 0 {
+                                                Label("\(count) known contents", systemImage: "list.bullet.rectangle")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
                                         }
                                     }
                                     Spacer()
@@ -1195,23 +1356,12 @@ private struct SealedProductCatalogSheet: View {
                 }
             }
             .task { await loadProducts() }
-            .alert("Add to Inventory", isPresented: Binding(
-                get: { selectedProduct != nil },
-                set: { if !$0 { selectedProduct = nil; quantity = 1; priceText = "" } }
-            )) {
-                TextField("Purchase Price", text: $priceText)
-                    .keyboardType(.decimalPad)
-                Button("Add") {
-                    if let product = selectedProduct {
-                        onAdd(product.id, quantity, Double(priceText))
-                        selectedProduct = nil
-                        quantity = 1
-                        priceText = ""
-                    }
+            .sheet(item: $selectedProduct) { product in
+                SealedProductDetailSheet(product: product) { quantity, purchasePrice in
+                    onAdd(product.id, quantity, purchasePrice)
+                    selectedProduct = nil
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Add \(selectedProduct?.name ?? "") to your inventory?")
+                .environmentObject(environmentStore)
             }
         }
     }

@@ -10,6 +10,7 @@ struct CollectionCardRow: View {
     let onToggleCopies: (() -> Void)?
     let binderLocations: [BinderCardLocation]
     let onShowBinderLocation: ((BinderCardLocation) -> Void)?
+    let banlistEntry: YugiohBanlistEntry?
     @Environment(\.colorScheme) private var colorScheme
 
     init(
@@ -21,7 +22,8 @@ struct CollectionCardRow: View {
         isCopiesExpanded: Bool = false,
         onToggleCopies: (() -> Void)? = nil,
         binderLocations: [BinderCardLocation] = [],
-        onShowBinderLocation: ((BinderCardLocation) -> Void)? = nil
+        onShowBinderLocation: ((BinderCardLocation) -> Void)? = nil,
+        banlistEntry: YugiohBanlistEntry? = nil
     ) {
         self.card = card
         self.showPricing = showPricing
@@ -32,6 +34,7 @@ struct CollectionCardRow: View {
         self.onToggleCopies = onToggleCopies
         self.binderLocations = binderLocations
         self.onShowBinderLocation = onShowBinderLocation
+        self.banlistEntry = banlistEntry
     }
 
     private func normalized(_ value: String?) -> String? {
@@ -237,6 +240,10 @@ struct CollectionCardRow: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             GameBadge(tcg: card.tcg, showsName: true)
+
+                            if let banlistEntry {
+                                YugiohLimitBadge(entry: banlistEntry)
+                            }
 
                             if let conditionSummary = conditionSummary() {
                                 MetaTagChip(

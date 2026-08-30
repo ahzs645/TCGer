@@ -90,6 +90,7 @@ final class CardScannerViewModel: ObservableObject {
     @Published private(set) var liveCandidateName: String?
     @Published private(set) var liveConfirmationCount = 0
     @Published private(set) var liveConfirmationRequired = 2
+    @Published private(set) var automaticCaptureNeedsRearm = false
     @Published private(set) var nextBinderPageNumber = 1
     @Published private(set) var latestCaptureQuality: ScannerCaptureQualityReport?
     @Published private(set) var hasCompletedScanInCurrentSession = false
@@ -121,6 +122,7 @@ final class CardScannerViewModel: ObservableObject {
     private var previewFrame: CGRect?
     private var guideFrame: CGRect?
     private var liveConsensus = LiveScanConsensus()
+    private var automaticCaptureRearmGate = AutomaticCaptureRearmGate()
     private var automaticallyPresentsResults = false
     private var isPhotoImportActive = false
     private var hasProducedCameraFrame = false
@@ -795,9 +797,18 @@ final class CardScannerViewModel: ObservableObject {
         rescueSources.removeAll()
         liveConsensus.reset()
         resetLiveConfirmation()
+        rearmAutomaticCapture()
         Task.detached(priority: .utility) {
             await ScannerStagingStore.shared.clear()
         }
+    }
+
+    func rearmAutomaticCapture() {
+        automaticCaptureRearmGate.nextCard()
+        automaticCaptureNeedsRearm = false
+        liveConsensus.reset()
+        resetLiveConfirmation()
+        lastAnalysisDate = .distantPast
     }
 
     func selectCandidate(_ candidate: CardScanCandidate, for resultID: CardScanResult.ID) {
@@ -1076,6 +1087,16 @@ final class CardScannerViewModel: ObservableObject {
         latestCaptureQuality = analysis.captureQuality
         guard captureMode == .card else { return }
 
+        if automaticCaptureNeedsRearm {
+            if automaticCaptureRearmGate.observe(cardPresent: analysis.cardPresent) {
+                automaticCaptureNeedsRearm = false
+                liveConsensus.reset()
+                resetLiveConfirmation()
+            }
+            cameraController.setIdle(cameraThrottle.noteAnalysis(cardVisible: analysis.cardPresent))
+            return
+        }
+
         switch analysis.result {
         case .success(let scanResult):
             cameraController.setIdle(cameraThrottle.noteAnalysis(cardVisible: true))
@@ -1266,6 +1287,8 @@ final class CardScannerViewModel: ObservableObject {
             state = .ready
         case .accepted:
             appendToSession(result)
+            automaticCaptureRearmGate.acceptedCapture()
+            automaticCaptureNeedsRearm = true
             resetLiveConfirmation()
             state = .ready
             if !isSimulator { HapticManager.notification(.success) }

@@ -744,6 +744,74 @@ extension APIService {
         }
     }
 
+    private struct CreateBinderShareLinkRequest: Encodable {
+        let label: String
+        let expiresAt: String?
+    }
+
+    func getBinderShareLinks(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String
+    ) async throws -> [BinderShareLink] {
+        guard !config.isOnDevice else { return [] }
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/share-links",
+            token: token
+        )
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let links = try? JSONDecoder().decode([BinderShareLink].self, from: data) else {
+            throw APIError.decodingError
+        }
+        return links
+    }
+
+    func createBinderShareLink(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String,
+        label: String,
+        expiresAt: String? = nil
+    ) async throws -> BinderShareLink {
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/share-links",
+            method: "POST",
+            token: token,
+            body: CreateBinderShareLinkRequest(label: label, expiresAt: expiresAt)
+        )
+        guard response.statusCode == 201 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        guard let link = try? JSONDecoder().decode(BinderShareLink.self, from: data) else {
+            throw APIError.decodingError
+        }
+        return link
+    }
+
+    func revokeBinderShareLink(
+        config: ServerConfiguration,
+        token: String,
+        binderId: String,
+        linkId: String
+    ) async throws {
+        let (data, response) = try await makeRequest(
+            config: config,
+            path: "collections/\(binderId)/share-links/\(linkId)",
+            method: "DELETE",
+            token: token
+        )
+        guard response.statusCode == 204 || response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+    }
+
     func getTags(
         config: ServerConfiguration,
         token: String

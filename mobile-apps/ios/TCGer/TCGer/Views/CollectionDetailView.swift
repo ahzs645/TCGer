@@ -38,11 +38,14 @@ struct CollectionDetailView: View {
     @State private var expandedCardIds: Set<String> = []
     @State private var showingDeleteBinderConfirmation = false
     @State private var isDeletingBinder = false
+    @State private var showingShareLinks = false
     @State private var availableTags: [CollectionCardTag] = []
     @State private var selectedTagFilters: Set<String> = []
     @State private var selectedConditionFilters: Set<String> = []
     @State private var minPriceFilter = ""
     @State private var maxPriceFilter = ""
+    @State private var selectedGameFilter: TCGGame = .all
+    @State private var gameFacetSelections: [TCGGame: [String: CollectionFacetSelection]] = [:]
     @State private var searchText = ""
     @State private var showFilters = false
     @State private var sortOption: CardSortOption = .name
@@ -56,6 +59,10 @@ struct CollectionDetailView: View {
     @State private var binderPages: [SavedBinderPage] = []
     @State private var binderPagesPresentation: BinderPagesPresentation?
     @State private var showsNavigationTitle = false
+    @State private var identityViewMode: CollectionIdentityViewMode = .collector
+    @State private var expandedIdentityKeys: Set<String> = []
+    @State private var yugiohBanlist: YugiohBanlistSnapshot?
+    @State private var banlistFormat = "tcg"
 
     private let apiService = APIService()
     init(
@@ -103,6 +110,20 @@ struct CollectionDetailView: View {
 
     private var filteredCards: [CollectionCard] {
         let filtered = cards.filter { card in
+            if selectedGameFilter != .all, card.tcg.lowercased() != selectedGameFilter.rawValue {
+                return false
+            }
+
+            if let definition = activeGameDefinition,
+               card.tcg.lowercased() == definition.game.rawValue,
+               !CollectionFacetEngine.matches(
+                   card: card,
+                   definition: definition,
+                   selections: gameFacetSelections[definition.game] ?? [:]
+               ) {
+                return false
+            }
+
             if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let query = SearchTextNormalizer.key(searchText)
                 let matchesSearch =
@@ -172,8 +193,29 @@ struct CollectionDetailView: View {
         return CardCondition.sorted(normalized)
     }
 
+    private var binderGameOptions: [TCGGame] {
+        Array(Set(cards.compactMap { TCGGame(rawValue: $0.tcg.lowercased()) }))
+            .filter { $0 != .all }
+            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
+    private var activeGameDefinition: GameCollectionDefinition? {
+        let game = selectedGameFilter != .all
+            ? selectedGameFilter
+            : (binderGameOptions.count == 1 ? binderGameOptions.first : nil)
+        return GameCollectionDefinitions.definition(for: game)
+    }
+
     private var visibleEntryIDs: Set<String> {
         Set(filteredCards.flatMap { selectableEntryIDs(for: $0) })
+    }
+
+    private var consolidatedGroups: [CollectionIdentityGroup] {
+        CollectionIdentityGrouping.groups(for: filteredCards)
+    }
+
+    private var supportsConsolidatedIdentity: Bool {
+        activeGameDefinition?.supportsConsolidatedIdentity == true || binderGameOptions.count > 1
     }
 
     private var allVisibleEntriesSelected: Bool {
@@ -283,11 +325,92 @@ struct CollectionDetailView: View {
                                 .listRowBackground(Color(.systemBackground))
                             }
 
+                            if supportsConsolidatedIdentity, !cards.isEmpty {
+                                Section {
+                                    Picker("Collection identity", selection: $identityViewMode) {
+                                        ForEach(CollectionIdentityViewMode.allCases) { mode in
+                                            Text(mode.label).tag(mode)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+
+                                    if binderGameOptions.contains(.yugioh) {
+                                        Picker("Yu-Gi-Oh format", selection: $banlistFormat) {
+                                            Text("TCG Advanced").tag("tcg")
+                                            Text("Traditional").tag("traditional")
+                                            Text("OCG").tag("ocg")
+                                            Text("Goat").tag("goat")
+                                        }
+                                    }
+                                } footer: {
+                                    if identityViewMode == .consolidated {
+                                        Text("Cards are grouped by gameplay identity. Expand a card to work with its exact printings.")
+                                    }
+                                    if let yugiohBanlist {
+                                        Text([yugiohBanlist.name, yugiohBanlist.effectiveDate].compactMap { $0 }.joined(separator: " · "))
+                                    }
+                                }
+                            }
+
                             Section {
                                 if cards.isEmpty {
                                     emptyStateView
                                 } else if filteredCards.isEmpty {
                                     filteredEmptyStateView
+                                } else if identityViewMode == .consolidated {
+                                    ForEach(consolidatedGroups) { group in
+                                        HStack(spacing: 12) {
+                                            if isSelectMode {
+                                                Button {
+                                                    toggleSelection(for: group)
+                                                } label: {
+                                                    Image(systemName: identitySelectionSymbol(for: group))
+                                                        .foregroundStyle(identityHasSelection(group) ? Color.accentColor : Color.secondary)
+                                                        .font(.title3)
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+
+                                            Button {
+                                                if expandedIdentityKeys.contains(group.id) {
+                                                    expandedIdentityKeys.remove(group.id)
+                                                } else {
+                                                    expandedIdentityKeys.insert(group.id)
+                                                }
+                                            } label: {
+                                                ConsolidatedCollectionGroupRow(
+                                                    group: group,
+                                                    showPricing: environmentStore.showPricing,
+                                                    isExpanded: expandedIdentityKeys.contains(group.id),
+                                                    banlistEntry: group.printings.compactMap { yugiohBanlist?.entry(for: $0) }.first
+                                                )
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+
+                                        if expandedIdentityKeys.contains(group.id) {
+                                            ForEach(group.printings) { card in
+                                                if isSelectMode {
+                                                    Button { toggleSelection(for: card) } label: {
+                                                        HStack(spacing: 12) {
+                                                            Image(systemName: cardSelectionSymbol(for: card))
+                                                                .foregroundStyle(cardHasSelection(card) ? Color.accentColor : Color.secondary)
+                                                            ConsolidatedPrintingRow(card: card, showPricing: environmentStore.showPricing)
+                                                        }
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                } else if environmentStore.isAuthenticated {
+                                                    Button { beginEditing(card) } label: {
+                                                        ConsolidatedPrintingRow(card: card, showPricing: environmentStore.showPricing)
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                    .accessibilityHint("Opens this exact printing for editing")
+                                                } else {
+                                                    ConsolidatedPrintingRow(card: card, showPricing: environmentStore.showPricing)
+                                                }
+                                            }
+                                        }
+                                    }
                                 } else {
                                     ForEach(filteredCards) { card in
                                     if isSelectMode {
@@ -310,7 +433,8 @@ struct CollectionDetailView: View {
                                                 onToggleCopies: card.copies.count > 1 ? {
                                                     toggleCopies(for: card)
                                                 } : nil,
-                                                binderLocations: binderPages.locations(for: card)
+                                                binderLocations: binderPages.locations(for: card),
+                                                banlistEntry: yugiohBanlist?.entry(for: card)
                                             )
                                         }
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -336,7 +460,8 @@ struct CollectionDetailView: View {
                                             binderLocations: binderPages.locations(for: card),
                                             onShowBinderLocation: { location in
                                                 binderPagesPresentation = BinderPagesPresentation(location: location)
-                                            }
+                                            },
+                                            banlistEntry: yugiohBanlist?.entry(for: card)
                                         )
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                         .listRowSeparator(.hidden)
@@ -380,7 +505,8 @@ struct CollectionDetailView: View {
                                             binderLocations: binderPages.locations(for: card),
                                             onShowBinderLocation: { location in
                                                 binderPagesPresentation = BinderPagesPresentation(location: location)
-                                            }
+                                            },
+                                            banlistEntry: yugiohBanlist?.entry(for: card)
                                         )
                                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                         .listRowSeparator(.hidden)
@@ -505,8 +631,12 @@ struct CollectionDetailView: View {
                                     selectedConditionFilters: $selectedConditionFilters,
                                     minPriceFilter: $minPriceFilter,
                                     maxPriceFilter: $maxPriceFilter,
+                                    selectedGameFilter: $selectedGameFilter,
+                                    gameFacetSelections: $gameFacetSelections,
                                     tagOptions: binderTagOptions,
                                     conditionOptions: binderConditionOptions,
+                                    availableGames: binderGameOptions,
+                                    cards: cards,
                                     hasActiveFilters: hasActiveFilters,
                                     onClearAll: clearFilters
                                 )
@@ -566,6 +696,11 @@ struct CollectionDetailView: View {
                                     // The Unsorted Library is a virtual holding
                                     // area, not a real binder — nothing to edit.
                                     if !collection.isUnsortedBinder {
+                                        Button(action: { showingShareLinks = true }) {
+                                            Image(systemName: "link")
+                                        }
+                                        .accessibilityLabel("Manage share links")
+
                                         Button(action: { isEditing = true }) {
                                             Text("Edit")
                                         }
@@ -632,6 +767,7 @@ struct CollectionDetailView: View {
                     BinderAccessLog.recordOpen(collection.id)
                     await loadAvailableTags()
                 }
+                .task(id: banlistFormat) { await loadCurrentBanlist() }
                 .task(id: collection.id) {
                     await loadBinderPages()
                 }
@@ -640,6 +776,10 @@ struct CollectionDetailView: View {
                         guard destinationBinderId == collection.id else { return }
                         await reloadBinderCards()
                     }
+                }
+                .sheet(isPresented: $showingShareLinks) {
+                    BinderShareLinksView(binderId: collection.id)
+                        .environmentObject(environmentStore)
                 }
                 .sheet(item: $binderPagesPresentation, onDismiss: {
                     Task { await loadBinderPages() }
@@ -756,7 +896,7 @@ struct CollectionDetailView: View {
                         showingDeleteBinderConfirmation = false
                     }
                 } message: {
-                    Text("This action permanently removes the binder and its cards.")
+                    Text("The binder will be deleted. Its cards will be kept and moved to Unsorted.")
                 }
         }
         .modifier(CollectionDetailNavigationModifier(parentProvidesNavigation: parentProvidesNavigation))
@@ -848,6 +988,29 @@ struct CollectionDetailView: View {
             selectedEntryIds.subtract(visibleEntryIDs)
         } else {
             selectedEntryIds.formUnion(visibleEntryIDs)
+        }
+    }
+
+    private func identityEntryIDs(for group: CollectionIdentityGroup) -> Set<String> {
+        Set(group.printings.flatMap { selectableEntryIDs(for: $0) })
+    }
+
+    private func identityHasSelection(_ group: CollectionIdentityGroup) -> Bool {
+        !identityEntryIDs(for: group).isDisjoint(with: selectedEntryIds)
+    }
+
+    private func identitySelectionSymbol(for group: CollectionIdentityGroup) -> String {
+        let ids = identityEntryIDs(for: group)
+        if ids.isSubset(of: selectedEntryIds) { return "checkmark.circle.fill" }
+        return ids.isDisjoint(with: selectedEntryIds) ? "circle" : "minus.circle.fill"
+    }
+
+    private func toggleSelection(for group: CollectionIdentityGroup) {
+        let ids = identityEntryIDs(for: group)
+        if ids.isSubset(of: selectedEntryIds) {
+            selectedEntryIds.subtract(ids)
+        } else {
+            selectedEntryIds.formUnion(ids)
         }
     }
 
@@ -1140,6 +1303,21 @@ struct CollectionDetailView: View {
     }
 
     @MainActor
+    private func loadCurrentBanlist() async {
+        guard cards.contains(where: { $0.tcg.caseInsensitiveCompare("yugioh") == .orderedSame }),
+              let token = environmentStore.authToken,
+              !environmentStore.serverConfiguration.isOnDevice else {
+            yugiohBanlist = nil
+            return
+        }
+        yugiohBanlist = try? await apiService.getCurrentYugiohBanlist(
+            config: environmentStore.serverConfiguration,
+            token: token,
+            format: banlistFormat
+        )
+    }
+
+    @MainActor
     private func createTag(label: String) async throws -> CollectionCardTag {
         guard let token = environmentStore.authToken else {
             throw APIService.APIError.unauthorized
@@ -1162,6 +1340,8 @@ struct CollectionDetailView: View {
     private var hasActiveFilters: Bool {
         !selectedTagFilters.isEmpty ||
         !selectedConditionFilters.isEmpty ||
+        selectedGameFilter != .all ||
+        gameFacetSelections.values.flatMap(\.values).contains(where: \.isActive) ||
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !minPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !maxPriceFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -1170,6 +1350,8 @@ struct CollectionDetailView: View {
     private func clearFilters() {
         selectedTagFilters.removeAll()
         selectedConditionFilters.removeAll()
+        selectedGameFilter = .all
+        gameFacetSelections.removeAll()
         minPriceFilter = ""
         maxPriceFilter = ""
         searchText = ""
@@ -1428,6 +1610,90 @@ struct CollectionDetailView: View {
     }
 }
 
+private struct ConsolidatedCollectionGroupRow: View {
+    let group: CollectionIdentityGroup
+    let showPricing: Bool
+    let isExpanded: Bool
+    let banlistEntry: YugiohBanlistEntry?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let card = group.printings.first {
+                CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                    .frame(width: 52, height: 73)
+                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+                    .clipShape(.rect(cornerRadius: 6))
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(group.name)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    GameBadge(tcg: group.tcg, showsName: true)
+                    if let banlistEntry { YugiohLimitBadge(entry: banlistEntry) }
+                }
+                Text("\(group.printings.count) printing\(group.printings.count == 1 ? "" : "s") · \(group.totalQuantity) owned")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 8) {
+                if showPricing, let totalValue = group.totalValue {
+                    Text(totalValue.priceText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+    }
+}
+
+private struct ConsolidatedPrintingRow: View {
+    let card: CollectionCard
+    let showPricing: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            CardArtworkImage(card: card.previewCard, useFullResolution: false)
+                .frame(width: 38, height: 54)
+                .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 4))
+                .clipShape(.rect(cornerRadius: 4))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(card.setName ?? "Unknown set")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text([card.setCode, card.collectorNumber, card.rarity].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("×\(card.quantity)").font(.subheadline.weight(.semibold))
+                if showPricing, let price = card.price {
+                    Text((price * Double(card.quantity)).priceText)
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+        }
+        .padding(.leading, 28)
+        .contentShape(Rectangle())
+    }
+}
+
 private struct CollectionDetailNavigationModifier: ViewModifier {
     let parentProvidesNavigation: Bool
 
@@ -1480,5 +1746,166 @@ private struct CardCopyContext: Identifiable {
 
     var id: String {
         "\(card.id):\(copy?.id ?? "all")"
+    }
+}
+
+private struct BinderShareLinksView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    let binderId: String
+
+    @State private var links: [BinderShareLink] = []
+    @State private var label = ""
+    @State private var isLoading = true
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var pendingRevocation: BinderShareLink?
+
+    private let apiService = APIService()
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    TextField("Label, e.g. Trade night", text: $label)
+                    Button {
+                        Task { await createLink() }
+                    } label: {
+                        if isSaving { ProgressView() } else { Label("Create Link", systemImage: "link.badge.plus") }
+                    }
+                    .disabled(label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+                } header: {
+                    Text("New Link")
+                } footer: {
+                    Text("Create separate links for friends, events, or listings. Each link can be revoked independently.")
+                }
+
+                Section("Active Links") {
+                    if isLoading {
+                        ProgressView("Loading share links…")
+                    } else if links.isEmpty {
+                        Text("No managed links yet.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(links) { link in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(link.label).font(.body.weight(.medium))
+                                    Text(link.createdAt)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                if let url = shareURL(token: link.token) {
+                                    ShareLink(item: url) {
+                                        Image(systemName: "square.and.arrow.up")
+                                    }
+                                    .accessibilityLabel("Share \(link.label)")
+                                }
+                                Button(role: .destructive) { pendingRevocation = link } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .accessibilityLabel("Revoke \(link.label)")
+                            }
+                        }
+                    }
+                }
+
+                if let errorMessage {
+                    Section { Text(errorMessage).foregroundStyle(.red) }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Share Links")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .task { await loadLinks() }
+            .alert("Revoke Share Link?", isPresented: Binding(
+                get: { pendingRevocation != nil },
+                set: { if !$0 { pendingRevocation = nil } }
+            )) {
+                Button("Revoke", role: .destructive) {
+                    guard let link = pendingRevocation else { return }
+                    Task { await revoke(link) }
+                }
+                Button("Cancel", role: .cancel) { pendingRevocation = nil }
+            } message: {
+                Text("Anyone using this link will immediately lose access.")
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func shareURL(token: String) -> URL? {
+        guard var components = URLComponents(string: environmentStore.serverConfiguration.baseURL) else { return nil }
+        if components.port == 3004 { components.port = 3003 }
+        var basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if basePath == "api" { basePath = "" }
+        components.path = "/" + [basePath, "shared", token]
+            .filter { !$0.isEmpty }
+            .joined(separator: "/")
+        components.query = nil
+        components.fragment = nil
+        return components.url
+    }
+
+    @MainActor
+    private func loadLinks() async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Sign in to manage share links."
+            isLoading = false
+            return
+        }
+        isLoading = true
+        do {
+            links = try await apiService.getBinderShareLinks(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: binderId
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    @MainActor
+    private func createLink() async {
+        guard let token = environmentStore.authToken else { return }
+        isSaving = true
+        errorMessage = nil
+        do {
+            let created = try await apiService.createBinderShareLink(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: binderId,
+                label: label.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            links.insert(created, at: 0)
+            label = ""
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isSaving = false
+    }
+
+    @MainActor
+    private func revoke(_ link: BinderShareLink) async {
+        guard let token = environmentStore.authToken else { return }
+        pendingRevocation = nil
+        do {
+            try await apiService.revokeBinderShareLink(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                binderId: binderId,
+                linkId: link.id
+            )
+            links.removeAll { $0.id == link.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

@@ -175,6 +175,15 @@ struct CardSearchView: View {
                     .badge(searchFilters.activeCount)
                 }
 
+                ToolbarItem(placement: .bottomBar) {
+                    Button {
+                        Task { await discoverCards() }
+                    } label: {
+                        Label("Discover", systemImage: "dice")
+                    }
+                    .disabled(isSearching || searchScope == .collection)
+                }
+
                 ToolbarSpacer(.flexible, placement: .bottomBar)
                 DefaultToolbarItem(kind: .search, placement: .bottomBar)
             }
@@ -493,6 +502,31 @@ struct CardSearchView: View {
         } catch {
             bulkWishlistStatus = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func discoverCards() async {
+        guard let token = environmentStore.authToken else {
+            errorMessage = "Not authenticated"
+            return
+        }
+        searchScope = .catalog
+        isSearching = true
+        errorMessage = nil
+        hasSearched = true
+        do {
+            let result = try await apiService.discoverCards(
+                config: environmentStore.serverConfiguration,
+                token: token,
+                game: selectedGame,
+                count: 6
+            )
+            searchResults = result.cards
+            ownedSearchResults = []
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isSearching = false
     }
 
     @MainActor
