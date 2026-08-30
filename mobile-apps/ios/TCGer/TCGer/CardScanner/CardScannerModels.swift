@@ -523,6 +523,10 @@ enum CardScannerError: Error, LocalizedError, Sendable {
     /// card recognition. The coordinator must not let a looser fallback turn
     /// this into a confident nearest-neighbor false positive.
     case rejectedInput
+    /// Hub collapse: the crop embedded into a degenerate region (blank, glare,
+    /// mis-rectified) near many unrelated rows at once. Unlike `rejectedInput`
+    /// this voids only the crop hypothesis it came from.
+    case degenerateInput
     case ineligibleMode
     case missingAuthToken
     case underlying(Error)
@@ -537,6 +541,8 @@ enum CardScannerError: Error, LocalizedError, Sendable {
             return "We could not recognize this card. Try adjusting lighting and framing."
         case .rejectedInput:
             return "We could not find a clear card face. Center one card and try again."
+        case .degenerateInput:
+            return "We could not read a card from this crop. Reduce glare and try again."
         case .ineligibleMode:
             return "The selected mode is not supported by the current strategy."
         case .missingAuthToken:

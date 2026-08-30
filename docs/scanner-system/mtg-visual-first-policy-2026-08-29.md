@@ -68,6 +68,43 @@ margin, i.e. `printingAmbiguous`), Rage into the Valley at 0.65 with a title
 match whose image leader disagreed, and Jungle Hollow whose Simulator crop
 scores 0.59 (device scored 0.70 with footer 239 — expected to pass on device).
 
+## Hand-held session 2026-08-29 23:37 (30 frames) and the fixes it forced
+
+The same cards re-scanned hand-held (hand + laptop keyboard in frame),
+labeled into the curated table. The device build accepted 21/30 — including
+**two wrong accepts**: Tranquil Cove accepted as Sandblast at 0.725/0.74
+through the whole-frame hypothesis, with no OCR consulted. The Simulator
+replay reproduced one and produced a second of its own (an inverted
+degenerate crop accepted as "Island" at 0.94 — the sibling orientation of a
+hub-rejected crop). The audit of every accepted attempt across the 79
+labeled MTG frames also showed a footer reading "273" once confirming
+Cathedral of War over Forsaken Sanctuary, because both have a #273 printing
+in the shortlist. Three fixes followed, all replay-verified:
+
+1. **Whole-frame margin** (`wholeFrameAttemptMargin = 0.05`): a plain-visual
+   whole-frame accept must clear strong + 0.05. Every correct plain-visual
+   whole-frame accept in the labeled replays scored ≥ 0.771; the wrong ones
+   scored 0.725–0.74.
+2. **Hub collapse voids the crop, not the orientation**
+   (`CardScannerError.degenerateInput`): if either orientation of a crop hub-
+   rejects, both are discarded; later hypotheses may still answer.
+3. **Footer collisions abstain**: when a collector-number reading matches
+   printings of more than one family in the shortlist, it confirms nothing
+   unless the shortlist is title-constrained to one name.
+
+| Replay (after fixes) | Correct | Wrong | Lost |
+|---|---:|---:|---:|
+| MTG 49-frame set | 36/49 | 0 | 0 |
+| MTG hand-held 30-frame set | 18/30 (14 exact + 4 family) | **0** (was 2) | 1 (Pinecone Strike, Simulator-divergence; lost pre-fix too) |
+| Pokémon 76-label library | 51/76 | 0 | same 5 pre-existing |
+
+The hand-held set's 12 abstentions are the camera-domain story again:
+Tranquil Cove, Forsaken Sanctuary ×4, Rage into the Valley ×3, Stone Quarry,
+Pinecone Strike — correct families stuck in the 0.55–0.70 band or hub-collapsed.
+A localizer bake-off on the same 30 frames (device quad vs Vision, DETR, YGO
+OBB, seg models) again moved top-1 by at most one frame — the crop is not
+what fails on hand-held captures either.
+
 ## Does this need a retrain?
 
 Not for these gains — they are policy and metadata handling. A retrain is the

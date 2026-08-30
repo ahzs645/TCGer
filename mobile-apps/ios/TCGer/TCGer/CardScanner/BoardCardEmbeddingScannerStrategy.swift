@@ -23,6 +23,15 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// a wrong accept at 0.707 was measured on exactly this path. Applies
         /// only to plain-embedding accepts — OCR-verified results are exempt.
         static let retryAttemptMargin: Double = 0.02
+        /// The whole-frame hypothesis of a hand-held capture is card plus
+        /// hand plus background, and its embedding can land on an unrelated
+        /// card with a healthy margin: Tranquil Cove accepted as Sandblast at
+        /// 0.725/0.735 (session 2026-08-29 23:37, device and Simulator).
+        /// Every correct plain-visual whole-frame accept in the labeled MTG
+        /// replays scored 0.771 or higher, so the whole frame must clear a
+        /// wider margin than the alternate detector box. OCR-backed accepts
+        /// are exempt as before.
+        static let wholeFrameAttemptMargin: Double = 0.05
         /// Footer-OCR cache: reuse the previous frame's reading only when the
         /// new crop's embedding is this close to the cached crop's. A steady
         /// card produces near-identical embeddings frame after frame; two
@@ -323,6 +332,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private enum OrientationOutcome {
         case result(CardScanResult?)
         case rejected
+        /// Hub collapse: the crop's pixels are degenerate, so neither
+        /// orientation of it may answer (the 180-degree twin of a collapsed
+        /// crop accepted "Island" at 0.94 from a Tranquil Cove photo).
+        case degenerate
         case failed(Error)
     }
 
@@ -339,6 +352,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             ))
         } catch CardScannerError.rejectedInput {
             return .rejected
+        } catch CardScannerError.degenerateInput {
+            return .degenerate
         } catch {
             return .failed(error)
         }
@@ -386,6 +401,10 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 }
             case .rejected:
                 sawRejection = true
+            case .degenerate:
+                // A collapsed crop is discarded whole; a later hypothesis
+                // (alternate box, whole frame) may still recover the card.
+                return HypothesisVerdict(result: nil, sawRejection: sawRejection)
             case .failed(let error):
                 throw error
             }
@@ -758,15 +777,18 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // printed evidence can rescue an embedding that is not of a card.
         if policy.isHubCollapse(ranked.map { ($0.details.identity.name, $0.confidence.score) }) {
             recordOutcome(.hubRejected)
-            return nil
+            throw CardScannerError.degenerateInput
         }
         // What THIS attempt must score to be accepted on visual evidence
         // alone (retry hypotheses carry the extra margin). Every OCR stage
         // keys off this, so a crop that cannot pass visually always gets its
         // evidence read instead of abstaining unexamined.
+        let retryMargin = attempt.kind == .wholeFrame
+            ? Configuration.wholeFrameAttemptMargin
+            : Configuration.retryAttemptMargin
         let requiredScore = attempt.isBaseline
             ? strongAcceptanceScore
-            : strongAcceptanceScore + Configuration.retryAttemptMargin
+            : strongAcceptanceScore + retryMargin
 
         // The gate is intentionally not an unconditional early return. It has
         // false negatives on foil/full-art cards. When the frame is rejected,
@@ -825,7 +847,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
         func matchCollectorNumber(
             in candidates: [CardScanCandidate],
-            reading: CollectorNumberOCR.FooterReading
+            reading: CollectorNumberOCR.FooterReading,
+            titleConstrained: Bool = false
         ) -> CollectorNumberMatch? {
             let options: [(candidate: CardScanCandidate, printing: CardDetails, number: String)] =
                 candidates.flatMap { candidate in
@@ -840,21 +863,33 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     collectorNumber: option.number
                 )
             }
+            // A three-digit number is not unique across a ten-card shortlist
+            // whose rows each represent many printings: "273" confirmed
+            // Cathedral of War over Forsaken Sanctuary at 0.595. When the
+            // reading matches printings of more than one family, only a
+            // title-constrained shortlist (one name) may resolve it.
+            func unambiguous(_ hits: [(candidate: CardScanCandidate, printing: CardDetails, number: String)]) -> CollectorNumberMatch? {
+                guard let first = hits.first else { return nil }
+                let families = Set(hits.map {
+                    $0.candidate.details.identity.recognitionFamilyID ?? $0.candidate.id.uuidString
+                })
+                guard families.count == 1 || titleConstrained else { return nil }
+                return match(first)
+            }
             let pairNumbers = Set(reading.pairNumbers)
-            if !pairNumbers.isEmpty,
-               let hit = options.first(where: { pairNumbers.contains($0.number) }) {
-                return match(hit)
+            if !pairNumbers.isEmpty {
+                let hits = options.filter { pairNumbers.contains($0.number) }
+                if !hits.isEmpty { return unambiguous(hits) }
             }
             // Letter-prefixed promo numbers ("SWSH204") never print as
             // NNN/NNN, so without this branch the entire promo class was
             // structurally impossible to OCR-confirm.
             if !reading.promoCodes.isEmpty {
                 let promoCodes = Set(reading.promoCodes)
-                if let hit = options.first(where: {
+                let hits = options.filter {
                     $0.number.contains(where: \.isLetter) && promoCodes.contains($0.number)
-                }) {
-                    return match(hit)
                 }
+                if !hits.isEmpty { return unambiguous(hits) }
             }
             if !reading.digitRuns.isEmpty {
                 let confirmed = options.filter {
@@ -1012,7 +1047,11 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     footerOCRMs += Date().timeIntervalSince(footerStarted) * 1_000
                     evidenceFooterPairs = reading.pairNumbers
                 }
-                if let matched = matchCollectorNumber(in: ocrEligibleCandidates, reading: reading) {
+                if let matched = matchCollectorNumber(
+                    in: ocrEligibleCandidates,
+                    reading: reading,
+                    titleConstrained: titleConstrained
+                ) {
                     primary = ocrVerifiedCandidate(
                         matched.candidate,
                         printing: matched.printing,
@@ -1034,9 +1073,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // still not enough. The same-name printing guards below still apply.
         if gateRejected && !ocrVerified {
             let titleBacked = titleConstrained
-                && primary.confidence.score >= (attempt.isBaseline
-                    ? strongAcceptanceScore
-                    : strongAcceptanceScore + Configuration.retryAttemptMargin)
+                && primary.confidence.score >= requiredScore
             if !titleBacked {
                 recordOutcome(.rejectedInput)
                 throw CardScannerError.rejectedInput
