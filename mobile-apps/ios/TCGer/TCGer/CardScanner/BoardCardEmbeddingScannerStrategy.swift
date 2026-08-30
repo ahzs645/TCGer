@@ -23,15 +23,14 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// a wrong accept at 0.707 was measured on exactly this path. Applies
         /// only to plain-embedding accepts — OCR-verified results are exempt.
         static let retryAttemptMargin: Double = 0.02
-        /// The whole-frame hypothesis of a hand-held capture is card plus
-        /// hand plus background, and its embedding can land on an unrelated
-        /// card with a healthy margin: Tranquil Cove accepted as Sandblast at
-        /// 0.725/0.735 (session 2026-08-29 23:37, device and Simulator).
-        /// Every correct plain-visual whole-frame accept in the labeled MTG
-        /// replays scored 0.771 or higher, so the whole frame must clear a
-        /// wider margin than the alternate detector box. OCR-backed accepts
-        /// are exempt as before.
-        static let wholeFrameAttemptMargin: Double = 0.05
+        /// When the card detector found a box covering at least this fraction
+        /// of the frame, the whole-frame hypothesis is card PLUS background —
+        /// its embedding is not evidence of a card and must not produce a
+        /// plain-visual accept (Tranquil Cove accepted as Sandblast at
+        /// 0.725/0.735 exactly this way, session 2026-08-29 23:37). Below
+        /// this fraction the detection is noise (a 1%-of-frame box) and the
+        /// frame is treated as effectively being the card, as for imports.
+        static let credibleDetectionMinimumArea: CGFloat = 0.10
         /// Footer-OCR cache: reuse the previous frame's reading only when the
         /// new crop's embedding is this close to the cached crop's. A steady
         /// card produces near-identical embeddings frame after frame; two
@@ -237,7 +236,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 for: candidate.image,
                 kind: candidate.kind,
                 quad: candidate.quad,
-                isBaseline: candidate.isBaseline
+                isBaseline: candidate.isBaseline,
+                requiresEvidence: candidate.requiresEvidence
             ) else { continue }
             evaluatedAnyHypothesis = true
             let verdict = try await evaluate(hypothesis, context: context, source: source)
@@ -264,6 +264,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let kind: ScanDiagnostics.AttemptKind
         let quad: [[Double]]?
         let isBaseline: Bool
+        var requiresEvidence: Bool = false
     }
 
     private func makeCropCandidates(
@@ -309,10 +310,19 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 image: wholeFrame,
                 kind: .wholeFrame,
                 quad: nil,
-                isBaseline: false
+                isBaseline: false,
+                requiresEvidence: Self.wholeFrameRequiresEvidence(detectorBox: detailed.detectorBox)
             ))
         }
         return candidates
+    }
+
+    /// The whole frame is only card-shaped evidence when the detector saw no
+    /// credible card box inside it; with a credible box the whole frame is
+    /// card plus background, and only printed evidence may accept it.
+    static func wholeFrameRequiresEvidence(detectorBox: CGRect?) -> Bool {
+        guard let box = detectorBox else { return false }
+        return box.width * box.height >= Configuration.credibleDetectionMinimumArea
     }
 
     private struct HypothesisVerdict {
@@ -449,18 +459,19 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         for image: CGImage,
         kind: ScanDiagnostics.AttemptKind,
         quad: [[Double]]? = nil,
-        isBaseline: Bool
+        isBaseline: Bool,
+        requiresEvidence: Bool = false
     ) async throws -> CropHypothesis? {
+        var hypothesis: CropHypothesis?
         if ScannerPerfOptions.isBatchedOrientationEnabled {
-            return try await makeBatchedHypothesis(
+            hypothesis = try await makeBatchedHypothesis(
                 for: image,
                 kind: kind,
                 quad: quad,
                 isBaseline: isBaseline
             )
-        }
-        if ScannerPerfOptions.isConcurrentOrientationsEnabled,
-           let rotated = cropper.rotated180(image) {
+        } else if ScannerPerfOptions.isConcurrentOrientationsEnabled,
+                  let rotated = cropper.rotated180(image) {
             async let uprightAttempt = makeAttempt(for: image, kind: kind, quad: quad)
             async let rotatedAttempt = makeAttempt(for: rotated, kind: kind, quad: quad)
             guard var upright = try await uprightAttempt else {
@@ -473,21 +484,31 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 semantic180.isSemantic180 = true
                 orientations.append(semantic180)
             }
-            return CropHypothesis(orientations: orientations)
+            hypothesis = CropHypothesis(orientations: orientations)
+        } else {
+            guard var upright = try await makeAttempt(for: image, kind: kind, quad: quad) else {
+                return nil
+            }
+            upright.isBaseline = isBaseline
+            var orientations = [upright]
+            if let rotated = cropper.rotated180(image),
+               var semantic180 = try await makeAttempt(for: rotated, kind: kind, quad: quad) {
+                // The extra orientation is another open-set retrieval draw, so it
+                // uses the existing retry margin for unverified ANN acceptance.
+                semantic180.isSemantic180 = true
+                orientations.append(semantic180)
+            }
+            hypothesis = CropHypothesis(orientations: orientations)
         }
-        guard var upright = try await makeAttempt(for: image, kind: kind, quad: quad) else {
-            return nil
+        guard var made = hypothesis else { return nil }
+        if requiresEvidence {
+            made = CropHypothesis(orientations: made.orientations.map {
+                var attempt = $0
+                attempt.requiresEvidence = true
+                return attempt
+            })
         }
-        upright.isBaseline = isBaseline
-        var orientations = [upright]
-        if let rotated = cropper.rotated180(image),
-           var semantic180 = try await makeAttempt(for: rotated, kind: kind, quad: quad) {
-            // The extra orientation is another open-set retrieval draw, so it
-            // uses the existing retry margin for unverified ANN acceptance.
-            semantic180.isSemantic180 = true
-            orientations.append(semantic180)
-        }
-        return CropHypothesis(orientations: orientations)
+        return made
     }
 
     /// Batched variant (`ScannerPerfOptions.isBatchedOrientationEnabled`):
@@ -564,6 +585,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         /// The geometry-preserving crop turned by 180 degrees to test the
         /// otherwise unknowable semantic top edge.
         var isSemantic180: Bool = false
+        /// True for a whole-frame crop taken while the detector saw a
+        /// credible card box: only printed evidence may accept it.
+        var requiresEvidence: Bool = false
         /// Wall time of this attempt's embedding (preprocess + inference).
         var embedMs: Double = 0
     }
@@ -641,7 +665,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
            let hypothesis = try await makeHypothesis(
                for: wholeFrame,
                kind: .wholeFrame,
-               isBaseline: false
+               isBaseline: false,
+               requiresEvidence: Self.wholeFrameRequiresEvidence(detectorBox: detailed.detectorBox)
            ) {
             hypotheses.append(hypothesis)
         }
@@ -711,10 +736,23 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             throw CardScannerError.rejectedInput
         }
 
-        let allowedIndices = await metadataStore.physicalCardIndices(
-            for: context.mode.tcgGame,
-            setCode: context.setCode
-        )
+        let allowedIndices: Set<Int>
+        if let deckScope = context.deckScope {
+            guard context.mode.tcgGame == .all || context.mode.tcgGame == deckScope.game else {
+                recordOutcome(.indexUnavailable)
+                throw CardScannerError.ineligibleMode
+            }
+            allowedIndices = await metadataStore.physicalCardIndices(
+                for: deckScope.game,
+                setCode: context.setCode,
+                externalCardIDs: deckScope.externalCardIDs
+            )
+        } else {
+            allowedIndices = await metadataStore.physicalCardIndices(
+                for: context.mode.tcgGame,
+                setCode: context.setCode
+            )
+        }
         guard !allowedIndices.isEmpty else {
             recordOutcome(.indexUnavailable)
             throw CardScannerError.ineligibleMode
@@ -744,7 +782,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         var ranked = await makeCandidates(
             from: matches,
             game: context.mode.tcgGame,
-            gateScore: gateScore
+            gateScore: gateScore,
+            deckScope: context.deckScope
         )
         evidenceCandidates = ranked.prefix(5).map {
             ScanDiagnostics.Candidate(
@@ -783,12 +822,14 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // alone (retry hypotheses carry the extra margin). Every OCR stage
         // keys off this, so a crop that cannot pass visually always gets its
         // evidence read instead of abstaining unexamined.
-        let retryMargin = attempt.kind == .wholeFrame
-            ? Configuration.wholeFrameAttemptMargin
-            : Configuration.retryAttemptMargin
-        let requiredScore = attempt.isBaseline
-            ? strongAcceptanceScore
-            : strongAcceptanceScore + retryMargin
+        // A whole-frame crop taken while the detector saw a credible card
+        // box is card-plus-background: no similarity is high enough on its
+        // own, only printed evidence may confirm it.
+        let requiredScore: Double = attempt.requiresEvidence
+            ? .infinity
+            : (attempt.isBaseline
+                ? strongAcceptanceScore
+                : strongAcceptanceScore + Configuration.retryAttemptMargin)
 
         // The gate is intentionally not an unconditional early return. It has
         // false negatives on foil/full-art cards. When the frame is rejected,
@@ -993,7 +1034,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                     from: titleMatches,
                     game: recognizedGame,
                     gateScore: gateScore,
-                    titleVerifiedName: titleMatch.name
+                    titleVerifiedName: titleMatch.name,
+                    deckScope: context.deckScope
                 )
                 if let titlePrimary = titleRanked.first {
                     ranked = titleRanked
@@ -1342,7 +1384,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         from matches: [ANNVectorMatch],
         game: TCGGame,
         gateScore: Double?,
-        titleVerifiedName: String? = nil
+        titleVerifiedName: String? = nil,
+        deckScope: CardScanDeckScope? = nil
     ) async -> [CardScanCandidate] {
         var candidates: [CardScanCandidate] = []
         for match in matches {
@@ -1363,6 +1406,14 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             }
             if let titleVerifiedName {
                 debugInfo["ocrTitle"] = titleVerifiedName
+            }
+            if let deckScope {
+                debugInfo["searchScope"] = "deck"
+                debugInfo["deckID"] = deckScope.deckID
+                debugInfo["deckName"] = deckScope.deckName
+                debugInfo["deckCardCount"] = String(deckScope.externalCardIDs.count)
+            } else {
+                debugInfo["searchScope"] = "full_catalog"
             }
             candidates.append(CardScanCandidate(
                 details: details,

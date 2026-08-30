@@ -147,7 +147,7 @@ nonisolated struct CardCropper {
     func detectRectanglesDetailed(
         in image: CGImage,
         intrinsics: ScannerCameraIntrinsics? = nil
-    ) throws -> (observations: [VNRectangleObservation], alternateBox: VNRectangleObservation?) {
+    ) throws -> (observations: [VNRectangleObservation], alternateBox: VNRectangleObservation?, detectorBox: CGRect?) {
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
 
         // A detector trained specifically on trading cards provides the coarse
@@ -179,9 +179,9 @@ nonisolated struct CardCropper {
                 let agreeing = documents.filter {
                     Self.intersectionOverUnion($0.boundingBox, detectedCard.boundingBox) >= 0.45
                 }
-                if !agreeing.isEmpty { return (agreeing, nil) }
+                if !agreeing.isEmpty { return (agreeing, nil, detectedCard.boundingBox) }
             } else {
-                return (documents, nil)
+                return (documents, nil, nil)
             }
         }
 
@@ -200,11 +200,11 @@ nonisolated struct CardCropper {
 
         try handler.perform([request])
         let rectangles = request.results ?? []
-        guard let detectedCard else { return (rectangles, nil) }
+        guard let detectedCard else { return (rectangles, nil, nil) }
         let agreeing = rectangles.filter {
             Self.intersectionOverUnion($0.boundingBox, detectedCard.boundingBox) >= 0.35
         }
-        if !agreeing.isEmpty { return (agreeing, nil) }
+        if !agreeing.isEmpty { return (agreeing, nil, detectedCard.boundingBox) }
 
         // Vision's full-frame detectors stop returning quads for steeply
         // angled cards; falling straight back to the detector's axis-aligned
@@ -222,9 +222,9 @@ nonisolated struct CardCropper {
             intrinsics: intrinsics
         ),
            !refined.isEmpty {
-            return (refined, fallbackBox)
+            return (refined, fallbackBox, detectedCard.boundingBox)
         }
-        return ([fallbackBox], nil)
+        return ([fallbackBox], nil, detectedCard.boundingBox)
     }
 
     /// The best refined quad for a single detector box, for callers that

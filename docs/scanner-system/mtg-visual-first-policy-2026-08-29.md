@@ -81,10 +81,17 @@ labeled MTG frames also showed a footer reading "273" once confirming
 Cathedral of War over Forsaken Sanctuary, because both have a #273 printing
 in the shortlist. Three fixes followed, all replay-verified:
 
-1. **Whole-frame margin** (`wholeFrameAttemptMargin = 0.05`): a plain-visual
-   whole-frame accept must clear strong + 0.05. Every correct plain-visual
-   whole-frame accept in the labeled replays scored ≥ 0.771; the wrong ones
-   scored 0.725–0.74.
+1. **Whole-frame crops need printed evidence when a card was detected.**
+   If the detector saw a credible box (≥ 10 % of the frame), the whole-frame
+   hypothesis is card *plus background* — its embedding is not evidence of a
+   card, and no similarity accepts it on its own. When the detector saw
+   nothing (imports, scans, a 1 %-of-frame noise box), the frame effectively
+   *is* the card and plain-visual acceptance stays. In the labeled data this
+   kills both Sandblast wrong accepts and loses no frame: every correct
+   plain-visual whole-frame accept happened with no credible detection, and
+   the one exception (Vow to Erebor) was already accepted by its detected
+   crop. An earlier interim fix used a fitted +0.05 whole-frame margin; this
+   structural rule replaces it.
 2. **Hub collapse voids the crop, not the orientation**
    (`CardScannerError.degenerateInput`): if either orientation of a crop hub-
    rejects, both are discarded; later hypotheses may still answer.
