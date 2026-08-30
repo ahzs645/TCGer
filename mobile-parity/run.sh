@@ -73,6 +73,14 @@ case "${1:-}" in
       echo "No ready Android emulator or device was found." >&2
       exit 1
     fi
+    # The AOSP Quickstep launcher can ANR during cold boots on headless CI
+    # emulators. Its system dialog sits above TCGer and makes every Maestro
+    # selector look absent even though the app launched correctly. Suppress
+    # system error dialogs for this ephemeral test device and clear any dialog
+    # created before the setting took effect.
+    adb -s "$android_device" shell settings put global hide_error_dialogs 1
+    adb -s "$android_device" shell am force-stop com.android.launcher3 || true
+    adb -s "$android_device" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null || true
     adb -s "$android_device" install -r "$android_apk"
     run_maestro "$android_device" "com.ahmadjalil.tcger" android
     ;;
