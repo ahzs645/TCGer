@@ -1,6 +1,6 @@
 # TCGer scanner and offline-game system
 
-**Status date:** 2026-08-27
+**Status date:** 2026-08-29
 
 **Purpose:** canonical index for the scanner, catalog, offline-pack, training,
 and distribution work completed during the universal-scanner project.
@@ -40,6 +40,14 @@ the required encoders separately and merging calibrated candidates.
 
 | Document | Use it for |
 |---|---|
+| [Current state and direction](current-state-and-direction-2026-08-29.md) | What is live now, what the recent work established, quick versus precise behavior, and the next priorities |
+| [2026-08-29 release record](releases/2026-08-29-physical-pokemon-and-magic-v2.md) | Physical-only Pokémon and family-aware Magic metrics, publication state, hashes, sizes, and rollback pointers |
+| [Real-camera recognition findings](real-camera-recognition-findings-2026-08-29.md) | The 27-frame Magic audit, resolver defects, full-index ONNX replay method, failure taxonomy, and root cause |
+| [Camera data and model hardening](camera-data-and-model-hardening.md) | Cross-game camera corpus schema, training recipe, hard negatives, dual-region experiment, and release gates |
+| [Reference-session ingestion and replay](reference-session-ingestion-and-replay.md) | Canonical session library, deduplicated ingestion, labeling, replay, integrity, and train/test separation |
+| [Game acceptance policy](game-acceptance-policy.md) | Declarative per-game thresholds, evidence behavior, client fallback order, calibration, and future-game onboarding |
+| [Magic visual-first replay record](mtg-visual-first-policy-2026-08-29.md) | The measured 49-frame policy A/B, recovered family/printing cases, and remaining model-side misses |
+| [Acceptance-policy manifest republish](releases/2026-08-29-acceptance-policy-manifest-republish.md) | Manifest-only Magic/Pokémon R2 publication and verification procedure |
 | [System architecture](architecture.md) | Runtime boundaries, data flow, identity model, and automatic versus explicit scanning |
 | [Training data and model pipeline](training-and-data-pipeline.md) | Catalog normalization, image library, Hugging Face jobs, checkpoints, evaluation, and exports |
 | [Image-library ownership and update policy](image-library-ownership-and-update-policy.md) | Local-first image acquisition, private Hugging Face dataset maintenance, immutable releases, and operator responsibilities |
@@ -68,11 +76,11 @@ Supporting implementation-specific documentation remains in:
 
 ## Current production-facing state
 
-| Area | State on 2026-08-27 |
+| Area | State on 2026-08-29 |
 |---|---|
 | Persistent Hugging Face authentication | Working; device-code workaround retired |
-| Full Pokémon training | Completed, but contaminated by 2,321 Pocket-only rows |
-| Full Magic training | Completed |
+| Pokémon physical-only v2 | Live on iOS, Android, and web with 19,507 rows and zero Pocket cards |
+| Magic visual-family v2 | Live on iOS, Android, and web with 67,849 family vectors representing 109,546 printings |
 | Full Yu-Gi-Oh training | Completed |
 | Android fp32 ONNX parity exports | Completed for all three games |
 | iOS downloadable scanner releases | Published for all three games |
@@ -82,23 +90,25 @@ Supporting implementation-specific documentation remains in:
 | Sealed-product catalogs | Published as optional per-game artifacts |
 | Durable scanner image-library tooling | Implemented and locally tested; no production image dataset release uploaded yet |
 | Source-release planner | Implemented for Pokémon, Scryfall, and YGOPRODeck, with a future-game adapter contract |
+| Declarative game acceptance policy | Implemented across publishers, iOS, Android, and browser; live native manifests still need the manifest-only republish, while identical built-in profiles are active |
 | User-URL GamePackageManifest | Implemented for verified catalog install, browse, search, and filters on web, iOS, and Android; unknown-game scanner/pack adapters remain gated |
-| Real-phone acceptance suites | Incomplete for Magic and Yu-Gi-Oh; Pokémon needs a clean physical-only rerun |
+| Real-phone acceptance suites | Pokémon physical-only replay is complete; Magic has an additional 27-frame diagnosed session; Yu-Gi-Oh coverage still needs expansion |
 
 ## Immediate priorities
 
-1. Rebuild the physical-only Pokémon index at 19,507 rows and replace the web,
-   iOS, and Android releases so the browser cannot return Pocket entries.
-2. Build and upload the first audited private image-library release, then pin
-   its immutable revision in future jobs.
-3. Retrain and evaluate Pokémon on physical-only data; do not treat the current
-   98.24% Recall@1 as a physical-only metric.
-4. Evaluate the family-disjoint MTG retrain and exact-print verifier on binder
-   captures before promotion.
-5. Establish real-phone evaluation and per-game operating points before
-   enabling automatic cross-game acceptance broadly.
-6. Publish a first-party game-package registry over the implemented direct-URL
-   contract and connect the unknown-game scanner/pack runtime adapters.
+1. Republish the four native Magic/Pokémon manifests with their declarative
+   `acceptancePolicy` blocks, following the manifest-only runbook exactly.
+2. Replay-validate Android's newly policy-enabled manual OCR rescue for
+   Pokémon and Yu-Gi-Oh! before treating it as a measured platform result.
+3. Create the private, platform-neutral camera-corpus manifest and prepare a
+   separate Magic camera-training set; do not train on release-gate sessions.
+4. A/B camera-positive training, full-gallery hard negatives, and a combined
+   full-card/art-region representation.
+5. Expand Yu-Gi-Oh real-phone and binder acceptance coverage.
+6. Add a reviewed Pokémon same-art family overlay only after the grouping
+   process is reproducible; keep the working physical-only v2 as the control.
+7. Publish a first-party game-package registry over the implemented direct-URL
+   contract and connect trusted unknown-game scanner/pack runtime adapters.
 
 ## Source-of-truth hierarchy
 
@@ -109,6 +119,10 @@ When documents disagree, use this order:
 3. Code that validates and consumes the artifact.
 4. This documentation set.
 5. Historical handoffs and experiment notes.
+
+Documents with an earlier status date may describe a then-current risk that is
+now resolved. In particular, the 21,828-row Pocket-contaminated Pokémon package
+is historical; the live package is the 19,507-row physical-only v2 release.
 
 No model should be identified only by a friendly filename. Record its catalog
 fingerprint, prepared-pack manifest SHA, checkpoint hash, export hash,
