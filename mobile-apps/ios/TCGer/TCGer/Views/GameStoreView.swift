@@ -3,10 +3,17 @@ import SwiftUI
 struct GameStoreView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @ObservedObject var catalogStore: CatalogStore
+    @StateObject private var gamePackages = GamePackageStore.shared
+    @StateObject private var scannerAssets = ScannerAssetStore.shared
+    @StateObject private var packDownloads = PackOfflineDownloadManager.shared
 
     @State private var packages: [OfficialGamePackage] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+
+    init(catalogStore: CatalogStore) {
+        self.catalogStore = catalogStore
+    }
 
     var body: some View {
         List {
@@ -52,16 +59,38 @@ struct GameStoreView: View {
                             isGameEnabled: environmentStore.isGameEnabled(package.game),
                             onActivated: { game in
                                 Task { await environmentStore.activateInstalledGame(game) }
-                            }
+                            },
+                            onRemoved: removeOfficialPackageData
                         )
                     }
                 }
+            }
+
+            Section {
+                NavigationLink {
+                    InstallGamePackageView(store: gamePackages)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Install from URL")
+                            Text("Add and manage packages from other publishers")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "link.badge.plus")
+                    }
+                }
+            } header: {
+                Text("Other Sources")
+            } footer: {
+                Text("Packages installed from a URL remain on this device if their source later becomes unavailable.")
             }
         }
         .navigationTitle("Game Store")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadPackages() }
-        .refreshable { await loadPackages() }
+        .refreshable { await refreshPackages() }
         .onChange(of: environmentStore.sealedProductsEnabled) { _, enabled in
             catalogStore.setSealedProductsEnabled(enabled)
         }
@@ -70,7 +99,6 @@ struct GameStoreView: View {
     private func loadPackages() async {
         isLoading = true
         errorMessage = nil
-        await catalogStore.refreshManifest()
         let loaded = await catalogStore.officialGamePackages()
         guard !Task.isCancelled else { return }
         packages = loaded
@@ -78,5 +106,33 @@ struct GameStoreView: View {
             errorMessage = "TCGer could not load the published catalog manifest."
         }
         isLoading = false
+
+        await refreshPackages()
+    }
+
+    private func refreshPackages() async {
+        await catalogStore.refreshManifest()
+        let loaded = await catalogStore.officialGamePackages()
+        guard !Task.isCancelled else { return }
+        if !loaded.isEmpty {
+            packages = loaded
+            errorMessage = nil
+        } else if packages.isEmpty, catalogStore.manifest == nil {
+            errorMessage = "TCGer could not load the published catalog manifest."
+        }
+        isLoading = false
+    }
+
+    private func removeOfficialPackageData(_ game: TCGGame) {
+        scannerAssets.remove(game)
+        for definition in packDownloads.definitions(for: game) {
+            packDownloads.remove(definition)
+        }
+
+        guard environmentStore.serverConfiguration.isOnDevice else { return }
+        environmentStore.setGameEnabled(game, enabled: false)
+        if environmentStore.defaultGame == game.rawValue {
+            environmentStore.defaultGame = nil
+        }
     }
 }

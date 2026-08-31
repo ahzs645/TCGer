@@ -20,10 +20,7 @@ struct RootView: View {
         Group {
             if shouldPresentMainContent {
                 if needsGameInstallation {
-                    GameInstallationView(
-                        catalogStore: catalogStore,
-                        gamePackages: gamePackages
-                    )
+                    GameInstallationView(catalogStore: catalogStore)
                 } else {
                     MainContentView()
                 }

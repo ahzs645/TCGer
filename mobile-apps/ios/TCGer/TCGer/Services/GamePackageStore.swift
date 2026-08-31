@@ -319,6 +319,7 @@ final class GamePackageStore: ObservableObject {
     @Published private(set) var installed: [InstalledGamePackage] = []
     @Published private(set) var isInstalling = false
     @Published private(set) var availableUpdates: [String: GamePackageManifest] = [:]
+    @Published private(set) var updateCheckErrors: [String: String] = [:]
     @Published var errorMessage: String?
 
     private let decoder = JSONDecoder()
@@ -335,6 +336,7 @@ final class GamePackageStore: ObservableObject {
 
     func checkForUpdates() async {
         var updates: [String: GamePackageManifest] = [:]
+        var failures: [String: String] = [:]
         for package in installed {
             guard !Task.isCancelled else { return }
             do {
@@ -343,18 +345,26 @@ final class GamePackageStore: ObservableObject {
                 let candidate = try decoder.decode(GamePackageManifest.self, from: manifestData)
                 try validate(candidate)
                 let verification = try await verifyPublisher(sourceURL: sourceURL, manifestData: manifestData, manifest: candidate)
-                if package.trust?.status == "verified", verification.trust.status != "verified" { continue }
-                if package.trust?.status == "verified", package.trust?.keyId != verification.trust.keyId { continue }
+                if package.trust?.status == "verified", verification.trust.status != "verified" {
+                    throw PackageError.invalid("The update source no longer provides a verified package")
+                }
+                if package.trust?.status == "verified", package.trust?.keyId != verification.trust.keyId {
+                    throw PackageError.invalid("The update source uses a different publisher key")
+                }
                 if gamePackageReleaseRelation(current: package.manifest, candidate: candidate) == .update {
                     updates[package.id] = candidate
                 }
             } catch is CancellationError {
                 return
             } catch {
+                let reason = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                let separator = reason.last.map { ".!?".contains($0) } == true ? " " : ". "
+                failures[package.id] = "Couldn’t check for updates: \(reason)\(separator)The installed package remains available."
                 continue
             }
         }
         availableUpdates = updates
+        updateCheckErrors = failures
     }
 
     func update(_ package: InstalledGamePackage) async {
@@ -459,6 +469,7 @@ final class GamePackageStore: ObservableObject {
                 try persistInstalled(nextInstalled)
                 installed = nextInstalled
                 availableUpdates.removeValue(forKey: record.id)
+                updateCheckErrors.removeValue(forKey: record.id)
                 if movedExistingToBackup { try? fileManager.removeItem(at: backup) }
             } catch {
                 try? fileManager.removeItem(at: staging)
@@ -504,6 +515,7 @@ final class GamePackageStore: ObservableObject {
         try? FileManager.default.removeItem(at: packageDirectory(package.id))
         installed.removeAll { $0.id == package.id }
         availableUpdates.removeValue(forKey: package.id)
+        updateCheckErrors.removeValue(forKey: package.id)
         try? persistInstalled()
     }
 
@@ -719,6 +731,7 @@ private extension PackageJSONValue {
 struct InstallGamePackageView: View {
     @ObservedObject var store: GamePackageStore
     @State private var packageURL = ""
+    @State private var packagePendingRemoval: InstalledGamePackage?
 
     var body: some View {
         List {
@@ -783,11 +796,18 @@ struct InstallGamePackageView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.tint)
                                 }
+                                if let updateError = store.updateCheckErrors[package.id] {
+                                    Label(updateError, systemImage: "exclamationmark.triangle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                }
                             }
                         }
                         .badge(store.availableUpdates[package.id] == nil ? nil : "Update")
                         .swipeActions {
-                            Button("Remove", role: .destructive) { store.remove(package) }
+                            Button("Remove", role: .destructive) {
+                                packagePendingRemoval = package
+                            }
                             if store.availableUpdates[package.id] != nil {
                                 Button("Update") { Task { await store.update(package) } }
                                     .tint(.accentColor)
@@ -810,6 +830,21 @@ struct InstallGamePackageView: View {
         .navigationTitle("Install from URL")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.checkForUpdates() }
+        .alert(
+            "Remove package?",
+            isPresented: Binding(
+                get: { packagePendingRemoval != nil },
+                set: { if !$0 { packagePendingRemoval = nil } }
+            ),
+            presenting: packagePendingRemoval
+        ) { package in
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                store.remove(package)
+            }
+        } message: { package in
+            Text("This deletes the downloaded \(package.manifest.effectiveDefinition.label) package. Cards already saved in collections and wishlists will remain.")
+        }
     }
 }
 

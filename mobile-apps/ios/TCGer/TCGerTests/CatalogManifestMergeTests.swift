@@ -31,8 +31,21 @@ final class CatalogManifestMergeTests: XCTestCase {
 
         for game in games {
             try await store.install(game)
+            XCTAssertTrue(store.isInstalled(game), "Expected \(game.rawValue) to be installed")
             XCTAssertTrue(store.isLoaded(game), "Expected \(game.rawValue) to load")
             XCTAssertFalse(store.sets(tcg: game).isEmpty, "Expected \(game.rawValue) sets")
+
+            store.remove(game)
+            XCTAssertFalse(store.isInstalled(game), "Expected \(game.rawValue) to be deleted")
+            XCTAssertFalse(store.isLoaded(game), "Expected \(game.rawValue) catalog to be unloaded")
+        }
+
+        // A legacy/default marker must not resurrect a package the user
+        // explicitly deleted.
+        defaults.set(999, forKey: "tcger.catalog.installedVersion.lorcana")
+        let reloadedStore = CatalogStore(source: source, defaults: defaults)
+        for game in games {
+            XCTAssertFalse(reloadedStore.isInstalled(game), "Expected \(game.rawValue) deletion to persist")
         }
     }
 

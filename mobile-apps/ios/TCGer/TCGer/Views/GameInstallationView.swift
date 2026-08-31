@@ -9,7 +9,6 @@ nonisolated enum GameInstallationState {
 struct GameInstallationView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @ObservedObject var catalogStore: CatalogStore
-    @ObservedObject var gamePackages: GamePackageStore
 
     var body: some View {
         NavigationStack {
@@ -27,14 +26,6 @@ struct GameInstallationView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-
-                    NavigationLink {
-                        InstallGamePackageView(store: gamePackages)
-                    } label: {
-                        Label("Install from URL", systemImage: "link.badge.plus")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: 320)
             }

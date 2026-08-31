@@ -23,9 +23,9 @@ The first release makes unknown games useful for catalog download, offline stora
 
 TCGer's own catalogs use the same identity model (`tcger--pokemon-catalog`, `tcger--magic-catalog`, and so on). The catalog build emits a stable `<game>.game-package.json` beside every generated pack, so official and third-party libraries share one definition and artifact contract. A third-party package may target the same `game.id`; only its package identity must be different.
 
-The generated catalog `manifest.json` is also the official Game Store index. Each published game entry names its `packageFile`; the catalog publisher uploads that package manifest beside its referenced card and sealed-product artifacts. Web and iOS Settings build their Game Store rows from those package manifests rather than a separate hard-coded download list. Other publishers remain installable from the separate **Install from URL** settings page.
+The generated catalog `manifest.json` is also the official Game Store index. Each published game entry names its `packageFile`; the catalog publisher uploads that package manifest beside its referenced card and sealed-product artifacts. Web and iOS Settings build their Game Store rows from those package manifests rather than a separate hard-coded download list. Other publishers remain installable from **Install from URL** inside the Game Store.
 
-Clients reject redundant installations. The exact same package version cannot be installed twice, and a second package ID cannot wrap an identical catalog hash for the same game. TCGer's official package identities are reserved for the Game Store and cannot be installed through the generic URL channel. A changed catalog in the same `publisher.id--packageId` slot is treated as an update.
+Clients reject redundant installations. The exact same package version cannot be installed twice, and a second package ID cannot wrap an identical catalog hash for the same game. TCGer's official package identities are reserved for the Game Store and cannot be installed through the generic URL channel. A changed catalog in the same `publisher.id--packageId` slot is treated as an update. If a package's source later becomes unavailable, the installed local package remains usable and the client reports that it could not check for updates.
 
 ## Unified game definition
 

@@ -4,6 +4,16 @@ import Security
 import SwiftUI
 import WidgetKit
 
+nonisolated enum GameAvailabilityState {
+    static func isActive(
+        preferenceEnabled: Bool,
+        isOnDevice: Bool,
+        isInstalled: Bool
+    ) -> Bool {
+        preferenceEnabled && (!isOnDevice || isInstalled)
+    }
+}
+
 enum AppColorScheme: String, CaseIterable, Identifiable, Codable {
     case system, light, dark
 
@@ -636,14 +646,7 @@ final class EnvironmentStore: ObservableObject {
     }
 
     var enabledGames: [TCGGame] {
-        var games: [TCGGame] = []
-        if enabledYugioh { games.append(.yugioh) }
-        if enabledMagic { games.append(.magic) }
-        if enabledPokemon { games.append(.pokemon) }
-        if enabledOnepiece { games.append(.onepiece) }
-        if enabledLorcana { games.append(.lorcana) }
-        if enabledDragonball { games.append(.dragonball) }
-        return games
+        TCGGame.catalogGames.filter(isGameEnabled)
     }
 
     func preferredPricingSource(for game: TCGGame) -> PricingSource? {
@@ -791,15 +794,23 @@ final class EnvironmentStore: ObservableObject {
     }
 
     func isGameEnabled(_ game: TCGGame) -> Bool {
-        switch game {
-        case .all: return true
-        case .yugioh: return enabledYugioh
-        case .magic: return enabledMagic
-        case .pokemon: return enabledPokemon
-        case .onepiece: return enabledOnepiece
-        case .lorcana: return enabledLorcana
-        case .dragonball: return enabledDragonball
+        guard game != .all else { return true }
+
+        let preferenceEnabled = switch game {
+        case .all: true
+        case .yugioh: enabledYugioh
+        case .magic: enabledMagic
+        case .pokemon: enabledPokemon
+        case .onepiece: enabledOnepiece
+        case .lorcana: enabledLorcana
+        case .dragonball: enabledDragonball
         }
+
+        return GameAvailabilityState.isActive(
+            preferenceEnabled: preferenceEnabled,
+            isOnDevice: serverConfiguration.isOnDevice,
+            isInstalled: CatalogStore.shared.isInstalled(game)
+        )
     }
 
     func setGameEnabled(_ game: TCGGame, enabled: Bool) {

@@ -17,7 +17,6 @@ struct SettingsView: View {
     @StateObject private var catalogStore = CatalogStore.shared
     @StateObject private var scannerAssets = ScannerAssetStore.shared
     @StateObject private var offlinePackDownloads = PackOfflineDownloadManager.shared
-    @StateObject private var gamePackages = GamePackageStore.shared
     @State private var serverStatus: ServerStatusState = .checking
     @State private var showingResetAlert = false
     @State private var isApplyingRemotePreferences = false
@@ -289,7 +288,7 @@ struct SettingsView: View {
 
                 // TCG Modules Section
                 Section {
-                    ForEach(TCGGame.allCases.filter { $0 != .all }) { game in
+                    ForEach(settingsGames) { game in
                         TCGModuleToggleRow(
                             game: game,
                             isOn: environmentStore.isGameEnabled(game),
@@ -317,7 +316,9 @@ struct SettingsView: View {
                 } header: {
                     Text("Games")
                 } footer: {
-                    Text("Enable or disable each game. The cloud button manages optional scanner models and pack artwork. A game can't be turned off while you still have its cards in a collection or wishlist.")
+                    Text(isLocalMode
+                        ? "Only installed games appear here. Enable or disable each game, and use the cloud button to manage optional scanner models and pack artwork."
+                        : "Enable or disable each game. The cloud button manages optional scanner models and pack artwork. A game can't be turned off while you still have its cards in a collection or wishlist.")
                 }
 
                 Section("Game Libraries") {
@@ -326,12 +327,6 @@ struct SettingsView: View {
                             .environmentObject(environmentStore)
                     } label: {
                         Label("Game Store", systemImage: "storefront")
-                    }
-
-                    NavigationLink {
-                        InstallGamePackageView(store: gamePackages)
-                    } label: {
-                        Label("Install from URL", systemImage: "link.badge.plus")
                     }
                 }
 
@@ -938,6 +933,11 @@ struct SettingsView: View {
 
     private var tabBarSummary: String {
         environmentStore.visibleTabs.map(\.title).joined(separator: " · ")
+    }
+
+    private var settingsGames: [TCGGame] {
+        guard isLocalMode else { return TCGGame.catalogGames }
+        return TCGGame.catalogGames.filter(catalogStore.isInstalled)
     }
 
     private var displayEmail: String {

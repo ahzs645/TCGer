@@ -5,7 +5,14 @@ import OSLog
 
 nonisolated protocol CatalogSource: Sendable {
     func data(for filename: String) async throws -> Data
+    func refreshData(for filename: String) async throws -> Data
     func remove(_ filename: String) async
+}
+
+nonisolated extension CatalogSource {
+    func refreshData(for filename: String) async throws -> Data {
+        try await data(for: filename)
+    }
 }
 
 nonisolated struct BundledCatalogSource: CatalogSource, @unchecked Sendable {
@@ -70,10 +77,25 @@ actor RemoteCatalogSource: CatalogSource {
         }
 
         let cachedURL = cacheDirectory.appendingPathComponent(filename, isDirectory: false)
-        if filename != "manifest.json",
-           let cached = try? Data(contentsOf: cachedURL, options: .mappedIfSafe) {
-            return cached
+        if let cached = try? Data(contentsOf: cachedURL, options: .mappedIfSafe) {
+            return filename == "manifest.json"
+                ? await preferredManifestData(remote: cached)
+                : cached
         }
+
+        if let bundled = try? await fallback.data(for: filename) {
+            return bundled
+        }
+
+        return try await refreshData(for: filename)
+    }
+
+    func refreshData(for filename: String) async throws -> Data {
+        guard Self.isSafe(filename) else {
+            throw CatalogStore.StoreError.resourceUnavailable(filename)
+        }
+
+        let cachedURL = cacheDirectory.appendingPathComponent(filename, isDirectory: false)
 
         do {
             let remoteURL = baseURL.appendingPathComponent(filename, isDirectory: false)
@@ -326,6 +348,8 @@ final class CatalogStore: ObservableObject {
     @Published private(set) var installPhases: [TCGGame: CatalogInstallPhase] = [:]
     @Published private(set) var installingSealedGames: Set<TCGGame> = []
     @Published private(set) var sealedInstallProgress: [TCGGame: Double] = [:]
+    @Published private(set) var installedVersions: [TCGGame: Int] = [:]
+    @Published private(set) var sealedInstalledVersions: [TCGGame: Int] = [:]
 
     nonisolated private struct CatalogPack: Decodable, Sendable {
         let formatVersion: Int
@@ -568,17 +592,28 @@ final class CatalogStore: ObservableObject {
     ) {
         self.source = source
         self.defaults = defaults
+        installedVersions = Self.loadInstalledVersions(from: defaults, sealed: false)
+        sealedInstalledVersions = Self.loadInstalledVersions(from: defaults, sealed: true)
         manifest = nil
 
         Task { [weak self] in
-            await self?.refreshManifest()
+            await self?.loadManifest()
         }
     }
 
     func refreshManifest() async {
+        await loadManifest(refreshing: true)
+    }
+
+    private func loadManifest(refreshing: Bool = false) async {
         do {
             let source = self.source
-            let data = try await source.data(for: "manifest.json")
+            let data: Data
+            if refreshing {
+                data = try await source.refreshData(for: "manifest.json")
+            } else {
+                data = try await source.data(for: "manifest.json")
+            }
             let decoded = try await Task.detached(priority: .utility) {
                 try JSONDecoder().decode(CatalogManifest.self, from: data)
             }.value
@@ -607,7 +642,7 @@ final class CatalogStore: ObservableObject {
     }
 
     func officialGamePackages() async -> [OfficialGamePackage] {
-        if manifest == nil { await refreshManifest() }
+        if manifest == nil { await loadManifest() }
         guard let manifest else { return [] }
         if officialPackages.isEmpty, !manifest.games.isEmpty {
             officialPackages = await loadOfficialGamePackages(from: manifest)
@@ -641,7 +676,7 @@ final class CatalogStore: ObservableObject {
     }
 
     func installState(for game: TCGGame) -> CatalogInstallState {
-        guard let version = defaults.object(forKey: installKey(for: game)) as? Int else {
+        guard let version = installedVersions[game] else {
             return .notInstalled
         }
         return .installed(version: version)
@@ -660,7 +695,7 @@ final class CatalogStore: ObservableObject {
     }
 
     func sealedInstallState(for game: TCGGame) -> CatalogInstallState {
-        guard let version = defaults.object(forKey: sealedInstallKey(for: game)) as? Int else {
+        guard let version = sealedInstalledVersions[game] else {
             return .notInstalled
         }
         return .installed(version: version)
@@ -757,16 +792,18 @@ final class CatalogStore: ObservableObject {
         if loadedPacks[game]?.version != metadata.version {
             try await load(game, metadata: metadata)
         }
+        defaults.removeObject(forKey: deletionKey(for: game))
         defaults.set(metadata.version, forKey: installKey(for: game))
 
         if !enabledGames.contains(game) {
             loadedPacks.removeValue(forKey: game)
         }
-        objectWillChange.send()
+        installedVersions[game] = metadata.version
     }
 
     func remove(_ game: TCGGame) {
         let file = metadata(for: game)?.file
+        defaults.set(true, forKey: deletionKey(for: game))
         defaults.removeObject(forKey: installKey(for: game))
         loadedPacks.removeValue(forKey: game)
         installProgress.removeValue(forKey: game)
@@ -776,7 +813,7 @@ final class CatalogStore: ObservableObject {
                 await source.remove(file)
             }
         }
-        objectWillChange.send()
+        installedVersions.removeValue(forKey: game)
     }
 
     func installSealed(_ game: TCGGame, forceReload: Bool = false) async throws {
@@ -799,7 +836,7 @@ final class CatalogStore: ObservableObject {
         if !enabledGames.contains(game) || !sealedProductsEnabled {
             loadedSealedPacks.removeValue(forKey: game)
         }
-        objectWillChange.send()
+        sealedInstalledVersions[game] = metadata.version
     }
 
     func removeSealed(_ game: TCGGame) {
@@ -811,7 +848,7 @@ final class CatalogStore: ObservableObject {
             let source = self.source
             Task(priority: .utility) { await source.remove(file) }
         }
-        objectWillChange.send()
+        sealedInstalledVersions.removeValue(forKey: game)
     }
 
     func sealedProducts(tcg: TCGGame? = nil) -> [SealedProduct] {
@@ -1332,7 +1369,7 @@ final class CatalogStore: ObservableObject {
         return "\(trimmed)/\(officialCardCount)"
     }
 
-    private func isInstalled(_ game: TCGGame) -> Bool {
+    func isInstalled(_ game: TCGGame) -> Bool {
         installedVersion(for: game) != nil
     }
 
@@ -1341,19 +1378,38 @@ final class CatalogStore: ObservableObject {
     }
 
     private func installedVersion(for game: TCGGame) -> Int? {
-        defaults.object(forKey: installKey(for: game)) as? Int
+        installedVersions[game]
     }
 
     private func installKey(for game: TCGGame) -> String {
         "tcger.catalog.installedVersion.\(game.rawValue)"
     }
 
+    private func deletionKey(for game: TCGGame) -> String {
+        "tcger.catalog.deleted.\(game.rawValue)"
+    }
+
     private func sealedInstalledVersion(for game: TCGGame) -> Int? {
-        defaults.object(forKey: sealedInstallKey(for: game)) as? Int
+        sealedInstalledVersions[game]
     }
 
     private func sealedInstallKey(for game: TCGGame) -> String {
         "tcger.catalog.sealed.installedVersion.\(game.rawValue)"
+    }
+
+    private static func loadInstalledVersions(
+        from defaults: UserDefaults,
+        sealed: Bool
+    ) -> [TCGGame: Int] {
+        Dictionary(uniqueKeysWithValues: TCGGame.catalogGames.compactMap { game in
+            if !sealed, defaults.bool(forKey: "tcger.catalog.deleted.\(game.rawValue)") {
+                return nil
+            }
+            let component = sealed ? "sealed.installedVersion" : "installedVersion"
+            let key = "tcger.catalog.\(component).\(game.rawValue)"
+            guard let version = defaults.object(forKey: key) as? Int else { return nil }
+            return (game, version)
+        })
     }
 
     private func searchablePacks(for tcg: TCGGame) -> [(TCGGame, LoadedCatalogPack)] {
