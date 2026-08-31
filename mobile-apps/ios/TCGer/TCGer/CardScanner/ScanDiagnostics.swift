@@ -44,6 +44,10 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
         /// Hub collapse: several different cards all above the hub similarity —
         /// the crop embedded into a degenerate region, not onto a card.
         case hubRejected
+        /// Both orientations of one crop would each be accepted as a
+        /// DIFFERENT card: a card is not two cards depending on which way up
+        /// it is, so the crop is degenerate and neither orientation answers.
+        case orientationContradiction
     }
 
     /// Semantic orientation is deliberately separate from pixel orientation.

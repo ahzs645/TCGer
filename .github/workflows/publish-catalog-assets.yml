@@ -2,6 +2,12 @@ name: Publish catalog assets
 
 on:
   workflow_dispatch:
+    inputs:
+      strict_release:
+        description: Require Dragon Ball and valid signatures for every official package
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -19,6 +25,10 @@ jobs:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: tcger-assets
+      APITCG_API_KEY: ${{ secrets.APITCG_API_KEY }}
+      TCGER_GAME_PACKAGE_SIGNING_KEY_ID: ${{ vars.TCGER_GAME_PACKAGE_SIGNING_KEY_ID }}
+      TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY_BASE64: ${{ secrets.TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY_BASE64 }}
+      STRICT_GAME_PACKAGE_RELEASE: ${{ inputs.strict_release }}
 
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +42,47 @@ jobs:
 
       - run: npm ci
 
+      - name: Prepare package signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$STRICT_GAME_PACKAGE_RELEASE" == "true" && -z "$APITCG_API_KEY" ]]; then
+            echo "::error::Strict releases require the APITCG_API_KEY repository secret."
+            exit 1
+          fi
+          if [[ -n "$TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY_BASE64" || -n "$TCGER_GAME_PACKAGE_SIGNING_KEY_ID" ]]; then
+            if [[ -z "$TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY_BASE64" || -z "$TCGER_GAME_PACKAGE_SIGNING_KEY_ID" ]]; then
+              echo "::error::Configure both the signing private-key secret and public key-id variable, or neither."
+              exit 1
+            fi
+            signing_key_path="$RUNNER_TEMP/tcger-game-packages.pem"
+            printf '%s' "$TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY_BASE64" | base64 --decode > "$signing_key_path"
+            chmod 600 "$signing_key_path"
+            echo "TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY=$signing_key_path" >> "$GITHUB_ENV"
+          elif [[ "$STRICT_GAME_PACKAGE_RELEASE" == "true" ]]; then
+            echo "::error::Strict releases require the signing private-key secret and key-id variable."
+            exit 1
+          fi
+
       - name: Build content-addressed catalogs
         run: npm run catalogs:build
 
+      - name: Validate package release
+        shell: bash
+        run: |
+          if [[ "$STRICT_GAME_PACKAGE_RELEASE" == "true" ]]; then
+            npm run assets:r2:publish-catalogs -- --check \
+              --require-games pokemon,magic,yugioh,onepiece,lorcana,dragonball
+          else
+            npm run assets:r2:publish-catalogs -- --check --allow-unsigned \
+              --require-games pokemon,magic,yugioh,onepiece,lorcana
+          fi
+
       - name: Publish catalogs and manifest
-        run: npm run assets:r2:publish-catalogs
+        shell: bash
+        run: |
+          if [[ "$STRICT_GAME_PACKAGE_RELEASE" == "true" ]]; then
+            npm run assets:r2:publish-catalogs
+          else
+            npm run assets:r2:publish-catalogs -- --allow-unsigned
+          fi

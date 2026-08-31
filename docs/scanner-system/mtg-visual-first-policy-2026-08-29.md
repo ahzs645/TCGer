@@ -283,9 +283,13 @@ sibling frame 3 used to fail the same way; with `hubDistinctNames` lowered
 from 3 to 2 its box crop is voided (Plains 0.99 / Forest 0.99 — two
 different names at hub similarity, which no correct crop of the 160 labeled
 ever shows) and the frame resolves correctly through the whole-frame
-hypothesis. Frame 4's twin orientation is not a hub (Plains 0.84), so the
-remaining lever there is the crop itself — the game-specific segmentation
-model — not a threshold. Session-level: 108 labeled Magic frames went from
+hypothesis. Frame 4's twin orientation is not a hub (Plains 0.85), but it
+is a *contradiction*: each orientation of that crop would be accepted as a
+different card. Measured on 125 correct accepts across both games a genuine
+crop's twin never reaches a different name above 0.66, so "both
+orientations acceptable as different cards" now voids the crop
+(`orientationContradiction`; operating point = the game's strong-accept
+score, no new number). CONTRADICTION_REPLAY_PLACEHOLDER Session-level: 108 labeled Magic frames went from
 72 correct at the start of 2026-08-30 to **102** (0 → 1 wrong).
 
 

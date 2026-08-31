@@ -47,6 +47,8 @@ import com.ahmadjalil.tcger.ParityTestMode
 import com.ahmadjalil.tcger.R
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerRequestHandler
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerResultRequestHandler
+import com.ahmadjalil.tcger.data.gamepackage.GameFeatureAdapters
+import com.ahmadjalil.tcger.data.gamepackage.needsGameInstallation
 import com.ahmadjalil.tcger.generated.ParityControlIDs
 import com.ahmadjalil.tcger.domain.BottomNavigationItem
 import com.ahmadjalil.tcger.domain.BottomNavigationLayout
@@ -93,6 +95,9 @@ import com.ahmadjalil.tcger.ui.screens.BottomNavigationCustomizationScreen
 import com.ahmadjalil.tcger.ui.screens.BottomNavigationMoreScreen
 import com.ahmadjalil.tcger.ui.screens.CollectionsScreen
 import com.ahmadjalil.tcger.ui.screens.DashboardScreen
+import com.ahmadjalil.tcger.ui.screens.GameInstallationScreen
+import com.ahmadjalil.tcger.ui.screens.InstallGamePackageScreen
+import com.ahmadjalil.tcger.ui.screens.OfficialGameStoreScreen
 import com.ahmadjalil.tcger.ui.screens.SearchScreen
 import com.ahmadjalil.tcger.ui.screens.ScannerScreen
 import com.ahmadjalil.tcger.ui.screens.SealedInventoryScreen
@@ -111,6 +116,8 @@ import kotlinx.coroutines.launch
 
 private const val MORE_ROUTE = "bottom-navigation-more"
 private const val CUSTOMIZE_NAVIGATION_ROUTE = "bottom-navigation-customize"
+private const val GAME_STORE_ROUTE = "settings-game-store"
+private const val INSTALL_GAME_URL_ROUTE = "settings-install-game-url"
 private val PARITY_BOTTOM_NAVIGATION_ITEMS = listOf(
     BottomNavigationItem.HOME,
     BottomNavigationItem.COLLECTIONS,
@@ -135,12 +142,49 @@ fun TCGerApp(container: AppContainer) {
         val navController = rememberNavController()
         val backStack by navController.currentBackStackEntryAsState()
         val route = backStack?.destination?.route
-        val visibleDestinations = if (ParityTestMode.isEnabled) {
+        val shouldInstallGame = !ParityTestMode.isEnabled && needsGameInstallation(
+            state.preferences.enabledGames,
+            state.gamePackages.installed.size,
+        )
+        if (shouldInstallGame) {
+            GameInstallationScreen(
+                state = state.gamePackages,
+                enabledGames = state.preferences.enabledGames,
+                onRefresh = viewModel::refreshOfficialGamePackages,
+                onEnable = viewModel::installOfficialGamePackage,
+                onInstall = viewModel::installGamePackage,
+            )
+            return@TCGerTheme
+        }
+        val pokedexCatalogIds = remember(
+            state.preferences.enabledGames,
+            state.gamePackages.official,
+            state.gamePackages.installed,
+        ) {
+            buildSet {
+                state.gamePackages.official.forEach { manifest ->
+                    if (
+                        manifest.game.id in state.preferences.enabledGames &&
+                        manifest.effectiveDefinition.interfaces?.supportsFeature(GameFeatureAdapters.POKEDEX) == true
+                    ) add(manifest.game.id)
+                }
+                state.gamePackages.installed.forEach { installed ->
+                    if (installed.manifest.effectiveDefinition.interfaces?.supportsFeature(GameFeatureAdapters.POKEDEX) == true) {
+                        add(installed.id)
+                    }
+                }
+            }
+        }
+        val supportsPokedex = pokedexCatalogIds.isNotEmpty()
+        val requestedDestinations = if (ParityTestMode.isEnabled) {
             PARITY_BOTTOM_NAVIGATION_ITEMS
         } else {
             state.preferences.visibleBottomNavigationItems
                 .ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
         }
+        val visibleDestinations = requestedDestinations.filter { destination ->
+            destination != BottomNavigationItem.POKEDEX || supportsPokedex
+        }.ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
         val navigationLayout = BottomNavigationLayout(visibleDestinations)
         val primaryDestinations = navigationLayout.primaryItems
         val overflowDestinations = navigationLayout.overflowItems
@@ -256,10 +300,15 @@ fun TCGerApp(container: AppContainer) {
             }
         }
 
-        LaunchedEffect(visibleDestinations, route) {
+        LaunchedEffect(visibleDestinations, route, supportsPokedex) {
             val currentDestination = BottomNavigationItem.entries.firstOrNull { it.route == route }
             if (currentDestination != null && currentDestination !in visibleDestinations) {
-                navigateTo(visibleDestinations.first())
+                val fallback = if (currentDestination == BottomNavigationItem.POKEDEX && !supportsPokedex) {
+                    BottomNavigationItem.SETTINGS
+                } else {
+                    visibleDestinations.first()
+                }
+                navigateTo(fallback)
             }
         }
 
@@ -333,15 +382,18 @@ fun TCGerApp(container: AppContainer) {
                     )
                 }
                 composable(BottomNavigationItem.POKEDEX.route) {
-                    LoadedPokedexScreen(
-                        dataSource = catalogSource,
-                        ownedCards = ownedPrintings,
-                        contentPadding = padding,
-                        onOpenSpecies = { species ->
-                            selectedSpecies = species
-                            navController.navigate("pokedex-species")
-                        },
-                    )
+                    if (supportsPokedex) {
+                        LoadedPokedexScreen(
+                            dataSource = catalogSource,
+                            ownedCards = ownedPrintings,
+                            gameIds = pokedexCatalogIds,
+                            contentPadding = padding,
+                            onOpenSpecies = { species ->
+                                selectedSpecies = species
+                                navController.navigate("pokedex-species")
+                            },
+                        )
+                    }
                 }
                 composable(BottomNavigationItem.DECKS.route) {
                     DecksScreen(
@@ -383,6 +435,8 @@ fun TCGerApp(container: AppContainer) {
                         onPricingSources = { navController.navigate("settings-pricing-sources") },
                         onServerAccess = { navController.navigate("settings-server-access") },
                         onFinanceHistory = { navController.navigate("settings-finance-history") },
+                        onGameStore = { navController.navigate(GAME_STORE_ROUTE) },
+                        onInstallGameFromUrl = { navController.navigate(INSTALL_GAME_URL_ROUTE) },
                     )
                 }
                 composable(BottomNavigationItem.SCAN.route) {
@@ -497,6 +551,24 @@ fun TCGerApp(container: AppContainer) {
                         enabledGames = state.preferences.enabledGames.sorted(),
                         defaultCurrency = state.preferences.currency,
                         contentPadding = padding,
+                    )
+                }
+                composable(GAME_STORE_ROUTE) {
+                    OfficialGameStoreScreen(
+                        state = state.gamePackages,
+                        enabledGames = state.preferences.enabledGames,
+                        contentPadding = padding,
+                        onRefresh = viewModel::refreshOfficialGamePackages,
+                        onEnable = viewModel::installOfficialGamePackage,
+                        onBack = navController::popBackStack,
+                    )
+                }
+                composable(INSTALL_GAME_URL_ROUTE) {
+                    InstallGamePackageScreen(
+                        state = state.gamePackages,
+                        contentPadding = padding,
+                        onInstall = viewModel::installGamePackage,
+                        onBack = navController::popBackStack,
                     )
                 }
                 composable("set-detail") {

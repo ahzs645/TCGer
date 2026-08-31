@@ -58,8 +58,8 @@ data class PokedexCatalogLoadResult(
 )
 
 class PokedexCatalogLoader(private val dataSource: CatalogParityDataSource) {
-    suspend fun load(): PokedexCatalogLoadResult {
-        val sets = dataSource.sets("pokemon").sets
+    suspend fun load(gameIds: Set<String> = setOf("pokemon")): PokedexCatalogLoadResult {
+        val sets = gameIds.flatMap { gameId -> dataSource.sets(gameId).sets }
         val cards = mutableListOf<CatalogParityCard>()
         val failures = mutableListOf<String>()
         // Bound parallelism without introducing a second networking stack.
@@ -81,23 +81,24 @@ class PokedexCatalogLoader(private val dataSource: CatalogParityDataSource) {
 fun LoadedPokedexScreen(
     dataSource: CatalogParityDataSource,
     ownedCards: List<OwnedPrinting>,
+    gameIds: Set<String> = setOf("pokemon"),
     nationalDex: List<PokedexEntry> = emptyList(),
     contentPadding: PaddingValues = PaddingValues(),
     onOpenSpecies: (PokedexSpeciesProgress) -> Unit,
 ) {
-    var catalogCards by remember(dataSource) { mutableStateOf<List<CatalogParityCard>>(emptyList()) }
-    var loading by remember(dataSource) { mutableStateOf(true) }
-    var error by remember(dataSource) { mutableStateOf<String?>(null) }
-    var warning by remember(dataSource) { mutableStateOf<String?>(null) }
+    var catalogCards by remember(dataSource, gameIds) { mutableStateOf<List<CatalogParityCard>>(emptyList()) }
+    var loading by remember(dataSource, gameIds) { mutableStateOf(true) }
+    var error by remember(dataSource, gameIds) { mutableStateOf<String?>(null) }
+    var warning by remember(dataSource, gameIds) { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
-    LaunchedEffect(dataSource, reload) {
+    LaunchedEffect(dataSource, gameIds, reload) {
         loading = true; error = null; warning = null
-        runCatching { PokedexCatalogLoader(dataSource).load() }
+        runCatching { PokedexCatalogLoader(dataSource).load(gameIds) }
             .onSuccess { result ->
                 catalogCards = result.cards
-                if (result.failedSetIds.isNotEmpty()) warning = "Some Pokémon sets are unavailable; progress is based on the available catalog."
+                if (result.failedSetIds.isNotEmpty()) warning = "Some compatible sets are unavailable; progress is based on the available catalog."
             }
-            .onFailure { error = it.message ?: "The Pokémon catalog could not be loaded." }
+            .onFailure { error = it.message ?: "The Pokédex catalog could not be loaded." }
         loading = false
     }
     when {

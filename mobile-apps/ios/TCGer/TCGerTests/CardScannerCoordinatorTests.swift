@@ -553,4 +553,42 @@ final class CardScannerCoordinatorTests: XCTestCase {
         XCTAssertEqual(scan.primary.details.identity.id, "right-set")
         XCTAssertEqual(recorder.kinds, [.mlDetector, .artworkFingerprint])
     }
+
+    func testDeckScopeUsesOnlyRestrictedVectorStrategyAndAbstains() async {
+        let recorder = ScanInvocationRecorder()
+        let coordinator = CardScannerCoordinator(
+            strategies: [
+                StubScanStrategy(
+                    kind: .mlDetector,
+                    supportedModes: [.yugioh],
+                    behavior: .match(cardID: "not-in-deck"),
+                    recorder: recorder
+                ),
+                StubScanStrategy(
+                    kind: .serverHash,
+                    supportedModes: [.yugioh],
+                    behavior: .match(cardID: "89631139"),
+                    recorder: recorder
+                )
+            ],
+            apiService: APIService()
+        )
+        let scope = CardScanDeckScope(
+            deckID: "deck-1",
+            deckName: "Test Deck",
+            game: .yugioh,
+            externalCardIDs: ["89631139"]
+        )
+
+        let result = await coordinator.scan(
+            image: ScannerTestImage.solid(),
+            context: .test(mode: .yugioh, deckScope: scope),
+            source: .photoCapture
+        )
+
+        guard case .failure(.noMatch) = result else {
+            return XCTFail("Expected Deck Scan to abstain instead of using a full-catalog fallback")
+        }
+        XCTAssertEqual(recorder.kinds, [.mlDetector])
+    }
 }

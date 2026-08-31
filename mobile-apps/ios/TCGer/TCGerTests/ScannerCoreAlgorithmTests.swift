@@ -466,6 +466,22 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertEqual(pixels[3], 255)
     }
 
+    func testOrientationContradictionVoidsCropsThatWouldBeTwoDifferentCards() {
+        typealias S = BoardCardEmbeddingScannerStrategy
+        // 23:37 frame 4 box crop: Island 0.94 one way up, Plains 0.85 the other.
+        XCTAssertTrue(S.isOrientationContradiction([("Island", 0.94), ("Plains", 0.85)], strongAcceptanceScore: 0.70))
+        // Frame 3: Island 0.82 / Plains 0.99.
+        XCTAssertTrue(S.isOrientationContradiction([("Island", 0.82), ("Plains", 0.99)], strongAcceptanceScore: 0.70))
+        // A genuine crop: the twin never reaches strong accept on another name.
+        XCTAssertFalse(S.isOrientationContradiction([("Tranquil Cove", 0.77), ("Plains", 0.62)], strongAcceptanceScore: 0.70))
+        // Same name both ways up (symmetric art, reprints) is not a contradiction.
+        XCTAssertFalse(S.isOrientationContradiction([("Nazgûl", 0.91), ("Nazgûl", 0.88)], strongAcceptanceScore: 0.70))
+        XCTAssertFalse(S.isOrientationContradiction([("Island", 0.94)], strongAcceptanceScore: 0.70))
+        // The operating point is the game's own strong-accept score.
+        XCTAssertTrue(S.isOrientationContradiction([("A", 0.66), ("B", 0.67)], strongAcceptanceScore: 0.65))
+        XCTAssertFalse(S.isOrientationContradiction([("A", 0.66), ("B", 0.67)], strongAcceptanceScore: 0.70))
+    }
+
     func testTheFramedDetectionBeatsAMoreConfidentBystanderCard() {
         // scan-session-20260830-171145 frame 27 (guide crop): Darksteel Ingot
         // on the table at 0.94, off-centre; the held Crosis's Charm at 0.89

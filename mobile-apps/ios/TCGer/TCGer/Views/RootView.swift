@@ -11,13 +11,22 @@ struct RootView: View {
     @State private var errorMessage: String?
     @State private var isAppLocked = true
     @State private var featureConfigurationURL: String?
+    @StateObject private var catalogStore = CatalogStore.shared
+    @StateObject private var gamePackages = GamePackageStore.shared
 
     private let apiService = APIService()
 
     var body: some View {
         Group {
             if shouldPresentMainContent {
-                MainContentView()
+                if needsGameInstallation {
+                    GameInstallationView(
+                        catalogStore: catalogStore,
+                        gamePackages: gamePackages
+                    )
+                } else {
+                    MainContentView()
+                }
             } else {
                 NavigationStack {
                     launchContent
@@ -83,6 +92,13 @@ struct RootView: View {
         environmentStore.appSettings != nil &&
         !isBootstrapping &&
         (environmentStore.isAuthenticated || !shouldRequireAuthentication)
+    }
+
+    private var needsGameInstallation: Bool {
+        GameInstallationState.needsInstallation(
+            enabledGameCount: environmentStore.enabledGames.count,
+            installedPackageCount: gamePackages.installed.count
+        )
     }
 
     @ViewBuilder

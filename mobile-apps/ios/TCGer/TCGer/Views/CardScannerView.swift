@@ -146,6 +146,8 @@ struct CardScannerView: View {
     @State private var showingRecentDebugCaptures = false
     @State private var scannerGameChoicePrompt: ScannerGameChoiceRequest?
     @State private var pendingScannerGameChoice: ScanMode?
+    @State private var shouldDismissAfterScannerChoice = false
+    @State private var shouldChooseAnotherScannerAfterPrompt = false
     @State private var scannerGameSelectionResolved = false
     @State private var scannerAssetPrompt: ScannerAssetPromptRequest?
     @State private var photoPickerMode: ScannerPhotoPickerMode?
@@ -162,6 +164,9 @@ struct CardScannerView: View {
     @State private var attemptedPriceLookupKeys: Set<String> = []
     @State private var isLoadingSessionPrices = false
     @State private var activePriceLookupID: ScannerPriceLookupRequestID?
+    @State private var yugiohDecks: [Deck] = []
+    @State private var isLoadingYugiohDecks = false
+    @State private var yugiohDeckLoadError: String?
     let scope: CardScanScope?
     let startingBinderID: String?
     let startingBinderPageNumber: Int?
@@ -209,6 +214,7 @@ struct CardScannerView: View {
                 resolveInitialScannerGame(requestedMode: consumePendingScanMode())
             }
             applyBinderStartIfNeeded()
+            Task { await loadYugiohDecks() }
         }
         .onReceive(environmentStore.$pendingDeepLinkTab) { tab in
             guard tab == .scan, scope == nil else { return }
@@ -217,6 +223,7 @@ struct CardScannerView: View {
         }
         .onChange(of: environmentStore.authToken, initial: false) { _, _ in
             viewModel.updateEnvironment(environmentStore)
+            Task { await loadYugiohDecks() }
         }
         .onChange(of: automaticallyShowResults, initial: false) { _, enabled in
             viewModel.setAutomaticallyPresentsResults(enabled)
@@ -262,14 +269,23 @@ struct CardScannerView: View {
             maxSelectionCount: photoPickerSelectionLimit,
             matching: .images
         )
-        .sheet(item: $scannerAssetPrompt) { request in
-            ScannerAssetInstallPrompt(store: scannerAssets, request: request)
+        .sheet(item: $scannerAssetPrompt, onDismiss: completeScannerAssetPrompt) { request in
+            ScannerAssetInstallPrompt(
+                store: scannerAssets,
+                request: request,
+                onChooseAnotherScanner: request.kind == .install
+                    ? { shouldChooseAnotherScannerAfterPrompt = true }
+                    : nil
+            )
         }
         .sheet(item: $scannerGameChoicePrompt, onDismiss: completePendingScannerGameChoice) { request in
             ScannerGameChoicePrompt(
                 store: scannerAssets,
                 request: request,
-                onSelect: { pendingScannerGameChoice = $0 }
+                onSelect: { pendingScannerGameChoice = $0 },
+                onCancel: (scope != nil || isPresented)
+                    ? { shouldDismissAfterScannerChoice = true }
+                    : nil
             )
         }
         .onPreferenceChange(ScannerGuideFramePreferenceKey.self) { frame in
@@ -683,6 +699,10 @@ struct CardScannerView: View {
                 debugCaptureControls
             }
 
+            if viewModel.selectedMode == .yugioh {
+                deckScopeControl
+            }
+
             if viewModel.captureMode == .binder, viewModel.binderPagesScanned > 0 {
                 binderSessionSummary
             } else if !viewModel.sessionResults.isEmpty || viewModel.liveConfirmationCount > 0 {
@@ -880,6 +900,101 @@ struct CardScannerView: View {
         .animation(.snappy, value: viewModel.captureMode)
         .accessibilityLabel("Scanner capture mode")
         .accessibilityValue(viewModel.captureMode.displayName)
+    }
+
+    private var deckScopeControl: some View {
+        Menu {
+            Button {
+                viewModel.selectDeckScope(nil)
+            } label: {
+                Label(
+                    "Full Yu-Gi-Oh! catalog",
+                    systemImage: viewModel.selectedDeckScope == nil ? "checkmark" : "square.stack.3d.up"
+                )
+            }
+            if !yugiohDecks.isEmpty {
+                Divider()
+                ForEach(yugiohDecks) { deck in
+                    Button {
+                        viewModel.selectDeckScope(deck)
+                    } label: {
+                        Label(
+                            "\(deck.name) (\(Set(deck.cards.map(\.externalId)).count))",
+                            systemImage: viewModel.selectedDeckScope?.deckID == deck.id
+                                ? "checkmark"
+                                : "rectangle.stack"
+                        )
+                    }
+                }
+            }
+            if environmentStore.authToken != nil {
+                Divider()
+                Button {
+                    Task { await loadYugiohDecks() }
+                } label: {
+                    Label("Refresh decks", systemImage: "arrow.clockwise")
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.stack")
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(viewModel.selectedDeckScope?.deckName ?? "Full Yu-Gi-Oh! catalog")
+                        .font(.caption.weight(.semibold))
+                    Text(deckScopeStatusText)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                if isLoadingYugiohDecks {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2.weight(.semibold))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .disabled(isProcessingPhoto)
+        .accessibilityLabel("Yu-Gi-Oh scan scope")
+        .accessibilityValue(viewModel.selectedDeckScope?.deckName ?? "Full catalog")
+    }
+
+    private var deckScopeStatusText: String {
+        if let scope = viewModel.selectedDeckScope {
+            return "Deck Scan · \(scope.externalCardIDs.count) identities · may abstain · not catalog accuracy"
+        }
+        if let yugiohDeckLoadError { return yugiohDeckLoadError }
+        if environmentStore.authToken == nil { return "Full-catalog scan · sign in to select a deck" }
+        return "Full-catalog scan · deck restriction optional"
+    }
+
+    @MainActor
+    private func loadYugiohDecks() async {
+        guard !environmentStore.serverConfiguration.isOnDevice,
+              let token = environmentStore.authToken else {
+            yugiohDecks = []
+            yugiohDeckLoadError = nil
+            return
+        }
+        isLoadingYugiohDecks = true
+        defer { isLoadingYugiohDecks = false }
+        do {
+            yugiohDecks = try await APIService().getDecks(
+                config: environmentStore.serverConfiguration,
+                token: token
+            ).filter { CardScanDeckScope(deck: $0) != nil }
+            yugiohDeckLoadError = nil
+            if let selected = viewModel.selectedDeckScope,
+               !yugiohDecks.contains(where: { $0.id == selected.deckID }) {
+                viewModel.selectDeckScope(nil)
+            }
+        } catch {
+            yugiohDecks = []
+            yugiohDeckLoadError = "Decks unavailable"
+        }
     }
 
     private var binderSessionSummary: some View {
@@ -1403,9 +1518,20 @@ private extension CardScannerView {
     }
 
     func completePendingScannerGameChoice() {
+        if shouldDismissAfterScannerChoice {
+            shouldDismissAfterScannerChoice = false
+            dismiss()
+            return
+        }
         guard let mode = pendingScannerGameChoice else { return }
         pendingScannerGameChoice = nil
         selectScannerMode(mode)
+    }
+
+    func completeScannerAssetPrompt() {
+        guard shouldChooseAnotherScannerAfterPrompt else { return }
+        shouldChooseAnotherScannerAfterPrompt = false
+        presentScannerGameChoice()
     }
 
     /// Deep links (tcger://scan?game=…) stash the requested game under this key

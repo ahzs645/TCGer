@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -13,7 +13,12 @@ import {
 import { canonicalizePokemonRarity } from '../modules/adapters/pokemon-normalization';
 import { resolvePokemonSetArtwork } from '../modules/adapters/pokemon-set-artwork';
 import { getPokemonWorldChampionshipCatalog } from '../modules/adapters/pokemon-world-championships';
-import { deriveCollectionTags } from '@tcg/api-types';
+import {
+  deriveCollectionTags,
+  gamePackageManifestSchema,
+  getGameDefinition,
+  type GamePackageManifest,
+} from '@tcg/api-types';
 
 type SupportedGame = 'pokemon' | 'magic' | 'yugioh' | 'onepiece' | 'lorcana' | 'dragonball';
 
@@ -22,6 +27,7 @@ interface BuildCliOptions {
   outDir: string;
   limit?: number;
   sync: boolean;
+  packagesOnly: boolean;
 }
 
 interface CatalogSet {
@@ -93,6 +99,7 @@ interface CatalogCard {
   printingKind?: string;
   sanctionedPlayLegal?: boolean;
   originalPrintingKey?: string;
+  attributes?: Record<string, unknown>;
   pokemonWorldChampionship?: {
     year: number;
     playerName: string;
@@ -125,6 +132,8 @@ interface ManifestGame {
   compressedBytes?: number;
   sha256: string;
   file: string;
+  packageFile?: string;
+  packageSignatureFile?: string;
   sealedProducts?: {
     version: number;
     productCount: number;
@@ -364,7 +373,7 @@ function parseSupportedGame(value: string | undefined): SupportedGame {
 
 function printUsage(): void {
   console.log(`Usage:
-  bunx tsx backend/src/scripts/build-catalog-packs.ts [--game pokemon|magic|yugioh|onepiece|lorcana|dragonball] [--out <dir>] [--limit <n>] [--sync]
+  bunx tsx backend/src/scripts/build-catalog-packs.ts [--game pokemon|magic|yugioh|onepiece|lorcana|dragonball] [--out <dir>] [--limit <n>] [--sync] [--packages-only]
 
 Defaults:
   --game all
@@ -402,7 +411,7 @@ function parseOptions(argv: string[]): BuildCliOptions | null {
     flags.add(rawKey);
   }
 
-  const knownOptions = new Set(['game', 'out', 'limit', 'sync']);
+  const knownOptions = new Set(['game', 'out', 'limit', 'sync', 'packages-only']);
   for (const key of [...values.keys(), ...flags]) {
     if (!knownOptions.has(key)) {
       throw new Error(`Unknown option: --${key}`);
@@ -426,6 +435,7 @@ function parseOptions(argv: string[]): BuildCliOptions | null {
     outDir: resolve(values.get('out') ?? DEFAULT_OUT_DIR),
     limit: parseOptionalInteger('limit', values.get('limit')),
     sync: flags.has('sync') || values.get('sync') === 'true',
+    packagesOnly: flags.has('packages-only') || values.get('packages-only') === 'true',
   };
 }
 
@@ -475,15 +485,18 @@ async function fetchWithRetry(
 }
 
 async function fetchPokemonCardIndex(): Promise<
-  Map<string, {
-    rarity?: string;
-    artist?: string;
-    category?: string;
-    dexEntries?: Array<{ number: number; name: string }>;
-    stage?: string;
-    suffix?: string;
-    types?: string[];
-  }>
+  Map<
+    string,
+    {
+      rarity?: string;
+      artist?: string;
+      category?: string;
+      dexEntries?: Array<{ number: number; name: string }>;
+      stage?: string;
+      suffix?: string;
+      types?: string[];
+    }
+  >
 > {
   const response = await fetchWithRetry(
     POKEMON_GRAPHQL_URL,
@@ -492,7 +505,8 @@ async function fetchPokemonCardIndex(): Promise<
     {
       method: 'POST',
       body: JSON.stringify({
-        query: 'query CatalogCardMetadata { cards { id rarity illustrator category stage suffix types dexId } }',
+        query:
+          'query CatalogCardMetadata { cards { id rarity illustrator category stage suffix types dexId } }',
       }),
     },
   );
@@ -510,24 +524,51 @@ async function fetchPokemonCardIndex(): Promise<
     throw new Error('TCGdex card metadata index contained no cards');
   }
   return new Map(
-    indexedCards.flatMap((card) => card.id
-      ? [[card.id, {
-          rarity: card.rarity,
-          artist: card.illustrator,
-          category: card.category,
-          dexEntries: card.dexId?.map((number) => ({ number, name: "" })),
-          stage: card.stage,
-          suffix: card.suffix,
-          types: card.types,
-        }] as const]
-      : []),
+    indexedCards.flatMap((card) =>
+      card.id
+        ? [
+            [
+              card.id,
+              {
+                rarity: card.rarity,
+                artist: card.illustrator,
+                category: card.category,
+                dexEntries: card.dexId?.map((number) => ({ number, name: '' })),
+                stage: card.stage,
+                suffix: card.suffix,
+                types: card.types,
+              },
+            ] as const,
+          ]
+        : [],
+    ),
   );
 }
 
 function taggedCard(tcg: SupportedGame, card: CatalogCard): CatalogCard {
+  const collectionTags = deriveCollectionTags({ tcg, ...card });
+  const attributes = Object.fromEntries(
+    Object.entries({ ...card, collectionTags }).filter(
+      ([key, value]) =>
+        value !== undefined &&
+        ![
+          'id',
+          'name',
+          'setCode',
+          'setName',
+          'collectorNumber',
+          'rarity',
+          'imageUrl',
+          'imageUrlSmall',
+          'printingKey',
+          'attributes',
+        ].includes(key),
+    ),
+  );
   return {
     ...card,
-    collectionTags: deriveCollectionTags({ tcg, ...card }),
+    collectionTags,
+    attributes: { ...attributes, ...card.attributes },
   };
 }
 
@@ -649,8 +690,9 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
             suffix: metadata?.suffix,
             type: pocket?.category ?? metadata?.category,
             types: pocket?.types ?? metadata?.types,
-            subtypes: [pocket?.stage ?? metadata?.stage, metadata?.suffix]
-              .filter((value): value is string => Boolean(value)),
+            subtypes: [pocket?.stage ?? metadata?.stage, metadata?.suffix].filter(
+              (value): value is string => Boolean(value),
+            ),
             pokemonPocket: pocket ? pocketMetadata(pocket) : undefined,
           });
         }),
@@ -661,7 +703,9 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
   const remaining = limit ? Math.max(0, limit - cards.length) : Number.POSITIVE_INFINITY;
   const championshipCards = worldChampionshipCatalog.cards.slice(0, remaining);
   if (championshipCards.length) {
-    const includedSetCodes = new Set(championshipCards.flatMap((card) => card.setCode ? [card.setCode] : []));
+    const includedSetCodes = new Set(
+      championshipCards.flatMap((card) => (card.setCode ? [card.setCode] : [])),
+    );
     sets.push(
       ...worldChampionshipCatalog.sets
         .filter((set) => includedSetCodes.has(set.code))
@@ -675,21 +719,23 @@ async function buildPokemonPack(updatedAt: string, limit?: number): Promise<Cata
         })),
     );
     cards.push(
-      ...championshipCards.map((card) => taggedCard('pokemon', {
-        id: card.id,
-        name: card.name,
-        setCode: card.setCode,
-        collectorNumber: card.collectorNumber,
-        rarity: card.rarity,
-        type: card.supertype,
-        imageUrl: card.imageUrl,
-        imageUrlSmall: card.imageUrlSmall,
-        printingKey: card.printingKey,
-        printingKind: card.printingKind,
-        sanctionedPlayLegal: card.sanctionedPlayLegal,
-        originalPrintingKey: card.originalPrintingKey,
-        pokemonWorldChampionship: card.pokemonPrint?.worldChampionship,
-      })),
+      ...championshipCards.map((card) =>
+        taggedCard('pokemon', {
+          id: card.id,
+          name: card.name,
+          setCode: card.setCode,
+          collectorNumber: card.collectorNumber,
+          rarity: card.rarity,
+          type: card.supertype,
+          imageUrl: card.imageUrl,
+          imageUrlSmall: card.imageUrlSmall,
+          printingKey: card.printingKey,
+          printingKind: card.printingKind,
+          sanctionedPlayLegal: card.sanctionedPlayLegal,
+          originalPrintingKey: card.originalPrintingKey,
+          pokemonWorldChampionship: card.pokemonPrint?.worldChampionship,
+        }),
+      ),
     );
   }
 
@@ -820,24 +866,26 @@ async function buildMagicPack(updatedAt: string, limit?: number): Promise<Catalo
     }
 
     const face = card.card_faces?.[0];
-    cards.push(taggedCard('magic', {
-      id: card.id,
-      name: card.name,
-      setCode: card.set,
-      collectorNumber: card.collector_number,
-      rarity: card.rarity,
-      type: card.type_line ?? face?.type_line,
-      manaCost: card.mana_cost ?? face?.mana_cost,
-      colors: card.colors,
-      artist: card.artist ?? face?.artist,
-      variants: card.finishes,
-      treatments: [
-        ...(card.frame_effects ?? []),
-        ...(card.promo_types ?? []),
-        ...(card.full_art ? ['full-art'] : []),
-        ...(card.border_color ? [`${card.border_color}-border`] : []),
-      ],
-    }));
+    cards.push(
+      taggedCard('magic', {
+        id: card.id,
+        name: card.name,
+        setCode: card.set,
+        collectorNumber: card.collector_number,
+        rarity: card.rarity,
+        type: card.type_line ?? face?.type_line,
+        manaCost: card.mana_cost ?? face?.mana_cost,
+        colors: card.colors,
+        artist: card.artist ?? face?.artist,
+        variants: card.finishes,
+        treatments: [
+          ...(card.frame_effects ?? []),
+          ...(card.promo_types ?? []),
+          ...(card.full_art ? ['full-art'] : []),
+          ...(card.border_color ? [`${card.border_color}-border`] : []),
+        ],
+      }),
+    );
 
     const existingSet = sets.get(card.set);
     if (existingSet) {
@@ -874,9 +922,8 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
   const sets = new Map<string, CatalogSet>();
 
   for (const card of sourceCards) {
-    const primaryArtworkId = card.card_images?.[0]?.id !== undefined
-      ? String(card.card_images[0]!.id)
-      : undefined;
+    const primaryArtworkId =
+      card.card_images?.[0]?.id !== undefined ? String(card.card_images[0]!.id) : undefined;
     const printings = card.card_sets?.length ? card.card_sets : [undefined];
     for (const printingSet of printings) {
       const setCode = printingSet
@@ -891,21 +938,25 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
         artworkId: primaryArtworkId,
       });
 
-      cards.push(taggedCard('yugioh', {
-        id,
-        name: card.name,
-        setCode,
-        setName: printingSet?.set_name,
-        collectorNumber: printingSet ? extractYugiohCollectorNumber(printingSet.set_code) : undefined,
-        rarity: printingSet?.set_rarity,
-        type: card.type,
-        race: card.race,
-        atk: card.atk,
-        def: card.def,
-        level: card.level,
-        archetype: card.archetype,
-        konamiId: Number.isFinite(imageId) ? imageId : card.id,
-      }));
+      cards.push(
+        taggedCard('yugioh', {
+          id,
+          name: card.name,
+          setCode,
+          setName: printingSet?.set_name,
+          collectorNumber: printingSet
+            ? extractYugiohCollectorNumber(printingSet.set_code)
+            : undefined,
+          rarity: printingSet?.set_rarity,
+          type: card.type,
+          race: card.race,
+          atk: card.atk,
+          def: card.def,
+          level: card.level,
+          archetype: card.archetype,
+          konamiId: Number.isFinite(imageId) ? imageId : card.id,
+        }),
+      );
 
       if (setCode && printingSet) {
         const existingSet = sets.get(setCode);
@@ -925,21 +976,23 @@ async function buildYugiohPack(updatedAt: string, limit?: number): Promise<Catal
       const artworkId = alternateImage.id !== undefined ? String(alternateImage.id) : undefined;
       if (!artworkId) continue;
       const imageId = Number(artworkId);
-      cards.push(taggedCard('yugioh', {
-        id: buildYugiohPrintingKey({
-          baseExternalId: String(card.id),
-          artworkId,
+      cards.push(
+        taggedCard('yugioh', {
+          id: buildYugiohPrintingKey({
+            baseExternalId: String(card.id),
+            artworkId,
+          }),
+          name: card.name,
+          type: card.type,
+          race: card.race,
+          atk: card.atk,
+          def: card.def,
+          level: card.level,
+          archetype: card.archetype,
+          variants: ['alternate-art'],
+          konamiId: Number.isFinite(imageId) ? imageId : card.id,
         }),
-        name: card.name,
-        type: card.type,
-        race: card.race,
-        atk: card.atk,
-        def: card.def,
-        level: card.level,
-        archetype: card.archetype,
-        variants: ['alternate-art'],
-        konamiId: Number.isFinite(imageId) ? imageId : card.id,
-      }));
+      );
     }
   }
 
@@ -992,16 +1045,18 @@ async function buildOnePiecePack(updatedAt: string, limit?: number): Promise<Cat
     const id = ['onepiece', setCode ?? 'unknown', imageToken ?? baseId]
       .map((part) => encodeURIComponent(part))
       .join(':');
-    cards.push(taggedCard('onepiece', {
-      id,
-      name,
-      setCode,
-      collectorNumber: card.card_set_id,
-      rarity: card.rarity ?? card.card_rarity,
-      type: card.card_type,
-      imageUrl,
-      imageUrlSmall: imageUrl,
-    }));
+    cards.push(
+      taggedCard('onepiece', {
+        id,
+        name,
+        setCode,
+        collectorNumber: card.card_set_id,
+        rarity: card.rarity ?? card.card_rarity,
+        type: card.card_type,
+        imageUrl,
+        imageUrlSmall: imageUrl,
+      }),
+    );
 
     if (setCode) {
       const existing = sets.get(setCode);
@@ -1145,24 +1200,33 @@ async function buildDragonBallPack(updatedAt: string, limit?: number): Promise<C
             ? (setById.get(product.set) ?? setByCode.get(product.set))
             : undefined;
       const image = product.images?.[0];
-      cards.push(taggedCard('dragonball', {
-        id: String(product._id),
-        name: product.name,
-        setCode:
-          set?.code ?? set?._id ?? (typeof product.set === 'string' ? product.set : undefined),
-        collectorNumber: product.cardNumber ?? product.code,
-        rarity: String(dragonBallAttribute(attributes, 'rarity') ?? '') || undefined,
-        type: String(dragonBallAttribute(attributes, 'type', 'card type') ?? '') || undefined,
-        character: String(dragonBallAttribute(attributes, 'character') ?? '') || undefined,
-        era: String(dragonBallAttribute(attributes, 'era') ?? '') || undefined,
-        specialTrait:
-          String(dragonBallAttribute(attributes, 'special trait', 'specialTrait') ?? '') ||
-          undefined,
-        imageUrl: image?.large ?? image?.medium ?? image?.small,
-        imageUrlSmall: image?.small ?? image?.medium ?? image?.large,
-      }));
+      cards.push(
+        taggedCard('dragonball', {
+          id: String(product._id),
+          name: product.name,
+          setCode:
+            set?.code ?? set?._id ?? (typeof product.set === 'string' ? product.set : undefined),
+          collectorNumber: product.cardNumber ?? product.code,
+          rarity: String(dragonBallAttribute(attributes, 'rarity') ?? '') || undefined,
+          type: String(dragonBallAttribute(attributes, 'type', 'card type') ?? '') || undefined,
+          character: String(dragonBallAttribute(attributes, 'character') ?? '') || undefined,
+          era: String(dragonBallAttribute(attributes, 'era') ?? '') || undefined,
+          specialTrait:
+            String(dragonBallAttribute(attributes, 'special trait', 'specialTrait') ?? '') ||
+            undefined,
+          imageUrl: image?.large ?? image?.medium ?? image?.small,
+          imageUrlSmall: image?.small ?? image?.medium ?? image?.large,
+        }),
+      );
     }
     page += 1;
+  }
+
+  if (!setPayload.data?.length) {
+    throw new Error('API TCG returned no Dragon Ball sets; refusing to publish an empty catalog');
+  }
+  if (!cards.length) {
+    throw new Error('API TCG returned no Dragon Ball cards; refusing to publish an empty catalog');
   }
 
   const counts = new Map<string, number>();
@@ -1264,6 +1328,135 @@ async function writePack(
   };
 }
 
+function officialGamePackage(
+  game: SupportedGame,
+  entry: ManifestGame,
+  publishedAt: string,
+  signing?: { keyId: string; publicKey: string; signatureFile: string },
+): GamePackageManifest {
+  const definition = getGameDefinition(game);
+  const publicCatalogRoot = (
+    process.env.TCGER_CATALOG_PUBLIC_BASE_URL ?? 'https://assets.tcger.ahmadjalil.com/catalogs'
+  ).replace(/\/$/, '');
+  return gamePackageManifestSchema.parse({
+    schema: 'https://tcger.app/schemas/game-package-manifest/v1',
+    packageId: `${game}-catalog`,
+    packageVersion: String(entry.version),
+    publishedAt,
+    update: {
+      sequence: entry.version,
+      manifestUrl: `${publicCatalogRoot}/${game}.game-package.json`,
+    },
+    game: {
+      id: game,
+      name: definition.label,
+      shortName: definition.shortLabel,
+      description: `TCGer's official ${definition.label} catalog package.`,
+      homepage: 'https://tcger.app',
+      accentColor: definition.presentation?.accentColor,
+    },
+    publisher: {
+      id: 'tcger',
+      name: 'TCGer',
+      homepage: 'https://tcger.app',
+      signingKey: signing
+        ? {
+            id: signing.keyId,
+            algorithm: 'ed25519',
+            publicKey: signing.publicKey,
+          }
+        : undefined,
+    },
+    signature: signing
+      ? {
+          algorithm: 'ed25519',
+          keyId: signing.keyId,
+          url: `./${signing.signatureFile}`,
+        }
+      : undefined,
+    catalog: {
+      schema: 'tcger-catalog-v1',
+      asset: {
+        url: `./${entry.file}`,
+        bytes: entry.bytes,
+        sha256: entry.sha256,
+        mediaType: 'application/json',
+      },
+      cardCount: entry.cardCount,
+      setCount: entry.setCount,
+    },
+    sealedProducts: entry.sealedProducts
+      ? {
+          schema: 'tcger-sealed-catalog-v1',
+          asset: {
+            url: `./${entry.sealedProducts.file}`,
+            bytes: entry.sealedProducts.bytes,
+            sha256: entry.sealedProducts.sha256,
+            mediaType: 'application/json',
+          },
+          productCount: entry.sealedProducts.productCount,
+        }
+      : undefined,
+    filters: [],
+    definition: {
+      ...definition,
+      interfaces: {
+        search: true,
+        collection: true,
+        sets: true,
+        wishlists: true,
+        decks: false,
+        pricing: false,
+        sealedProducts: Boolean(entry.sealedProducts),
+        scanner: false,
+        packOpening: false,
+        features: definition.interfaces?.features ?? [],
+      },
+    },
+  });
+}
+
+async function writeOfficialGamePackages(outDir: string, manifest: CatalogManifest): Promise<void> {
+  const privateKeyPath = process.env.TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY;
+  const keyId = process.env.TCGER_GAME_PACKAGE_SIGNING_KEY_ID;
+  if (Boolean(privateKeyPath) !== Boolean(keyId)) {
+    throw new Error(
+      'TCGER_GAME_PACKAGE_SIGNING_PRIVATE_KEY and TCGER_GAME_PACKAGE_SIGNING_KEY_ID must be provided together',
+    );
+  }
+  const privateKey = privateKeyPath
+    ? createPrivateKey(await readFile(resolve(privateKeyPath)))
+    : undefined;
+  if (privateKey && privateKey.asymmetricKeyType !== 'ed25519') {
+    throw new Error('The official game-package signing key must be Ed25519');
+  }
+  const publicKey = privateKey
+    ? (() => {
+        const spki = createPublicKey(privateKey).export({ type: 'spki', format: 'der' });
+        return spki.subarray(spki.length - 32).toString('base64');
+      })()
+    : undefined;
+  for (const game of Object.keys(manifest.games) as SupportedGame[]) {
+    const entry = manifest.games[game];
+    if (!entry) continue;
+    const packageFile = `${game}.game-package.json`;
+    const signatureFile = `${packageFile}.sig`;
+    const gamePackage = officialGamePackage(
+      game,
+      entry,
+      manifest.generatedAt,
+      privateKey && keyId && publicKey ? { keyId, publicKey, signatureFile } : undefined,
+    );
+    const contents = Buffer.from(`${JSON.stringify(gamePackage, null, 2)}\n`);
+    await writeFile(resolve(outDir, packageFile), contents);
+    if (privateKey) {
+      await writeFile(resolve(outDir, signatureFile), sign(null, contents, privateKey));
+    }
+    entry.packageFile = packageFile;
+    entry.packageSignatureFile = privateKey ? signatureFile : undefined;
+  }
+}
+
 async function syncOutputs(outDir: string, manifest: CatalogManifest): Promise<void> {
   const destinations = [
     resolve(REPO_ROOT, 'frontend/public/catalog'),
@@ -1273,11 +1466,21 @@ async function syncOutputs(outDir: string, manifest: CatalogManifest): Promise<v
     await mkdir(destination, { recursive: true });
     const currentFiles = new Set(
       Object.values(manifest.games)
-        .flatMap((entry) => [entry?.file, entry?.sealedProducts?.file])
+        .flatMap((entry) => [
+          entry?.file,
+          entry?.packageFile,
+          entry?.packageSignatureFile,
+          entry?.sealedProducts?.file,
+        ])
         .filter((file): file is string => Boolean(file)),
     );
     for (const filename of await readdir(destination)) {
-      if (filename.endsWith('.pack.json') && !currentFiles.has(filename)) {
+      if (
+        (filename.endsWith('.pack.json') ||
+          filename.endsWith('.game-package.json') ||
+          filename.endsWith('.game-package.json.sig')) &&
+        !currentFiles.has(filename)
+      ) {
         await unlink(resolve(destination, filename));
       }
     }
@@ -1286,6 +1489,18 @@ async function syncOutputs(outDir: string, manifest: CatalogManifest): Promise<v
       const entry = manifest.games[game];
       if (entry) {
         await copyFile(resolve(outDir, entry.file), resolve(destination, entry.file));
+        if (entry.packageFile) {
+          await copyFile(
+            resolve(outDir, entry.packageFile),
+            resolve(destination, entry.packageFile),
+          );
+        }
+        if (entry.packageSignatureFile) {
+          await copyFile(
+            resolve(outDir, entry.packageSignatureFile),
+            resolve(destination, entry.packageSignatureFile),
+          );
+        }
         if (entry.sealedProducts) {
           await copyFile(
             resolve(outDir, entry.sealedProducts.file),
@@ -1306,6 +1521,17 @@ async function main(): Promise<void> {
   await mkdir(options.outDir, { recursive: true });
   const generatedAt = new Date().toISOString();
   const existingManifest = await loadExistingManifest(options.outDir);
+  if (options.packagesOnly) {
+    if (!existingManifest) throw new Error('--packages-only requires an existing catalog manifest');
+    await writeOfficialGamePackages(options.outDir, existingManifest);
+    await writeFile(
+      resolve(options.outDir, 'manifest.json'),
+      `${JSON.stringify(existingManifest, null, 2)}\n`,
+    );
+    if (options.sync) await syncOutputs(options.outDir, existingManifest);
+    console.log('Emitted official game package manifests.');
+    return;
+  }
   const manifest: CatalogManifest = {
     formatVersion: 1,
     generatedAt,
@@ -1330,6 +1556,7 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ game, ...manifest.games[game] }));
   }
 
+  await writeOfficialGamePackages(options.outDir, manifest);
   await writeFile(
     resolve(options.outDir, 'manifest.json'),
     `${JSON.stringify(manifest, null, 2)}\n`,

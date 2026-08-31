@@ -28,8 +28,16 @@ fun CommunityCatalogCard.asCatalogParityCard(tcg: String, setName: String? = nul
         id = id, name = name, tcg = tcg, setCode = setCode, setName = setName,
         rarity = rarity, collectorNumber = collectorNumber, artist = artist,
         imageUrl = imageUrl, imageUrlSmall = imageUrlSmall,
-        dexEntries = attributes.dexEntries(),
+        dexEntries = dexEntries.toPokedexEntries().ifEmpty { attributes.dexEntries() },
     )
+
+private fun List<kotlinx.serialization.json.JsonElement>.toPokedexEntries(): List<PokedexEntry> =
+    mapNotNull { value ->
+        val item = value as? JsonObject ?: return@mapNotNull null
+        val number = item["number"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+        val name = item["name"]?.jsonPrimitive?.content.orEmpty().ifBlank { "#$number" }
+        PokedexEntry(number, name)
+    }
 
 private fun Map<String, kotlinx.serialization.json.JsonElement>.dexEntries(): List<PokedexEntry> {
     val element = this["dexEntries"]

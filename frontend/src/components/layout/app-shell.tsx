@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ServerFeatures } from "@tcg/api-types";
+import { POKEDEX_GAME_FEATURE_ID } from "@tcg/api-types";
 
 interface NavigationItem {
   href: string;
@@ -33,6 +34,7 @@ interface NavigationItem {
   mobileLabel?: string;
   icon: LucideIcon;
   feature?: keyof ServerFeatures;
+  gameFeature?: string;
 }
 
 /** Extra pages accessible via Quick Actions (⌘K) and mobile "More" menu */
@@ -43,7 +45,12 @@ export const secondaryNavigation: NavigationItem[] = [
     icon: QrCode,
     feature: "onlineCodes",
   },
-  { href: "/pokedex", label: "Pokédex", icon: BookOpen },
+  {
+    href: "/pokedex",
+    label: "Pokédex",
+    icon: BookOpen,
+    gameFeature: POKEDEX_GAME_FEATURE_ID,
+  },
   { href: "/guides", label: "Guides", icon: Palette },
   { href: "/sets", label: "Sets", icon: LibraryBig },
   { href: "/decks", label: "Decks", icon: Layers, feature: "decks" },
@@ -87,6 +94,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CatalogDownloadPrompt } from "@/components/catalog/catalog-download-prompt";
+import { GameInstallationGate } from "@/components/account/game-installation-gate";
+import { GameFeatureGate } from "@/components/game-features/game-feature-gate";
 import { ServerStatusBanner } from "./server-status-banner";
 import { getAppRoute } from "@/lib/app-routes";
 import {
@@ -97,6 +106,7 @@ import { cn } from "@/lib/utils";
 import { getUserPreferences } from "@/lib/api/user-preferences";
 import { isFeatureAvailable, useServerFeatures } from "@/lib/api/health";
 import { useAuthStore } from "@/stores/auth";
+import { useActiveGameFeatures } from "@/lib/game-packages/active-game-features";
 
 import { CommandMenu } from "../navigation/command-menu";
 import { GameSwitcher } from "../navigation/game-switcher";
@@ -124,6 +134,16 @@ function primaryNavigationFor(): NavigationItem[] {
   return navigation;
 }
 
+function requiredGameFeature(pathname: string): {
+  id: string;
+  label: string;
+} | null {
+  if (pathname === "/pokedex" || pathname.startsWith("/pokedex/")) {
+    return { id: POKEDEX_GAME_FEATURE_ID, label: "Pokédex" };
+  }
+  return null;
+}
+
 interface AppShellProps {
   children: React.ReactNode;
   /**
@@ -136,6 +156,7 @@ interface AppShellProps {
 
 export function AppShell({ children, fullBleed = false }: AppShellProps) {
   const pathname = usePathname();
+  const activeGameFeatures = useActiveGameFeatures();
   const dashboardHref = getAppRoute("/", pathname);
   const features = useServerFeatures();
   const [sealedProductsEnabled, setSealedProductsPreference] = useState(true);
@@ -149,10 +170,17 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
   }, []);
   // Stable during SSR and hydration; the persisted demo flag is client-only.
   const demoMode = pathname === "/demo" || pathname.startsWith("/demo/");
+  const requiredFeature = demoMode ? null : requiredGameFeature(pathname);
+  const requiredFeatureSources = requiredFeature
+    ? activeGameFeatures.sourcesFor(requiredFeature.id)
+    : [];
   const availableSecondaryNavigation = [...secondaryNavigation].filter(
     (item) =>
       (item.href !== "/online-codes" || !demoMode) &&
       (item.href !== "/sealed" || sealedProductsEnabled) &&
+      (demoMode ||
+        !item.gameFeature ||
+        activeGameFeatures.sourcesFor(item.gameFeature).length > 0) &&
       (demoMode || !item.feature || isFeatureAvailable(features, item.feature)),
   );
   const primaryNavigation = primaryNavigationFor();
@@ -336,10 +364,42 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
       >
         <ServerStatusBanner demoMode={demoMode} />
         {fullBleed ? (
-          <div className="min-h-0 flex-1">{children}</div>
+          <div className="min-h-0 flex-1">
+            <GameInstallationGate>
+              {requiredFeature ? (
+                <GameFeatureGate
+                  featureLabel={requiredFeature.label}
+                  isLoading={
+                    activeGameFeatures.isLoading &&
+                    requiredFeatureSources.length === 0
+                  }
+                  supported={requiredFeatureSources.length > 0}
+                >
+                  {children}
+                </GameFeatureGate>
+              ) : (
+                children
+              )}
+            </GameInstallationGate>
+          </div>
         ) : (
           <div className="container space-y-6 py-6 md:py-8" data-oid="1zq._:c">
-            {children}
+            <GameInstallationGate>
+              {requiredFeature ? (
+                <GameFeatureGate
+                  featureLabel={requiredFeature.label}
+                  isLoading={
+                    activeGameFeatures.isLoading &&
+                    requiredFeatureSources.length === 0
+                  }
+                  supported={requiredFeatureSources.length > 0}
+                >
+                  {children}
+                </GameFeatureGate>
+              ) : (
+                children
+              )}
+            </GameInstallationGate>
           </div>
         )}
       </main>

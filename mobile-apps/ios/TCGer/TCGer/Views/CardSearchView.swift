@@ -18,10 +18,12 @@ private struct OwnedCardSearchResult: Identifiable {
 struct CardSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @StateObject private var gamePackages = GamePackageStore.shared
     @State private var searchText: String
     @State private var isSearchPresented = false
     @State private var searchScope = CardSearchScope.catalog
     @State private var selectedGame: TCGGame = .all
+    @State private var selectedPackageId: String?
     @State private var searchResults: [Card] = []
     @State private var ownedSearchResults: [OwnedCardSearchResult] = []
     @State private var isSearching = false
@@ -181,7 +183,7 @@ struct CardSearchView: View {
                     } label: {
                         Label("Discover", systemImage: "dice")
                     }
-                    .disabled(isSearching || searchScope == .collection)
+                    .disabled(isSearching || searchScope == .collection || selectedPackageId != nil)
                 }
 
                 ToolbarSpacer(.flexible, placement: .bottomBar)
@@ -319,6 +321,38 @@ struct CardSearchView: View {
                 .padding(.vertical, 8)
             }
 
+
+            let searchablePackages = gamePackages.installed.filter {
+                $0.manifest.effectiveDefinition.interfaces?.search != false
+            }
+            if !searchablePackages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(searchablePackages) { package in
+                            let selected = selectedPackageId == package.id
+                            Button {
+                                selectedPackageId = selected ? nil : package.id
+                                if !selected { selectedGame = .all }
+                                if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    Task { await performSearch() }
+                                }
+                            } label: {
+                                Text("\(package.manifest.effectiveDefinition.shortLabel ?? package.manifest.effectiveDefinition.label) · \(package.manifest.publisher.name)")
+                                    .font(.caption.weight(.medium))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(selected ? Color.accentColor : Color.secondary.opacity(0.12), in: Capsule())
+                                    .foregroundStyle(selected ? Color.white : Color.primary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(selected ? .isSelected : [])
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .accessibilityLabel("Installed game libraries")
+            }
+
             if let wishlistId = addToWishlistId,
                hasSearched,
                !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -387,7 +421,8 @@ struct CardSearchView: View {
     }
 
     private func selectGame(_ game: TCGGame) {
-        guard game != selectedGame else { return }
+        guard game != selectedGame || selectedPackageId != nil else { return }
+        selectedPackageId = nil
         selectedGame = game
         searchFilters.clearIncompatibleValues(for: game)
         if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -549,7 +584,10 @@ struct CardSearchView: View {
         hasSearched = true
 
         do {
-            if searchScope == .collection {
+            if let selectedPackageId, searchScope == .catalog {
+                searchResults = try gamePackages.search(packageId: selectedPackageId, query: query)
+                ownedSearchResults = []
+            } else if searchScope == .collection {
                 let collections: [Collection]
                 if let loadedCollections {
                     collections = loadedCollections

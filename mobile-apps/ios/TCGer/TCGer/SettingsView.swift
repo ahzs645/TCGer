@@ -37,8 +37,6 @@ struct SettingsView: View {
     @State private var gameDisableBlock: GameDisableBlock?
     @State private var gameDisableCheckError: String?
     @State private var gamesBeingUpdated: Set<TCGGame> = []
-    @State private var pendingCatalogInstall: TCGGame?
-    @State private var catalogInstallError: String?
     @State private var sampleDataLoaded = false
     @State private var localBackupURLs: [URL] = []
     @State private var localDataMessage: String?
@@ -46,6 +44,7 @@ struct SettingsView: View {
     @State private var showingEraseLocalDataAlert = false
     @State private var showingHideDeveloperToolsAlert = false
     @State private var versionTapCount = 0
+    @State private var offlineDownloadsGame: TCGGame?
 
     init(parentProvidesNavigation: Bool = false) {
         self.parentProvidesNavigation = parentProvidesNavigation
@@ -295,7 +294,13 @@ struct SettingsView: View {
                             game: game,
                             isOn: environmentStore.isGameEnabled(game),
                             isEnabled: canEditPreferences,
-                            isUpdating: gamesBeingUpdated.contains(game)
+                            isUpdating: gamesBeingUpdated.contains(game),
+                            catalogStore: catalogStore,
+                            scannerAssets: scannerAssets,
+                            packDownloads: offlinePackDownloads,
+                            onOpenDownloads: {
+                                offlineDownloadsGame = game
+                            }
                         ) { isOn in
                             guard !gamesBeingUpdated.contains(game) else { return }
                             gamesBeingUpdated.insert(game)
@@ -308,44 +313,27 @@ struct SettingsView: View {
                             }
                         }
 
-                        if TCGGame.catalogGames.contains(game) {
-                            catalogInstallProgress(for: game)
-                        }
                     }
                 } header: {
                     Text("Games")
                 } footer: {
-                    Text("Enable or disable specific TCG games in search and analytics. A game can't be turned off while you still have its cards in a collection or wishlist.")
+                    Text("Enable or disable each game. The cloud button manages optional scanner models and pack artwork. A game can't be turned off while you still have its cards in a collection or wishlist.")
                 }
 
-                Section {
+                Section("Game Libraries") {
                     NavigationLink {
-                        OfflineDownloadsView(
-                            catalogStore: catalogStore,
-                            scannerAssets: scannerAssets,
-                            packDownloads: offlinePackDownloads
-                        )
-                        .environmentObject(environmentStore)
+                        GameStoreView(catalogStore: catalogStore)
+                            .environmentObject(environmentStore)
                     } label: {
-                        Label {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Offline Downloads")
-                                Text("Catalogs, scanner models, and pack sets by game")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: "icloud.and.arrow.down")
-                                .foregroundStyle(.tint)
-                        }
+                        Label("Game Store", systemImage: "storefront")
                     }
-                } header: {
-                    Text("Downloads")
-                } footer: {
-                    Text("Downloadable content is grouped under its relevant game. OCR remains in Scanner Options while scanning.")
-                }
 
-                CommunityGameLibrariesSection(store: gamePackages)
+                    NavigationLink {
+                        InstallGamePackageView(store: gamePackages)
+                    } label: {
+                        Label("Install from URL", systemImage: "link.badge.plus")
+                    }
+                }
 
                 // Display Preferences Section
                 Section {
@@ -909,41 +897,6 @@ struct SettingsView: View {
             } message: {
                 Text(gameDisableCheckError ?? "The game stayed enabled. Please try again.")
             }
-            .alert(
-                pendingCatalogInstall.map {
-                    "Install the \($0.displayName) catalog (\(catalogPromptSize(for: $0)))?"
-                } ?? "Install catalog?",
-                isPresented: Binding(
-                    get: { pendingCatalogInstall != nil },
-                    set: { if !$0 { pendingCatalogInstall = nil } }
-                ),
-                presenting: pendingCatalogInstall
-            ) { game in
-                Button("Not Now", role: .cancel) {
-                    pendingCatalogInstall = nil
-                }
-                Button("Install") {
-                    pendingCatalogInstall = nil
-                    installCatalog(game)
-                }
-            } message: { game in
-                Text(environmentStore.sealedProductsEnabled
-                    ? "This installs the separate card and sealed-product catalogs for this game."
-                    : "This installs only the card catalog for this game.")
-            }
-            .alert(
-                "Catalog Installation Failed",
-                isPresented: Binding(
-                    get: { catalogInstallError != nil },
-                    set: { if !$0 { catalogInstallError = nil } }
-                )
-            ) {
-                Button("OK", role: .cancel) {
-                    catalogInstallError = nil
-                }
-            } message: {
-                Text(catalogInstallError ?? "The catalog could not be installed.")
-            }
             .sheet(isPresented: $showingProfile) {
                 ProfileView()
                     .environmentObject(environmentStore)
@@ -951,6 +904,16 @@ struct SettingsView: View {
             .sheet(isPresented: $showingDeleteServerAccount) {
                 DeleteServerAccountView()
                     .environmentObject(environmentStore)
+            }
+            .sheet(item: $offlineDownloadsGame) { game in
+                GameOfflineDownloadsSheet(
+                    game: game,
+                    catalogStore: catalogStore,
+                    scannerAssets: scannerAssets,
+                    packDownloads: offlinePackDownloads
+                )
+                .environmentObject(environmentStore)
+                .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showingExportSheet) {
                 if let data = exportData, let filename = exportFilename {
@@ -1095,12 +1058,6 @@ private extension SettingsView {
                     enabledDragonball: game == .dragonball ? true : nil
                 )
             }
-            if isLocalMode,
-               TCGGame.catalogGames.contains(game),
-               case .notInstalled = catalogStore.installState(for: game),
-               catalogStore.isAvailable(game) {
-                pendingCatalogInstall = game
-            }
             return
         }
 
@@ -1172,56 +1129,7 @@ private extension SettingsView {
     }
 
     func setGameEnabled(_ game: TCGGame, enabled: Bool) {
-        switch game {
-        case .yugioh: environmentStore.enabledYugioh = enabled
-        case .magic: environmentStore.enabledMagic = enabled
-        case .pokemon: environmentStore.enabledPokemon = enabled
-        case .onepiece: environmentStore.enabledOnepiece = enabled
-        case .lorcana: environmentStore.enabledLorcana = enabled
-        case .dragonball: environmentStore.enabledDragonball = enabled
-        case .all: break
-        }
-    }
-
-    @ViewBuilder
-    func catalogInstallProgress(for game: TCGGame) -> some View {
-        if catalogStore.installingGames.contains(game) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(catalogStore.installStatus(for: game) ?? "Installing \(game.displayName) catalog")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text((catalogStore.installProgress[game] ?? 0).formatted(.percent.precision(.fractionLength(0))))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                ProgressView(value: catalogStore.installProgress[game] ?? 0)
-            }
-        }
-    }
-
-    func catalogPromptSize(for game: TCGGame) -> String {
-        guard let metadata = catalogStore.metadata(for: game) else { return "size unavailable" }
-        let cardBytes = metadata.compressedBytes ?? metadata.bytes
-        let sealedBytes = environmentStore.sealedProductsEnabled
-            ? catalogStore.sealedMetadata(for: game).map { $0.compressedBytes ?? $0.bytes } ?? 0
-            : 0
-        return "~\(ByteCountFormatter.string(fromByteCount: Int64(cardBytes + sealedBytes), countStyle: .file))"
-    }
-
-    func installCatalog(_ game: TCGGame) {
-        Task {
-            do {
-                try await catalogStore.install(game)
-                if environmentStore.sealedProductsEnabled,
-                   catalogStore.isSealedAvailable(game) {
-                    try await catalogStore.installSealed(game)
-                }
-            } catch {
-                catalogInstallError = error.localizedDescription
-            }
-        }
+        environmentStore.setGameEnabled(game, enabled: enabled)
     }
 
     /// Count cards of a game across collections and wishlists.
@@ -1547,28 +1455,66 @@ private extension SettingsView {
 }
 
 private struct TCGModuleToggleRow: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+
     let game: TCGGame
     let isOn: Bool
     let isEnabled: Bool
     let isUpdating: Bool
+    @ObservedObject var catalogStore: CatalogStore
+    @ObservedObject var scannerAssets: ScannerAssetStore
+    @ObservedObject var packDownloads: PackOfflineDownloadManager
+    let onOpenDownloads: () -> Void
     let onChange: (Bool) -> Void
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { isOn },
-            set: onChange
-        )) {
-            HStack(spacing: 8) {
-                TCGGameIcon(game: game, size: 20)
-                    .foregroundStyle(game.brandColor)
-                Text(game.displayName)
-                if isUpdating {
-                    ProgressView()
-                        .controlSize(.small)
-                }
+        HStack(spacing: 12) {
+            TCGGameIcon(game: game, size: 20)
+                .foregroundStyle(game.brandColor)
+            Text(game.displayName)
+            if isUpdating {
+                ProgressView()
+                    .controlSize(.small)
             }
+
+            Spacer(minLength: 8)
+
+            Button(action: onOpenDownloads) {
+                HStack(spacing: 4) {
+                    Image(systemName: downloadStatus.systemImage)
+                    if downloadStatus.availableCount > 0 {
+                        Text("\(downloadStatus.installedCount)/\(downloadStatus.availableCount)")
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                    }
+                }
+                .foregroundStyle(downloadStatus.tint)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(downloadStatus.accessibilityLabel(for: game))
+
+            Toggle(isOn: Binding(
+                get: { isOn },
+                set: onChange
+            )) {
+                Text(game.displayName)
+            }
+            .labelsHidden()
+            .disabled(!isEnabled || isUpdating)
+            .accessibilityLabel("Enable \(game.displayName)")
         }
-        .disabled(!isEnabled || isUpdating)
+    }
+
+    private var downloadStatus: GameOfflineDownloadStatus {
+        GameOfflineDownloadStatus(
+            game: game,
+            isLocalMode: environmentStore.serverConfiguration.isOnDevice,
+            includeSealedProducts: environmentStore.sealedProductsEnabled,
+            catalogStore: catalogStore,
+            scannerAssets: scannerAssets,
+            packDownloads: packDownloads
+        )
     }
 }
 

@@ -33,6 +33,7 @@ import com.ahmadjalil.tcger.domain.WishlistInput
 import com.ahmadjalil.tcger.domain.gameDisableBlockReason
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerRequest
 import com.ahmadjalil.tcger.data.gamepackage.GamePackageState
+import com.ahmadjalil.tcger.data.gamepackage.CommunityCatalogCard
 import com.ahmadjalil.tcger.data.scanner.ScannerRecognitionEngine
 import com.ahmadjalil.tcger.data.scanner.ScannerEncoderVariant
 import com.ahmadjalil.tcger.data.scanner.model.ScannerAssetInstallStatus
@@ -52,6 +53,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import java.util.UUID
 
 data class AppUiState(
@@ -93,6 +96,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 _state.update { it.copy(gamePackages = packages) }
             }
         }
+        viewModelScope.launch { container.gamePackages.refreshOfficial() }
         viewModelScope.launch {
             container.scannerAssets.statuses.collectLatest { scannerAssets ->
                 _state.update { it.copy(scannerAssets = scannerAssets) }
@@ -323,7 +327,33 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 return@launch
             }
             _state.update { it.copy(isSearching = true) }
-            runCatching { repository.searchCards(snapshot.searchQuery, snapshot.searchGame) }
+            runCatching {
+                val selectedPackageId = snapshot.searchGame
+                    ?.takeIf { it.startsWith("package:") }
+                    ?.removePrefix("package:")
+                val serverResults = if (selectedPackageId == null) {
+                    repository.searchCards(snapshot.searchQuery, snapshot.searchGame)
+                } else {
+                    emptyList()
+                }
+                val query = snapshot.searchQuery.trim()
+                val packageResults = buildList {
+                    snapshot.gamePackages.installed
+                        .filter { it.manifest.effectiveDefinition.interfaces?.search != false }
+                        .filter { snapshot.searchGame == null || it.id == selectedPackageId }
+                        .forEach { installed ->
+                            addAll(container.gamePackages.cards(installed.id)
+                                .filter { card ->
+                                    card.name.contains(query, true) ||
+                                        card.setName?.contains(query, true) == true ||
+                                        card.setCode?.contains(query, true) == true ||
+                                        card.collectorNumber?.contains(query, true) == true
+                                }
+                                .map { it.toDomainCard(installed.id, installed.manifest.game.id) })
+                        }
+                }.take(200)
+                (serverResults + packageResults).distinctBy { "${it.tcg}:${it.id}" }
+            }
                 .onSuccess { results -> _state.update { it.copy(searchResults = results, isSearching = false) } }
                 .onFailure(::showError)
         }
@@ -597,6 +627,12 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
     fun removeScannerAssets(game: String) = container.scannerAssets.remove(game)
     fun installGamePackage(url: String) = viewModelScope.launch { container.gamePackages.install(url) }
+    fun installOfficialGamePackage(gameId: String) = viewModelScope.launch {
+        container.gamePackages.installOfficial(gameId)
+    }
+    fun checkGamePackageUpdates() = viewModelScope.launch { container.gamePackages.checkForUpdates() }
+    fun updateGamePackage(packageId: String) = viewModelScope.launch { container.gamePackages.update(packageId) }
+    fun refreshOfficialGamePackages() = viewModelScope.launch { container.gamePackages.refreshOfficial() }
     fun removeGamePackage(game: String) = container.gamePackages.remove(game)
     suspend fun communityGameCards(game: String) = container.gamePackages.cards(game)
     fun clearMessage() = _state.update { it.copy(message = null) }
@@ -635,6 +671,28 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 }
+
+private fun CommunityCatalogCard.toDomainCard(packageId: String, gameId: String) = CatalogCard(
+    id = "$packageId::$id",
+    name = name,
+    tcg = gameId,
+    setCode = setCode,
+    setName = setName,
+    rarity = rarity,
+    collectorNumber = collectorNumber,
+    imageUrl = imageUrl,
+    exactPrintingId = printingKey,
+    releaseDate = releasedAt,
+    artist = artist,
+    supertype = supertype ?: type,
+    attributes = effectiveAttributes().mapValues { (_, value) ->
+        when (value) {
+            is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.content }
+            is JsonPrimitive -> listOf(value.content)
+            else -> listOf(value.toString())
+        }
+    },
+)
 
 private fun AndroidScannerRequest.toDomainScanOptions() = CardScanOptions(
     engine = when (options.recognitionEngine) {

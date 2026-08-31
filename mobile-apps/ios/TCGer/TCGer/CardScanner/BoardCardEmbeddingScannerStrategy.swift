@@ -339,6 +339,20 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     // stronger match.
     /// One orientation's recognition, folded into a value so concurrent and
     /// serial evaluation share identical downstream handling.
+    /// The unconstrained visual leader of one orientation, reported whether
+    /// or not that orientation went on to accept, so the two orientations of
+    /// a crop can be checked against each other.
+    struct VisualLeader: Sendable {
+        let name: String
+        let score: Double
+        let game: TCGGame
+    }
+
+    /// Side channel from `recognize` to `evaluate` for one orientation.
+    private final class OrientationReport: @unchecked Sendable {
+        var leader: VisualLeader?
+    }
+
     private enum OrientationOutcome {
         case result(CardScanResult?)
         case rejected
@@ -353,20 +367,40 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         attempt: CropAttempt,
         context: CardScannerContext,
         source: ScanInvocationKind
-    ) async -> OrientationOutcome {
+    ) async -> (outcome: OrientationOutcome, leader: VisualLeader?) {
+        let report = OrientationReport()
         do {
-            return .result(try await recognize(
+            let result = try await recognize(
                 attempt: attempt,
                 context: context,
-                source: source
-            ))
+                source: source,
+                report: report
+            )
+            return (.result(result), report.leader)
         } catch CardScannerError.rejectedInput {
-            return .rejected
+            return (.rejected, report.leader)
         } catch CardScannerError.degenerateInput {
-            return .degenerate
+            return (.degenerate, report.leader)
         } catch {
-            return .failed(error)
+            return (.failed(error), report.leader)
         }
+    }
+
+    /// A card is not two different cards depending on which way up it is.
+    /// When both orientations of one crop would each be accepted on visual
+    /// evidence as DIFFERENT cards, the crop is degenerate: on the 23:37
+    /// hand-held Tranquil Cove box crops the twins scored Island 0.94 /
+    /// Plains 0.85 and Island 0.82 / Plains 0.99. Measured on 125 correct
+    /// accepts across both games, a genuine crop's twin never reaches a
+    /// different name above 0.66. The operating point is the game's own
+    /// strong-accept score — no new number.
+    static func isOrientationContradiction(
+        _ leaders: [(name: String, score: Double)],
+        strongAcceptanceScore: Double
+    ) -> Bool {
+        let acceptable = leaders.filter { $0.score >= strongAcceptanceScore }
+        guard acceptable.count >= 2 else { return false }
+        return Set(acceptable.map { CardTitleOCR.normalizedName($0.name) }).count > 1
     }
 
     private func evaluate(
@@ -380,7 +414,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         // Both orientations always run and arbitrate only afterwards, so the
         // pair is order-independent — running it concurrently changes wall
         // time, never the outcome. Serial evaluation remains for A/B runs.
-        let outcomes: [(attempt: CropAttempt, outcome: OrientationOutcome)]
+        let outcomes: [(attempt: CropAttempt, outcome: OrientationOutcome, leader: VisualLeader?)]
         if ScannerPerfOptions.isConcurrentOrientationsEnabled,
            hypothesis.orientations.count == 2 {
             let first = hypothesis.orientations[0]
@@ -391,17 +425,46 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
             async let secondOutcome = recognizeOutcome(
                 attempt: second, context: context, source: source
             )
-            outcomes = [(first, await firstOutcome), (second, await secondOutcome)]
+            let (firstResult, secondResult) = (await firstOutcome, await secondOutcome)
+            outcomes = [
+                (first, firstResult.outcome, firstResult.leader),
+                (second, secondResult.outcome, secondResult.leader),
+            ]
         } else {
-            var collected: [(CropAttempt, OrientationOutcome)] = []
+            var collected: [(CropAttempt, OrientationOutcome, VisualLeader?)] = []
             for attempt in hypothesis.orientations {
-                collected.append((attempt, await recognizeOutcome(
+                let recognized = await recognizeOutcome(
                     attempt: attempt, context: context, source: source
-                )))
+                )
+                collected.append((attempt, recognized.outcome, recognized.leader))
             }
             outcomes = collected
         }
-        for (attempt, outcome) in outcomes {
+        let leaders = outcomes.compactMap(\.leader)
+        if let game = leaders.first?.game,
+           Self.isOrientationContradiction(
+               leaders.map { ($0.name, $0.score) },
+               strongAcceptanceScore: acceptancePolicy(for: game).strongAcceptanceScore
+           ) {
+            for (attempt, _, _) in outcomes {
+                context.diagnostics?.record(ScanDiagnostics.Attempt(
+                    kind: attempt.kind,
+                    quad: attempt.quad,
+                    gateScore: attempt.gateScore,
+                    gateThreshold: rejectionGate?.threshold,
+                    topCandidates: [],
+                    titleMatchedName: nil,
+                    titlePrintingCount: nil,
+                    footerPairNumbers: [],
+                    ocrVerifiedCollectorNumber: nil,
+                    outcome: .orientationContradiction,
+                    imageIndex: -1,
+                    semanticOrientation: attempt.isSemantic180 ? .upsideDown : .upright
+                ))
+            }
+            return HypothesisVerdict(result: nil, sawRejection: sawRejection)
+        }
+        for (attempt, outcome, _) in outcomes {
             switch outcome {
             case .result(let result):
                 if attempt.isSemantic180 {
@@ -683,7 +746,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private func recognize(
         attempt: CropAttempt,
         context: CardScannerContext,
-        source: ScanInvocationKind
+        source: ScanInvocationKind,
+        report: OrientationReport? = nil
     ) async throws -> CardScanResult? {
         let cropped = attempt.image
         let embedding = attempt.embedding
@@ -809,6 +873,11 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let policy = acceptancePolicy(for: recognizedGame)
         let strongAcceptanceScore = policy.strongAcceptanceScore
         let ambiguityMargin = policy.ambiguityMargin
+        report?.leader = VisualLeader(
+            name: primary.details.identity.name,
+            score: primary.confidence.score,
+            game: recognizedGame
+        )
 
         // Hub collapse: a degenerate crop (blank, glare-saturated, badly
         // rectified) does not land near ONE card, it lands near many

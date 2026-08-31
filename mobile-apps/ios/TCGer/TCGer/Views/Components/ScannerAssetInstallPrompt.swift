@@ -39,54 +39,73 @@ struct ScannerGameChoicePrompt: View {
 
     let request: ScannerGameChoiceRequest
     let onSelect: (ScanMode) -> Void
+    let onCancel: (() -> Void)?
 
     var body: some View {
         NavigationStack {
-            List(request.modes) { mode in
-                Button {
-                    onSelect(mode)
-                    dismiss()
-                } label: {
-                    HStack(spacing: 14) {
-                        scannerIcon(for: mode.tcgGame)
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(mode.tcgGame.displayName)
-                                .font(.headline)
-                                .foregroundStyle(.primary)
-                            Text(packageSummary(for: mode.tcgGame))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-                        Image(systemName: "chevron.forward")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Choose a scanner")
+                        .font(.title2.bold())
+                    Text("Installed scanners start immediately. Other games need a one-time download first.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
-                .accessibilityLabel("Scan \(mode.tcgGame.displayName)")
-                .accessibilityHint(packageSummary(for: mode.tcgGame))
-            }
-            .listStyle(.plain)
-            .contentMargins(.top, 8, for: .scrollContent)
-            .navigationTitle("Choose a Game")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 10)
+
+                List(request.modes) { mode in
                     Button {
+                        onSelect(mode)
                         dismiss()
                     } label: {
-                        Image(systemName: "xmark")
+                        HStack(spacing: 14) {
+                            scannerIcon(for: mode.tcgGame)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(mode.tcgGame.displayName)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                Label {
+                                    Text(packageSummary(for: mode.tcgGame))
+                                } icon: {
+                                    Image(systemName: packageStatusIcon(for: mode.tcgGame))
+                                }
+                                .font(.subheadline)
+                                .foregroundStyle(packageStatusColor(for: mode.tcgGame))
+                            }
+
+                            Spacer()
+                            Image(systemName: "chevron.forward")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
                     }
-                    .accessibilityLabel("Not now")
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                    .accessibilityLabel("Scan \(mode.tcgGame.displayName)")
+                    .accessibilityHint(packageSummary(for: mode.tcgGame))
+                }
+                .listStyle(.plain)
+                .contentMargins(.top, 4, for: .scrollContent)
+            }
+            .toolbar {
+                if let onCancel {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            onCancel()
+                            dismiss()
+                        }
+                    }
                 }
             }
         }
+        .interactiveDismissDisabled(onCancel == nil)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color(.systemBackground))
@@ -97,10 +116,24 @@ struct ScannerGameChoicePrompt: View {
             return "Ready to scan"
         }
         guard let manifest = store.manifests[game] else {
-            return "Scanner download available"
+            return "Download required"
         }
         let size = ByteCountFormatter.string(fromByteCount: Int64(manifest.downloadBytes), countStyle: .file)
-        return "\(manifest.displayedCardCount.formatted(.number)) cards · \(size) download"
+        return "\(size) download required"
+    }
+
+    private func packageStatusIcon(for game: TCGGame) -> String {
+        if case .installed = store.installState(for: game) {
+            return "checkmark.circle.fill"
+        }
+        return "arrow.down.circle.fill"
+    }
+
+    private func packageStatusColor(for game: TCGGame) -> Color {
+        if case .installed = store.installState(for: game) {
+            return .green
+        }
+        return .secondary
     }
 
     @ViewBuilder
@@ -152,6 +185,7 @@ struct ScannerAssetInstallPrompt: View {
     @ObservedObject var store: ScannerAssetStore
 
     let request: ScannerAssetPromptRequest
+    let onChooseAnotherScanner: (() -> Void)?
 
     @State private var errorMessage: String?
 
@@ -199,7 +233,10 @@ struct ScannerAssetInstallPrompt: View {
                 .frame(maxWidth: .infinity)
                 .disabled(isInstalling || store.manifests[request.game] == nil)
 
-                Button(request.kind == .install ? "Not now" : "Use installed version") {
+                Button(request.kind == .install ? "Choose another scanner" : "Use installed version") {
+                    if request.kind == .install {
+                        onChooseAnotherScanner?()
+                    }
                     dismiss()
                 }
                 .frame(maxWidth: .infinity)

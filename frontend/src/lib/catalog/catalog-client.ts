@@ -10,6 +10,10 @@ import { invalidateCatalogSearchIndex } from "./catalog-search";
 import { CATALOG_GAMES, type CatalogTcgCode } from "./catalog-types";
 import { catalogAssetUrl } from "./catalog-assets";
 import { isDemoMode } from "@/lib/demo-mode";
+import {
+  gamePackageManifestSchema,
+  type GamePackageManifest,
+} from "@tcg/api-types";
 
 export interface CatalogManifestGame {
   version: number;
@@ -19,7 +23,14 @@ export interface CatalogManifestGame {
   compressedBytes?: number;
   sha256: string;
   file: string;
+  packageFile?: string;
   sealedProducts?: SealedCatalogManifestEntry;
+}
+
+export interface OfficialGamePackage {
+  tcg: CatalogTcgCode;
+  manifestUrl: string;
+  manifest: GamePackageManifest;
 }
 
 export interface SealedCatalogManifestEntry {
@@ -160,6 +171,13 @@ function parseManifestGame(value: unknown): CatalogManifestGame | undefined {
       : undefined,
     sha256: value.sha256,
     file: value.file,
+    packageFile:
+      isOptionalString(value.packageFile) &&
+      value.packageFile &&
+      !value.packageFile.includes("/") &&
+      !value.packageFile.includes("\\")
+        ? value.packageFile
+        : undefined,
     sealedProducts: parseSealedManifestEntry(value.sealedProducts),
   };
 }
@@ -203,8 +221,10 @@ function parseCatalogManifest(value: unknown): CatalogManifest {
   }
 
   const games: Partial<Record<CatalogTcgCode, CatalogManifestGame>> = {};
-  for (const tcg of CATALOG_GAMES) {
-    const entry = parseManifestGame(value.games[tcg]);
+  for (const [gameId, candidate] of Object.entries(value.games)) {
+    if (!isCatalogGameCode(gameId)) continue;
+    const tcg: CatalogTcgCode = gameId;
+    const entry = parseManifestGame(candidate);
     if (entry) games[tcg] = entry;
   }
 
@@ -213,6 +233,38 @@ function parseCatalogManifest(value: unknown): CatalogManifest {
     generatedAt: value.generatedAt,
     games,
   };
+}
+
+export async function fetchOfficialGamePackages(
+  catalogManifest: CatalogManifest,
+): Promise<OfficialGamePackage[]> {
+  const packages = await Promise.all(
+    Object.entries(catalogManifest.games).map(async ([gameId, entry]) => {
+      if (!entry?.packageFile || !isCatalogGameCode(gameId)) return undefined;
+      const tcg: CatalogTcgCode = gameId;
+      const manifestUrl = catalogAssetUrl(entry.packageFile);
+      const response = await fetch(manifestUrl, { cache: "no-cache" });
+      if (!response.ok) return undefined;
+      const parsed = gamePackageManifestSchema.safeParse(await response.json());
+      if (!parsed.success) return undefined;
+      const manifest = parsed.data;
+      if (
+        manifest.publisher.id !== "tcger" ||
+        manifest.game.id !== tcg ||
+        manifest.catalog.cardCount !== entry.cardCount ||
+        manifest.catalog.asset.sha256.toLowerCase() !==
+          entry.sha256.toLowerCase()
+      ) {
+        return undefined;
+      }
+      return { tcg, manifestUrl, manifest } satisfies OfficialGamePackage;
+    }),
+  );
+  return packages
+    .filter((value): value is OfficialGamePackage => value !== undefined)
+    .sort((left, right) =>
+      left.manifest.game.name.localeCompare(right.manifest.game.name),
+    );
 }
 
 function isCatalogSet(value: unknown): value is CatalogSet {
@@ -283,13 +335,15 @@ function parseCatalogPack(
 }
 
 function isSealedProductContent(value: unknown): boolean {
-  return isRecord(value) &&
+  return (
+    isRecord(value) &&
     isOptionalString(value.externalId) &&
     isString(value.name) &&
     isOptionalNumber(value.quantity) &&
     isOptionalString(value.setCode) &&
     isOptionalString(value.rarity) &&
-    isOptionalString(value.imageUrl);
+    isOptionalString(value.imageUrl)
+  );
 }
 
 function isSealedCatalogProduct(value: unknown): value is SealedCatalogProduct {
@@ -307,9 +361,13 @@ function isSealedCatalogProduct(value: unknown): value is SealedCatalogProduct {
     isOptionalString(value.imageUrl) &&
     isOptionalNumber(value.marketPrice) &&
     isOptionalString(value.upc) &&
-    (value.contentMode === undefined || value.contentMode === "fixed" || value.contentMode === "pool") &&
+    (value.contentMode === undefined ||
+      value.contentMode === "fixed" ||
+      value.contentMode === "pool") &&
     isOptionalNumber(value.contentCount) &&
-    (value.contents === undefined || (Array.isArray(value.contents) && value.contents.every(isSealedProductContent))) &&
+    (value.contents === undefined ||
+      (Array.isArray(value.contents) &&
+        value.contents.every(isSealedProductContent))) &&
     isOptionalString(value.contentSource) &&
     isOptionalString(value.contentUpdatedAt)
   );

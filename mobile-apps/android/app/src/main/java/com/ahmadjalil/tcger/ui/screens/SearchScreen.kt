@@ -47,8 +47,12 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
     var appliedDefaultGame by remember { mutableStateOf(false) }
     var showingFilters by remember { mutableStateOf(false) }
     var filters by remember { mutableStateOf(CardSearchFilters()) }
-    val games = listOf("pokemon", "magic", "yugioh", "onepiece", "lorcana", "dragonball")
-        .filter { it in state.preferences.enabledGames }
+    val packageDefinitions = state.gamePackages.installed
+        .filter { it.manifest.effectiveDefinition.interfaces?.search != false }
+    val packageLabels = packageDefinitions.associate {
+        "package:${it.id}" to "${it.manifest.effectiveDefinition.label} · ${it.manifest.publisher.name}"
+    }
+    val games = (state.preferences.enabledGames.sorted() + packageDefinitions.map { "package:${it.id}" }).distinct()
     val filteredResults = state.searchResults.filter { filters.matches(it, state.searchGame) }
 
     LaunchedEffect(state.preferences.defaultGame, games) {
@@ -81,8 +85,8 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item { FilterChip(state.searchGame == null, { viewModel.setSearchGame(null) }, { Text("All") }) }
-            items(games) { game ->
-                FilterChip(state.searchGame == game, { viewModel.setSearchGame(game) }, { Text(game.displayGame()) })
+            items(games, key = { it }) { game ->
+                FilterChip(state.searchGame == game, { viewModel.setSearchGame(game) }, { Text(packageLabels[game] ?: "${game.displayGame()} · TCGer") })
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

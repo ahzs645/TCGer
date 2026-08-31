@@ -69,6 +69,8 @@ fun SettingsScreen(
     onPricingSources: () -> Unit = {},
     onServerAccess: () -> Unit = {},
     onFinanceHistory: () -> Unit = {},
+    onGameStore: () -> Unit = {},
+    onInstallGameFromUrl: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var serverDialog by remember { mutableStateOf(false) }
@@ -96,7 +98,9 @@ fun SettingsScreen(
         }.onSuccess(viewModel::importPortableBackup)
             .onFailure { transferMessage = it.message }
     }
-    val games = listOf("pokemon", "magic", "yugioh", "onepiece", "lorcana", "dragonball")
+    val games = (state.gamePackages.official.map { it.game.id } + state.preferences.enabledGames)
+        .distinct()
+        .sorted()
     val biometricAvailable = remember(context) {
         BiometricManager.from(context).canAuthenticate(
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
@@ -360,7 +364,14 @@ fun SettingsScreen(
                 }
             }
         }
-        item { CommunityGamePackagesSection(state.gamePackages, viewModel) }
+        item {
+            CommunityGamePackagesSection(
+                state.gamePackages,
+                viewModel,
+                onOpenStore = onGameStore,
+                onInstallFromUrl = onInstallGameFromUrl,
+            )
+        }
         item {
             SettingsSection("Data & storage") {
                 FilledTonalButton(onClick = viewModel::refresh, modifier = Modifier.fillMaxWidth()) {

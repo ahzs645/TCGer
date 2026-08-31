@@ -15,6 +15,10 @@ Frames already labeled in the curated tables inside
 DevModeSessionReplayTests.swift are never overwritten here; conflicts between
 a verdict and a curated label are reported for manual resolution.
 
+Binder-page `binder_labels_json` remains intentionally dataset/journal-only.
+The exported session schema has no stable per-pocket ground-truth target, and
+writing a page-level expectedCardId would destroy the pocket association.
+
 Run with --dry-run first. Then sync the sessions dir back to Drive yourself:
   rsync -a ~/Downloads/Reference/TCGer-Session-Reference/sessions/ \
       "/Users/ahmadjalil/Library/CloudStorage/GoogleDrive-ahzs645@gmail.com/My Drive/Projects/TCG/Reference/TCGer-Session-Reference/sessions/"
@@ -73,7 +77,8 @@ def main():
         key = sample["key"]
         if sample["frame_type"] == "binder":
             # Binder pages replay through their own harness; a single-card
-            # expectedCardId on the whole page would be meaningless.
+            # expectedCardId on the whole page would be meaningless. Durable
+            # per-pocket labels remain in binder_labels_json + backups/journal.
             binder_skipped.append(key)
             continue
         session, image_file = key.split("/", 1)

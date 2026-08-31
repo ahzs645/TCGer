@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/auth";
 import { useGameFilterStore } from "@/stores/game-filter";
+import { getDecks, type DeckResponse } from "@/lib/api/decks";
+import { restrictEmbeddingIndexToExternalIds } from "@/lib/scan/embedding-matcher";
 import { isSupportedScannerTcg } from "@/lib/scan/scan-types";
 import {
   normalizeScannerPrintingMode,
@@ -96,6 +98,9 @@ export function VideoScanLab() {
   const [analysisIntervalMs, setAnalysisIntervalMs] = useState(
     DEFAULT_ANALYSIS_INTERVAL_MS,
   );
+  const [yugiohDecks, setYugiohDecks] = useState<DeckResponse[]>([]);
+  const [selectedDeckId, setSelectedDeckId] = useState<string>("full_catalog");
+  const [deckStatus, setDeckStatus] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<{
@@ -203,6 +208,48 @@ export function VideoScanLab() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!token || !isAuthenticated) {
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setYugiohDecks([]);
+        setSelectedDeckId("full_catalog");
+        setDeckStatus(null);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+    void getDecks(token)
+      .then((decks) => {
+        if (cancelled) return;
+        const eligible = decks.filter(
+          (deck) =>
+            ["yugioh", "yu-gi-oh", "yu-gi-oh!", "yu_gi_oh"].includes(
+              deck.tcg.trim().toLowerCase(),
+            ) && deck.cards.length > 0,
+        );
+        setYugiohDecks(eligible);
+        setDeckStatus(null);
+        setSelectedDeckId((current) =>
+          current === "full_catalog" ||
+          eligible.some((deck) => deck.id === current)
+            ? current
+            : "full_catalog",
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setYugiohDecks([]);
+        setSelectedDeckId("full_catalog");
+        setDeckStatus("Decks unavailable; full-catalog scan remains active.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, token]);
+
+  useEffect(() => {
     return () => {
       stopAndCleanup();
     };
@@ -286,7 +333,7 @@ export function VideoScanLab() {
       setIsProcessing(true);
       setHashStatus(null);
       try {
-        const indexes = await ensureEmbeddingIndexes(scanFilter);
+        let indexes = await ensureEmbeddingIndexes(scanFilter);
         if (indexes.length === 0) {
           setError(
             scanFilter === "all"
@@ -295,6 +342,33 @@ export function VideoScanLab() {
           );
           setIsProcessing(false);
           return;
+        }
+        const selectedDeck = yugiohDecks.find(
+          (deck) => deck.id === selectedDeckId,
+        );
+        if (selectedDeck) {
+          const allowedIds = new Set(
+            selectedDeck.cards.map((card) => card.externalId.toLowerCase()),
+          );
+          indexes = indexes.map((index) =>
+            index.tcg === "yugioh"
+              ? restrictEmbeddingIndexToExternalIds(index, allowedIds)
+              : index,
+          );
+          const scopedRows = indexes.reduce(
+            (sum, index) => sum + index.total,
+            0,
+          );
+          if (scopedRows === 0) {
+            setError(
+              `None of the ${selectedDeck.name} deck identities are present in the installed Yu-Gi-Oh scanner index.`,
+            );
+            setIsProcessing(false);
+            return;
+          }
+          setHashStatus(
+            `Deck Scan: ${selectedDeck.name} · ${scopedRows} restricted visual identities.`,
+          );
         }
         await processYoloWithEmbedding({
           video: videoRef.current,
@@ -344,12 +418,14 @@ export function VideoScanLab() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Film className="h-5 w-5" />
-          Video Scan Lab
-          <Badge variant="secondary">Experimental</Badge>
+          Duel / Table Scan
+          <Badge variant="secondary">Oriented boxes</Badge>
         </CardTitle>
         <CardDescription>
-          Import a video, run the published encoder and visual-family index in
-          this browser, and step through sampled frames with a live guess panel.
+          Recover multiple rotated or steep-angle cards from a local video,
+          de-rotate each oriented box, perspective-refine failed crops, and
+          recognize them on-device. Keep the ordinary scanner for a single
+          handheld card.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6 xl:grid-cols-[380px_1fr]">
@@ -364,11 +440,21 @@ export function VideoScanLab() {
           <canvas ref={frameCanvasRef} className="hidden" />
           <ScanControlsSidebar
             scanFilter={scanFilter}
-            onScanFilterChange={setScanFilter}
+            onScanFilterChange={(filter) => {
+              setScanFilter(filter);
+              if (filter !== "yugioh") setSelectedDeckId("full_catalog");
+            }}
+            yugiohDecks={yugiohDecks}
+            selectedDeckId={selectedDeckId}
+            onSelectedDeckIdChange={setSelectedDeckId}
+            deckStatus={deckStatus}
             detectionOnly={detectionOnly}
             onDetectionOnlyChange={setDetectionOnly}
             embeddingMode={embeddingMode}
-            onEmbeddingModeChange={setEmbeddingMode}
+            onEmbeddingModeChange={(enabled) => {
+              setEmbeddingMode(enabled);
+              if (!enabled) setSelectedDeckId("full_catalog");
+            }}
             printingMode={printingMode}
             onPrintingModeChange={(mode) => {
               setPrintingMode(mode);

@@ -9,6 +9,8 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @EnvironmentObject private var featureDependencies: AppFeatureDependencies
+    @ObservedObject private var catalogStore = CatalogStore.shared
+    @ObservedObject private var gamePackages = GamePackageStore.shared
     @State private var showingSearch = false
     @State private var showingPackOpening = false
     @State private var searchQuery: String?
@@ -153,6 +155,10 @@ struct ContentView: View {
     }
 
     private func isAvailable(_ tab: AppTab) -> Bool {
+        if let feature = tab.requiredGameFeature,
+           !supportsGameFeature(feature) {
+            return false
+        }
         switch tab {
         case .settings:
             return true
@@ -167,6 +173,17 @@ struct ContentView: View {
         case .sets, .pokedex, .decks, .wishlists, .guides, .prices, .analytics, .trades, .activity, .scan:
             return environmentStore.isAuthenticated
         }
+    }
+
+    private func supportsGameFeature(_ feature: String) -> Bool {
+        let officialSupport = catalogStore.officialPackages.contains { package in
+            environmentStore.isGameEnabled(package.game) &&
+                package.manifest.effectiveDefinition.interfaces?.supportsFeature(feature) == true
+        }
+        let installedSupport = gamePackages.installed.contains { package in
+            package.manifest.effectiveDefinition.interfaces?.supportsFeature(feature) == true
+        }
+        return officialSupport || installedSupport
     }
 
     private func applyDeepLink(_ request: AppDeepLinkRequest?) {

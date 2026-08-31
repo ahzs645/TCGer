@@ -17,8 +17,9 @@ struct PokedexView: View {
 
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @StateObject private var catalogStore = CatalogStore.shared
+    @ObservedObject private var gamePackages = GamePackageStore.shared
     @State private var species: [PokedexSpeciesProgress] = []
-    @State private var catalogEntriesBySpecies: [Int: [CatalogEntry]] = [:]
+    @State private var catalogCardsBySpecies: [Int: [Card]] = [:]
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var refreshWarning: String?
@@ -62,6 +63,23 @@ struct PokedexView: View {
     }
 
     private var ownedCount: Int { progressSpecies.lazy.filter(\.isOwned).count }
+
+    private var featurePackages: [InstalledGamePackage] {
+        gamePackages.installed.filter {
+            $0.manifest.effectiveDefinition.interfaces?.supportsFeature(GameFeatureID.pokedex) == true
+        }
+    }
+
+    private var packageFeatureRevision: String {
+        let official = catalogStore.officialPackages
+            .filter {
+                environmentStore.isGameEnabled($0.game) &&
+                    $0.manifest.effectiveDefinition.interfaces?.supportsFeature(GameFeatureID.pokedex) == true
+            }
+            .map { $0.id + ":" + $0.manifest.packageVersion }
+        let installed = featurePackages.map { $0.id + ":" + $0.manifest.packageVersion }
+        return (official + installed).sorted().joined(separator: "|")
+    }
 
     var body: some View {
         Group {
@@ -141,7 +159,7 @@ struct PokedexView: View {
                 .accessibilityValue(ownershipFilter.rawValue)
             }
         }
-        .task { await load() }
+        .task(id: packageFeatureRevision) { await load() }
         .refreshable { await load(useCache: false) }
         .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { _ in
             collectionRevision += 1
@@ -203,7 +221,7 @@ struct PokedexView: View {
     }
 
     private func cards(for species: PokedexSpeciesProgress) -> [Card] {
-        (catalogEntriesBySpecies[species.id] ?? []).map(catalogStore.card(from:))
+        catalogCardsBySpecies[species.id] ?? []
     }
 
     @MainActor
@@ -212,11 +230,17 @@ struct PokedexView: View {
         errorMessage = nil
         refreshWarning = nil
         await catalogStore.loadIfNeeded(.pokemon)
-        let entries = catalogStore.pokedexCards()
+        let officialCards = catalogStore.pokedexCards().map(catalogStore.card(from:))
+        let installedCards = featurePackages.flatMap { package in
+            (try? gamePackages.cards(for: package).map {
+                $0.card(gameId: package.manifest.game.id)
+            }) ?? []
+        }
+        let cards = officialCards + installedCards
 
-        guard !entries.isEmpty else {
+        guard !cards.isEmpty else {
             if species.isEmpty {
-                errorMessage = "Install and enable the Pokémon card catalog in Settings to track species completion."
+                errorMessage = "Install or enable a game package with Pokédex support to track species completion."
             } else {
                 refreshWarning = "The Pokémon catalog is unavailable. Showing the latest Pokédex snapshot."
             }
@@ -231,30 +255,40 @@ struct PokedexView: View {
                 useCache: useCache
             )
             let snapshot = await Task.detached(priority: .userInitiated) {
-                PokedexProgressBuilder.build(
-                    catalogEntries: entries,
-                    collections: collections
-                )
+                Self.buildSnapshot(cards: cards, collections: collections)
             }.value
-            catalogEntriesBySpecies = snapshot.catalogEntriesByNumber
-            species = snapshot.species
+            catalogCardsBySpecies = snapshot.cardsByNumber
+            species = snapshot.progress
         } catch is CancellationError {
             isLoading = false
             return
         } catch {
             if species.isEmpty {
                 let snapshot = await Task.detached(priority: .userInitiated) {
-                    PokedexProgressBuilder.build(
-                        catalogEntries: entries,
-                        collections: []
-                    )
+                    Self.buildSnapshot(cards: cards, collections: [])
                 }.value
-                catalogEntriesBySpecies = snapshot.catalogEntriesByNumber
-                species = snapshot.species
+                catalogCardsBySpecies = snapshot.cardsByNumber
+                species = snapshot.progress
             }
             refreshWarning = "Couldn’t refresh ownership. Showing the latest available Pokédex progress."
         }
         isLoading = false
+    }
+
+    nonisolated private static func buildSnapshot(
+        cards: [Card],
+        collections: [Collection]
+    ) -> (progress: [PokedexSpeciesProgress], cardsByNumber: [Int: [Card]]) {
+        var cardsByNumber: [Int: [Card]] = [:]
+        for card in cards {
+            for entry in NationalPokedex.species(for: card) {
+                cardsByNumber[entry.number, default: []].append(card)
+            }
+        }
+        return (
+            PokedexProgressBuilder.build(catalogCards: cards, collections: collections),
+            cardsByNumber
+        )
     }
 }
 

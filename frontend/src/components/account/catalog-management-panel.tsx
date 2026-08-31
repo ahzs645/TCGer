@@ -1,24 +1,29 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import type { UserPreferences } from "@tcg/api-types";
 import { Download, HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 import { CardImage } from "@/components/cards/card-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { GAME_LABELS, getCardBackImage } from "@/lib/utils";
+import { ENABLED_PREFERENCE_KEY, getCardBackImage } from "@/lib/utils";
+import { updateUserPreferences } from "@/lib/api/user-preferences";
 import {
-  CATALOG_GAMES,
   type CatalogTcgCode,
   type CatalogInstallStatus,
   useCatalog,
 } from "@/lib/catalog/use-catalog";
 import {
   areSealedProductsEnabled,
+  fetchOfficialGamePackages,
+  type OfficialGamePackage,
   SEALED_PRODUCTS_PREFERENCE_EVENT,
   setSealedProductsEnabled,
 } from "@/lib/catalog/catalog-client";
+import { useAuthStore } from "@/stores/auth";
+import { useModuleStore } from "@/stores/preferences";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -36,9 +41,14 @@ function actionLabel(status: CatalogInstallStatus): string {
   return status === "update-available" ? "Update" : "Download";
 }
 
-export function CatalogManagementPanel() {
+interface GameStorePanelProps {
+  onInstalled?: (tcg: CatalogTcgCode) => void;
+}
+
+export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
   const {
     states,
+    manifest: catalogManifest,
     progress,
     errors,
     isLoading,
@@ -48,6 +58,16 @@ export function CatalogManagementPanel() {
     removeSealed,
   } = useCatalog();
   const [removing, setRemoving] = useState<CatalogTcgCode | null>(null);
+  const [officialPackages, setOfficialPackages] = useState<
+    OfficialGamePackage[]
+  >([]);
+  const [storeError, setStoreError] = useState<string>();
+  const token = useAuthStore((state) => state.token);
+  const updateStoredPreferences = useAuthStore(
+    (state) => state.updateStoredPreferences,
+  );
+  const enabledGames = useModuleStore((state) => state.enabledGames);
+  const setGameEnabled = useModuleStore((state) => state.setGameEnabled);
   const includeSealedProducts = useSyncExternalStore(
     (onStoreChange) => {
       window.addEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, onStoreChange);
@@ -61,6 +81,28 @@ export function CatalogManagementPanel() {
     () => true,
   );
 
+  useEffect(() => {
+    let active = true;
+    if (!catalogManifest) {
+      setOfficialPackages([]);
+      return () => {
+        active = false;
+      };
+    }
+    setStoreError(undefined);
+    void fetchOfficialGamePackages(catalogManifest)
+      .then((packages) => {
+        if (active) setOfficialPackages(packages);
+      })
+      .catch(() => {
+        if (active)
+          setStoreError("The official package catalog could not be loaded.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [catalogManifest]);
+
   const handleRemove = async (tcg: CatalogTcgCode) => {
     setRemoving(tcg);
     try {
@@ -72,11 +114,29 @@ export function CatalogManagementPanel() {
     }
   };
 
+  const activateGame = async (tcg: CatalogTcgCode) => {
+    setGameEnabled(tcg, true);
+    onInstalled?.(tcg);
+    if (token) {
+      const preference = {
+        [ENABLED_PREFERENCE_KEY[tcg]]: true,
+      } as Partial<UserPreferences>;
+      try {
+        await updateUserPreferences(preference, token);
+        updateStoredPreferences(preference);
+      } catch {
+        // The package and this device's active-game state are already valid;
+        // the next preference refresh can retry server persistence.
+      }
+    }
+  };
+
   const handleInstall = async (tcg: CatalogTcgCode, isUpdate: boolean) => {
     try {
       await (isUpdate
         ? update(tcg, includeSealedProducts)
         : install(tcg, includeSealedProducts));
+      await activateGame(tcg);
     } catch {
       // The hook exposes the user-facing error in the matching row.
     }
@@ -93,10 +153,10 @@ export function CatalogManagementPanel() {
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <HardDrive className="h-4 w-4" />
-            Offline Catalogs
+            Game Store
           </h3>
           <p className="text-sm text-muted-foreground">
-            Download each game separately for offline demo and PWA use.
+            Install official packages published through the catalog manifest.
           </p>
         </div>
         {isLoading && (
@@ -119,13 +179,16 @@ export function CatalogManagementPanel() {
       </div>
 
       <div className="grid gap-3">
-        {CATALOG_GAMES.map((tcg) => {
+        {officialPackages.map((officialPackage) => {
+          const tcg = officialPackage.tcg;
+          const packageManifest = officialPackage.manifest;
           const state = states[tcg];
           const download = progress[tcg];
           const entry = state.manifest;
           const installed = state.installed;
           const isUpdate = state.status === "update-available";
           const isInstalled = Boolean(installed);
+          const isGameEnabled = enabledGames[tcg];
           const sealedEntry = entry?.sealedProducts;
           const needsSealedInstall =
             includeSealedProducts &&
@@ -142,14 +205,16 @@ export function CatalogManagementPanel() {
                 <CardImage
                   src={getCardBackImage(tcg)}
                   tcg={tcg}
-                  alt={`${GAME_LABELS[tcg]} card back`}
+                  alt={`${packageManifest.game.name} card back`}
                   width={42}
                   height={59}
                   className="h-[59px] w-[42px] shrink-0 rounded object-contain shadow-sm"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium">{GAME_LABELS[tcg]}</p>
+                    <p className="text-sm font-medium">
+                      {packageManifest.game.name}
+                    </p>
                     {isInstalled && (
                       <Badge
                         variant={isUpdate ? "default" : "secondary"}
@@ -162,6 +227,7 @@ export function CatalogManagementPanel() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
+                    {packageManifest.publisher.name} official ·{" "}
                     {cardCount !== undefined
                       ? `${cardCount.toLocaleString()} cards`
                       : "Catalog not published"}
@@ -180,7 +246,7 @@ export function CatalogManagementPanel() {
                       <div
                         className="h-1.5 overflow-hidden rounded-full bg-muted"
                         role="progressbar"
-                        aria-label={`Downloading ${GAME_LABELS[tcg]} catalog`}
+                        aria-label={`Downloading ${packageManifest.game.name} catalog`}
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={download.percent ?? undefined}
@@ -214,6 +280,18 @@ export function CatalogManagementPanel() {
                   )}
                 </div>
                 <div className="flex shrink-0 gap-2">
+                  {isInstalled &&
+                    state.status === "installed" &&
+                    !needsSealedInstall &&
+                    !isGameEnabled && (
+                      <Button
+                        size="sm"
+                        disabled={Boolean(download) || isRemoving}
+                        onClick={() => void activateGame(tcg)}
+                      >
+                        Use Game
+                      </Button>
+                    )}
                   {(state.status !== "installed" || needsSealedInstall) && (
                     <Button
                       size="sm"
@@ -242,7 +320,7 @@ export function CatalogManagementPanel() {
                           : actionLabel(state.status)}
                     </Button>
                   )}
-                  {isInstalled && (
+                  {isInstalled && isGameEnabled && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -262,6 +340,12 @@ export function CatalogManagementPanel() {
             </div>
           );
         })}
+        {!isLoading && !officialPackages.length && (
+          <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
+            {storeError ??
+              "No official packages are published in this catalog manifest."}
+          </p>
+        )}
       </div>
     </section>
   );

@@ -283,6 +283,54 @@ final class ScannerIndexTests: XCTestCase {
         XCTAssertEqual(automatic, [0, 1, 2])
     }
 
+    func testDeckScopedPhysicalIndicesMatchRepresentativeAndNestedPrintingIDs() async {
+        let store = CardIndexMetadataStore(entries: [
+            metadata(index: 0, id: "89631139", game: "yugioh", setCode: "LOB"),
+            CardIndexMetadataEntry(
+                annIndex: 1,
+                cardId: "representative",
+                recognitionFamilyId: "yugioh:art:alternate",
+                name: "Alternate Artwork",
+                game: "yugioh",
+                setCode: "NEW",
+                setName: nil,
+                rarity: nil,
+                imageURL: nil,
+                price: nil,
+                printings: [
+                    CardIndexPrintingEntry(
+                        cardId: "46986414",
+                        exactPrintingId: "printing-46986414",
+                        format: "paper",
+                        setCode: "OLD",
+                        collectorNumber: nil,
+                        setName: nil,
+                        rarity: nil,
+                        imageURL: nil,
+                        price: nil,
+                        releaseDate: nil
+                    )
+                ]
+            ),
+            metadata(index: 2, id: "not-in-deck", game: "yugioh", setCode: "LOB"),
+            metadata(index: 3, id: "89631139", game: "pokemon", setCode: "SV1"),
+        ])
+
+        let scoped = await store.physicalCardIndices(
+            for: .yugioh,
+            setCode: nil,
+            externalCardIDs: ["89631139", "46986414"]
+        )
+        let exactPrintingScoped = await store.physicalCardIndices(
+            for: .yugioh,
+            setCode: nil,
+            externalCardIDs: ["PRINTING-46986414"]
+        )
+
+        XCTAssertEqual(scoped, [0, 1])
+        XCTAssertEqual(exactPrintingScoped, [1])
+    }
+
     func testANNRanksByCosineDistanceAndHonorsAllowedIndices() async throws {
         let store = AnnoyIndexStore(vectors: [
             [1, 0],

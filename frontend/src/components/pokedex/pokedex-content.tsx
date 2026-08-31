@@ -11,6 +11,10 @@ import {
   Search,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import {
+  POKEDEX_GAME_FEATURE_ID,
+  type GamePackageCatalogCard,
+} from "@tcg/api-types";
 
 import { CardImage } from "@/components/cards/card-image";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +66,9 @@ import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import { useDemoStore } from "@/stores/demo-store";
 import { formatTotalCopyCount } from "@/lib/copy-labels";
+import { useActiveGameFeatures } from "@/lib/game-packages/active-game-features";
+import { gamePackageCards } from "@/lib/game-packages/game-package-client";
+import { useModuleStore } from "@/stores/preferences";
 
 const INITIAL_SPECIES_LIMIT = 120;
 const SPECIES_PAGE_SIZE = 120;
@@ -82,6 +89,20 @@ function normalizeCatalogCard(
     releasedAt: set?.releasedAt,
     imageUrl: images.imageUrl,
     imageUrlSmall: images.imageUrlSmall,
+  };
+}
+
+function normalizePackageCard(
+  card: GamePackageCatalogCard,
+  gameId: string,
+): PokedexCardInput {
+  return {
+    ...card,
+    tcg: gameId,
+    dexEntries: card.dexEntries?.map((entry) => ({
+      number: entry.number,
+      name: entry.name ?? `#${entry.number}`,
+    })),
   };
 }
 
@@ -136,6 +157,20 @@ export function PokedexContent() {
   const initDemo = useDemoStore((state) => state.init);
   const catalog = useCatalog();
   const pokemonCatalog = catalog.states.pokemon;
+  const enabledPokemon = useModuleStore((state) => state.enabledGames.pokemon);
+  const activeGameFeatures = useActiveGameFeatures();
+  const pokedexSources = useMemo(
+    () => activeGameFeatures.sourcesFor(POKEDEX_GAME_FEATURE_ID),
+    [activeGameFeatures],
+  );
+  const installedPokedexSources = useMemo(
+    () => pokedexSources.filter((source) => source.package),
+    [pokedexSources],
+  );
+  const supportingGameIds = useMemo(
+    () => new Set(pokedexSources.map((source) => source.gameId)),
+    [pokedexSources],
+  );
 
   const [catalogCards, setCatalogCards] = useState<PokedexCardInput[]>(() =>
     demoMode ? demoCatalogCards() : [],
@@ -161,10 +196,11 @@ export function PokedexContent() {
   }, [demoMode, fetchCollections, hasFetched, isAuthenticated, token]);
 
   const readCatalog = useCallback(async () => {
-    if (
-      pokemonCatalog.status !== "installed" &&
-      pokemonCatalog.status !== "update-available"
-    ) {
+    const officialInstalled =
+      enabledPokemon &&
+      (pokemonCatalog.status === "installed" ||
+        pokemonCatalog.status === "update-available");
+    if (!officialInstalled && installedPokedexSources.length === 0) {
       setCatalogCards(demoMode ? demoCatalogCards() : []);
       setCatalogReadError(null);
       return;
@@ -173,15 +209,35 @@ export function PokedexContent() {
     setCatalogReading(true);
     setCatalogReadError(null);
     try {
-      const [cards, installed] = await Promise.all([
-        getCatalogCards("pokemon"),
-        getInstalledCatalog("pokemon"),
-      ]);
-      if (!installed || !cards.length) {
-        throw new Error("The installed Pokémon catalog could not be read.");
+      const officialCards = officialInstalled
+        ? await Promise.all([
+            getCatalogCards("pokemon"),
+            getInstalledCatalog("pokemon"),
+          ]).then(([cards, installed]) => {
+            if (!installed || !cards.length) {
+              throw new Error(
+                "The installed Pokémon catalog could not be read.",
+              );
+            }
+            const sets = new Map(installed.sets.map((set) => [set.code, set]));
+            return cards.map((card) => normalizeCatalogCard(card, sets));
+          })
+        : [];
+      const packageCards = (
+        await Promise.all(
+          installedPokedexSources.map(async (source) => {
+            const installed = source.package;
+            if (!installed) return [];
+            return (await gamePackageCards(installed.id)).map((card) =>
+              normalizePackageCard(card, source.gameId),
+            );
+          }),
+        )
+      ).flat();
+      if (!officialCards.length && !packageCards.length) {
+        throw new Error("The active Pokédex catalogs could not be read.");
       }
-      const sets = new Map(installed.sets.map((set) => [set.code, set]));
-      setCatalogCards(cards.map((card) => normalizeCatalogCard(card, sets)));
+      setCatalogCards([...officialCards, ...packageCards]);
     } catch (error) {
       setCatalogCards(demoMode ? demoCatalogCards() : []);
       setCatalogReadError(
@@ -192,7 +248,12 @@ export function PokedexContent() {
     } finally {
       setCatalogReading(false);
     }
-  }, [demoMode, pokemonCatalog.status]);
+  }, [
+    demoMode,
+    enabledPokemon,
+    installedPokedexSources,
+    pokemonCatalog.status,
+  ]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void readCatalog(), 0);
@@ -224,8 +285,8 @@ export function PokedexContent() {
     }
     return collections
       .flatMap((collection) => collection.cards)
-      .filter((card) => card.tcg === "pokemon");
-  }, [collections, demoBinders, demoMode]);
+      .filter((card) => supportingGameIds.has(card.tcg));
+  }, [collections, demoBinders, demoMode, supportingGameIds]);
 
   const species = useMemo(
     () => buildPokedex(catalogCards, collectionCards),
@@ -259,11 +320,14 @@ export function PokedexContent() {
   const installProgress = catalog.progress.pokemon;
   const installError = catalog.errors.pokemon;
   const catalogInstalled =
-    pokemonCatalog.status === "installed" ||
-    pokemonCatalog.status === "update-available";
+    installedPokedexSources.length > 0 ||
+    (enabledPokemon &&
+      (pokemonCatalog.status === "installed" ||
+        pokemonCatalog.status === "update-available"));
   const canInstall =
-    pokemonCatalog.status === "not-installed" ||
-    pokemonCatalog.status === "update-available";
+    enabledPokemon &&
+    (pokemonCatalog.status === "not-installed" ||
+      pokemonCatalog.status === "update-available");
 
   return (
     <div className="space-y-6">

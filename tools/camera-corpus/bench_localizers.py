@@ -320,11 +320,86 @@ def evaluate_localization(localizers, items):
     return stats
 
 
-def evaluate_recognition(localizers, frames, runtimes):
+def external_id_indices(runtime, external_ids):
+    allowed = {str(value).strip().lower() for value in external_ids if str(value).strip()}
+    indices = []
+    for index, row in enumerate(runtime.rows):
+        identities = {str(row.get("cardId") or "").strip().lower(), str(row.get("exactPrintingId") or "").strip().lower()}
+        for printing in row.get("printings") or []:
+            identities.add(str(printing.get("cardId") or "").strip().lower())
+            identities.add(str(printing.get("exactPrintingId") or "").strip().lower())
+        if identities & allowed:
+            indices.append(index)
+    return np.asarray(indices, dtype=np.int64)
+
+
+def recognition_summary(per_loc, strong_thresholds):
+    summaries = {}
+    for localizer, rows in per_loc.items():
+        localizer_summary = {}
+        games = sorted({row["game"] for row in rows})
+        for game in games:
+            game_rows = [row for row in rows if row["game"] == game]
+            threshold = strong_thresholds.get(game, 0.65)
+            for row in game_rows:
+                margin = row.get("margin")
+                row["accepted"] = bool(
+                    row.get("found")
+                    and row.get("top1") is not None
+                    and row["top1"] >= threshold
+                    and (margin is None or margin >= 0.05)
+                )
+                expected = row.get("expected", "identify")
+                row["outcome"] = (
+                    "correct_reject" if expected == "reject" and not row["accepted"]
+                    else "wrong_accept" if expected == "reject"
+                    else "correct_accept" if row["accepted"] and row.get("rank") == 0
+                    else "wrong_accept" if row["accepted"]
+                    else "abstain"
+                )
+            counts = collections.Counter(row["outcome"] for row in game_rows)
+            found = [row for row in game_rows if row.get("found")]
+            identify = [row for row in game_rows if row.get("expected", "identify") == "identify"]
+            summary = {
+                "frames": len(game_rows),
+                "localized": len(found),
+                "identifyFrames": len(identify),
+                "rejectFrames": len(game_rows) - len(identify),
+                "top1": sum(row.get("rank") == 0 for row in identify),
+                "top5": sum(row.get("rank") is not None and row["rank"] < 5 for row in identify),
+                "correctAccept": counts["correct_accept"],
+                "wrongAccept": counts["wrong_accept"],
+                "abstain": counts["abstain"],
+                "correctReject": counts["correct_reject"],
+                "strongThreshold": threshold,
+            }
+            slices = sorted({row.get("slice") for row in game_rows if row.get("slice")})
+            if slices:
+                summary["bySlice"] = {
+                    slice_name: dict(collections.Counter(
+                        row["outcome"] for row in game_rows if row.get("slice") == slice_name
+                    ))
+                    for slice_name in slices
+                }
+            localizer_summary[game] = summary
+            print(
+                f"  {localizer:<22} {game:<8} frames {len(game_rows):>3} localized {len(found):>3}  "
+                f"correct-accept {counts['correct_accept']:>3}  wrong-accept {counts['wrong_accept']:>3}  "
+                f"abstain {counts['abstain']:>3}  correct-reject {counts['correct_reject']:>3}",
+                file=sys.stderr,
+            )
+        summaries[localizer] = localizer_summary
+    return summaries
+
+
+def evaluate_recognition(localizers, frames, runtimes, strong_thresholds, deck_scoped=False):
     per_loc = {}
     for loc in localizers:
         rows = []
+        quad_cache = {}
         for frame in frames:
+            if deck_scoped and not frame.get("deckExternalIds"):
+                continue
             game = "magic" if frame["mode"] == "mtg" else frame["mode"]
             runtime = runtimes.get(game)
             if runtime is None:
@@ -332,19 +407,42 @@ def evaluate_recognition(localizers, frames, runtimes):
             image = cv2.imread(frame["path"])
             if image is None:
                 continue
-            preds = loc.quads(image, frame["path"])
+            path = frame["path"]
+            if path not in quad_cache:
+                quad_cache[path] = loc.quads(image, path)
+            preds = quad_cache[path]
             if not preds:
-                rows.append({"key": frame["key"], "game": game, "found": False})
+                rows.append({
+                    "key": frame["key"], "game": game, "found": False,
+                    "expected": frame.get("expected", "identify"), "slice": frame.get("slice"),
+                    "scope": "deck" if deck_scoped else "full_catalog",
+                })
                 continue
-            # Single-card frames: the largest plausible quad is the card.
-            quad = max(preds, key=lambda q: cv2.contourArea(q.astype(np.float32)))
+            target_quad = frame.get("targetQuad")
+            if target_quad:
+                target_quad = order_quad(np.asarray(target_quad, dtype=np.float64))
+                quad = max(preds, key=lambda q: polygon_iou(target_quad, q))
+                localization_iou = polygon_iou(target_quad, quad)
+            else:
+                # Legacy/single-card frames: the largest plausible quad is the card.
+                quad = max(preds, key=lambda q: cv2.contourArea(q.astype(np.float32)))
+                localization_iou = None
             crop = warp(image, quad)
             best = None
             for oriented in (crop, cv2.rotate(crop, cv2.ROTATE_180)):
                 pil = Image.fromarray(cv2.cvtColor(oriented, cv2.COLOR_BGR2RGB))
                 embedding = runtime.embed(pil)
                 scores = runtime.vectors @ embedding
-                order = np.argsort(-scores)
+                gallery_indices = (
+                    external_id_indices(runtime, frame.get("deckExternalIds") or [])
+                    if deck_scoped else np.arange(len(scores), dtype=np.int64)
+                )
+                if len(gallery_indices) == 0:
+                    candidate = {"rank": None, "sim": None, "top1": None, "margin": None, "galleryRows": 0}
+                    if best is None:
+                        best = candidate
+                    continue
+                order = gallery_indices[np.argsort(-scores[gallery_indices])]
                 target_key = runtime.label_index.get(frame["label"])
                 rank, sim = None, None
                 if target_key is not None:
@@ -353,23 +451,17 @@ def evaluate_recognition(localizers, frames, runtimes):
                             rank, sim = int(r), float(scores[i]); break
                 top1 = float(scores[order[0]])
                 rival = next((float(scores[i]) for i in order[1:10] if runtime.family_of(int(i)) != runtime.family_of(int(order[0]))), None)
-                candidate = {"rank": rank, "sim": sim, "top1": top1, "margin": (top1 - rival) if rival is not None else None}
+                candidate = {"rank": rank, "sim": sim, "top1": top1, "margin": (top1 - rival) if rival is not None else None, "galleryRows": int(len(gallery_indices))}
                 if best is None or ((candidate["sim"] or -1) > (best["sim"] or -1)):
                     best = candidate
-            rows.append({"key": frame["key"], "game": game, "found": True, **best})
+            rows.append({
+                "key": frame["key"], "game": game, "found": True,
+                "expected": frame.get("expected", "identify"), "slice": frame.get("slice"),
+                "scope": "deck" if deck_scoped else "full_catalog",
+                "localizationIoU": localization_iou, **best,
+            })
         per_loc[loc.name] = rows
-        for game in ("magic", "pokemon"):
-            sub = [r for r in rows if r["game"] == game]
-            if not sub:
-                continue
-            found = [r for r in sub if r["found"]]
-            top1 = sum(1 for r in found if r.get("rank") == 0)
-            top5 = sum(1 for r in found if r.get("rank") is not None and r["rank"] < 5)
-            sims = [r["sim"] for r in found if r.get("sim") is not None]
-            strong = {"magic": 0.70, "pokemon": 0.65}[game]
-            acceptable = sum(1 for r in found if r.get("rank") == 0 and r["sim"] >= strong and (r["margin"] is None or r["margin"] >= 0.05))
-            print(f"  {loc.name:<22} {game:<8} frames {len(sub):>3} localized {len(found):>3}  top1 {top1:>3}  top5 {top5:>3}  policy-acceptable {acceptable:>3}  correct-sim p50 {np.median(sims) if sims else float('nan'):.3f}", file=sys.stderr)
-    return per_loc
+    return per_loc, recognition_summary(per_loc, strong_thresholds)
 
 
 class LabeledRuntime(Runtime):
@@ -398,6 +490,8 @@ def main():
     parser.add_argument("--contour-repo")
     parser.add_argument("--vision-swift")
     parser.add_argument("--detector-mlmodelc")
+    parser.add_argument("--strong-threshold", action="append", default=[], help="GAME=COSINE acceptance threshold")
+    parser.add_argument("--deck-scoped", action="store_true", help="also evaluate frames with deckExternalIds against only those identities")
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
@@ -436,7 +530,7 @@ def main():
         for stage in ("vision-app", "vision-doc", "vision-rect", "app-detector-box"):
             localizers.append(VisionLocalizer(stage, vision_cache))
 
-    report = {"localization": {}, "recognition": {}}
+    report = {"localization": {}, "recognition": {}, "recognitionSummary": {}}
     for name, items in coco_items:
         print(f"== localization: {name} ({len(items)} images)", file=sys.stderr)
         report["localization"][name] = evaluate_localization(localizers, items)
@@ -448,8 +542,20 @@ def main():
             game, d = spec.split("=", 1)
             runtimes[game] = LabeledRuntime(Path(d), Path(onnx[game]))
         session_localizers = [DeviceLocalizer(frames)] + localizers
+        strong_thresholds = {"magic": 0.70, "pokemon": 0.65, "yugioh": 0.65}
+        for spec in args.strong_threshold:
+            game, value = spec.split("=", 1)
+            strong_thresholds[game] = float(value)
         print(f"== recognition: {len(frames)} labeled frames", file=sys.stderr)
-        report["recognition"] = evaluate_recognition(session_localizers, frames, runtimes)
+        report["recognition"], report["recognitionSummary"] = evaluate_recognition(
+            session_localizers, frames, runtimes, strong_thresholds
+        )
+        if args.deck_scoped:
+            scoped_frames = sum(bool(frame.get("deckExternalIds")) for frame in frames)
+            print(f"== deck-scoped recognition: {scoped_frames} labeled frames", file=sys.stderr)
+            report["recognitionDeckScoped"], report["recognitionDeckScopedSummary"] = evaluate_recognition(
+                session_localizers, frames, runtimes, strong_thresholds, deck_scoped=True
+            )
 
     (args.out / "bench-localizers.json").write_text(json.dumps(report, indent=1, default=float))
     print(f"wrote {args.out / 'bench-localizers.json'}", file=sys.stderr)

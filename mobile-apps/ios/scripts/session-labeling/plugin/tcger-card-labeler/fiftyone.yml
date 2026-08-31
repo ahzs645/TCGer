@@ -1,6 +1,6 @@
 name: tcger-card-labeler
-description: Five-button verdict panel for TCGer scan-session labeling
-version: 1.0.0
+description: Game-aware single-card and focused binder-pocket labeling for TCGer scan sessions
+version: 1.3.0
 operators:
   - tcger_card_verdict
   - apply_card_verdict

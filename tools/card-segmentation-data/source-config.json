@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "canonicalCategories": [
+    {"id": 1, "name": "card", "role": "primary"},
+    {"id": 2, "name": "inner_border", "role": "auxiliary"},
+    {"id": 3, "name": "title_region", "role": "auxiliary"},
+    {"id": 4, "name": "info_region", "role": "auxiliary"},
+    {"id": 5, "name": "collection_region", "role": "auxiliary"},
+    {"id": 6, "name": "slab", "role": "context"}
+  ],
+  "sources": [
+    {
+      "name": "pk-detect",
+      "archive": "pk-detect.v3i.coco.zip",
+      "task": "object-detection",
+      "license": "CC BY 4.0",
+      "categories": {"pokemon_card": "card", "z": null}
+    },
+    {
+      "name": "pokemon_card_detector",
+      "archive": "pokemon_card_detector.v1-versie-1.coco.zip",
+      "task": "object-detection",
+      "license": "CC BY 4.0",
+      "categories": {"pokemon_card": "card", "objects": null}
+    },
+    {
+      "name": "tcgx-annotations",
+      "archive": "annotations.v7i.coco-segmentation.zip",
+      "task": "instance-segmentation",
+      "license": "CC BY 4.0",
+      "categories": {"Pokemon_Card": "card", "objects": null}
+    },
+    {
+      "name": "labelyolo",
+      "archive": "labelyolo.v4i.coco.zip",
+      "task": "object-detection",
+      "license": "CC BY 4.0",
+      "categories": {"pokemon_card": "card", "cards-XFJF": null}
+    },
+    {
+      "name": "pokefolio",
+      "archive": "pokefolio.v1i.coco.zip",
+      "task": "object-detection",
+      "license": "CC BY 4.0",
+      "categories": {"pokemon_card": "card", "objects": null}
+    },
+    {
+      "name": "pokemon-card-outliner",
+      "archive": "pokemon-card-outliner.v1i.coco-yolo.zip",
+      "task": "object-detection",
+      "license": "CC BY 4.0",
+      "categories": {"card": "card", "pokemon-cards": null}
+    },
+    {
+      "name": "carddetection-hegxe",
+      "archive": "carddetection-hegxe.v7i.coco.zip",
+      "task": "object-detection",
+      "license": "CC BY 4.0",
+      "categories": {"cards": "card"}
+    },
+    {
+      "name": "mtg-scanner-bughx",
+      "archive": "mtg-scanner-bughx.v4i.coco.zip",
+      "task": "object-detection",
+      "license": "CC BY 4.0",
+      "categories": {
+        "card": "card",
+        "main_info": "info_region",
+        "title": "title_region",
+        "objects": null
+      }
+    },
+    {
+      "name": "mtg-rqful",
+      "archive": "mtg-rqful.v1i.coco.zip",
+      "task": "object-detection",
+      "license": "MIT",
+      "categories": {"card": "card"}
+    },
+    {
+      "name": "card-segmentation-gldmt",
+      "archive": "card-segmentation-gldmt.v2i.coco-segmentation.zip",
+      "task": "instance-segmentation",
+      "license": "CC BY 4.0",
+      "categories": {"card": "card", "aze": null}
+    },
+    {
+      "name": "card-seg-j74w1",
+      "originNamespace": "card-seg-j74w1",
+      "archive": "card-seg-j74w1.v3i.coco-segmentation.zip",
+      "task": "instance-segmentation",
+      "license": "CC BY 4.0",
+      "categories": {"card-2UtV": "card", "inner-border": "inner_border"}
+    },
+    {
+      "name": "card-detector-wmbbb",
+      "archive": "card-detector-wmbbb.v8i.coco-segmentation.zip",
+      "task": "instance-segmentation",
+      "license": "CC BY 4.0",
+      "categories": {"Cards": "card", "Collection": "collection_region", "Name": "title_region"}
+    },
+    {
+      "name": "card-scanner-seg",
+      "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+      "task": "instance-segmentation",
+      "license": "CC BY 4.0",
+      "categories": {"card": "card", "slab": "slab", "cards": null}
+    },
+    {
+      "name": "card-seg-j74w1-q8yst",
+      "originNamespace": "card-seg-j74w1",
+      "archive": "card-seg-j74w1-q8yst.v1i.coco-segmentation.zip",
+      "task": "instance-segmentation",
+      "license": "CC BY 4.0",
+      "categories": {"card-2UtV": "card"}
+    }
+  ]
+}

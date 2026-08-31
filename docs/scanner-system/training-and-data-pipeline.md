@@ -142,6 +142,31 @@ first measure real-world glare, sleeve, crop, foil, blur, and lighting
 performance. Training promotion requires compatible consent, deduplication,
 identity-level split retention, and a new A/B evaluation.
 
+## Multi-source card-localization corpus
+
+Roboflow card-boundary archives are normalized by
+`tools/card-segmentation-data/build_standardized_corpus.py` before they are
+combined. Its reviewed source configuration maps whole cards, inner borders,
+OCR regions, information regions, and slabs to distinct canonical categories.
+It never silently treats every polygon as a card.
+
+The compiler reads immutable ZIPs directly, verifies their inventory hashes,
+deduplicates exact bytes, keeps one representative per Roboflow augmentation
+family by default, links known forks into the same leakage group, and rebuilds
+deterministic train/validation/test splits. It emits three COCO views:
+
+- `coco-card-segmentation`: source whole-card masks only; canonical
+  segmentation training and evaluation;
+- `coco-card-detection`: whole-card polygons plus box-derived rectangles;
+  detector pretraining and coarse localization;
+- `coco`: every reviewed primary, auxiliary, and context label for explicit
+  multi-task experiments.
+
+Object-detection boxes are marked `bbox-derived` and cannot enter the
+segmentation-quality denominator. See
+[`tools/card-segmentation-data/README.md`](../../tools/card-segmentation-data/README.md)
+for the reproducible archive-backed and materialized commands.
+
 ## Trainer hardening
 
 `mobile-apps/ios/scripts/train_arcface_encoder.py` now enforces:

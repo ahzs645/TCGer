@@ -141,6 +141,10 @@ actor RemoteCatalogSource: CatalogSource {
             if games[game].map({ $0.version < bundledEntry.version }) ?? true {
                 games[game] = bundledEntry
             }
+            if games[game]?.packageFile == nil,
+               games[game]?.sha256 == bundledEntry.sha256 {
+                games[game]?.packageFile = bundledEntry.packageFile
+            }
             let preferredSealed = [remoteSealed, bundledEntry.sealedProducts]
                 .compactMap { $0 }
                 .max { $0.version < $1.version }
@@ -193,7 +197,15 @@ nonisolated struct CatalogManifestGame: Codable, Sendable {
     var compressedBytes: Int? = nil
     let sha256: String
     let file: String
+    var packageFile: String? = nil
     var sealedProducts: SealedCatalogManifestEntry? = nil
+}
+
+struct OfficialGamePackage: Identifiable {
+    let game: TCGGame
+    let manifest: GamePackageManifest
+
+    var id: String { manifest.installedId }
 }
 
 nonisolated struct SealedCatalogManifestEntry: Codable, Sendable {
@@ -308,6 +320,7 @@ final class CatalogStore: ObservableObject {
     }
 
     @Published private(set) var manifest: CatalogManifest?
+    @Published private(set) var officialPackages: [OfficialGamePackage] = []
     @Published private(set) var installingGames: Set<TCGGame> = []
     @Published private(set) var installProgress: [TCGGame: Double] = [:]
     @Published private(set) var installPhases: [TCGGame: CatalogInstallPhase] = [:]
@@ -573,6 +586,7 @@ final class CatalogStore: ObservableObject {
                 throw StoreError.unsupportedFormat(decoded.formatVersion)
             }
             manifest = decoded
+            officialPackages = await loadOfficialGamePackages(from: decoded)
             for game in TCGGame.catalogGames where enabledGames.contains(game) && isInstalled(game) {
                 await loadIfNeeded(game)
             }
@@ -590,6 +604,36 @@ final class CatalogStore: ObservableObject {
     func metadata(for game: TCGGame) -> CatalogManifestGame? {
         guard game != .all else { return nil }
         return manifest?.games[game.rawValue]
+    }
+
+    func officialGamePackages() async -> [OfficialGamePackage] {
+        if manifest == nil { await refreshManifest() }
+        guard let manifest else { return [] }
+        if officialPackages.isEmpty, !manifest.games.isEmpty {
+            officialPackages = await loadOfficialGamePackages(from: manifest)
+        }
+        return officialPackages
+    }
+
+    private func loadOfficialGamePackages(from manifest: CatalogManifest) async -> [OfficialGamePackage] {
+        var packages: [OfficialGamePackage] = []
+        for (gameID, entry) in manifest.games {
+            guard let game = TCGGame(rawValue: gameID),
+                  game != .all,
+                  let packageFile = entry.packageFile,
+                  let data = try? await source.data(for: packageFile),
+                  let package = try? JSONDecoder().decode(GamePackageManifest.self, from: data),
+                  package.publisher.id == "tcger",
+                  package.game.id == gameID,
+                  package.catalog.cardCount == entry.cardCount,
+                  package.catalog.asset.sha256.caseInsensitiveCompare(entry.sha256) == .orderedSame else {
+                continue
+            }
+            packages.append(OfficialGamePackage(game: game, manifest: package))
+        }
+        return packages.sorted {
+            $0.manifest.game.name.localizedCaseInsensitiveCompare($1.manifest.game.name) == .orderedAscending
+        }
     }
 
     func sealedMetadata(for game: TCGGame) -> SealedCatalogManifestEntry? {

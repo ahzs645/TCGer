@@ -19,7 +19,7 @@ class TCGerApplication : Application() {
         val database = TCGerDatabase.create(this)
         val preferences = PreferencesStore(this)
         val scannerAssets = ScannerAssetStore(this, BuildConfig.SCANNER_ASSET_BASE_URL)
-        val gamePackages = GamePackageStore(this)
+        val gamePackages = GamePackageStore(this, BuildConfig.CATALOG_BASE_URL)
         container = AppContainer(
             preferences = preferences,
             scannerAssets = scannerAssets,

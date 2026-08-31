@@ -8,6 +8,11 @@ plugins {
 
 val scannerAssetBaseUrl = providers.gradleProperty("tcgerScannerAssetBaseUrl")
     .orElse("https://assets.tcger.ahmadjalil.com/android/scan-assets")
+val catalogBaseUrl = providers.gradleProperty("tcgerCatalogBaseUrl")
+    .orElse("https://assets.tcger.ahmadjalil.com/catalogs")
+val requireSignedOfficialGamePackages = providers.gradleProperty("tcgerRequireSignedOfficialGamePackages")
+    .map(String::toBoolean)
+    .orElse(false)
 
 android {
     namespace = "com.ahmadjalil.tcger"
@@ -24,6 +29,16 @@ android {
             "String",
             "SCANNER_ASSET_BASE_URL",
             "\"${scannerAssetBaseUrl.get()}\"",
+        )
+        buildConfigField(
+            "String",
+            "CATALOG_BASE_URL",
+            "\"${catalogBaseUrl.get()}\"",
+        )
+        buildConfigField(
+            "boolean",
+            "REQUIRE_SIGNED_OFFICIAL_GAME_PACKAGES",
+            requireSignedOfficialGamePackages.get().toString(),
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -103,6 +118,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.81")
 
     implementation("androidx.camera:camera-core:$cameraXVersion")
     implementation("androidx.camera:camera-camera2:$cameraXVersion")

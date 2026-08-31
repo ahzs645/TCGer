@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/yugioh-acceptance-v1.json",
+  "title": "TCGer Yu-Gi-Oh acceptance corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "frames"],
+  "properties": {
+    "kind": { "const": "tcger-yugioh-acceptance-v1" },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "path", "slice", "face", "expected"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "slice": { "enum": ["single_handheld", "steep_playmat", "duel_field"] },
+          "face": { "enum": ["face_up", "face_down", "partial"] },
+          "expected": { "enum": ["identify", "reject"] },
+          "label": { "type": "string", "pattern": "^[0-9]{8}$" },
+          "deckExternalIds": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[0-9]{8}$" }
+          },
+          "targetQuad": {
+            "type": "array",
+            "description": "Four card-corner [x, y] points in source-image pixels, top-left origin.",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "type": "number", "minimum": 0 }
+            }
+          },
+          "notes": { "type": "string" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "expected": { "const": "identify" } } },
+            "then": { "required": ["label"] }
+          },
+          {
+            "if": { "properties": { "expected": { "const": "reject" } } },
+            "then": { "not": { "required": ["label"] } }
+          },
+          {
+            "if": { "properties": { "face": { "const": "face_down" } } },
+            "then": { "properties": { "expected": { "const": "reject" } } }
+          },
+          {
+            "if": { "properties": { "slice": { "const": "duel_field" } } },
+            "then": { "required": ["targetQuad"] }
+          }
+        ]
+      }
+    }
+  }
+}

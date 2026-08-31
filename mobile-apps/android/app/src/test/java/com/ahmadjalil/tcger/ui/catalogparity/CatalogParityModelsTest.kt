@@ -1,7 +1,10 @@
 package com.ahmadjalil.tcger.ui.catalogparity
 
+import com.ahmadjalil.tcger.data.gamepackage.CommunityCatalogCard
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -49,6 +52,32 @@ class CatalogParityModelsTest {
         assertFalse(progress.first { it.entry.number == 1 }.isOwned)
         assertEquals(2, progress.first { it.entry.number == 25 }.ownedCopies)
         assertEquals(2, progress.first { it.entry.number == 25 }.printings.size)
+    }
+
+    @Test fun `community cards expose normalized top-level dex entries`() {
+        val card = CommunityCatalogCard(
+            id = "critter-1",
+            name = "Mooncrumb",
+            dexEntries = listOf(buildJsonObject {
+                put("number", 7)
+                put("name", "Mooncrumb")
+            }),
+        ).asCatalogParityCard("publisher--critters")
+
+        assertEquals(listOf(PokedexEntry(7, "Mooncrumb")), card.dexEntries)
+    }
+
+    @Test fun `pokedex loader combines every compatible game catalog`() = runTest {
+        val source = LocalCatalogParityDataSource(
+            listOf(
+                CatalogParityCard("pika", "Pikachu", "pokemon", "base", "Base", dexEntries = listOf(PokedexEntry(25, "Pikachu"))),
+                CatalogParityCard("critter", "Mooncrumb", "publisher--critters", "first", "First", dexEntries = listOf(PokedexEntry(7, "Mooncrumb"))),
+            ),
+        )
+
+        val loaded = PokedexCatalogLoader(source).load(setOf("pokemon", "publisher--critters"))
+
+        assertEquals(setOf("pika", "critter"), loaded.cards.map { it.id }.toSet())
     }
 
     @Test fun `guide category uses server wire value`() {

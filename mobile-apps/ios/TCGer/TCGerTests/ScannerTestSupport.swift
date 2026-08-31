@@ -130,7 +130,8 @@ extension CardScannerContext {
     static func test(
         mode: ScanMode = .pokemon,
         engine: ScanEnginePreference = .automatic,
-        setCode: String? = nil
+        setCode: String? = nil,
+        deckScope: CardScanDeckScope? = nil
     ) -> CardScannerContext {
         CardScannerContext(
             mode: mode,
@@ -140,7 +141,8 @@ extension CardScannerContext {
             showPricing: false,
             saveDebugCapture: false,
             captureNotes: nil,
-            setCode: setCode
+            setCode: setCode,
+            deckScope: deckScope
         )
     }
 }

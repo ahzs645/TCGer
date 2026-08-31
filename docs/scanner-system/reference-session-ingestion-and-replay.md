@@ -24,25 +24,35 @@ TCGER_REFERENCE_LIBRARY="/path/to/Reference/TCGer-Session-Reference"
 The structure is:
 
 ```text
-TCGer-Session-Reference/
-  README.md
-  manifest.json
-  provenance.csv
-  checksums.sha256
-  sessions/
-    scan-session-YYYYMMDD-HHMMSS/
-      results.json
-      evidence.json
-      frame-....jpg
-      attempt-....jpg
-  labeling/
-    ... private labeling state and backups ...
+Reference/
+  TCGer-Session-Reference/
+    README.md
+    manifest.json
+    provenance.csv
+    checksums.sha256
+    sessions/
+      scan-session-YYYYMMDD-HHMMSS/
+        results.json
+        evidence.json
+        frame-....jpg
+        attempt-....jpg
+  TCGer-Labeling/
+    fiftyone-sessions/
+      journal.jsonl
+      backups/
+    legacy-label-studio-2026-08-08/
 ```
 
 - `sessions/` preserves complete app exports byte-for-byte.
 - `manifest.json` is the machine-readable session inventory and provenance.
 - `provenance.csv` is the same provenance in review-friendly form.
 - `checksums.sha256` is the per-file integrity authority.
+- The sibling `TCGer-Labeling/fiftyone-sessions/` directory retains only
+  irreplaceable human-label journals and backups. Set
+  `TCGER_LABELING_STATE_DIR` when using a different layout.
+  Reproducible FiftyOne card thumbnails and derived crops live outside synced
+  Drive in the platform cache (`~/Library/Caches/TCGer/session-labeling` on
+  macOS, or `TCGER_LABELING_CACHE_DIR` when explicitly configured).
 - aggregate v2 session digests hash sorted `relative-path`, line feed, file
   hash, line feed pairs. Old v1 aggregate values are historical; per-file
   hashes remain authoritative.

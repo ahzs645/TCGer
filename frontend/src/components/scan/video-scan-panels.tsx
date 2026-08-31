@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn, GAME_LABELS } from "@/lib/utils";
+import type { DeckResponse } from "@/lib/api/decks";
 import type { ScannerPrintingMode } from "@/lib/scan/scanner-options";
 
 import {
@@ -38,6 +39,10 @@ import {
 export interface ScanControlsProps {
   scanFilter: ScanFilter;
   onScanFilterChange: (filter: ScanFilter) => void;
+  yugiohDecks: DeckResponse[];
+  selectedDeckId: string;
+  onSelectedDeckIdChange: (deckId: string) => void;
+  deckStatus: string | null;
   detectionOnly: boolean;
   onDetectionOnlyChange: (value: boolean) => void;
   embeddingMode: boolean;
@@ -92,6 +97,58 @@ export function ScanControlsSidebar(props: ScanControlsProps) {
           the browser.
         </p>
       </div>
+
+      {props.scanFilter === "yugioh" ? (
+        <div className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+          <Label htmlFor="video-scan-gallery">Recognition Gallery</Label>
+          <Select
+            value={props.selectedDeckId}
+            onValueChange={props.onSelectedDeckIdChange}
+            disabled={
+              props.isProcessing || props.detectionOnly || !props.embeddingMode
+            }
+          >
+            <SelectTrigger id="video-scan-gallery">
+              <SelectValue placeholder="Choose a gallery" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="full_catalog">
+                Full Yu-Gi-Oh catalog
+              </SelectItem>
+              {props.yugiohDecks.map((deck) => {
+                const identities = new Set(
+                  deck.cards.map((card) => card.externalId.toLowerCase()),
+                ).size;
+                return (
+                  <SelectItem key={deck.id} value={deck.id}>
+                    Deck Scan · {deck.name} ({identities})
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          {props.detectionOnly ? (
+            <p className="text-xs text-muted-foreground">
+              Detection-only mode outlines cards and skips every recognition
+              gallery.
+            </p>
+          ) : !props.embeddingMode ? (
+            <p className="text-xs text-muted-foreground">
+              Deck Scan requires the on-device ArcFace model.
+            </p>
+          ) : props.selectedDeckId === "full_catalog" ? (
+            <p className="text-xs text-muted-foreground">
+              {props.deckStatus ??
+                "Full-catalog matching remains active. Sign in to select one of your Yu-Gi-Oh decks."}
+            </p>
+          ) : (
+            <p className="text-xs text-amber-900 dark:text-amber-200">
+              Deck Scan searches only the selected deck and may still abstain.
+              Its results are deck-restricted, not full-catalog accuracy.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="space-y-1">
         <label className="flex items-center gap-2 text-sm font-medium">

@@ -10,14 +10,18 @@ import {
 import Image from "next/image";
 import {
   Activity,
+  ArrowLeft,
   CheckCircle2,
+  ChevronRight,
   Globe,
   Key,
   Loader2,
   Moon,
+  PackagePlus,
   RotateCcw,
   Settings2,
   ShieldCheck,
+  Store,
   User as UserIcon,
   XCircle,
 } from "lucide-react";
@@ -75,8 +79,8 @@ import { useAuthStore } from "@/stores/auth";
 import { useDemoStore } from "@/stores/demo-store";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
 import { useTheme } from "next-themes";
-import { CatalogManagementPanel } from "./catalog-management-panel";
-import { CommunityGameLibrariesPanel } from "./community-game-libraries-panel";
+import { GameStorePanel } from "./catalog-management-panel";
+import { InstallGamePackagePanel } from "./community-game-libraries-panel";
 import { CatalogMaintenancePanel } from "./catalog-maintenance-panel";
 
 import { useShallow } from "zustand/react/shallow";
@@ -84,6 +88,8 @@ interface AccountSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+type GameLibrarySettingsPage = "root" | "store" | "install-url";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Light" },
@@ -147,6 +153,8 @@ export function AccountSettingsDialog({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [resettingDemo, setResettingDemo] = useState(false);
   const [demoResetMessage, setDemoResetMessage] = useState<string | null>(null);
+  const [gameLibraryPage, setGameLibraryPage] =
+    useState<GameLibrarySettingsPage>("root");
   const scannerOcrEnabled = useSyncExternalStore(
     subscribeScannerOcrEnabled,
     readScannerOcrEnabled,
@@ -371,598 +379,719 @@ export function AccountSettingsDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange} data-oid="he1m9xo">
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setGameLibraryPage("root");
+          onOpenChange(nextOpen);
+        }}
+        data-oid="he1m9xo"
+      >
         <DialogContent
           className="max-w-3xl sm:max-w-4xl max-h-[85vh] overflow-y-auto"
           data-oid="md5o42-"
         >
           <DialogHeader data-oid="g8vq-to">
-            <DialogTitle data-oid="o4pwzt0">Account & Preferences</DialogTitle>
+            <DialogTitle data-oid="o4pwzt0">
+              {gameLibraryPage === "store"
+                ? "Game Store"
+                : gameLibraryPage === "install-url"
+                  ? "Install from URL"
+                  : "Account & Preferences"}
+            </DialogTitle>
             <DialogDescription data-oid="itfte52">
-              Configure your profile, notifications, and which TCG modules are
-              active.
+              {gameLibraryPage === "root"
+                ? "Configure your profile, notifications, and which TCG modules are active."
+                : "Manage downloadable game packages without leaving settings."}
             </DialogDescription>
           </DialogHeader>
 
-          {(preferencesError || saveError || settingsError) && (
-            <div
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-              role="alert"
-            >
-              <p>{saveError ?? preferencesError ?? settingsError}</p>
-              {!saveError && (preferencesError || settingsError) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (preferencesError) void loadPreferences();
-                    if (settingsError) void loadAdminSettings();
-                  }}
+          {gameLibraryPage === "root" ? (
+            <>
+              {(preferencesError || saveError || settingsError) && (
+                <div
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                  role="alert"
                 >
-                  Try again
-                </Button>
+                  <p>{saveError ?? preferencesError ?? settingsError}</p>
+                  {!saveError && (preferencesError || settingsError) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (preferencesError) void loadPreferences();
+                        if (settingsError) void loadAdminSettings();
+                      }}
+                    >
+                      Try again
+                    </Button>
+                  )}
+                </div>
               )}
-            </div>
-          )}
 
-          <section className="space-y-4" data-oid="q24fta7">
-            <div
-              className="flex items-start justify-between rounded-lg border bg-muted/40 p-4"
-              data-oid="tj1e7-0"
-            >
-              <div data-oid="boxwtbv">
-                <h3
-                  className="flex items-center gap-2 text-sm font-semibold"
-                  data-oid="bsbgx:7"
+              <section className="space-y-4" data-oid="q24fta7">
+                <div
+                  className="flex items-start justify-between rounded-lg border bg-muted/40 p-4"
+                  data-oid="tj1e7-0"
                 >
-                  <UserIcon className="h-4 w-4" data-oid="i-shaju" /> Account
-                  Details
-                </h3>
-                <p
-                  className="mt-1 text-sm text-muted-foreground"
-                  data-oid="-g9vyf6"
-                >
-                  Manage how you appear across web and mobile clients.
-                </p>
-              </div>
-              <div
-                className="text-right text-sm text-muted-foreground"
-                data-oid="2gzn_9r"
-              >
-                <p className="font-medium text-foreground" data-oid="kuaqydj">
-                  {user?.username || "User"}
-                </p>
-                <p data-oid="mc8d-y9">{user?.email}</p>
-              </div>
-            </div>
-
-            <div className="grid gap-4" data-oid="kdvyjyg">
-              <PreferenceCard
-                title="Appearance"
-                description={
-                  theme === "system"
-                    ? "Following your device setting."
-                    : `Always ${theme === "dark" ? "dark" : "light"}.`
-                }
-                icon={<Moon className="h-4 w-4" data-oid=".jeuphl" />}
-                action={
-                  <div
-                    className="flex items-center gap-1"
-                    role="group"
-                    aria-label="Colour theme"
-                  >
-                    {THEME_OPTIONS.map((option) => (
-                      <Button
-                        key={option.value}
-                        size="sm"
-                        variant={theme === option.value ? "secondary" : "ghost"}
-                        aria-pressed={theme === option.value}
-                        onClick={() => setTheme(option.value)}
-                        className="px-2.5"
-                      >
-                        {option.label}
-                      </Button>
-                    ))}
+                  <div data-oid="boxwtbv">
+                    <h3
+                      className="flex items-center gap-2 text-sm font-semibold"
+                      data-oid="bsbgx:7"
+                    >
+                      <UserIcon className="h-4 w-4" data-oid="i-shaju" />{" "}
+                      Account Details
+                    </h3>
+                    <p
+                      className="mt-1 text-sm text-muted-foreground"
+                      data-oid="-g9vyf6"
+                    >
+                      Manage how you appear across web and mobile clients.
+                    </p>
                   </div>
-                }
-                data-oid="jnse5ex"
-              />
+                  <div
+                    className="text-right text-sm text-muted-foreground"
+                    data-oid="2gzn_9r"
+                  >
+                    <p
+                      className="font-medium text-foreground"
+                      data-oid="kuaqydj"
+                    >
+                      {user?.username || "User"}
+                    </p>
+                    <p data-oid="mc8d-y9">{user?.email}</p>
+                  </div>
+                </div>
 
-              {/* The notifications card sat here with a dead "Configure" button;
+                <div className="grid gap-4" data-oid="kdvyjyg">
+                  <PreferenceCard
+                    title="Appearance"
+                    description={
+                      theme === "system"
+                        ? "Following your device setting."
+                        : `Always ${theme === "dark" ? "dark" : "light"}.`
+                    }
+                    icon={<Moon className="h-4 w-4" data-oid=".jeuphl" />}
+                    action={
+                      <div
+                        className="flex items-center gap-1"
+                        role="group"
+                        aria-label="Colour theme"
+                      >
+                        {THEME_OPTIONS.map((option) => (
+                          <Button
+                            key={option.value}
+                            size="sm"
+                            variant={
+                              theme === option.value ? "secondary" : "ghost"
+                            }
+                            aria-pressed={theme === option.value}
+                            onClick={() => setTheme(option.value)}
+                            className="px-2.5"
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
+                    }
+                    data-oid="jnse5ex"
+                  />
+
+                  {/* The notifications card sat here with a dead "Configure" button;
                 there is no notifications feature to configure, so it is gone
                 rather than faked. Card-number and pricing toggles already have
                 real controls in the Display preferences section below. */}
-            </div>
-          </section>
-
-          <Separator data-oid="ijdm9wi" />
-
-          <section className="space-y-4" data-oid="-gg3d2v">
-            <div
-              className="flex items-center justify-between"
-              data-oid="qv_q2p0"
-            >
-              <div data-oid="_ac96b6">
-                <h3 className="text-sm font-semibold" data-oid="g76snc5">
-                  TCG Modules
-                </h3>
-                <p className="text-sm text-muted-foreground" data-oid="a1rhplz">
-                  Toggle which adapters are active in your dashboards and
-                  search. ({activeCount}/6 enabled)
-                </p>
-              </div>
-              <ShieldCheck
-                className="h-5 w-5 text-muted-foreground"
-                data-oid="0hrgrht"
-              />
-            </div>
-
-            <div className="grid gap-3" data-oid="s:rre0n">
-              {(
-                Object.entries(enabledGames) as Array<[ManageableGame, boolean]>
-              ).map(([game, enabled]) => {
-                const { icon } = gamePresentation(game);
-                return (
-                  <div
-                    key={game}
-                    className="flex items-center justify-between rounded-lg border bg-background p-3"
-                    data-oid="b-4_i5t"
-                  >
-                    <div className="flex items-center gap-3" data-oid="4imfp9c">
-                      <span
-                        className="flex h-9 w-9 items-center justify-center rounded-md bg-muted"
-                        data-oid="0qhu8yu"
-                      >
-                        {icon ? (
-                          <Image
-                            src={icon}
-                            alt={GAME_LABELS[game]}
-                            width={16}
-                            height={16}
-                            className="dark:invert"
-                            data-oid="swmrv_o"
-                          />
-                        ) : null}
-                      </span>
-                      <div data-oid="eva596k">
-                        <p className="text-sm font-medium" data-oid="8g2aev:">
-                          {GAME_LABELS[game]}
-                        </p>
-                        <p
-                          className="text-xs text-muted-foreground"
-                          data-oid="9ohefc8"
-                        >
-                          Include {GAME_LABELS[game]} in global search and
-                          analytics.
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={enabled}
-                      disabled={updatingGame === game}
-                      onCheckedChange={() => handleGameToggle(game)}
-                      aria-label={`Toggle ${GAME_LABELS[game]}`}
-                      data-oid="3ja.f.:"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <Separator data-oid="9u8__q_" />
-
-          <CatalogManagementPanel />
-          <CommunityGameLibrariesPanel />
-
-          <Separator />
-
-          <section className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold">Scanner Recognition</h3>
-              <p className="text-sm text-muted-foreground">
-                Configure browser-side recognition on this device.
-              </p>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border bg-background p-3">
-              <div>
-                <p className="text-sm font-medium">Use OCR for Difficult Scans</p>
-                <p className="text-xs text-muted-foreground">
-                  Read collector numbers when visual candidates are too similar.
-                </p>
-              </div>
-              <Switch
-                checked={scannerOcrEnabled}
-                onCheckedChange={(enabled) => {
-                  writeScannerOcrEnabled(enabled);
-                }}
-                aria-label="Toggle scanner OCR"
-              />
-            </div>
-          </section>
-
-          <Separator />
-
-          <section className="space-y-4" data-oid="inksgtk">
-            <div data-oid="jheeyaf">
-              <h3 className="text-sm font-semibold" data-oid="43ls4ah">
-                Display Preferences
-              </h3>
-              <p className="text-sm text-muted-foreground" data-oid="::vyc4.">
-                Customize how cards are displayed in search results.
-              </p>
-            </div>
-
-            <div
-              className="flex items-center justify-between rounded-lg border bg-background p-3"
-              data-oid="_nde-_j"
-            >
-              <div data-oid="mqc1v7h">
-                <p className="text-sm font-medium" data-oid="5etesal">
-                  Show Card Numbers
-                </p>
-                <p className="text-xs text-muted-foreground" data-oid="g1y_8b-">
-                  Display set codes (e.g., STAX-EN020, xy7) with card names.
-                </p>
-              </div>
-              <Switch
-                checked={showCardNumbers}
-                disabled={
-                  !token ||
-                  loadingPreferences ||
-                  updatingPreference === "showCardNumbers"
-                }
-                onCheckedChange={(checked) =>
-                  handlePreferenceToggle("showCardNumbers", checked)
-                }
-                aria-label="Toggle card numbers"
-                data-oid=":f_2sq5"
-              />
-            </div>
-
-            <div
-              className="flex items-center justify-between rounded-lg border bg-background p-3"
-              data-oid="hy7dq92"
-            >
-              <div data-oid="vhsbvmg">
-                <p className="text-sm font-medium" data-oid="wtg9az6">
-                  Show Pricing
-                </p>
-                <p className="text-xs text-muted-foreground" data-oid="y.g-0.j">
-                  Toggle pricing summaries and estimated values across the
-                  dashboard and collection views.
-                </p>
-              </div>
-              <Switch
-                checked={showPricing}
-                disabled={
-                  !token ||
-                  loadingPreferences ||
-                  updatingPreference === "showPricing"
-                }
-                onCheckedChange={(checked) =>
-                  handlePreferenceToggle("showPricing", checked)
-                }
-                aria-label="Toggle pricing display"
-                data-oid="n.-r0nc"
-              />
-            </div>
-
-            {showPricing && priceSources.length > 0 && (
-              <div className="space-y-3 rounded-lg border bg-background p-3">
-                <div>
-                  <p className="text-sm font-medium">Price Source</p>
-                  <p className="text-xs text-muted-foreground">
-                    Server-backed choices appear only when this server has the
-                    required provider configured.
-                  </p>
                 </div>
-                <Select
-                  value={priceSource}
-                  onValueChange={(value) =>
-                    setPriceSource(value as (typeof priceSources)[number]["id"])
-                  }
-                >
-                  <SelectTrigger aria-label="Price source">
-                    <SelectValue placeholder="Choose a price source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {priceSources.map((source) => (
-                      <SelectItem key={source.id} value={source.id}>
-                        {source.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {priceSources.find((source) => source.id === priceSource)
-                    ?.description ?? "Uses the best compatible source."}
-                </p>
-              </div>
-            )}
-          </section>
-
-          {isAdmin && (
-            <>
-              <Separator data-oid="w20d534" />
-              <section className="space-y-4" data-oid="uui_o62">
-                <div data-oid="5-0won3">
-                  <h3
-                    className="flex items-center gap-2 text-sm font-semibold"
-                    data-oid="yb__g42"
-                  >
-                    <Globe className="h-4 w-4" data-oid="0je_pt0" />
-                    Admin Settings
-                  </h3>
-                  <p
-                    className="text-sm text-muted-foreground"
-                    data-oid="zhvcb6d"
-                  >
-                    Control public access and authentication requirements.
-                  </p>
-                </div>
-
-                {loadingSettings ? (
-                  <div
-                    className="flex justify-center p-4"
-                    role="status"
-                    aria-label="Loading admin settings"
-                    data-oid="7174euq"
-                  >
-                    <div
-                      className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                      aria-hidden="true"
-                      data-oid="z4.pbhj"
-                    />
-                  </div>
-                ) : appSettings ? (
-                  <>
-                    <div
-                      className="flex items-center justify-between rounded-lg border bg-background p-3"
-                      data-oid="h1spui5"
-                    >
-                      <div data-oid="xom22hq">
-                        <p className="text-sm font-medium" data-oid="50xgqoi">
-                          Public Dashboard
-                        </p>
-                        <p
-                          className="text-xs text-muted-foreground"
-                          data-oid="0uq-80t"
-                        >
-                          Allow dashboard to be viewed without authentication.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={appSettings.publicDashboard}
-                        onCheckedChange={(checked) =>
-                          handleSettingChange("publicDashboard", checked)
-                        }
-                        aria-label="Toggle public dashboard"
-                        data-oid="ph-s45p"
-                      />
-                    </div>
-
-                    <div
-                      className="flex items-center justify-between rounded-lg border bg-background p-3"
-                      data-oid="8gmu-ar"
-                    >
-                      <div data-oid="9ahaicq">
-                        <p className="text-sm font-medium" data-oid="nff_g9b">
-                          Public Collections
-                        </p>
-                        <p
-                          className="text-xs text-muted-foreground"
-                          data-oid="pprcr76"
-                        >
-                          Allow collections to be viewed without authentication.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={appSettings.publicCollections}
-                        onCheckedChange={(checked) =>
-                          handleSettingChange("publicCollections", checked)
-                        }
-                        aria-label="Toggle public collections"
-                        data-oid="6fpajhe"
-                      />
-                    </div>
-
-                    <div
-                      className="flex items-center justify-between rounded-lg border bg-background p-3"
-                      data-oid="v.zuye9"
-                    >
-                      <div data-oid="rwks9y9">
-                        <p className="text-sm font-medium" data-oid="ce4jkqm">
-                          Require Authentication
-                        </p>
-                        <p
-                          className="text-xs text-muted-foreground"
-                          data-oid="mf.r3gl"
-                        >
-                          Require login for all features. When disabled, search
-                          remains authenticated-only.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={appSettings.requireAuth}
-                        onCheckedChange={(checked) =>
-                          handleSettingChange("requireAuth", checked)
-                        }
-                        aria-label="Toggle require authentication"
-                        data-oid="bqbhg85"
-                      />
-                    </div>
-                  </>
-                ) : null}
               </section>
 
-              <Separator data-oid="-zfch3i" />
+              <Separator data-oid="ijdm9wi" />
 
-              <section className="space-y-4" data-oid=":82_.e:">
+              <section className="space-y-4" data-oid="-gg3d2v">
                 <div
                   className="flex items-center justify-between"
-                  data-oid="w.18vbl"
+                  data-oid="qv_q2p0"
                 >
-                  <div data-oid="x.3-7ml">
-                    <h3
-                      className="flex items-center gap-2 text-sm font-semibold"
-                      data-oid="n_2h4w-"
-                    >
-                      <Activity className="h-4 w-4" data-oid="as1yhr0" />
-                      Data Sources
+                  <div data-oid="_ac96b6">
+                    <h3 className="text-sm font-semibold" data-oid="g76snc5">
+                      TCG Modules
                     </h3>
                     <p
                       className="text-sm text-muted-foreground"
-                      data-oid="e0qt6j_"
+                      data-oid="a1rhplz"
                     >
-                      External APIs that power card search and pricing. Test
-                      connectivity or override URLs.
+                      Toggle which adapters are active in your dashboards and
+                      search. ({activeCount}/6 enabled)
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleTestAll}
-                    disabled={loadingSettings}
-                    data-oid="paqr3ru"
-                  >
-                    Test All
-                  </Button>
+                  <ShieldCheck
+                    className="h-5 w-5 text-muted-foreground"
+                    data-oid="0hrgrht"
+                  />
                 </div>
 
-                {loadingSettings ? (
-                  <div
-                    className="flex justify-center p-4"
-                    role="status"
-                    aria-label="Loading source settings"
-                    data-oid="yw-aik9"
-                  >
-                    <div
-                      className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                      aria-hidden="true"
-                      data-oid="6xv_fno"
-                    />
-                  </div>
-                ) : sourceDefaults ? (
-                  <div className="space-y-3" data-oid="9c-ywnl">
-                    {(
-                      Object.entries(sourceDefaults).filter(([key]) =>
-                        isSourceKey(key),
-                      ) as Array<[SourceKey, { url: string; label: string }]>
-                    ).map(([key, source]) => {
-                      const result = testResults[key];
-                      const overrideKey =
-                        key === "scryfall"
-                          ? "scryfallApiBaseUrl"
-                          : key === "yugioh"
-                            ? "ygoApiBaseUrl"
-                            : key === "pokemon"
-                              ? "scrydexApiBaseUrl"
-                              : "tcgdexApiBaseUrl";
-                      const overrideUrl = appSettings?.[
-                        overrideKey as keyof AdminAppSettings
-                      ] as string | null;
-                      const activeUrl = overrideUrl || source.url;
-                      const local = isLocalCache(activeUrl);
-                      const note = local
-                        ? SOURCE_NOTES[key].local
-                        : SOURCE_NOTES[key].remote;
-                      const authType =
-                        local && key === "pokemon"
-                          ? ("none" as const)
-                          : SOURCE_AUTH[key];
-
-                      return (
-                        <DataSourceCard
-                          key={key}
-                          sourceKey={key}
-                          label={source.label}
-                          defaultUrl={source.url}
-                          activeUrl={activeUrl}
-                          overrideUrl={overrideUrl}
-                          testResult={result}
-                          onTest={() => handleTestSource(key)}
-                          onOverride={(url) =>
-                            handleSettingChange(overrideKey, url || null)
-                          }
-                          authType={authType}
-                          note={note}
-                          scrydexApiKey={
-                            key === "pokemon"
-                              ? appSettings?.scrydexApiKey
-                              : undefined
-                          }
-                          scrydexTeamId={
-                            key === "pokemon"
-                              ? appSettings?.scrydexTeamId
-                              : undefined
-                          }
-                          onScrydexKeyChange={
-                            key === "pokemon"
-                              ? (v) =>
-                                  handleSettingChange(
-                                    "scrydexApiKey",
-                                    v || null,
-                                  )
-                              : undefined
-                          }
-                          onScrydexTeamIdChange={
-                            key === "pokemon"
-                              ? (v) =>
-                                  handleSettingChange(
-                                    "scrydexTeamId",
-                                    v || null,
-                                  )
-                              : undefined
-                          }
-                          data-oid="__:ic:q"
+                <div className="grid gap-3" data-oid="s:rre0n">
+                  {(
+                    Object.entries(enabledGames) as Array<
+                      [ManageableGame, boolean]
+                    >
+                  ).map(([game, enabled]) => {
+                    const { icon } = gamePresentation(game);
+                    return (
+                      <div
+                        key={game}
+                        className="flex items-center justify-between rounded-lg border bg-background p-3"
+                        data-oid="b-4_i5t"
+                      >
+                        <div
+                          className="flex items-center gap-3"
+                          data-oid="4imfp9c"
+                        >
+                          <span
+                            className="flex h-9 w-9 items-center justify-center rounded-md bg-muted"
+                            data-oid="0qhu8yu"
+                          >
+                            {icon ? (
+                              <Image
+                                src={icon}
+                                alt={GAME_LABELS[game]}
+                                width={16}
+                                height={16}
+                                className="dark:invert"
+                                data-oid="swmrv_o"
+                              />
+                            ) : null}
+                          </span>
+                          <div data-oid="eva596k">
+                            <p
+                              className="text-sm font-medium"
+                              data-oid="8g2aev:"
+                            >
+                              {GAME_LABELS[game]}
+                            </p>
+                            <p
+                              className="text-xs text-muted-foreground"
+                              data-oid="9ohefc8"
+                            >
+                              Include {GAME_LABELS[game]} in global search and
+                              analytics.
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={enabled}
+                          disabled={updatingGame === game}
+                          onCheckedChange={() => handleGameToggle(game)}
+                          aria-label={`Toggle ${GAME_LABELS[game]}`}
+                          data-oid="3ja.f.:"
                         />
-                      );
-                    })}
-                  </div>
-                ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
               </section>
 
-              {token && !isDemoMode() && (
+              <Separator data-oid="9u8__q_" />
+
+              <section className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Game Libraries</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Download official packages or connect another
+                    publisher&apos;s manifest.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-lg border bg-background p-4 text-left hover:bg-muted/40"
+                  onClick={() => setGameLibraryPage("store")}
+                >
+                  <Store className="h-5 w-5 text-muted-foreground" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      Game Store
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Official packages from the published catalog manifest.
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-lg border bg-background p-4 text-left hover:bg-muted/40"
+                  onClick={() => setGameLibraryPage("install-url")}
+                >
+                  <PackagePlus className="h-5 w-5 text-muted-foreground" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      Install from URL
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Connect a compatible package from another publisher.
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </section>
+
+              <Separator />
+
+              <section className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Scanner Recognition</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Configure browser-side recognition on this device.
+                  </p>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border bg-background p-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      Use OCR for Difficult Scans
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Read collector numbers when visual candidates are too
+                      similar.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={scannerOcrEnabled}
+                    onCheckedChange={(enabled) => {
+                      writeScannerOcrEnabled(enabled);
+                    }}
+                    aria-label="Toggle scanner OCR"
+                  />
+                </div>
+              </section>
+
+              <Separator />
+
+              <section className="space-y-4" data-oid="inksgtk">
+                <div data-oid="jheeyaf">
+                  <h3 className="text-sm font-semibold" data-oid="43ls4ah">
+                    Display Preferences
+                  </h3>
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-oid="::vyc4."
+                  >
+                    Customize how cards are displayed in search results.
+                  </p>
+                </div>
+
+                <div
+                  className="flex items-center justify-between rounded-lg border bg-background p-3"
+                  data-oid="_nde-_j"
+                >
+                  <div data-oid="mqc1v7h">
+                    <p className="text-sm font-medium" data-oid="5etesal">
+                      Show Card Numbers
+                    </p>
+                    <p
+                      className="text-xs text-muted-foreground"
+                      data-oid="g1y_8b-"
+                    >
+                      Display set codes (e.g., STAX-EN020, xy7) with card names.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={showCardNumbers}
+                    disabled={
+                      !token ||
+                      loadingPreferences ||
+                      updatingPreference === "showCardNumbers"
+                    }
+                    onCheckedChange={(checked) =>
+                      handlePreferenceToggle("showCardNumbers", checked)
+                    }
+                    aria-label="Toggle card numbers"
+                    data-oid=":f_2sq5"
+                  />
+                </div>
+
+                <div
+                  className="flex items-center justify-between rounded-lg border bg-background p-3"
+                  data-oid="hy7dq92"
+                >
+                  <div data-oid="vhsbvmg">
+                    <p className="text-sm font-medium" data-oid="wtg9az6">
+                      Show Pricing
+                    </p>
+                    <p
+                      className="text-xs text-muted-foreground"
+                      data-oid="y.g-0.j"
+                    >
+                      Toggle pricing summaries and estimated values across the
+                      dashboard and collection views.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={showPricing}
+                    disabled={
+                      !token ||
+                      loadingPreferences ||
+                      updatingPreference === "showPricing"
+                    }
+                    onCheckedChange={(checked) =>
+                      handlePreferenceToggle("showPricing", checked)
+                    }
+                    aria-label="Toggle pricing display"
+                    data-oid="n.-r0nc"
+                  />
+                </div>
+
+                {showPricing && priceSources.length > 0 && (
+                  <div className="space-y-3 rounded-lg border bg-background p-3">
+                    <div>
+                      <p className="text-sm font-medium">Price Source</p>
+                      <p className="text-xs text-muted-foreground">
+                        Server-backed choices appear only when this server has
+                        the required provider configured.
+                      </p>
+                    </div>
+                    <Select
+                      value={priceSource}
+                      onValueChange={(value) =>
+                        setPriceSource(
+                          value as (typeof priceSources)[number]["id"],
+                        )
+                      }
+                    >
+                      <SelectTrigger aria-label="Price source">
+                        <SelectValue placeholder="Choose a price source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {priceSources.map((source) => (
+                          <SelectItem key={source.id} value={source.id}>
+                            {source.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {priceSources.find((source) => source.id === priceSource)
+                        ?.description ?? "Uses the best compatible source."}
+                    </p>
+                  </div>
+                )}
+              </section>
+
+              {isAdmin && (
+                <>
+                  <Separator data-oid="w20d534" />
+                  <section className="space-y-4" data-oid="uui_o62">
+                    <div data-oid="5-0won3">
+                      <h3
+                        className="flex items-center gap-2 text-sm font-semibold"
+                        data-oid="yb__g42"
+                      >
+                        <Globe className="h-4 w-4" data-oid="0je_pt0" />
+                        Admin Settings
+                      </h3>
+                      <p
+                        className="text-sm text-muted-foreground"
+                        data-oid="zhvcb6d"
+                      >
+                        Control public access and authentication requirements.
+                      </p>
+                    </div>
+
+                    {loadingSettings ? (
+                      <div
+                        className="flex justify-center p-4"
+                        role="status"
+                        aria-label="Loading admin settings"
+                        data-oid="7174euq"
+                      >
+                        <div
+                          className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                          aria-hidden="true"
+                          data-oid="z4.pbhj"
+                        />
+                      </div>
+                    ) : appSettings ? (
+                      <>
+                        <div
+                          className="flex items-center justify-between rounded-lg border bg-background p-3"
+                          data-oid="h1spui5"
+                        >
+                          <div data-oid="xom22hq">
+                            <p
+                              className="text-sm font-medium"
+                              data-oid="50xgqoi"
+                            >
+                              Public Dashboard
+                            </p>
+                            <p
+                              className="text-xs text-muted-foreground"
+                              data-oid="0uq-80t"
+                            >
+                              Allow dashboard to be viewed without
+                              authentication.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={appSettings.publicDashboard}
+                            onCheckedChange={(checked) =>
+                              handleSettingChange("publicDashboard", checked)
+                            }
+                            aria-label="Toggle public dashboard"
+                            data-oid="ph-s45p"
+                          />
+                        </div>
+
+                        <div
+                          className="flex items-center justify-between rounded-lg border bg-background p-3"
+                          data-oid="8gmu-ar"
+                        >
+                          <div data-oid="9ahaicq">
+                            <p
+                              className="text-sm font-medium"
+                              data-oid="nff_g9b"
+                            >
+                              Public Collections
+                            </p>
+                            <p
+                              className="text-xs text-muted-foreground"
+                              data-oid="pprcr76"
+                            >
+                              Allow collections to be viewed without
+                              authentication.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={appSettings.publicCollections}
+                            onCheckedChange={(checked) =>
+                              handleSettingChange("publicCollections", checked)
+                            }
+                            aria-label="Toggle public collections"
+                            data-oid="6fpajhe"
+                          />
+                        </div>
+
+                        <div
+                          className="flex items-center justify-between rounded-lg border bg-background p-3"
+                          data-oid="v.zuye9"
+                        >
+                          <div data-oid="rwks9y9">
+                            <p
+                              className="text-sm font-medium"
+                              data-oid="ce4jkqm"
+                            >
+                              Require Authentication
+                            </p>
+                            <p
+                              className="text-xs text-muted-foreground"
+                              data-oid="mf.r3gl"
+                            >
+                              Require login for all features. When disabled,
+                              search remains authenticated-only.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={appSettings.requireAuth}
+                            onCheckedChange={(checked) =>
+                              handleSettingChange("requireAuth", checked)
+                            }
+                            aria-label="Toggle require authentication"
+                            data-oid="bqbhg85"
+                          />
+                        </div>
+                      </>
+                    ) : null}
+                  </section>
+
+                  <Separator data-oid="-zfch3i" />
+
+                  <section className="space-y-4" data-oid=":82_.e:">
+                    <div
+                      className="flex items-center justify-between"
+                      data-oid="w.18vbl"
+                    >
+                      <div data-oid="x.3-7ml">
+                        <h3
+                          className="flex items-center gap-2 text-sm font-semibold"
+                          data-oid="n_2h4w-"
+                        >
+                          <Activity className="h-4 w-4" data-oid="as1yhr0" />
+                          Data Sources
+                        </h3>
+                        <p
+                          className="text-sm text-muted-foreground"
+                          data-oid="e0qt6j_"
+                        >
+                          External APIs that power card search and pricing. Test
+                          connectivity or override URLs.
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleTestAll}
+                        disabled={loadingSettings}
+                        data-oid="paqr3ru"
+                      >
+                        Test All
+                      </Button>
+                    </div>
+
+                    {loadingSettings ? (
+                      <div
+                        className="flex justify-center p-4"
+                        role="status"
+                        aria-label="Loading source settings"
+                        data-oid="yw-aik9"
+                      >
+                        <div
+                          className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                          aria-hidden="true"
+                          data-oid="6xv_fno"
+                        />
+                      </div>
+                    ) : sourceDefaults ? (
+                      <div className="space-y-3" data-oid="9c-ywnl">
+                        {(
+                          Object.entries(sourceDefaults).filter(([key]) =>
+                            isSourceKey(key),
+                          ) as Array<
+                            [SourceKey, { url: string; label: string }]
+                          >
+                        ).map(([key, source]) => {
+                          const result = testResults[key];
+                          const overrideKey =
+                            key === "scryfall"
+                              ? "scryfallApiBaseUrl"
+                              : key === "yugioh"
+                                ? "ygoApiBaseUrl"
+                                : key === "pokemon"
+                                  ? "scrydexApiBaseUrl"
+                                  : "tcgdexApiBaseUrl";
+                          const overrideUrl = appSettings?.[
+                            overrideKey as keyof AdminAppSettings
+                          ] as string | null;
+                          const activeUrl = overrideUrl || source.url;
+                          const local = isLocalCache(activeUrl);
+                          const note = local
+                            ? SOURCE_NOTES[key].local
+                            : SOURCE_NOTES[key].remote;
+                          const authType =
+                            local && key === "pokemon"
+                              ? ("none" as const)
+                              : SOURCE_AUTH[key];
+
+                          return (
+                            <DataSourceCard
+                              key={key}
+                              sourceKey={key}
+                              label={source.label}
+                              defaultUrl={source.url}
+                              activeUrl={activeUrl}
+                              overrideUrl={overrideUrl}
+                              testResult={result}
+                              onTest={() => handleTestSource(key)}
+                              onOverride={(url) =>
+                                handleSettingChange(overrideKey, url || null)
+                              }
+                              authType={authType}
+                              note={note}
+                              scrydexApiKey={
+                                key === "pokemon"
+                                  ? appSettings?.scrydexApiKey
+                                  : undefined
+                              }
+                              scrydexTeamId={
+                                key === "pokemon"
+                                  ? appSettings?.scrydexTeamId
+                                  : undefined
+                              }
+                              onScrydexKeyChange={
+                                key === "pokemon"
+                                  ? (v) =>
+                                      handleSettingChange(
+                                        "scrydexApiKey",
+                                        v || null,
+                                      )
+                                  : undefined
+                              }
+                              onScrydexTeamIdChange={
+                                key === "pokemon"
+                                  ? (v) =>
+                                      handleSettingChange(
+                                        "scrydexTeamId",
+                                        v || null,
+                                      )
+                                  : undefined
+                              }
+                              data-oid="__:ic:q"
+                            />
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </section>
+
+                  {token && !isDemoMode() && (
+                    <>
+                      <Separator />
+                      <CatalogMaintenancePanel token={token} />
+                    </>
+                  )}
+                </>
+              )}
+
+              {isDemoMode() && (
                 <>
                   <Separator />
-                  <CatalogMaintenancePanel token={token} />
+                  <section className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                      <div>
+                        <h3 className="text-sm font-semibold">Demo Data</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Restore every demo feature to its original sample
+                          data.
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        onClick={() => void handleResetDemo()}
+                        disabled={resettingDemo}
+                      >
+                        {resettingDemo ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        {resettingDemo ? "Resetting…" : "Reset demo data"}
+                      </Button>
+                    </div>
+                    {demoResetMessage && (
+                      <p
+                        className="text-sm text-muted-foreground"
+                        role="status"
+                      >
+                        {demoResetMessage}
+                      </p>
+                    )}
+                  </section>
                 </>
               )}
             </>
-          )}
-
-          {isDemoMode() && (
-            <>
-              <Separator />
-              <section className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                  <div>
-                    <h3 className="text-sm font-semibold">Demo Data</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Restore every demo feature to its original sample data.
-                    </p>
-                  </div>
-                  <Button
-                    variant="destructive"
-                    onClick={() => void handleResetDemo()}
-                    disabled={resettingDemo}
-                  >
-                    {resettingDemo ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RotateCcw className="h-4 w-4" />
-                    )}
-                    {resettingDemo ? "Resetting…" : "Reset demo data"}
-                  </Button>
-                </div>
-                {demoResetMessage && (
-                  <p className="text-sm text-muted-foreground" role="status">
-                    {demoResetMessage}
-                  </p>
-                )}
-              </section>
-            </>
+          ) : (
+            <section className="space-y-5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-2"
+                onClick={() => setGameLibraryPage("root")}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to settings
+              </Button>
+              {gameLibraryPage === "store" ? (
+                <GameStorePanel />
+              ) : (
+                <InstallGamePackagePanel />
+              )}
+            </section>
           )}
 
           <DialogFooter

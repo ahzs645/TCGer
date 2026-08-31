@@ -17,6 +17,19 @@ export const tcgCodeSchema = z.enum(TCG_CODES);
 export type TcgCode = z.infer<typeof tcgCodeSchema>;
 
 /**
+ * Stable game identifier used by generic catalog, collection, and package
+ * surfaces. Built-in provider APIs still use `TcgCode`; installed game
+ * packages use this open, validated identifier instead of requiring a client
+ * release for every new game.
+ */
+export const gameIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9-]*$/);
+export type GameId = z.infer<typeof gameIdSchema>;
+
+/**
  * Finish codes are deliberately open-ended. Providers already expose more
  * finishes than the legacy normal/reverse/holo set, and new
  * finishes should not require an API contract release.

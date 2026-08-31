@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { Dices, Loader2, Search as SearchIcon } from "lucide-react";
 import {
+  gamePackageDefinition,
   getGameDefinition,
   matchesCollectionFacets,
   type CollectionFacetCard,
   type GameFilterSelection,
   type TcgCode,
+  type GamePackageCatalogCard,
 } from "@tcg/api-types";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,11 @@ import type { Card as CardType } from "@/types/card";
 
 import { CardPreview } from "./card-preview";
 import { GameFacetFilters } from "@/components/collections/sandbox/game-facet-filters";
+import {
+  gamePackageCards,
+  listInstalledGamePackages,
+  type InstalledGamePackage,
+} from "@/lib/game-packages/game-package-client";
 
 import { useShallow } from "zustand/react/shallow";
 export function CardSearchPanel() {
@@ -66,22 +73,27 @@ export function CardSearchPanel() {
   const [discoveredCards, setDiscoveredCards] = useState<CardType[] | null>(null);
   const [discoverSource, setDiscoverSource] = useState<string | null>(null);
   const [isDiscovering, setIsDiscovering] = useState(false);
+  const [installedPackages, setInstalledPackages] = useState<InstalledGamePackage[]>([]);
+  const [selectedPackageId, setSelectedPackageId] = useState<string>();
+  const [packageCards, setPackageCards] = useState<CardType[]>([]);
 
   const { data, error, isError, isFetching, refetch } = useCardSearch(
-    searchQuery,
+    selectedPackageId ? "" : searchQuery,
     selectedGame === "all" ? undefined : selectedGame,
   );
   const normalizedSetFilter = setFilter.trim().toLowerCase();
   const normalizedRarityFilter = rarityFilter.trim().toLowerCase();
   const normalizedCollectorFilter = collectorFilter.trim().toLowerCase();
-  const selectedDefinition =
-    selectedGame === "all" ? null : getGameDefinition(selectedGame as TcgCode);
-  const sourceCards = discoveredCards ?? data ?? [];
+  const selectedPackage = installedPackages.find((item) => item.id === selectedPackageId);
+  const selectedDefinition = selectedPackage
+    ? gamePackageDefinition(selectedPackage.manifest)
+    : selectedGame === "all" ? null : getGameDefinition(selectedGame as TcgCode);
+  const sourceCards = selectedPackageId ? packageCards : discoveredCards ?? data ?? [];
   const facetCards = sourceCards.map(
     (card) => ({ ...card, quantity: 0 }) as CollectionFacetCard,
   );
   const filteredCards = sourceCards.filter((card) => {
-    if (!enabledGames[card.tcg as keyof typeof enabledGames]) return false;
+    if (!selectedPackageId && !enabledGames[card.tcg as keyof typeof enabledGames]) return false;
     if (
       normalizedSetFilter &&
       ![card.setCode, card.setName].some((value) =>
@@ -117,9 +129,9 @@ export function CardSearchPanel() {
   const cards = filteredCards;
   const hasResults = cards.length > 0;
   const selectedGameDisabled =
-    selectedGame !== "all" &&
+    !selectedPackageId && selectedGame !== "all" &&
     !enabledGames[selectedGame as keyof typeof enabledGames];
-  const noGamesEnabled = Object.values(enabledGames).every(
+  const noGamesEnabled = installedPackages.length === 0 && Object.values(enabledGames).every(
     (enabled) => !enabled,
   );
   const hasFacetFilters = Boolean(
@@ -136,6 +148,13 @@ export function CardSearchPanel() {
     setDiscoveredCards(null);
     setDiscoverSource(null);
     setSearchQuery(trimmed);
+    if (selectedPackageId) {
+      void gamePackageCards(selectedPackageId).then((cards) => {
+        const gameId = selectedPackage?.manifest.game.id ?? selectedPackageId;
+        setPackageCards(cards.filter((card) => packageCardMatches(card, trimmed)).map((card) => packageCard(card, gameId)));
+      });
+      return;
+    }
     if (trimmed === searchQuery) {
       void refetch();
     }
@@ -161,6 +180,10 @@ export function CardSearchPanel() {
       setIsDiscovering(false);
     }
   };
+
+  useEffect(() => {
+    void listInstalledGamePackages().then(setInstalledPackages).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -233,7 +256,7 @@ export function CardSearchPanel() {
                 variant="outline"
                 className="w-full gap-2"
                 onClick={() => void handleDiscover()}
-                disabled={isDiscovering || !isAuthenticated || noGamesEnabled}
+                disabled={isDiscovering || !isAuthenticated || noGamesEnabled || Boolean(selectedPackageId)}
               >
                 {isDiscovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Dices className="h-4 w-4" />}
                 Discover random cards
@@ -249,8 +272,16 @@ export function CardSearchPanel() {
                 TCG Filter
               </label>
               <Select
-                value={selectedGame}
+                value={selectedPackageId ? `package:${selectedPackageId}` : selectedGame}
                 onValueChange={(value) => {
+                  if (value.startsWith("package:")) {
+                    setSelectedPackageId(value.slice("package:".length));
+                    setGameFacetSelections({});
+                    setDiscoveredCards(null);
+                    return;
+                  }
+                  setSelectedPackageId(undefined);
+                  setPackageCards([]);
                   setGame(value as SupportedGame);
                   setGameFacetSelections({});
                   setDiscoveredCards(null);
@@ -275,10 +306,15 @@ export function CardSearchPanel() {
                         value={game}
                         disabled={!enabledGames[game]}
                       >
-                        {GAME_LABELS[game]}{" "}
+                        {GAME_LABELS[game]} · TCGer{" "}
                         {!enabledGames[game] && "(disabled)"}
                       </SelectItem>
                     ))}
+                  {installedPackages.map((installed) => (
+                    <SelectItem key={installed.id} value={`package:${installed.id}`}>
+                      {gamePackageDefinition(installed.manifest).label} · {installed.manifest.publisher.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -465,7 +501,10 @@ export function CardSearchPanel() {
                         className="text-lg font-semibold mb-4 capitalize"
                         data-oid="dqt0:bq"
                       >
-                        {GAME_LABELS[tcg as keyof typeof GAME_LABELS] || tcg}
+                        {(() => {
+                          const installed = installedPackages.find((item) => item.manifest.game.id === tcg);
+                          return installed ? gamePackageDefinition(installed.manifest).label : (GAME_LABELS[tcg as keyof typeof GAME_LABELS] ?? tcg);
+                        })()}
                       </h3>
                       <div className="flex flex-wrap gap-4" data-oid="0mf81m4">
                         {tcgCards.map((card) => (
@@ -486,4 +525,18 @@ export function CardSearchPanel() {
       </Card>
     </div>
   );
+}
+
+function packageCardMatches(card: GamePackageCatalogCard, query: string): boolean {
+  const normalized = query.toLocaleLowerCase();
+  return [card.name, card.setName, card.setCode, card.collectorNumber]
+    .some((value) => value?.toLocaleLowerCase().includes(normalized));
+}
+
+function packageCard(card: GamePackageCatalogCard, gameId: string): CardType {
+  return {
+    ...card,
+    tcg: gameId,
+    printingKey: card.printingKey ?? card.id,
+  } as unknown as CardType;
 }

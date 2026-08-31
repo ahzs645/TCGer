@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  embeddingEntryMatchesExternalIds,
   DEFAULT_EMBEDDING_MATCH_THRESHOLDS,
   embeddingIndexesShareModel,
+  matchEmbeddingTopK,
   matchEmbeddingShardsTopK,
+  restrictEmbeddingIndexToExternalIds,
   resolveEmbeddingPrintingCandidates,
   type EmbeddingIndex,
 } from "./embedding-matcher";
@@ -168,6 +171,82 @@ test("automatic mode rejects shards from different encoder contracts", () => {
   assert.deepEqual(
     matchEmbeddingShardsTopK(new Float32Array([1, 0]), [pokemon, yugioh]),
     [],
+  );
+});
+
+test("deck-scoped matching searches only selected Yu-Gi-Oh passcodes", () => {
+  const index = shard("yugioh", "89631139", [127, 0]);
+  index.total = 2;
+  index.entries = [
+    index.entries[0]!,
+    {
+      ...index.entries[0]!,
+      externalId: "46986414",
+      name: "Dark Magician",
+    },
+  ];
+  index.vectors = Int8Array.from([127, 0, 120, 20]);
+  index.invNorms = Float32Array.from([
+    1 / 127,
+    1 / Math.sqrt(120 * 120 + 20 * 20),
+  ]);
+
+  const matches = matchEmbeddingTopK(new Float32Array([1, 0]), index, {
+    topK: 5,
+    minSimilarity: 0.65,
+    allowedExternalIds: new Set(["46986414"]),
+  });
+
+  assert.deepEqual(
+    matches.map((candidate) => candidate.externalId),
+    ["46986414"],
+  );
+  assert.equal(matches[0]?.passedThreshold, true);
+  assert.deepEqual(
+    matchEmbeddingTopK(new Float32Array([1, 0]), index, {
+      allowedExternalIds: new Set(["not-in-index"]),
+    }),
+    [],
+  );
+
+  const restricted = restrictEmbeddingIndexToExternalIds(
+    index,
+    new Set(["46986414"]),
+  );
+  assert.equal(restricted.total, 1);
+  assert.equal(restricted.entries[0]?.externalId, "46986414");
+  assert.deepEqual([...restricted.vectors], [120, 20]);
+  assert.equal(index.total, 2, "cached source index remains unchanged");
+});
+
+test("deck scope recognizes nested exact-printing ids", () => {
+  const entry = {
+    externalId: "representative",
+    name: "Alternate artwork",
+    setCode: null,
+    setName: null,
+    rarity: null,
+    imageUrl: null,
+    exactPrintingId: "representative-print",
+    printings: [
+      {
+        externalId: "46986414",
+        exactPrintingId: "printing-46986414",
+        setCode: null,
+        setName: null,
+        rarity: null,
+        imageUrl: null,
+        releaseDate: null,
+      },
+    ],
+  };
+  assert.equal(
+    embeddingEntryMatchesExternalIds(entry, new Set(["printing-46986414"])),
+    true,
+  );
+  assert.equal(
+    embeddingEntryMatchesExternalIds(entry, new Set(["89631139"])),
+    false,
   );
 });
 

@@ -27,15 +27,25 @@ CLI:  alt_detectors.py <image.jpg> [--save-crops DIR]
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-MODELS_DIR = (
-    Path.home() / "Downloads/Reference/TCGer-Session-Reference/labeling/alt-models"
-)
+
+def default_models_dir():
+    cache_root = os.environ.get("TCGER_LABELING_CACHE_DIR")
+    if cache_root:
+        return Path(cache_root).expanduser() / "alt-models"
+    if sys.platform == "darwin":
+        return Path.home() / "Library/Caches/TCGer/session-labeling/alt-models"
+    cache_home = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    return cache_home / "tcger/session-labeling/alt-models"
+
+
+MODELS_DIR = default_models_dir()
 WEIGHTS = {
     "tcgscanner": ("Adrihp06/TCGscanner-detector", "riftbound_regions.onnx"),
     "pagescan-yolo": ("7rplus/pagescan-weights", "yolo_doc_v1.onnx"),

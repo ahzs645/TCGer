@@ -1,5 +1,5 @@
 import type { CollectionCard } from './collections';
-import { getGameDefinition } from './game-definitions';
+import { getGameDefinitionOrDefault } from './game-definitions';
 
 export interface ConsolidatedCollectionGroup {
   key: string;
@@ -16,7 +16,7 @@ function normalizedName(value: string): string {
 
 /** Stable gameplay identity while preserving exact-printing rows underneath. */
 export function collectionIdentityKey(card: CollectionCard): string {
-  const mode = getGameDefinition(card.tcg).collection.identityModes.find(
+  const mode = getGameDefinitionOrDefault(card.tcg).collection.identityModes.find(
     (candidate) => candidate.id === 'consolidated',
   );
   const configured = mode?.key === 'baseExternalId' ? card.baseExternalId : card.printingKey;

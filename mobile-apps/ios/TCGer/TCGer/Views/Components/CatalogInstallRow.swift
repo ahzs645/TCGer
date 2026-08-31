@@ -4,6 +4,9 @@ struct CatalogInstallRow: View {
     let game: TCGGame
     @ObservedObject var catalogStore: CatalogStore
     let includeSealedProducts: Bool
+    let packageManifest: GamePackageManifest?
+    let isGameEnabled: Bool
+    let onActivated: ((TCGGame) -> Void)?
 
     @State private var errorMessage: String?
     @State private var showingRemoveConfirmation = false
@@ -12,11 +15,17 @@ struct CatalogInstallRow: View {
     init(
         game: TCGGame,
         catalogStore: CatalogStore,
-        includeSealedProducts: Bool = false
+        includeSealedProducts: Bool = false,
+        packageManifest: GamePackageManifest? = nil,
+        isGameEnabled: Bool = true,
+        onActivated: ((TCGGame) -> Void)? = nil
     ) {
         self.game = game
         self.catalogStore = catalogStore
         self.includeSealedProducts = includeSealedProducts
+        self.packageManifest = packageManifest
+        self.isGameEnabled = isGameEnabled
+        self.onActivated = onActivated
     }
 
     private var metadata: CatalogManifestGame? {
@@ -32,7 +41,7 @@ struct CatalogInstallRow: View {
             catalogImage
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(game.displayName)
+                Text(displayName)
                     .font(.subheadline.weight(.semibold))
 
                 DownloadableAssetStatusLabel(
@@ -46,7 +55,7 @@ struct CatalogInstallRow: View {
                 if isInstalling {
                     DownloadableAssetProgressView(
                         progress: currentProgress,
-                        accessibilityLabel: "Installing \(game.displayName) catalog"
+                        accessibilityLabel: "Installing \(displayName) catalog"
                     )
                 }
 
@@ -67,7 +76,7 @@ struct CatalogInstallRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("About \(game.displayName) catalog")
+                .accessibilityLabel("About \(displayName) catalog")
 
                 DownloadableAssetActionControl(
                     state: actionState,
@@ -82,7 +91,7 @@ struct CatalogInstallRow: View {
             catalogDetails
                 .presentationCompactAdaptation(.popover)
         }
-        .alert("Remove \(game.displayName) catalog?", isPresented: $showingRemoveConfirmation) {
+        .alert("Remove \(displayName) package?", isPresented: $showingRemoveConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) {
                 catalogStore.remove(game)
@@ -114,8 +123,12 @@ struct CatalogInstallRow: View {
 
     private var catalogDetails: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(game.displayName, systemImage: "internaldrive")
+            Label(displayName, systemImage: "internaldrive")
                 .font(.headline)
+            if let publisherName = packageManifest?.publisher.name {
+                Text("Published by \(publisherName)")
+                    .foregroundStyle(.secondary)
+            }
             Text(catalogSummary)
             if let sealedCatalogSummary {
                 Text(sealedCatalogSummary)
@@ -130,7 +143,7 @@ struct CatalogInstallRow: View {
 
     private var actionState: DownloadableAssetActionControl.State {
         guard !isInstalling else {
-            return .busy(accessibilityLabel: "Installing \(game.displayName) catalog")
+            return .busy(accessibilityLabel: "Installing \(displayName) package")
         }
 
         switch catalogStore.installState(for: game) {
@@ -146,13 +159,16 @@ struct CatalogInstallRow: View {
             if needsSealedInstall {
                 return .button(title: "Add Products")
             }
+            if !isGameEnabled {
+                return .button(title: "Use Game")
+            }
             return .button(title: "Remove", role: .destructive)
         }
     }
 
     private var removesCatalog: Bool {
         guard case .installed = catalogStore.installState(for: game) else { return false }
-        return !(needsCatalogUpdate && isAvailable) && !needsSealedInstall
+        return isGameEnabled && !(needsCatalogUpdate && isAvailable) && !needsSealedInstall
     }
 
     private var catalogSummary: String {
@@ -217,6 +233,7 @@ struct CatalogInstallRow: View {
                 if includeSealedProducts, catalogStore.isSealedAvailable(game) {
                     try await catalogStore.installSealed(game)
                 }
+                onActivated?(game)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -224,6 +241,13 @@ struct CatalogInstallRow: View {
     }
 
     private func performAction() {
+        if !isGameEnabled,
+           case .installed = catalogStore.installState(for: game),
+           !needsCatalogUpdate,
+           !needsSealedInstall {
+            onActivated?(game)
+            return
+        }
         if removesCatalog {
             showingRemoveConfirmation = true
         } else {
@@ -252,6 +276,10 @@ struct CatalogInstallRow: View {
     private var needsCatalogUpdate: Bool {
         catalogStore.isUpdateAvailable(game) ||
             (includeSealedProducts && catalogStore.isSealedUpdateAvailable(game))
+    }
+
+    private var displayName: String {
+        packageManifest?.game.name ?? game.displayName
     }
 }
 

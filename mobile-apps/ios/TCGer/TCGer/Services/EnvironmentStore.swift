@@ -802,6 +802,46 @@ final class EnvironmentStore: ObservableObject {
         }
     }
 
+    func setGameEnabled(_ game: TCGGame, enabled: Bool) {
+        switch game {
+        case .yugioh: enabledYugioh = enabled
+        case .magic: enabledMagic = enabled
+        case .pokemon: enabledPokemon = enabled
+        case .onepiece: enabledOnepiece = enabled
+        case .lorcana: enabledLorcana = enabled
+        case .dragonball: enabledDragonball = enabled
+        case .all: break
+        }
+    }
+
+    /// Installing an official package also activates its app surfaces. Local
+    /// mode persists through the published preference properties; a connected
+    /// account additionally receives the same preference on the server.
+    func activateInstalledGame(_ game: TCGGame) async {
+        guard game != .all else { return }
+        setGameEnabled(game, enabled: true)
+
+        guard !serverConfiguration.isOnDevice,
+              isAuthenticated,
+              let authToken else { return }
+        do {
+            let preferences = try await APIService().updateUserPreferences(
+                config: serverConfiguration,
+                token: authToken,
+                enabledYugioh: game == .yugioh ? true : nil,
+                enabledMagic: game == .magic ? true : nil,
+                enabledPokemon: game == .pokemon ? true : nil,
+                enabledOnepiece: game == .onepiece ? true : nil,
+                enabledLorcana: game == .lorcana ? true : nil,
+                enabledDragonball: game == .dragonball ? true : nil
+            )
+            applyUserPreferences(preferences)
+        } catch {
+            // The downloaded package is usable on this device. Keep that local
+            // state active and let the next preference refresh retry syncing.
+        }
+    }
+
     func storeToken(_ token: String) {
         authToken = token
         KeychainTokenStore.saveToken(token)

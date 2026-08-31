@@ -25,6 +25,10 @@ final class CatalogManifestMergeTests: XCTestCase {
         await store.refreshManifest()
         await store.configure(enabledGames: games)
 
+        let packages = await store.officialGamePackages()
+        XCTAssertEqual(Set(packages.map(\.game)), Set(games))
+        XCTAssertTrue(packages.allSatisfy { $0.manifest.publisher.id == "tcger" })
+
         for game in games {
             try await store.install(game)
             XCTAssertTrue(store.isLoaded(game), "Expected \(game.rawValue) to load")
@@ -71,6 +75,26 @@ final class CatalogManifestMergeTests: XCTestCase {
 
         XCTAssertEqual(merged.games["magic"]?.version, 3)
         XCTAssertEqual(merged.games["magic"]?.file, "magic.v3.remote.pack.json")
+    }
+
+    func testMatchingRemoteEntryInheritsBundledPackageFile() throws {
+        let packageFile = "pokemon.game-package.json"
+        let remoteEntry = entry(version: 2, file: "pokemon.v2.pack.json")
+        var bundledEntry = remoteEntry
+        bundledEntry.packageFile = packageFile
+        let remote = try manifestData(
+            generatedAt: "2026-08-29T00:00:00Z",
+            games: ["pokemon": remoteEntry]
+        )
+        let bundled = try manifestData(
+            generatedAt: "2026-08-30T00:00:00Z",
+            games: ["pokemon": bundledEntry]
+        )
+
+        let mergedData = RemoteCatalogSource.mergeManifest(remote: remote, bundled: bundled)
+        let merged = try JSONDecoder().decode(CatalogManifest.self, from: mergedData)
+
+        XCTAssertEqual(merged.games["pokemon"]?.packageFile, packageFile)
     }
 
     private func entry(version: Int, file: String) -> CatalogManifestGame {

@@ -100,6 +100,16 @@ enum AppTab: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    /// A versioned package feature adapter required before this destination is
+    /// advertised. New game-specific surfaces opt in here without coupling the
+    /// tab shell to a particular game identifier or publisher.
+    var requiredGameFeature: String? {
+        switch self {
+        case .pokedex: GameFeatureID.pokedex
+        default: nil
+        }
+    }
+
     func isSupported(by features: ServerFeatures) -> Bool {
         switch self {
         case .decks:

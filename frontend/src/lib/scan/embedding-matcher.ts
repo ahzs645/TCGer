@@ -620,6 +620,68 @@ export interface EmbeddingMatchOptions {
   minMargin?: number;
   /** Keep false for raw embedding; OCR/downstream verification promotes later. */
   allowVerifiedMarginAcceptance?: boolean;
+  /** Optional explicit deck gallery. Thresholds remain unchanged and an empty
+   * intersection returns no candidates rather than falling back to catalog. */
+  allowedExternalIds?: ReadonlySet<string>;
+}
+
+export function embeddingEntryMatchesExternalIds(
+  entry: EmbeddingIndexEntry,
+  allowedExternalIds: ReadonlySet<string>,
+): boolean {
+  if (allowedExternalIds.size === 0) return false;
+  const contains = (value: string | null | undefined) =>
+    value ? allowedExternalIds.has(value.trim().toLowerCase()) : false;
+  if (contains(entry.externalId) || contains(entry.exactPrintingId))
+    return true;
+  return (
+    entry.printings?.some(
+      (printing) =>
+        contains(printing.externalId) || contains(printing.exactPrintingId),
+    ) ?? false
+  );
+}
+
+/** Build a tiny exact-search gallery for an explicitly selected deck. The
+ * source index remains immutable/cached, and an empty intersection stays
+ * empty so callers cannot silently fall back to the full catalog. */
+export function restrictEmbeddingIndexToExternalIds(
+  index: EmbeddingIndex,
+  allowedExternalIds: ReadonlySet<string>,
+): EmbeddingIndex {
+  const normalized = new Set(
+    [...allowedExternalIds]
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const selectedRows: number[] = [];
+  for (let row = 0; row < index.entries.length; row++) {
+    if (embeddingEntryMatchesExternalIds(index.entries[row]!, normalized)) {
+      selectedRows.push(row);
+    }
+  }
+  const vectors = new Int8Array(selectedRows.length * index.dimension);
+  const invNorms = new Float32Array(selectedRows.length);
+  selectedRows.forEach((sourceRow, targetRow) => {
+    const sourceOffset = sourceRow * index.dimension;
+    vectors.set(
+      index.vectors.subarray(sourceOffset, sourceOffset + index.dimension),
+      targetRow * index.dimension,
+    );
+    invNorms[targetRow] = index.invNorms[sourceRow]!;
+  });
+  const entries = selectedRows.map((row) => index.entries[row]!);
+  return {
+    ...index,
+    total: entries.length,
+    printingTotal: entries.reduce(
+      (sum, entry) => sum + Math.max(entry.printings?.length ?? 0, 1),
+      0,
+    ),
+    entries,
+    vectors,
+    invNorms,
+  };
 }
 
 /**
@@ -644,6 +706,7 @@ export function matchEmbeddingTopK(
     minVerifiedSimilarity = indexThresholds.minVerifiedSimilarity,
     minMargin = indexThresholds.minMargin,
     allowVerifiedMarginAcceptance = false,
+    allowedExternalIds,
   } = options;
 
   const { dimension, vectors, invNorms, entries, tcg } = index;
@@ -656,6 +719,12 @@ export function matchEmbeddingTopK(
   let worst = -Infinity;
 
   for (let i = 0; i < entries.length; i++) {
+    if (
+      allowedExternalIds &&
+      !embeddingEntryMatchesExternalIds(entries[i]!, allowedExternalIds)
+    ) {
+      continue;
+    }
     const inv = invNorms[i]!;
     if (inv === 0) continue;
     const base = i * dimension;

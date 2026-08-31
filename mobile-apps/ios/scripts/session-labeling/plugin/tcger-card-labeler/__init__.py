@@ -1,4 +1,4 @@
-"""FiftyOne plugin: five-button labeling for TCGer scan sessions.
+"""FiftyOne plugin: single-card and binder-pocket TCGer session labeling.
 
 The sample in the modal is the REAL frame image (with the detection-quad
 polyline overlay toggleable in the sidebar). This panel supplies the rest as
@@ -15,10 +15,15 @@ Verdicts (written to the sample's `verdict` field, consumed by writeback.py):
   no_card       — frame contains no identifiable card (accidental shutter etc.)
 
 Fallback: the `apply_card_verdict` operator (backtick key) on grid selections.
+
+Binder pages keep independent human judgments in `binder_labels_json`, keyed
+by recorded pocket number. These labels never replace recorded device crops or
+candidates and are also captured by the append-only journal.
 """
 
 import base64
 import io
+import os
 from pathlib import Path
 
 import fiftyone.operators as foo
@@ -33,9 +38,129 @@ VERDICTS = [
 ]
 WRONG = {"false", "false_margin"}
 N_CANDS = 5
+N_SEARCH_RESULTS = 12
 CROP_H = 380
 THUMB_H = 230
 POCKET_H = 190
+BINDER_PAGE_H = 320
+BINDER_OVERVIEW_H = 110
+BINDER_FOCUS_H = 360
+_CATALOG_CACHE = {}
+
+
+def _normalized_game(game):
+    value = str(game or "pokemon").strip().lower()
+    return {"mtg": "magic", "pokémon": "pokemon"}.get(value, value)
+
+
+def _game_label(game):
+    game = _normalized_game(game)
+    return {
+        "magic": "Magic",
+        "pokemon": "Pokémon",
+        "yugioh": "Yu-Gi-Oh!",
+    }.get(game, game.replace("-", " ").title())
+
+
+def _game_catalog(dataset, game):
+    """Load and cache exact-print metadata for one sample's active game."""
+    import json
+
+    game = _normalized_game(game)
+    paths = tuple(dataset.info.get("card_metadata_paths") or [])
+    key = (game, paths)
+    if key in _CATALOG_CACHE:
+        return _CATALOG_CACHE[key]
+
+    by_id = {}
+    for raw_path in paths:
+        path = Path(raw_path)
+        if not path.exists():
+            continue
+        path_hint = str(path).lower()
+        try:
+            with path.open(encoding="utf-8") as source:
+                rows = json.load(source)
+        except Exception:
+            continue
+        for row in rows:
+            row_game = _normalized_game(row.get("game")) if row.get("game") else (
+                "magic" if "magic" in path_hint else "pokemon"
+            )
+            if row_game != game:
+                continue
+            image_url = str(row.get("imageURL") or "").lower()
+            if game == "pokemon" and (
+                row.get("series") == "tcgp"
+                or row.get("format") == "pocket"
+                or "/tcgp/" in image_url
+            ):
+                continue
+            card_id = row.get("cardId")
+            if card_id:
+                normalized = dict(row)
+                normalized["setName"] = (
+                    row.get("setName") or row.get("setCode")
+                )
+                normalized["collectorNumber"] = (
+                    row.get("collectorNumber")
+                    or (card_id.rsplit("-", 1)[-1] if "-" in card_id else None)
+                )
+                by_id[card_id] = normalized
+
+    rows = list(by_id.values())
+    _CATALOG_CACHE[key] = rows
+    return rows
+
+
+def _search_catalog(rows, query, limit=N_SEARCH_RESULTS):
+    """Rank name/set/collector/ID matches without fuzzy false positives."""
+    query = " ".join(str(query or "").strip().lower().split())
+    if not query:
+        return []
+    words = query.split()
+    matches = []
+    for row in rows:
+        card_id = str(row.get("cardId") or "")
+        name = str(row.get("name") or "")
+        set_name = str(row.get("setName") or "")
+        set_code = str(row.get("setCode") or "")
+        collector = str(row.get("collectorNumber") or "")
+        values = [card_id, name, set_name, set_code, collector]
+        lowered = [value.lower() for value in values]
+        haystack = " ".join(lowered)
+        if not all(word in haystack for word in words):
+            continue
+        if query == lowered[0]:
+            rank = 0
+        elif query == lowered[4]:
+            rank = 1
+        elif query == lowered[1]:
+            rank = 2
+        elif lowered[1].startswith(query):
+            rank = 3
+        elif query in lowered[1]:
+            rank = 4
+        elif query in lowered[2] or query == lowered[3]:
+            rank = 5
+        else:
+            rank = 6
+        release_digits = "".join(
+            character
+            for character in str(row.get("releaseDate") or "")
+            if character.isdigit()
+        )
+        release_rank = -int(release_digits or "0")
+        matches.append((
+            rank,
+            name.lower(),
+            release_rank,
+            set_name.lower(),
+            collector.lower(),
+            row,
+        ))
+    matches.sort(key=lambda item: item[:-1])
+    return [item[-1] for item in matches[:limit]]
 
 
 def _data_uri(pil_image, quality=82):
@@ -74,10 +199,25 @@ def _captioned_thumb(path, line1, line2, highlight, height=THUMB_H):
     return canvas
 
 
-JOURNAL = (
-    Path.home()
-    / "Downloads/Reference/TCGer-Session-Reference/labeling/journal.jsonl"
-)
+def _journal_path(sample):
+    """Place durable labels outside immutable captured session evidence."""
+    override = os.environ.get("TCGER_LABELING_STATE_DIR")
+    if override:
+        return Path(override).expanduser() / "journal.jsonl"
+    try:
+        frame_path = Path(sample.filepath).expanduser().resolve()
+        sessions_dir = frame_path.parents[1]
+        if sessions_dir.name == "sessions":
+            session_root = sessions_dir.parent
+            if session_root.name == "TCGer-Session-Reference":
+                return (
+                    session_root.parent
+                    / "TCGer-Labeling/fiftyone-sessions/journal.jsonl"
+                )
+            return session_root / "labeling/journal.jsonl"
+    except Exception:
+        pass
+    return Path.home() / ".local/share/TCGer/labeling/journal.jsonl"
 
 
 def _journal(sample):
@@ -92,7 +232,7 @@ def _journal(sample):
                "key": sample["key"]}
         for f in ("verdict", "corrected_card_id",
                   "fixed_quad_json", "fixed_quad_source", "rerun_top5_json",
-                  "binder_rerun_json"):
+                  "binder_rerun_json", "binder_labels_json"):
             rec[f] = sample[f] if sample.has_field(f) else None
         try:
             mq = sample["manual_quad"]
@@ -102,8 +242,9 @@ def _journal(sample):
                 ]
         except Exception:
             pass
-        JOURNAL.parent.mkdir(parents=True, exist_ok=True)
-        with open(JOURNAL, "a") as f:
+        journal = _journal_path(sample)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        with open(journal, "a") as f:
             f.write(_json.dumps(rec) + "\n")
     except Exception:
         pass
@@ -183,8 +324,35 @@ class CardVerdictPanel(foo.Panel):
         ctx.panel.state.n_pockets = 0
         ctx.panel.state.pocket_labels = []
         ctx.panel.state.pocket_crops = {}
+        ctx.panel.state.binder_page = {}
+        ctx.panel.state.binder_pockets = []
+        ctx.panel.state.focus_pocket_index = 0
+        ctx.panel.state.focus_pocket_label = ""
+        ctx.panel.state.focus_pocket_crop = {}
+        ctx.panel.state.focus_candidates = {}
+        ctx.panel.state.focus_candidate_ids = []
+        ctx.panel.state.focus_candidate_sims = []
+        ctx.panel.state.focus_candidate_names = []
+        ctx.panel.state.focus_candidate_sets = []
+        ctx.panel.state.focus_candidate_collectors = []
+        ctx.panel.state.focus_matched_id = None
+        ctx.panel.state.focus_label_base = None
+        ctx.panel.state.focus_label_margin = False
+        ctx.panel.state.focus_has_label = False
+        ctx.panel.state.focus_saved_corrected = None
+        ctx.panel.state.focus_saved_line = ""
+        ctx.panel.state.binder_library_query = ""
+        ctx.panel.state.binder_library_results = {}
+        ctx.panel.state.binder_library_ids = []
+        ctx.panel.state.binder_library_names = []
+        ctx.panel.state.binder_library_sets = []
+        ctx.panel.state.binder_library_collectors = []
+        ctx.panel.state.binder_library_status = ""
         ctx.panel.state.pick_ids = []
         ctx.panel.state.pick_sims = []
+        ctx.panel.state.pick_names = []
+        ctx.panel.state.pick_sets = []
+        ctx.panel.state.pick_collectors = []
         ctx.panel.state.device_id = None
         ctx.panel.state.base = None
         ctx.panel.state.margin = False
@@ -196,7 +364,18 @@ class CardVerdictPanel(foo.Panel):
         ctx.panel.state.rerun_cands = {}
         ctx.panel.state.rerun_ids = []
         ctx.panel.state.rerun_sims = []
+        ctx.panel.state.rerun_names = []
+        ctx.panel.state.rerun_sets = []
+        ctx.panel.state.rerun_collectors = []
+        ctx.panel.state.rerun_game = None
         ctx.panel.state.rerun_source = None
+        ctx.panel.state.library_query = ""
+        ctx.panel.state.library_results = {}
+        ctx.panel.state.library_ids = []
+        ctx.panel.state.library_names = []
+        ctx.panel.state.library_sets = []
+        ctx.panel.state.library_collectors = []
+        ctx.panel.state.library_status = ""
         ctx.panel.state.rescan_crops = {}
         ctx.panel.state.rescan_n = 0
         ctx.panel.state.picking = False
@@ -283,12 +462,28 @@ class CardVerdictPanel(foo.Panel):
                 if sample.has_field("rerun_top5_json") else None
         except Exception:
             rr = None
-        if rr and rr.get("cands"):
-            self._show_rerun(ctx, rr["cands"], rr.get("source"), fetch_missing=False)
+        sample_game = sample["game"] or "pokemon"
+        rerun_game = rr.get("game") if rr else None
+        if rr and rr.get("cands") and (
+            rerun_game == sample_game
+            or (rerun_game is None and sample_game == "pokemon")
+        ):
+            self._show_rerun(
+                ctx,
+                rr["cands"],
+                rr.get("source"),
+                fetch_missing=False,
+                game=sample_game,
+            )
 
         cache_dir = Path(ctx.dataset.info.get("card_cache_dir", ""))
         ids = sample["top5_card_ids"] or []
         sims = sample["top5_similarities"] or []
+        names = sample["top5_names"] or []
+        sets = sample["top5_set_names"] or [] \
+            if sample.has_field("top5_set_names") else []
+        collectors = sample["top5_collector_numbers"] or [] \
+            if sample.has_field("top5_collector_numbers") else []
         cands = {}
         for i, cid in enumerate(ids[:N_CANDS]):
             path = cache_dir / f"{cid.replace('/', '_')}.webp"
@@ -300,11 +495,18 @@ class CardVerdictPanel(foo.Panel):
         ctx.panel.state.cands = cands
         ctx.panel.state.pick_ids = list(ids[:N_CANDS])
         ctx.panel.state.pick_sims = [float(s) for s in sims[:N_CANDS]]
+        ctx.panel.state.pick_names = list(names[:N_CANDS])
+        ctx.panel.state.pick_sets = list(sets[:N_CANDS])
+        ctx.panel.state.pick_collectors = list(collectors[:N_CANDS])
 
     def _refresh_binder(self, ctx, sample):
-        """Binder pages show the two pipeline stages separately: first the
-        page carve (all pocket crops in one strip), then the recognition
-        results per pocket."""
+        """Show the full binder page, then one recorded pocket at a time.
+
+        The compact crop strip remains a complete map of all detected pockets,
+        while the focused crop and candidates are large enough to judge. Page
+        and pocket navigation only change panel state; recorded scanner data
+        and the verdict journal are untouched.
+        """
         import json
 
         from PIL import Image
@@ -312,34 +514,17 @@ class CardVerdictPanel(foo.Panel):
         header = f"**{sample['key']}** — {sample['outcome'] or 'binder page'}"
         ctx.panel.state.header = header
         pockets = json.loads(sample["binder_pockets_json"] or "[]")
-        cache_dir = Path(ctx.dataset.info.get("card_cache_dir", ""))
-
-        crops = {}
-        for i, p in enumerate(pockets):
-            crop = p.get("crop_path")
-            if crop and Path(crop).exists():
-                thumb = _captioned_thumb(
-                    crop, f"P{p['pocket'] + 1}", p.get("outcome"),
-                    bool(p.get("matched_card_id")), height=POCKET_H,
-                )
-                crops[f"p{i}"] = _data_uri(thumb)
-        ctx.panel.set_state("pocket_crops", crops)
-
-        labels = []
-        for i, p in enumerate(pockets):
-            status = p.get("matched_card_id") or p.get("outcome") or "?"
-            labels.append(f"**Pocket {p['pocket'] + 1}** — `{status}`")
-            row = {}
-            for j, c in enumerate(p.get("cands") or []):
-                thumb = _captioned_thumb(
-                    cache_dir / f"{c['id'].replace('/', '_')}.webp",
-                    c["id"], f"{c['sim']:.3f}", c["id"] == p.get("matched_card_id"),
-                    height=POCKET_H - 40,
-                )
-                row[f"c{j}"] = _data_uri(thumb)
-            ctx.panel.set_state(f"pocket{i}", row)
-        ctx.panel.state.pocket_labels = labels
+        ctx.panel.state.binder_pockets = pockets
         ctx.panel.state.n_pockets = len(pockets)
+
+        if sample.filepath and Path(sample.filepath).exists():
+            try:
+                page = _scaled(Image.open(sample.filepath), BINDER_PAGE_H)
+                ctx.panel.set_state("binder_page", {"img": _data_uri(page, quality=75)})
+            except Exception:
+                pass
+
+        self._set_binder_focus(ctx, sample, pockets, 0)
 
         # Restore a persisted page re-scan (survives navigation/restarts).
         try:
@@ -349,6 +534,330 @@ class CardVerdictPanel(foo.Panel):
             rescan = None
         if rescan:
             self._show_binder_rescan(ctx, sample, rescan)
+
+    def _set_binder_focus(self, ctx, sample, pockets, index):
+        """Populate the selected-pocket state and refresh the compact map."""
+        from PIL import Image
+
+        if not pockets:
+            ctx.panel.state.focus_pocket_index = 0
+            ctx.panel.state.focus_pocket_label = "No recorded pockets"
+            return
+
+        index = max(0, min(int(index), len(pockets) - 1))
+        pocket = pockets[index]
+        ctx.panel.state.focus_pocket_index = index
+        ctx.panel.state.focus_matched_id = pocket.get("matched_card_id")
+
+        status = pocket.get("matched_card_id") or pocket.get("outcome") or "unknown"
+        ctx.panel.state.focus_pocket_label = (
+            f"**Pocket {pocket.get('pocket', index) + 1} of {len(pockets)}** "
+            f"— recorded result: `{status}`"
+        )
+
+        focus_crop = {}
+        crop_path = pocket.get("crop_path")
+        if crop_path and Path(crop_path).exists():
+            try:
+                crop = _scaled(Image.open(crop_path), BINDER_FOCUS_H)
+                focus_crop["img"] = _data_uri(crop)
+            except Exception:
+                pass
+        ctx.panel.set_state("focus_pocket_crop", focus_crop)
+
+        cache_dir = Path(ctx.dataset.info.get("card_cache_dir", ""))
+        candidates = pocket.get("cands") or []
+        images = {}
+        for candidate_index, candidate in enumerate(candidates):
+            path = cache_dir / f"{candidate['id'].replace('/', '_')}.webp"
+            try:
+                card = _scaled(Image.open(path).convert("RGB"), THUMB_H)
+            except Exception:
+                card = Image.new(
+                    "RGB", (int(THUMB_H * 0.72), THUMB_H), (60, 60, 65)
+                )
+            images[f"c{candidate_index}"] = {"img": _data_uri(card)}
+        ctx.panel.set_state("focus_candidates", images)
+        ctx.panel.state.focus_candidate_ids = [c["id"] for c in candidates]
+        ctx.panel.state.focus_candidate_sims = [float(c["sim"]) for c in candidates]
+        ctx.panel.state.focus_candidate_names = [c.get("name") for c in candidates]
+        ctx.panel.state.focus_candidate_sets = [c.get("setName") for c in candidates]
+        ctx.panel.state.focus_candidate_collectors = [
+            c.get("collectorNumber") for c in candidates
+        ]
+
+        labels = self._binder_labels(sample)
+        saved = labels.get(str(pocket.get("pocket", index))) or {}
+        ctx.panel.state.focus_has_label = bool(saved)
+        ctx.panel.state.focus_label_base = saved.get("verdict")
+        ctx.panel.state.focus_label_margin = bool(saved.get("crop_needs_edit"))
+        ctx.panel.state.focus_saved_corrected = saved.get("corrected_card_id")
+        ctx.panel.state.focus_saved_line = self._binder_saved_line(saved)
+        ctx.panel.state.binder_library_query = ""
+        ctx.panel.set_state("binder_library_results", {})
+        ctx.panel.state.binder_library_ids = []
+        ctx.panel.state.binder_library_names = []
+        ctx.panel.state.binder_library_sets = []
+        ctx.panel.state.binder_library_collectors = []
+        ctx.panel.state.binder_library_status = ""
+
+        overview = {}
+        overview_labels = []
+        for pocket_index, item in enumerate(pockets):
+            item_status = item.get("matched_card_id") or item.get("outcome") or "?"
+            pocket_number = item.get("pocket", pocket_index)
+            human = self._binder_saved_line(labels.get(str(pocket_number)) or {})
+            overview_labels.append(
+                f"**Pocket {pocket_number + 1}** — `{item_status}`"
+                + (f" — {human}" if human else "")
+            )
+            path = item.get("crop_path")
+            if not path or not Path(path).exists():
+                continue
+            thumb = _captioned_thumb(
+                path,
+                ("▶ " if pocket_index == index else "")
+                + f"P{item.get('pocket', pocket_index) + 1}",
+                item.get("outcome"),
+                pocket_index == index,
+                height=BINDER_OVERVIEW_H,
+            )
+            overview[f"p{pocket_index}"] = _data_uri(thumb)
+        ctx.panel.set_state("pocket_crops", overview)
+        ctx.panel.state.pocket_labels = overview_labels
+
+    @staticmethod
+    def _binder_labels(sample):
+        """Return the versioned per-pocket human-label mapping."""
+        import json
+
+        try:
+            raw = sample["binder_labels_json"] \
+                if sample.has_field("binder_labels_json") else None
+            payload = json.loads(raw or "{}")
+        except Exception:
+            payload = {}
+        pockets = payload.get("pockets") if isinstance(payload, dict) else None
+        return pockets if isinstance(pockets, dict) else {}
+
+    @staticmethod
+    def _binder_saved_line(label):
+        verdict = label.get("verdict") if label else None
+        corrected = label.get("corrected_card_id") if label else None
+        margin = bool(label and label.get("crop_needs_edit"))
+        if verdict == "true":
+            identity = "✅ recorded match correct"
+        elif verdict == "false":
+            identity = f"❌ wrong → `{corrected}`" if corrected else "❌ wrong"
+        elif verdict == "no_card":
+            identity = "∅ no card"
+        else:
+            identity = ""
+        if not identity and not label:
+            return ""
+        crop = "needs crop edit" if margin else "crop OK"
+        return f"{identity} · {crop}" if identity else crop
+
+    def _save_binder_label(self, ctx, verdict=None, corrected_id=None):
+        """Atomically replace one pocket's human label and journal it."""
+        import json
+
+        if not ctx.current_sample:
+            return
+        sample = ctx.dataset[ctx.current_sample]
+        pockets = json.loads(sample["binder_pockets_json"] or "[]")
+        if not pockets:
+            return
+        index = max(0, min(
+            int(ctx.panel.get_state("focus_pocket_index") or 0),
+            len(pockets) - 1,
+        ))
+        pocket = pockets[index]
+        pocket_key = str(pocket.get("pocket", index))
+        labels = self._binder_labels(sample)
+        current = labels.get(pocket_key) or {}
+        if verdict is None:
+            verdict = current.get("verdict")
+            corrected_id = current.get("corrected_card_id")
+        label = {
+            "verdict": verdict,
+            "corrected_card_id": corrected_id if verdict == "false" else None,
+            "crop_needs_edit": bool(
+                ctx.panel.get_state("focus_label_margin")
+            ),
+            # Captures what was being judged without changing device evidence.
+            "recorded_card_id": pocket.get("matched_card_id"),
+        }
+        labels[pocket_key] = label
+        sample["binder_labels_json"] = json.dumps(
+            {"version": 1, "pockets": labels}, sort_keys=True
+        )
+        if "binder-labels-applied" not in sample.tags:
+            sample.tags.append("binder-labels-applied")
+        sample.save()
+        _journal(sample)
+        library_state = {
+            key: ctx.panel.get_state(key)
+            for key in (
+                "binder_library_query",
+                "binder_library_results",
+                "binder_library_ids",
+                "binder_library_names",
+                "binder_library_sets",
+                "binder_library_collectors",
+                "binder_library_status",
+            )
+        }
+        self._set_binder_focus(ctx, sample, pockets, index)
+        # Keep search results visible so an exact-library selection remains
+        # visibly selected after it is saved. Moving pockets still clears them.
+        for key, value in library_state.items():
+            ctx.panel.set_state(key, value)
+
+    def on_binder_correct(self, ctx):
+        if not ctx.panel.get_state("focus_matched_id"):
+            return
+        self._save_binder_label(ctx, "true", None)
+
+    def on_binder_no_card(self, ctx):
+        self._save_binder_label(ctx, "no_card", None)
+
+    def on_binder_candidate_pick(self, ctx):
+        ids = ctx.panel.get_state("focus_candidate_ids") or []
+        index = int(ctx.params.get("candidate_index", -1))
+        if index < 0 or index >= len(ids):
+            return
+        card_id = ids[index]
+        if card_id == ctx.panel.get_state("focus_matched_id"):
+            self._save_binder_label(ctx, "true", None)
+        else:
+            self._save_binder_label(ctx, "false", card_id)
+
+    def on_binder_library_search(self, ctx):
+        """Search the focused pocket's active-game exact-print catalog."""
+        query = (ctx.panel.get_state("binder_library_query") or "").strip()
+        if not ctx.current_sample or not query:
+            ctx.panel.state.binder_library_status = (
+                "Enter a card name, set, number, or ID."
+            )
+            return
+
+        import requests
+        from PIL import Image
+
+        sample = ctx.dataset[ctx.current_sample]
+        game = sample["game"] or "pokemon"
+        results = _search_catalog(_game_catalog(ctx.dataset, game), query)
+        cache_dir = Path(ctx.dataset.info.get("card_cache_dir", "."))
+        images = {}
+        for index, row in enumerate(results):
+            card_id = row["cardId"]
+            cached = cache_dir / f"{card_id.replace('/', '_')}.webp"
+            if not cached.exists() and row.get("imageURL"):
+                try:
+                    response = requests.get(
+                        row["imageURL"],
+                        timeout=15,
+                        headers={
+                            "User-Agent": "TCGer/1.0 (+https://tcger.ahmadjalil.com)",
+                            "Accept": "image/*",
+                        },
+                    )
+                    response.raise_for_status()
+                    cached.write_bytes(response.content)
+                except Exception:
+                    pass
+            try:
+                image = _scaled(Image.open(cached).convert("RGB"), THUMB_H)
+            except Exception:
+                image = Image.new(
+                    "RGB", (int(THUMB_H * 0.72), THUMB_H), (60, 60, 65)
+                )
+            images[f"s{index}"] = {"img": _data_uri(image)}
+
+        ctx.panel.set_state("binder_library_results", images)
+        ctx.panel.state.binder_library_ids = [row["cardId"] for row in results]
+        ctx.panel.state.binder_library_names = [row.get("name") for row in results]
+        ctx.panel.state.binder_library_sets = [row.get("setName") for row in results]
+        ctx.panel.state.binder_library_collectors = [
+            row.get("collectorNumber") for row in results
+        ]
+        game_label = _game_label(game)
+        ctx.panel.state.binder_library_status = (
+            f"{len(results)} {game_label} result{'s' if len(results) != 1 else ''}"
+            if results
+            else f"No {game_label} cards matched `{query}`."
+        )
+
+    def on_binder_library_pick(self, ctx):
+        ids = ctx.panel.get_state("binder_library_ids") or []
+        index = int(ctx.params.get("result_index", -1))
+        if index < 0 or index >= len(ids):
+            return
+        card_id = ids[index]
+        if card_id == ctx.panel.get_state("focus_matched_id"):
+            self._save_binder_label(ctx, "true", None)
+        else:
+            self._save_binder_label(ctx, "false", card_id)
+
+    def on_binder_crop_ok(self, ctx):
+        ctx.panel.state.focus_label_margin = False
+        self._save_binder_label(ctx)
+
+    def on_binder_crop_margin(self, ctx):
+        ctx.panel.state.focus_label_margin = True
+        self._save_binder_label(ctx)
+
+    def on_binder_clear_label(self, ctx):
+        import json
+
+        if not ctx.current_sample:
+            return
+        sample = ctx.dataset[ctx.current_sample]
+        pockets = json.loads(sample["binder_pockets_json"] or "[]")
+        if not pockets:
+            return
+        index = max(0, min(
+            int(ctx.panel.get_state("focus_pocket_index") or 0),
+            len(pockets) - 1,
+        ))
+        pocket_key = str(pockets[index].get("pocket", index))
+        labels = self._binder_labels(sample)
+        labels.pop(pocket_key, None)
+        sample["binder_labels_json"] = (
+            json.dumps({"version": 1, "pockets": labels}, sort_keys=True)
+            if labels else None
+        )
+        if not labels and "binder-labels-applied" in sample.tags:
+            sample.tags.remove("binder-labels-applied")
+        sample.save()
+        _journal(sample)
+        self._set_binder_focus(ctx, sample, pockets, index)
+
+    def _move_binder_focus(self, ctx, index):
+        if not ctx.current_sample:
+            return
+        sample = ctx.dataset[ctx.current_sample]
+        if sample["frame_type"] != "binder":
+            return
+        import json
+
+        try:
+            pockets = json.loads(sample["binder_pockets_json"] or "[]")
+        except Exception:
+            pockets = []
+        self._set_binder_focus(ctx, sample, pockets, index)
+
+    def on_binder_previous(self, ctx):
+        current = ctx.panel.get_state("focus_pocket_index") or 0
+        self._move_binder_focus(ctx, current - 1)
+
+    def on_binder_next(self, ctx):
+        current = ctx.panel.get_state("focus_pocket_index") or 0
+        self._move_binder_focus(ctx, current + 1)
+
+    def on_binder_jump(self, ctx):
+        self._move_binder_focus(ctx, ctx.params.get("pocket_index", 0))
 
     ACCEPT_SIM = 0.60  # arcface strong-accept: green border = would-accept
 
@@ -388,7 +897,9 @@ class CardVerdictPanel(foo.Panel):
             crop = alt_detectors.warp_quad_crop(image, quad, ordered=True)
             pil = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
             try:
-                cands = rerun_candidates.top_k(pil, 3)
+                cands = rerun_candidates.top_k(
+                    pil, 3, game=sample["game"] or "pokemon"
+                )
             except Exception as e:
                 ctx.panel.state.saved_line = f"re-run failed: {type(e).__name__}: {e}"
                 return
@@ -535,6 +1046,112 @@ class CardVerdictPanel(foo.Panel):
         ctx.panel.state.base = "false"
         ctx.panel.state.corrected_id = ""
         self._apply_current(ctx, clear_corrected=True)
+
+    def on_library_search(self, ctx):
+        """Search exact printings in the current sample's game catalog."""
+        sample_id = ctx.current_sample
+        query = (ctx.panel.get_state("library_query") or "").strip()
+        if not sample_id or not query:
+            ctx.panel.state.library_status = "Enter a card name, set, number, or ID."
+            return
+
+        import requests
+        from PIL import Image
+
+        sample = ctx.dataset[sample_id]
+        game = sample["game"] or "pokemon"
+        results = _search_catalog(_game_catalog(ctx.dataset, game), query)
+        cache_dir = Path(ctx.dataset.info.get("card_cache_dir", "."))
+        images = {}
+        for index, row in enumerate(results):
+            card_id = row["cardId"]
+            cached = cache_dir / f"{card_id.replace('/', '_')}.webp"
+            if not cached.exists() and row.get("imageURL"):
+                try:
+                    response = requests.get(
+                        row["imageURL"],
+                        timeout=15,
+                        headers={
+                            "User-Agent": "TCGer/1.0 (+https://tcger.ahmadjalil.com)",
+                            "Accept": "image/*",
+                        },
+                    )
+                    response.raise_for_status()
+                    cached.write_bytes(response.content)
+                except Exception:
+                    pass
+            try:
+                image = _scaled(Image.open(cached).convert("RGB"), THUMB_H)
+            except Exception:
+                image = Image.new(
+                    "RGB", (int(THUMB_H * 0.72), THUMB_H), (60, 60, 65)
+                )
+            images[f"s{index}"] = {"img": _data_uri(image)}
+
+        ctx.panel.set_state("library_results", images)
+        ctx.panel.state.library_ids = [row["cardId"] for row in results]
+        ctx.panel.state.library_names = [row.get("name") for row in results]
+        ctx.panel.state.library_sets = [row.get("setName") for row in results]
+        ctx.panel.state.library_collectors = [
+            row.get("collectorNumber") for row in results
+        ]
+        label = _game_label(game)
+        ctx.panel.state.library_status = (
+            f"{len(results)} {label} result{'s' if len(results) != 1 else ''}"
+            if results
+            else f"No {label} cards matched `{query}`."
+        )
+
+    def _library_pick(self, ctx, index):
+        ids = ctx.panel.get_state("library_ids") or []
+        if index >= len(ids):
+            return
+        card_id = ids[index]
+        if card_id == ctx.panel.get_state("device_id"):
+            ctx.panel.state.base = "true"
+            ctx.panel.state.corrected_id = ""
+        else:
+            ctx.panel.state.base = "false"
+            ctx.panel.state.corrected_id = card_id
+        self._apply_current(ctx)
+        ctx.panel.state.corrected_id = ""
+        ctx.panel.state.library_status = f"Selected `{card_id}` as the card truth."
+
+    def on_library_pick0(self, ctx):
+        self._library_pick(ctx, 0)
+
+    def on_library_pick1(self, ctx):
+        self._library_pick(ctx, 1)
+
+    def on_library_pick2(self, ctx):
+        self._library_pick(ctx, 2)
+
+    def on_library_pick3(self, ctx):
+        self._library_pick(ctx, 3)
+
+    def on_library_pick4(self, ctx):
+        self._library_pick(ctx, 4)
+
+    def on_library_pick5(self, ctx):
+        self._library_pick(ctx, 5)
+
+    def on_library_pick6(self, ctx):
+        self._library_pick(ctx, 6)
+
+    def on_library_pick7(self, ctx):
+        self._library_pick(ctx, 7)
+
+    def on_library_pick8(self, ctx):
+        self._library_pick(ctx, 8)
+
+    def on_library_pick9(self, ctx):
+        self._library_pick(ctx, 9)
+
+    def on_library_pick10(self, ctx):
+        self._library_pick(ctx, 10)
+
+    def on_library_pick11(self, ctx):
+        self._library_pick(ctx, 11)
 
     def on_alt_detect(self, ctx):
         """Run the alternative boundary detectors (TCGscanner YOLO, pagescan
@@ -711,6 +1328,10 @@ class CardVerdictPanel(foo.Panel):
         ctx.panel.state.rerun_cands = {}
         ctx.panel.state.rerun_ids = []
         ctx.panel.state.rerun_sims = []
+        ctx.panel.state.rerun_names = []
+        ctx.panel.state.rerun_sets = []
+        ctx.panel.state.rerun_collectors = []
+        ctx.panel.state.rerun_game = None
         ctx.panel.state.rerun_source = None
 
     def _clear_rerun(self, ctx, sample):
@@ -1004,7 +1625,8 @@ class CardVerdictPanel(foo.Panel):
         crop = alt_detectors.warp_quad_crop(image, quad, ordered=True)
         pil = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
         try:
-            cands = rerun_candidates.top_k(pil, 5)
+            game = sample["game"] or "pokemon"
+            cands = rerun_candidates.top_k(pil, 5, game=game)
         except Exception as e:
             ctx.panel.state.saved_line = f"re-run failed: {type(e).__name__}: {e}"
             return
@@ -1014,48 +1636,70 @@ class CardVerdictPanel(foo.Panel):
         # The quad is stored with the result so a later boundary change can't
         # silently present a stale re-run as current (_set_fix clears it).
         sample["rerun_top5_json"] = json.dumps({
+            "game": game,
             "source": source,
             "quad": [[float(x), float(y)] for x, y in quad],
             "cands": [
-                {"cardID": c["cardID"], "similarity": float(c["similarity"])}
+                {
+                    "cardID": c["cardID"],
+                    "name": c.get("name"),
+                    "setName": c.get("setName"),
+                    "collectorNumber": c.get("collectorNumber"),
+                    "similarity": float(c["similarity"]),
+                }
                 for c in cands
             ],
         })
         sample.save()
         _journal(sample)
 
-        self._show_rerun(ctx, cands, source, fetch_missing=True)
+        self._show_rerun(
+            ctx, cands, source, fetch_missing=True, game=game
+        )
         ctx.panel.state.saved_line = (
             f"🔁 re-ran current encoder on `{source}` boundary (saved)"
         )
 
-    def _show_rerun(self, ctx, cands, source, fetch_missing):
+    def _show_rerun(self, ctx, cands, source, fetch_missing, game):
         """Render re-run candidates into panel state from a cands list
         ([{cardID, similarity}]), fetching missing catalog thumbnails only on
         a live re-run (never during a refresh restore)."""
+        import sys
+
         from PIL import Image
 
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        import rerun_candidates
+
         cache_dir = Path(ctx.dataset.info.get("card_cache_dir", "."))
-        by_id = None
+        _, _, cards = rerun_candidates._index(game)
+        by_id = {c["cardId"]: c for c in cards if c}
         thumbs = {}
+        names = []
+        sets = []
+        collectors = []
         for i, cand in enumerate(cands):
             cid = cand["cardID"]
+            meta = by_id.get(cid) or {}
+            names.append(cand.get("name") or meta.get("name"))
+            sets.append(cand.get("setName") or meta.get("setName"))
+            collectors.append(
+                cand.get("collectorNumber") or meta.get("collectorNumber")
+            )
             cached = cache_dir / f"{cid.replace('/', '_')}.webp"
             if not cached.exists() and fetch_missing:
-                import sys
-
                 import requests
-
-                sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-                import rerun_candidates
-
-                if by_id is None:
-                    _, _, cards = rerun_candidates._index()
-                    by_id = {c["cardId"]: c for c in cards if c}
                 url = (by_id.get(cid) or {}).get("imageURL")
                 if url:
                     try:
-                        resp = requests.get(url, timeout=15)
+                        resp = requests.get(
+                            url,
+                            timeout=15,
+                            headers={
+                                "User-Agent": "TCGer/1.0 (+https://tcger.ahmadjalil.com)",
+                                "Accept": "image/*",
+                            },
+                        )
                         resp.raise_for_status()
                         cached.write_bytes(resp.content)
                     except Exception:
@@ -1068,6 +1712,10 @@ class CardVerdictPanel(foo.Panel):
         ctx.panel.set_state("rerun_cands", thumbs)
         ctx.panel.state.rerun_ids = [c["cardID"] for c in cands]
         ctx.panel.state.rerun_sims = [float(c["similarity"]) for c in cands]
+        ctx.panel.state.rerun_names = names
+        ctx.panel.state.rerun_sets = sets
+        ctx.panel.state.rerun_collectors = collectors
+        ctx.panel.state.rerun_game = game
         ctx.panel.state.rerun_source = source
 
     def _rpick(self, ctx, index):
@@ -1284,10 +1932,16 @@ class CardVerdictPanel(foo.Panel):
         rerun = ctx.panel.get_state("rerun_cands") or {}
         rerun_ids = ctx.panel.get_state("rerun_ids") or []
         rerun_sims = ctx.panel.get_state("rerun_sims") or []
+        rerun_names = ctx.panel.get_state("rerun_names") or []
+        rerun_sets = ctx.panel.get_state("rerun_sets") or []
+        rerun_collectors = ctx.panel.get_state("rerun_collectors") or []
         if rerun:
             src = ctx.panel.get_state("rerun_source")
+            rerun_game = ctx.panel.get_state("rerun_game") or "pokemon"
+            game_label = "Magic" if rerun_game == "magic" else "Pokémon"
             panel.md(
-                "**Re-run candidates** — current encoder on the fixed crop"
+                f"**Re-run candidates** — {game_label} encoder and index on "
+                "the fixed crop"
                 + (f" (`{src}`)" if src else "")
                 + "; recorded device data untouched · saved with the sample",
                 name="rerun_label",
@@ -1307,7 +1961,21 @@ class CardVerdictPanel(foo.Panel):
                 col = types.Object()
                 col.str("img", view=types.ImageView())
                 sim = f"{rerun_sims[i]:.3f}" if i < len(rerun_sims) else "?"
-                cap = f"**{cid}** · {sim}"
+                name = rerun_names[i] if i < len(rerun_names) else None
+                set_name = rerun_sets[i] if i < len(rerun_sets) else None
+                collector = (
+                    rerun_collectors[i]
+                    if i < len(rerun_collectors)
+                    else None
+                )
+                cap = f"**{name or 'Unknown card'}** · {sim}"
+                printing = " · ".join(filter(None, [
+                    set_name,
+                    f"#{collector}" if collector else None,
+                ]))
+                if printing:
+                    cap += f"  \n{printing}"
+                cap += f"  \n`{cid}`"
                 if cid == device_id:
                     cap += "  \n🟢 scanner pick"
                 col.md(cap, name="cap")
@@ -1348,9 +2016,28 @@ class CardVerdictPanel(foo.Panel):
 
         n_pockets = ctx.panel.get_state("n_pockets") or 0
         if n_pockets:
+            page = ctx.panel.get_state("binder_page") or {}
+            if page:
+                panel.md("### 1 — Binder page overview", name="page_overview_label")
+                page_view = types.Object()
+                page_view.str("img", view=types.ImageView())
+                panel.define_property(
+                    "binder_page",
+                    page_view,
+                    view=types.GridView(orientation="vertical", gap=0),
+                )
+                panel.md(
+                    "_Use the full page to check placement and ordering before "
+                    "reviewing individual pockets._",
+                    name="page_overview_note",
+                )
+
             crops = ctx.panel.get_state("pocket_crops") or {}
             if crops:
-                panel.md("### 1 — Page carve (pocket crops)", name="carve_label")
+                panel.md(
+                    f"### 2 — Pocket map ({n_pockets} detected)",
+                    name="carve_label",
+                )
                 strip = types.Object()
                 for key in sorted(crops, key=lambda k: int(k[1:])):
                     strip.str(key, view=types.ImageView())
@@ -1358,24 +2045,289 @@ class CardVerdictPanel(foo.Panel):
                     "pocket_crops", strip,
                     view=types.GridView(orientation="horizontal", gap=1),
                 )
-            panel.md("### 2 — Recognition per pocket", name="recog_label")
-            labels = ctx.panel.get_state("pocket_labels") or []
+
+            focus_index = ctx.panel.get_state("focus_pocket_index") or 0
+            jump = types.Object()
             for i in range(n_pockets):
-                if i < len(labels):
-                    panel.md(labels[i], name=f"pocket_label{i}")
-                imgs = ctx.panel.get_state(f"pocket{i}") or {}
-                if not imgs:
-                    continue
-                row = types.Object()
-                for key in sorted(imgs):
-                    row.str(key, view=types.ImageView())
+                jump.btn(
+                    f"p{i}",
+                    label=("● " if i == focus_index else "") + str(i + 1),
+                    on_click=self.on_binder_jump,
+                    params={"pocket_index": i},
+                    variant="contained" if i == focus_index else "outlined",
+                )
+            panel.define_property(
+                "binder_jump",
+                jump,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+
+            panel.md("### 3 — Focused pocket", name="focus_label")
+            navigation = types.Object()
+            navigation.btn(
+                "previous",
+                label="← Previous",
+                on_click=self.on_binder_previous,
+                disabled=focus_index <= 0,
+                variant="outlined",
+            )
+            navigation.md(
+                ctx.panel.get_state("focus_pocket_label") or "",
+                name="current",
+            )
+            navigation.btn(
+                "next",
+                label="Next →",
+                on_click=self.on_binder_next,
+                disabled=focus_index >= n_pockets - 1,
+                variant="outlined",
+            )
+            panel.define_property(
+                "binder_navigation",
+                navigation,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+
+            focus_crop = ctx.panel.get_state("focus_pocket_crop") or {}
+            if focus_crop:
+                focused = types.Object()
+                focused.str("img", view=types.ImageView())
                 panel.define_property(
-                    f"pocket{i}", row,
+                    "focus_pocket_crop",
+                    focused,
+                    view=types.GridView(orientation="vertical", gap=0),
+                )
+
+            focus_base = ctx.panel.get_state("focus_label_base")
+            focus_margin = bool(ctx.panel.get_state("focus_label_margin"))
+            focus_has_label = bool(ctx.panel.get_state("focus_has_label"))
+            matched_id = ctx.panel.get_state("focus_matched_id")
+            identity = types.Object()
+            identity.btn(
+                "correct",
+                label=("● " if focus_base == "true" else "")
+                + "✓ Recorded match correct",
+                on_click=self.on_binder_correct,
+                disabled=not bool(matched_id),
+                variant="contained" if focus_base == "true" else "outlined",
+            )
+            identity.btn(
+                "no_card",
+                label=("● " if focus_base == "no_card" else "") + "∅ No card",
+                on_click=self.on_binder_no_card,
+                variant="contained" if focus_base == "no_card" else "outlined",
+            )
+            panel.define_property(
+                "binder_identity",
+                identity,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+
+            crop_quality = types.Object()
+            crop_quality.btn(
+                "ok",
+                label=("● " if focus_has_label and not focus_margin else "")
+                + "Crop OK",
+                on_click=self.on_binder_crop_ok,
+                variant=(
+                    "contained" if focus_has_label and not focus_margin else "outlined"
+                ),
+            )
+            crop_quality.btn(
+                "margin",
+                label=("● " if focus_margin else "") + "Needs crop edit",
+                on_click=self.on_binder_crop_margin,
+                variant="contained" if focus_margin else "outlined",
+            )
+            panel.define_property(
+                "binder_crop_quality",
+                crop_quality,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+
+            candidates = ctx.panel.get_state("focus_candidates") or {}
+            candidate_ids = ctx.panel.get_state("focus_candidate_ids") or []
+            candidate_sims = ctx.panel.get_state("focus_candidate_sims") or []
+            candidate_names = ctx.panel.get_state("focus_candidate_names") or []
+            candidate_sets = ctx.panel.get_state("focus_candidate_sets") or []
+            candidate_collectors = (
+                ctx.panel.get_state("focus_candidate_collectors") or []
+            )
+            saved_corrected = ctx.panel.get_state("focus_saved_corrected")
+            if candidates:
+                panel.md(
+                    "**Recorded candidates for this pocket** — choose the true "
+                    "card to save a correction",
+                    name="recog_label",
+                )
+                row = types.Object()
+                for key in sorted(candidates, key=lambda value: int(value[1:])):
+                    i = int(key[1:])
+                    if i >= len(candidate_ids):
+                        continue
+                    card_id = candidate_ids[i]
+                    column = types.Object()
+                    column.str("img", view=types.ImageView())
+                    similarity = (
+                        f"{candidate_sims[i]:.3f}" if i < len(candidate_sims) else "?"
+                    )
+                    name = candidate_names[i] if i < len(candidate_names) else None
+                    set_name = candidate_sets[i] if i < len(candidate_sets) else None
+                    collector = (
+                        candidate_collectors[i]
+                        if i < len(candidate_collectors)
+                        else None
+                    )
+                    caption = f"**{name or 'Unknown card'}** · {similarity}"
+                    printing = " · ".join(filter(None, [
+                        set_name,
+                        f"#{collector}" if collector else None,
+                    ]))
+                    if printing:
+                        caption += f"  \n{printing}"
+                    caption += f"  \n`{card_id}`"
+                    if card_id == matched_id:
+                        caption += "  \n🟢 recorded match"
+                    selected = (
+                        (focus_base == "true" and card_id == matched_id)
+                        or (focus_base == "false" and card_id == saved_corrected)
+                    )
+                    if selected:
+                        caption += "  \n✅ human truth"
+                    column.md(caption, name="caption")
+                    column.btn(
+                        "pick",
+                        label="● selected" if selected else "select as truth",
+                        on_click=self.on_binder_candidate_pick,
+                        params={"candidate_index": i},
+                        variant="contained" if selected else "outlined",
+                    )
+                    row.define_property(
+                        key,
+                        column,
+                        view=types.GridView(orientation="vertical", gap=0),
+                    )
+                panel.define_property(
+                    "focus_candidates",
+                    row,
                     view=types.GridView(orientation="horizontal", gap=1),
                 )
+            else:
+                panel.md(
+                    "_No recorded candidates for this pocket._",
+                    name="no_focus_candidates",
+                )
+
             panel.md(
-                "_Binder page — single-card verdicts are disabled here; "
-                "pocket labeling comes with the margin-edit workflow._",
+                "**Not in the candidates? Search this game's exact-print library.**",
+                name="binder_library_search_label",
+            )
+            panel.str(
+                "binder_library_query",
+                label="Card name, set, collector number, or card ID",
+            )
+            panel.btn(
+                "btn_binder_library_search",
+                label="Search card library",
+                on_click=self.on_binder_library_search,
+                variant="outlined",
+            )
+            binder_library_status = (
+                ctx.panel.get_state("binder_library_status") or ""
+            )
+            if binder_library_status:
+                panel.md(binder_library_status, name="binder_library_status_md")
+            binder_library_results = (
+                ctx.panel.get_state("binder_library_results") or {}
+            )
+            binder_library_ids = ctx.panel.get_state("binder_library_ids") or []
+            binder_library_names = (
+                ctx.panel.get_state("binder_library_names") or []
+            )
+            binder_library_sets = (
+                ctx.panel.get_state("binder_library_sets") or []
+            )
+            binder_library_collectors = (
+                ctx.panel.get_state("binder_library_collectors") or []
+            )
+            if binder_library_results:
+                search_grid = types.Object()
+                for key in sorted(
+                    binder_library_results, key=lambda value: int(value[1:])
+                ):
+                    i = int(key[1:])
+                    if i >= len(binder_library_ids):
+                        continue
+                    card_id = binder_library_ids[i]
+                    name = (
+                        binder_library_names[i]
+                        if i < len(binder_library_names)
+                        else None
+                    )
+                    set_name = (
+                        binder_library_sets[i]
+                        if i < len(binder_library_sets)
+                        else None
+                    )
+                    collector = (
+                        binder_library_collectors[i]
+                        if i < len(binder_library_collectors)
+                        else None
+                    )
+                    selected = (
+                        (focus_base == "true" and card_id == matched_id)
+                        or (focus_base == "false" and card_id == saved_corrected)
+                    )
+                    column = types.Object()
+                    column.str("img", view=types.ImageView())
+                    caption = f"**{name or 'Unknown card'}**"
+                    printing = " · ".join(filter(None, [
+                        set_name,
+                        f"#{collector}" if collector else None,
+                    ]))
+                    if printing:
+                        caption += f"  \n{printing}"
+                    caption += f"  \n`{card_id}`"
+                    column.md(caption, name="caption")
+                    column.btn(
+                        "pick",
+                        label="● selected" if selected else "select as truth",
+                        on_click=self.on_binder_library_pick,
+                        params={"result_index": i},
+                        variant="contained" if selected else "outlined",
+                    )
+                    search_grid.define_property(
+                        key,
+                        column,
+                        view=types.GridView(orientation="vertical", gap=0),
+                    )
+                panel.define_property(
+                    "binder_library_results",
+                    search_grid,
+                    view=types.GridView(orientation="horizontal", gap=1),
+                )
+
+            saved_line = ctx.panel.get_state("focus_saved_line") or ""
+            if saved_line:
+                panel.md(f"**Saved pocket label:** {saved_line}", name="pocket_saved")
+                panel.btn(
+                    "btn_clear_binder_label",
+                    label="Clear this pocket label",
+                    on_click=self.on_binder_clear_label,
+                    variant="outlined",
+                )
+
+            labels = ctx.panel.get_state("pocket_labels") or []
+            if labels:
+                panel.md(
+                    "**All recorded pocket outcomes**  \n" + "  \n".join(labels),
+                    name="all_pocket_outcomes",
+                )
+
+            panel.md(
+                "_Pocket navigation only changes this review panel; the "
+                "recorded device page, crops, and candidates remain unchanged. "
+                "Human pocket labels are stored separately and journaled._",
                 name="binder_note",
             )
             panel.btn(
@@ -1387,7 +2339,7 @@ class CardVerdictPanel(foo.Panel):
             rescan = ctx.panel.get_state("rescan_crops") or {}
             if rescan:
                 panel.md(
-                    "### 3 — Page re-scan (webobb+sam, current encoder) — "
+                    "### 4 — Page re-scan (webobb+sam, current encoder) — "
                     "green = would accept; recorded pockets untouched",
                     name="rescan_label",
                 )
@@ -1465,6 +2417,9 @@ class CardVerdictPanel(foo.Panel):
         cands = ctx.panel.get_state("cands") or {}
         pick_ids = ctx.panel.get_state("pick_ids") or []
         pick_sims = ctx.panel.get_state("pick_sims") or []
+        pick_names = ctx.panel.get_state("pick_names") or []
+        pick_sets = ctx.panel.get_state("pick_sets") or []
+        pick_collectors = ctx.panel.get_state("pick_collectors") or []
         if cands:
             panel.md("**Top-5 candidates** — select the true card, or "
                      "'None of these'", name="cand_label")
@@ -1477,7 +2432,17 @@ class CardVerdictPanel(foo.Panel):
                 col = types.Object()
                 col.str("img", view=types.ImageView())
                 sim = f"{pick_sims[i]:.3f}" if i < len(pick_sims) else "?"
-                caption = f"**{cid}** · {sim}"
+                name = pick_names[i] if i < len(pick_names) else None
+                set_name = pick_sets[i] if i < len(pick_sets) else None
+                collector = pick_collectors[i] if i < len(pick_collectors) else None
+                caption = f"**{name or 'Unknown card'}** · {sim}"
+                printing = " · ".join(filter(None, [
+                    set_name,
+                    f"#{collector}" if collector else None,
+                ]))
+                if printing:
+                    caption += f"  \n{printing}"
+                caption += f"  \n`{cid}`"
                 if scanner:
                     caption += "  \n🟢 scanner pick"
                 col.md(caption, name="cap")
@@ -1531,8 +2496,72 @@ class CardVerdictPanel(foo.Panel):
         panel.define_property(
             "identity_row", row, view=types.GridView(orientation="horizontal", gap=1)
         )
+        panel.md(
+            "**Not in the candidates? Search this game's exact-print library.**",
+            name="library_search_label",
+        )
+        panel.str(
+            "library_query",
+            label="Card name, set, collector number, or card ID",
+        )
+        panel.btn(
+            "btn_library_search",
+            label="Search card library",
+            on_click=self.on_library_search,
+            variant="outlined",
+        )
+        library_status = ctx.panel.get_state("library_status") or ""
+        if library_status:
+            panel.md(library_status, name="library_status_md")
+        library_results = ctx.panel.get_state("library_results") or {}
+        library_ids = ctx.panel.get_state("library_ids") or []
+        library_names = ctx.panel.get_state("library_names") or []
+        library_sets = ctx.panel.get_state("library_sets") or []
+        library_collectors = ctx.panel.get_state("library_collectors") or []
+        if library_results:
+            search_grid = types.Object()
+            for key in sorted(library_results, key=lambda value: int(value[1:])):
+                index = int(key[1:])
+                if index >= len(library_ids):
+                    continue
+                card_id = library_ids[index]
+                name = library_names[index] if index < len(library_names) else None
+                set_name = library_sets[index] if index < len(library_sets) else None
+                collector = (
+                    library_collectors[index]
+                    if index < len(library_collectors)
+                    else None
+                )
+                selected = card_id == saved_corrected
+                column = types.Object()
+                column.str("img", view=types.ImageView())
+                caption = f"**{name or 'Unknown card'}**"
+                printing = " · ".join(filter(None, [
+                    set_name,
+                    f"#{collector}" if collector else None,
+                ]))
+                if printing:
+                    caption += f"  \n{printing}"
+                caption += f"  \n`{card_id}`"
+                column.md(caption, name="cap")
+                column.btn(
+                    "pick",
+                    label="● selected" if selected else "select as truth",
+                    on_click=getattr(self, f"on_library_pick{index}"),
+                    variant="contained" if selected else "outlined",
+                )
+                search_grid.define_property(
+                    key,
+                    column,
+                    view=types.GridView(orientation="vertical", gap=0),
+                )
+            panel.define_property(
+                "library_results",
+                search_grid,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
         panel.str("corrected_id",
-                  label="Actual card ID if not in the list (e.g. me05-043)")
+                  label="Or enter the exact card ID directly (e.g. me05-043)")
 
         if not has_crop:
             standalone = types.Object()
