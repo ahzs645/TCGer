@@ -468,18 +468,29 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
 
     func testOrientationContradictionVoidsCropsThatWouldBeTwoDifferentCards() {
         typealias S = BoardCardEmbeddingScannerStrategy
-        // 23:37 frame 4 box crop: Island 0.94 one way up, Plains 0.85 the other.
-        XCTAssertTrue(S.isOrientationContradiction([("Island", 0.94), ("Plains", 0.85)], strongAcceptanceScore: 0.70))
-        // Frame 3: Island 0.82 / Plains 0.99.
-        XCTAssertTrue(S.isOrientationContradiction([("Island", 0.82), ("Plains", 0.99)], strongAcceptanceScore: 0.70))
+        func check(_ a: [(String, Double)], _ b: [(String, Double)], strong: Double = 0.70, margin: Double = 0.05) -> Bool {
+            S.isOrientationContradiction(
+                [a.map { (name: $0.0, score: $0.1) }, b.map { (name: $0.0, score: $0.1) }],
+                strongAcceptanceScore: strong, ambiguityMargin: margin
+            )
+        }
+        // 23:37 frame 4 box crop: Island 0.94 one way up, Plains 0.85/0.83/0.83
+        // the other — neither orientation sees the other's card at all.
+        XCTAssertTrue(check([("Island", 0.94), ("Instill Energy", 0.68)], [("Plains", 0.85), ("Plains", 0.83), ("Plains", 0.83)]))
+        // Frame 3: Island 0.82 / Plains 0.99, Forest 0.99.
+        XCTAssertTrue(check([("Island", 0.82)], [("Plains", 0.99), ("Forest", 0.99)]))
         // A genuine crop: the twin never reaches strong accept on another name.
-        XCTAssertFalse(S.isOrientationContradiction([("Tranquil Cove", 0.77), ("Plains", 0.62)], strongAcceptanceScore: 0.70))
+        XCTAssertFalse(check([("Tranquil Cove", 0.77), ("Plains", 0.62)], [("Plains", 0.62), ("Oasis", 0.58)]))
+        // Pokémon basic energy (220315 frame 9): the twin is undecided between
+        // Darkness and the upright's Water Energy, so it is not contradicting.
+        XCTAssertFalse(check([("Water Energy", 0.94), ("Water Energy", 0.78), ("Darkness Energy", 0.72)],
+                             [("Darkness Energy", 0.78), ("Water Energy", 0.77), ("Darkness Energy", 0.65)], strong: 0.65))
         // Same name both ways up (symmetric art, reprints) is not a contradiction.
-        XCTAssertFalse(S.isOrientationContradiction([("Nazgûl", 0.91), ("Nazgûl", 0.88)], strongAcceptanceScore: 0.70))
-        XCTAssertFalse(S.isOrientationContradiction([("Island", 0.94)], strongAcceptanceScore: 0.70))
+        XCTAssertFalse(check([("Nazgûl", 0.91)], [("Nazgûl", 0.88)]))
+        XCTAssertFalse(S.isOrientationContradiction([[(name: "Island", score: 0.94)]], strongAcceptanceScore: 0.70, ambiguityMargin: 0.05))
         // The operating point is the game's own strong-accept score.
-        XCTAssertTrue(S.isOrientationContradiction([("A", 0.66), ("B", 0.67)], strongAcceptanceScore: 0.65))
-        XCTAssertFalse(S.isOrientationContradiction([("A", 0.66), ("B", 0.67)], strongAcceptanceScore: 0.70))
+        XCTAssertTrue(check([("A", 0.66)], [("B", 0.67)], strong: 0.65))
+        XCTAssertFalse(check([("A", 0.66)], [("B", 0.67)], strong: 0.70))
     }
 
     func testTheFramedDetectionBeatsAMoreConfidentBystanderCard() {

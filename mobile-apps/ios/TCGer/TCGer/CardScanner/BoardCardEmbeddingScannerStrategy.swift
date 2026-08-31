@@ -346,6 +346,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let name: String
         let score: Double
         let game: TCGGame
+        /// The orientation's ranked shortlist (name, similarity), leader first.
+        let candidates: [(name: String, score: Double)]
     }
 
     /// Side channel from `recognize` to `evaluate` for one orientation.
@@ -390,17 +392,37 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     /// When both orientations of one crop would each be accepted on visual
     /// evidence as DIFFERENT cards, the crop is degenerate: on the 23:37
     /// hand-held Tranquil Cove box crops the twins scored Island 0.94 /
-    /// Plains 0.85 and Island 0.82 / Plains 0.99. Measured on 125 correct
-    /// accepts across both games, a genuine crop's twin never reaches a
-    /// different name above 0.66. The operating point is the game's own
-    /// strong-accept score — no new number.
+    /// Plains 0.85 and Island 0.82 / Plains 0.99. "Accepted as a different
+    /// card" means unambiguously so: an orientation whose shortlist still
+    /// carries the other orientation's name within the ambiguity margin is
+    /// undecided, not contradicting — a basic Water Energy reads Darkness
+    /// Energy 0.78 / Water Energy 0.77 upside down and must keep its 0.94
+    /// upright accept. Measured on 125 correct accepts across both games, a
+    /// genuine crop's twin never reaches a different name above 0.66. The
+    /// operating point is the game's own strong-accept score and ambiguity
+    /// margin — no new number.
     static func isOrientationContradiction(
-        _ leaders: [(name: String, score: Double)],
-        strongAcceptanceScore: Double
+        _ orientations: [[(name: String, score: Double)]],
+        strongAcceptanceScore: Double,
+        ambiguityMargin: Double
     ) -> Bool {
-        let acceptable = leaders.filter { $0.score >= strongAcceptanceScore }
+        let acceptable = orientations.compactMap { shortlist -> (name: String, score: Double, shortlist: [(name: String, score: Double)])? in
+            guard let leader = shortlist.first, leader.score >= strongAcceptanceScore else { return nil }
+            return (CardTitleOCR.normalizedName(leader.name), leader.score, shortlist)
+        }
         guard acceptable.count >= 2 else { return false }
-        return Set(acceptable.map { CardTitleOCR.normalizedName($0.name) }).count > 1
+        for (index, first) in acceptable.enumerated() {
+            for second in acceptable[(index + 1)...] where first.name != second.name {
+                let firstSeesSecond = first.shortlist.contains {
+                    CardTitleOCR.normalizedName($0.name) == second.name && $0.score >= first.score - ambiguityMargin
+                }
+                let secondSeesFirst = second.shortlist.contains {
+                    CardTitleOCR.normalizedName($0.name) == first.name && $0.score >= second.score - ambiguityMargin
+                }
+                if !firstSeesSecond && !secondSeesFirst { return true }
+            }
+        }
+        return false
     }
 
     private func evaluate(
@@ -443,8 +465,9 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let leaders = outcomes.compactMap(\.leader)
         if let game = leaders.first?.game,
            Self.isOrientationContradiction(
-               leaders.map { ($0.name, $0.score) },
-               strongAcceptanceScore: acceptancePolicy(for: game).strongAcceptanceScore
+               leaders.map(\.candidates),
+               strongAcceptanceScore: acceptancePolicy(for: game).strongAcceptanceScore,
+               ambiguityMargin: acceptancePolicy(for: game).ambiguityMargin
            ) {
             for (attempt, _, _) in outcomes {
                 context.diagnostics?.record(ScanDiagnostics.Attempt(
@@ -876,7 +899,8 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         report?.leader = VisualLeader(
             name: primary.details.identity.name,
             score: primary.confidence.score,
-            game: recognizedGame
+            game: recognizedGame,
+            candidates: ranked.map { ($0.details.identity.name, $0.confidence.score) }
         )
 
         // Hub collapse: a degenerate crop (blank, glare-saturated, badly

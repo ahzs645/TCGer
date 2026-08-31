@@ -213,6 +213,40 @@ and a per-game shard for every selected game. Isolated jobs use game-scoped Hub
 paths so classification heads, checkpoints, and exports cannot overwrite or
 resume from another game.
 
+## Query normalization, colour-cast augmentation and fine-tuning (2026-08-30)
+
+Measured on the labeled Dev Mode frames with the released encoders, the
+band of hand-held failures previously filed as "camera-domain model
+failure" is a query/gallery **colour and contrast** gap: the Magic encoder
+ranks the correct family first on 79 of 108 labeled crops raw and on 104
+after a grey-world white balance plus Pillow's 1 % per-channel autocontrast
+(`docs/scanner-system/mtg-visual-first-policy-2026-08-29.md`). Three trainer
+changes follow from it:
+
+- `--query-normalization {none,grey-world-autocontrast}` applies the
+  runtime's `QueryColorNormalization` (pixel-exact on iOS and Android) to
+  every training view, gallery render and evaluation query, so a model is
+  trained on the distribution it is queried with. It is recorded in the
+  checkpoint config and provenance and must match the game's
+  `queryNormalization` in `tools/scanner-acceptance-policies.json`
+  (Magic on; Pokémon measured off — its `physical-v2` encoder was trained
+  toward camera captures and loses under it).
+- `apply_colour_cast`: warm ↔ cool channel gains up to 1.25× (log-uniform,
+  red and blue opposed, small green wobble) with gamma up to 1.25, applied
+  to half of the training views. The previous recipe had brightness,
+  saturation, contrast, blur and noise but no cast.
+- `--finetune-from <checkpoint>`: encoder and head weights only, with a
+  fresh optimizer and cosine schedule over `--epochs` at `--lr`. Hub resume
+  is not a fine-tune: it restores the finished schedule and learns nothing.
+
+Both job wrappers forward `--lr`, `--query-normalization` and
+`--finetune-from-hub-path`. `mobile-apps/ios/scripts/submit_magic_colour_finetune.sh`
+uploads the trainer and wrappers under `jobs/visual-style-v2-colour/`, pins
+the resulting model revision and launches the plan wrapper on an L4
+(3 epochs from `exports/magic/full/visual-style-v2-5c27e506-r2/arcface-checkpoint.pt`,
+lr 5e-5, ≈1 h). A fine-tuned export must be evaluated with the same
+normalization the runtime applies, and its gallery re-embedded through it.
+
 ## Evaluation layers
 
 Evaluation must be reported in separate layers:

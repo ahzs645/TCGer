@@ -163,6 +163,16 @@ minimum evidence level.
 
 ## Root cause
 
+> **Superseded 2026-08-30.** The "genuine camera-domain embedding failures"
+> below (Bilbo's Deadly Slice, Stone Quarry) turned out to be a query/gallery
+> *colour and contrast* gap, not an encoder limit: with a grey-world white
+> balance and 1 % autocontrast applied to the same crops, the released
+> encoder ranks every one of them first (Stone Quarry rank ∞ → 0 at
+> 0.67–0.83). The normalization now ships per game as
+> `queryNormalization` in the acceptance policy; the measurements and
+> replays are in `mtg-visual-first-policy-2026-08-29.md`.
+
+
 The model was trained on one prepared catalog representative per family, with
 three synthetic views per identity for twelve epochs. Its useful augmentation
 already includes:
