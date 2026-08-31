@@ -389,6 +389,63 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertNil(noisy)
     }
 
+    func testNestedDetectionsAreDroppedAsArtPanelsWhileNeighboursSurvive() {
+        // Full-resolution boxes from scan-session-20260830-171145 frame 22:
+        // the art panel (listed first because it out-scored the card) sits
+        // entirely inside the card's own detection.
+        let card = CGRect(x: 0.31, y: 0.30, width: 0.33, height: 0.35)
+        let panel = CGRect(x: 0.34, y: 0.42, width: 0.27, height: 0.14)
+        XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([panel, card]), [1])
+        XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([card, panel]), [0])
+
+        // Binder neighbours overlap only at their borders and both remain.
+        let left = CGRect(x: 0.05, y: 0.1, width: 0.28, height: 0.38)
+        let right = CGRect(x: 0.31, y: 0.1, width: 0.28, height: 0.38)
+        XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([left, right]), [0, 1])
+
+        // A smaller card half-covered by a larger one is occlusion, not a
+        // panel: only 50% of its area is inside, below the containment share.
+        let big = CGRect(x: 0.0, y: 0.0, width: 0.5, height: 0.6)
+        let overlapped = CGRect(x: 0.4, y: 0.1, width: 0.2, height: 0.3)
+        XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([big, overlapped]), [0, 1])
+
+        // Identical boxes never suppress each other; empty boxes are dropped.
+        XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([card, card]), [0, 1])
+        XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([.zero, card]), [1])
+    }
+
+    func testFullFrameQuadsMustShareTheDetectorBoxOrientation() {
+        // scan-session-20260830-171145 frame 11 (812×1138): detector box
+        // 593×772 px portrait; Vision's rectangle candidate is the 431×329 px
+        // landscape art panel, its document candidate the 486×715 px card.
+        let imageSize = CGSize(width: 812, height: 1138)
+        let detectorBox = CGRect(x: 0.10, y: 0.09, width: 0.73, height: 0.68)
+        let panel = CardCropper.rectangleObservation(for: CGRect(x: 0.2, y: 0.4, width: 0.53, height: 0.29))
+        XCTAssertFalse(CardCropper.matchesDetectorOrientation(panel, detectorBox: detectorBox, imageSize: imageSize))
+        let card = CardCropper.rectangleObservation(for: CGRect(x: 0.15, y: 0.15, width: 0.60, height: 0.63))
+        XCTAssertTrue(CardCropper.matchesDetectorOrientation(card, detectorBox: detectorBox, imageSize: imageSize))
+
+        // A sleeved card in a loose binder box (Pokémon 231419 frame 41:
+        // quad covers 0.27 of the box) is still portrait in a portrait box.
+        let looseBox = CGRect(x: 0.0, y: 0.1, width: 1.0, height: 0.79)
+        let sleeved = CardCropper.rectangleObservation(for: CGRect(x: 0.3, y: 0.2, width: 0.43, height: 0.65))
+        XCTAssertTrue(CardCropper.matchesDetectorOrientation(sleeved, detectorBox: looseBox, imageSize: imageSize))
+
+        // A tilted card keeps portrait edges while its box goes near-square,
+        // which decides nothing: the previous gates alone apply.
+        let squareBox = CGRect(x: 0.05, y: 0.15, width: 0.9, height: 0.66)
+        XCTAssertNil(CardCropper.orientation(width: squareBox.width * imageSize.width, height: squareBox.height * imageSize.height))
+        XCTAssertTrue(CardCropper.matchesDetectorOrientation(panel, detectorBox: squareBox, imageSize: imageSize))
+
+        // A landscape-held card: the box is landscape, so its portrait art
+        // panel is the mismatch and the landscape card quad agrees.
+        let landscapeBox = CGRect(x: 0.02, y: 0.3, width: 0.96, height: 0.48)
+        let landscapeCard = CardCropper.rectangleObservation(for: CGRect(x: 0.05, y: 0.32, width: 0.9, height: 0.44))
+        let portraitPanel = CardCropper.rectangleObservation(for: CGRect(x: 0.1, y: 0.35, width: 0.3, height: 0.38))
+        XCTAssertTrue(CardCropper.matchesDetectorOrientation(landscapeCard, detectorBox: landscapeBox, imageSize: imageSize))
+        XCTAssertFalse(CardCropper.matchesDetectorOrientation(portraitPanel, detectorBox: landscapeBox, imageSize: imageSize))
+    }
+
     func testDocumentDetectionRejectsLowConfidenceAndImplausibleAreas() {
         XCTAssertTrue(CardCropper.isPlausibleDocumentDetection(
             confidence: 0.9,

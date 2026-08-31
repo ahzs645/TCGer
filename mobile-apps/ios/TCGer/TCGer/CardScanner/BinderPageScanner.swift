@@ -572,13 +572,16 @@ actor BinderPageScanner {
         intrinsics: ScannerCameraIntrinsics? = nil
     ) throws -> [VNRectangleObservation] {
         if let detector = CardObjectDetector.shared {
-            let boxes = ((try? detector.detections(in: image)) ?? [])
+            let sizedBoxes = ((try? detector.detections(in: image)) ?? [])
                 .map { $0.boundingBox.standardized }
                 .filter { box in
                     let area = box.width * box.height
                     return area >= CGFloat(Configuration.minimumSize * Configuration.minimumSize)
                         && area <= Configuration.maximumBoundingBoxArea
                 }
+            // Art panels detected inside a card are not extra cards.
+            let boxes = CardObjectDetector.indicesSuppressingNestedBoxes(sizedBoxes)
+                .map { sizedBoxes[$0] }
             if !boxes.isEmpty {
                 let imageSize = CGSize(width: image.width, height: image.height)
                 let refinements = boxes.map { box in

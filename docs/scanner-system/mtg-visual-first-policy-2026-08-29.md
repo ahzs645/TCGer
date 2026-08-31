@@ -112,6 +112,93 @@ A localizer bake-off on the same 30 frames (device quad vs Vision, DETR, YGO
 OBB, seg models) again moved top-1 by at most one frame — the crop is not
 what fails on hand-held captures either.
 
+## Art-panel crops — the largest single failure class (2026-08-30)
+
+`scan-session-20260830-171145` (29 hand-held frames, first session on a
+device build with hub rejection) accepted 21/29 with 0 wrong. Its eight
+abstentions were audited crop by crop, and five of them share one cause that
+also explains six frames of the 23:37 hand-held session and one of the 20:02
+photo session — **12 of the 86 labeled Magic frames**: the crop handed to the
+encoder was the card's **art panel**, not the card. The panel embeds as
+garbage (0.55–0.68 "Swamp", "Call Forth the Tenebrous", "Lessons"), while the
+same frames rank the correct card first at 0.76–0.93 from the plain detector
+box (`tools/camera-corpus/bench_localizers.py`, `app-detector-box` localizer).
+Both Sandblast wrong accepts of 08-29 were downstream of this: the panel crop
+failed, and the unguarded whole-frame hypothesis answered instead.
+
+Two mechanisms, one per runtime, both structural rather than tuned:
+
+1. **The detector fires on the panel (device).** On the full-resolution
+   original the YOLO11s card detector returns the card *and* its art panel
+   — 0.95 vs 0.90–0.96, and on frame 22 the panel out-scores the card. The
+   app took the highest-confidence box, and every later stage is gated on
+   agreement with that box, so the panel became the crop (the recorded quad
+   equals the detector box exactly on frames 1/11/13/16; on frame 22 the
+   winning box is a second card lying on the table, which is the two-card
+   problem, not this one). Fix:
+   `CardObjectDetector.indicesSuppressingNestedBoxes` — a detection whose
+   area lies ≥ 80 % inside a larger detection is a panel, because cards do
+   not contain cards, and is dropped regardless of confidence. Applied in
+   `CardCropper` (single card) and `BinderPageScanner` (after its own size
+   filter, so a page-sized false detection cannot swallow the cards).
+2. **Vision's quad passes the agreement gate (Simulator, and any device
+   frame where the detector finds only the card).** The doc-seg and
+   rectangle candidates had to overlap the detector box by IoU ≥ 0.45/0.35
+   — measured on axis-aligned `boundingBox`es. On a tilted card the panel's
+   bounding box inflates (a 0.15-area panel reports a ≈0.24 box) and clears
+   the gate against the 0.50 card box (Simulator probe, frames 11/13/22:
+   one card-sized detection, chosen quad = the 0.15-area panel);
+   `isCardShaped` cannot help because a Magic art panel is itself ≈0.75
+   and the band is orientation-agnostic.
+   An area bound does not separate the cases: a panel in a tight box covers
+   ~0.35 of it, while a sleeved or toploaded card in a loose box covers
+   0.27–0.46 (a first attempt with "quad ≥ 0.5 × box" recovered the Magic
+   frames and broke two Pokémon binder frames, Timburr and Regigigas, by
+   discarding their correct quads). Orientation does separate them: the
+   panel is landscape inside a portrait card. Fix:
+   `CardCropper.matchesDetectorOrientation` — a candidate quad must share
+   the detector box's orientation whenever both are decisive (beyond a 10 %
+   difference of extents, in pixel space); a near-square box, i.e. a
+   steeply tilted card, decides nothing and keeps the old gates. Rejected
+   candidates fall through to the padded-box retry and finally to the plain
+   box crop.
+
+Android has no card detector (single-crop pipeline), so nothing to port;
+the web runtime crops from the browser's own detector output and should
+adopt rule 1 when it gains multi-box output.
+
+| Replay (Simulator, same build otherwise) | Before | After | Wrong | Notes |
+|---|---:|---:|---:|---|
+| 171145 hand-held (29) | 18/29 | **24/29** (20 exact + 4 family) | 1 → 1 | frames 11/13/22 now 0.82/0.82/0.90 from the card crop, frame 1 at 0.65, Forsaken Sanctuary (10) at 0.69; the one wrong is the pre-existing two-card frame 27 |
+| MTG 49-frame set | 36/49 | **39/49** (35 exact + 4 family) | 0 → 0 | 223150 frames 1 and 17, Jungle Hollow (200235 frame 19) recovered; nothing lost |
+| MTG 23:37 hand-held (30) | 17/30 | 18/30 (15 exact + 3 family) | 0 → **1** | frame 24 recovered; frame 2: see below |
+| Pokémon 76-label library (390 frames) | 51/76 | **53/76** | 0 → 0 | binder sleeves/toploaders unaffected by the orientation rule (Timburr, Regigigas agree with the device again); two labeled recoveries |
+
+The new wrong accept is the honest cost of a better crop. On 23:37 frame 2
+the crop is now the whole Tranquil Cove (previously the art panel, which
+abstained), and the encoder returns **Island, Aetherdrift #508 at 0.95**
+with a 0.24 margin. That Island is a yellow full-art card and the photo has
+a strong warm cast (the Cove's text box reads yellow in it): the match is on
+global colour, not the card. Its 180° twin lands in a spread of unrelated
+lands at 0.70–0.77, and offline every competent localizer's crop of frames
+2/3/4 produces a confident wrong top-1 (0.83–0.99), so this is the
+camera-domain model failure the notes above already name, not a crop or
+policy defect — no structural rule separates it from a real 0.95, and a
+fitted one is not wanted. Frames 3/4 of the same card stay abstained only
+because their other orientation hub-rejects. The lever is the real-camera
+fine-tune with colour-cast augmentation (the augmentation bank measured the
+warm-light channel ratios at 0.89/0.85/0.85).
+
+
+What remains in 171145 after this: frame 0 (Rage into the Valley) is a
+genuine encoder miss (every crop ≈0.6 wrong); frame 19 is motion blur
+(sharpness 0.027, a retake hint would be honest); frames 22/27 have two
+cards in frame and belong to a multi-card path; four family fallbacks
+(Golgari Guildgate, Jungle Hollow, Riveteers Charm, Darksteel Ingot) happen
+because OCR is not consulted once the visual score clears strong accept —
+pinning the printing from the footer on strong accepts is an OCR-on-only
+refinement and is deliberately not part of the visual path.
+
 ## Does this need a retrain?
 
 Not for these gains — they are policy and metadata handling. A retrain is the

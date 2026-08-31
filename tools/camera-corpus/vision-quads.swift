@@ -37,6 +37,8 @@ struct Output: Encodable {
     let path: String
     let detector: [Double]?
     let detectorConfidence: Double?
+    /// Every detector box, [x, y, w, h, confidence], normalized bottom-left.
+    let detections: [[Double]]
     let document: [[Double]]?
     let documentConfidence: Double?
     let rectangles: [[[Double]]]
@@ -53,11 +55,31 @@ for path in paths {
     let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
     var detectorBox: [Double]?
     var detectorConfidence: Double?
+    var detections: [[Double]] = []
     if let detectorModel {
         let request = VNCoreMLRequest(model: detectorModel)
         request.imageCropAndScaleOption = .scaleFit
         try? handler.perform([request])
-        if let best = (request.results as? [VNRecognizedObjectObservation])?.max(by: { $0.confidence < $1.confidence }) {
+        for observation in (request.results as? [VNRecognizedObjectObservation]) ?? [] {
+            let b = observation.boundingBox
+            detections.append([Double(b.origin.x), Double(b.origin.y), Double(b.size.width), Double(b.size.height), Double(observation.confidence)])
+        }
+        // Mirror CardObjectDetector.indicesSuppressingNestedBoxes: a detection
+        // lying >= 80% inside a larger detection is an art panel, not a card.
+        let observations = (request.results as? [VNRecognizedObjectObservation]) ?? []
+        let topLevel = observations.filter { candidate in
+            let box = candidate.boundingBox.standardized
+            let area = box.width * box.height
+            guard area > 0 else { return false }
+            return !observations.contains { other in
+                let container = other.boundingBox.standardized
+                guard container.width * container.height > area else { return false }
+                let overlap = box.intersection(container)
+                guard !overlap.isNull else { return false }
+                return overlap.width * overlap.height >= area * 0.8
+            }
+        }
+        if let best = topLevel.max(by: { $0.confidence < $1.confidence }) {
             let b = best.boundingBox
             detectorBox = [Double(b.origin.x), Double(b.origin.y), Double(b.size.width), Double(b.size.height)]
             detectorConfidence = Double(best.confidence)
@@ -76,6 +98,7 @@ for path in paths {
         path: path,
         detector: detectorBox,
         detectorConfidence: detectorConfidence,
+        detections: detections,
         document: doc.map(quad),
         documentConfidence: doc.map { Double($0.confidence) },
         rectangles: (rectangles.results ?? []).map(quad)

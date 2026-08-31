@@ -35,7 +35,7 @@ nonisolated final class CardObjectDetector: @unchecked Sendable {
         request.imageCropAndScaleOption = .scaleFit
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
         try handler.perform([request])
-        return (request.results as? [VNRecognizedObjectObservation] ?? [])
+        let cards = (request.results as? [VNRecognizedObjectObservation] ?? [])
             .filter { observation in
                 observation.labels.contains {
                     $0.identifier.caseInsensitiveCompare("card") == .orderedSame
@@ -45,5 +45,38 @@ nonisolated final class CardObjectDetector: @unchecked Sendable {
             .sorted { lhs, rhs in
                 (lhs.labels.first?.confidence ?? 0) > (rhs.labels.first?.confidence ?? 0)
             }
+        return cards
+    }
+
+    /// Share of a box's own area that must lie inside a larger detection for
+    /// the box to count as nested in it.
+    static let nestedContainment: CGFloat = 0.8
+
+    /// A card's art panel is itself a rectangle of card-like proportions, and
+    /// the detector fires on it at nearly the card's confidence — 0.90–0.96 on
+    /// the hand-held frames of `scan-session-20260830-171145`, out-scoring the
+    /// card outright on one of them. Because every later stage is gated on
+    /// agreement with the top detection, a panel that wins on confidence is
+    /// cropped and embedded as if it were the card (four abstentions in that
+    /// session; the card itself ranked first at 0.76–0.93 from the plain box).
+    /// Cards do not contain cards, so a detection nested inside a larger
+    /// detection is a panel and is dropped regardless of confidence. Boxes may
+    /// be in any consistent space; the input order is preserved. Callers apply
+    /// this after their own size filters: the detector also fires page-sized
+    /// boxes on binder spreads, and one of those must not swallow the cards.
+    static func indicesSuppressingNestedBoxes(_ boxes: [CGRect]) -> [Int] {
+        boxes.indices.filter { index in
+            let box = boxes[index].standardized
+            let area = box.width * box.height
+            guard area > 0 else { return false }
+            return !boxes.indices.contains { other in
+                guard other != index else { return false }
+                let container = boxes[other].standardized
+                guard container.width * container.height > area else { return false }
+                let overlap = box.intersection(container)
+                guard !overlap.isNull else { return false }
+                return overlap.width * overlap.height >= area * nestedContainment
+            }
+        }
     }
 }

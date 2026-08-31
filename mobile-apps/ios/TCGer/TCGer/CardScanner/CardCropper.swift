@@ -153,7 +153,10 @@ nonisolated struct CardCropper {
         // A detector trained specifically on trading cards provides the coarse
         // location. Vision then refines the corners, but only candidates that
         // agree with the detector are allowed to suppress its fallback box.
-        let detectedCard = try? detectorSource.detector?.detections(in: image).first
+        let detections = (try? detectorSource.detector?.detections(in: image)) ?? []
+        let detectedCard = CardObjectDetector.indicesSuppressingNestedBoxes(
+            detections.map(\.boundingBox)
+        ).first.map { detections[$0] }
 
         // Primary: VNDetectDocumentSegmentationRequest — ANE-accelerated,
         // real-time, iOS 15+. Returns a VNRectangleObservation with corners, so
@@ -178,6 +181,11 @@ nonisolated struct CardCropper {
             if let detectedCard {
                 let agreeing = documents.filter {
                     Self.intersectionOverUnion($0.boundingBox, detectedCard.boundingBox) >= 0.45
+                        && Self.matchesDetectorOrientation(
+                            $0,
+                            detectorBox: detectedCard.boundingBox,
+                            imageSize: CGSize(width: image.width, height: image.height)
+                        )
                 }
                 if !agreeing.isEmpty { return (agreeing, nil, detectedCard.boundingBox) }
             } else {
@@ -203,6 +211,11 @@ nonisolated struct CardCropper {
         guard let detectedCard else { return (rectangles, nil, nil) }
         let agreeing = rectangles.filter {
             Self.intersectionOverUnion($0.boundingBox, detectedCard.boundingBox) >= 0.35
+                && Self.matchesDetectorOrientation(
+                    $0,
+                    detectorBox: detectedCard.boundingBox,
+                    imageSize: CGSize(width: image.width, height: image.height)
+                )
         }
         if !agreeing.isEmpty { return (agreeing, nil, detectedCard.boundingBox) }
 
@@ -225,6 +238,55 @@ nonisolated struct CardCropper {
             return (refined, fallbackBox, detectedCard.boundingBox)
         }
         return ([fallbackBox], nil, detectedCard.boundingBox)
+    }
+
+    /// Bounding-box IoU is not enough to keep interior panels out: on a tilted
+    /// hand-held card the art panel's axis-aligned box inflates (a 0.15-area
+    /// panel reports a ~0.24 box) and clears the agreement gate against the
+    /// 0.50 card box. `scan-session-20260830-171145` frames 11/13/22 and
+    /// `scan-session-20260829-233753` frame 2 were embedded from the art panel
+    /// this way, with the whole card ranking first at 0.76–0.93 from the
+    /// plain detector box. An area bound cannot separate the two cases — a
+    /// panel in a tight box covers ~0.35 of it, a sleeved or toploaded card in
+    /// a loose box covers 0.27–0.46 (Pokémon binder replays) — but
+    /// orientation does: the panel is landscape inside a portrait card. The
+    /// quad must share the detector box's orientation whenever both are
+    /// decisive; a near-square box (a steeply tilted card) decides nothing
+    /// and keeps the previous behaviour.
+    static func matchesDetectorOrientation(
+        _ observation: VNRectangleObservation,
+        detectorBox: CGRect,
+        imageSize: CGSize
+    ) -> Bool {
+        let box = detectorBox.standardized
+        guard let boxOrientation = orientation(
+            width: box.width * imageSize.width,
+            height: box.height * imageSize.height
+        ) else { return true }
+        func scaled(_ point: CGPoint) -> CGPoint {
+            CGPoint(x: point.x * imageSize.width, y: point.y * imageSize.height)
+        }
+        let topLeft = scaled(observation.topLeft)
+        let topRight = scaled(observation.topRight)
+        let bottomLeft = scaled(observation.bottomLeft)
+        let bottomRight = scaled(observation.bottomRight)
+        let horizontal = (distance(topLeft, topRight) + distance(bottomLeft, bottomRight)) / 2
+        let vertical = (distance(topLeft, bottomLeft) + distance(topRight, bottomRight)) / 2
+        guard let quadOrientation = orientation(width: horizontal, height: vertical) else {
+            return true
+        }
+        return quadOrientation == boxOrientation
+    }
+
+    enum Orientation { case portrait, landscape }
+
+    /// Decisive only beyond a 10 % difference between the two extents; a
+    /// tilted card's axis-aligned box drifts towards square and must not be
+    /// read as either.
+    static func orientation(width: CGFloat, height: CGFloat) -> Orientation? {
+        if height > width * 1.1 { return .portrait }
+        if width > height * 1.1 { return .landscape }
+        return nil
     }
 
     /// The best refined quad for a single detector box, for callers that
