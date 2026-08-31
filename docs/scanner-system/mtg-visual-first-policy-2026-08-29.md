@@ -290,7 +290,7 @@ crop's twin never reaches a different name above 0.66, so "both
 orientations acceptable as different cards" now voids the crop
 (`orientationContradiction`; operating point = the game's strong-accept
 score, no new number). Replayed: it fires on frame 4 alone across the three Magic sets — 27/29,
-47/49 and **28/30 with 0 wrong** (Pokémon: the 76-label regression was still running at commit time; its result is recorded in the follow-up commit) — so the 108 labeled
+47/49 and **28/30 with 0 wrong** (Pokémon 53/76, 0 wrong, outcomes identical to the run without the rule — it never fires there; the basic Water Energy whose twin reads Darkness 0.78 / Water 0.77 keeps its 0.94 accept) — so the 108 labeled
 Magic frames end the day at **102 correct, 0 wrong**, from 72 correct at
 its start. Session-level: 108 labeled Magic frames went from
 72 correct at the start of 2026-08-30 to **102** (0 → 1 wrong).
