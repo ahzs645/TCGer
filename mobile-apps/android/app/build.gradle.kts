@@ -69,7 +69,10 @@ android {
         buildConfig = true
     }
 
-    packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    packaging.resources.excludes += setOf(
+        "/META-INF/{AL2.0,LGPL2.1}",
+        "/META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+    )
 
     sourceSets.getByName("androidTest").assets.srcDir(
         "../../ios/TCGer/TCGer/Assets.xcassets/DemoCards",
