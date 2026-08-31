@@ -10,21 +10,41 @@ import kotlin.math.max
 import kotlin.math.min
 
 object ArcFaceImagePreprocessor {
-    fun preprocess(encodedImage: ByteArray): FloatArray {
+    fun preprocess(
+        encodedImage: ByteArray,
+        normalization: ScannerAcceptancePolicy.QueryNormalization = ScannerAcceptancePolicy.QueryNormalization.NONE,
+    ): FloatArray {
         require(encodedImage.isNotEmpty()) { "image is empty" }
         val decoded = BitmapFactory.decodeByteArray(encodedImage, 0, encodedImage.size)
             ?: error("image could not be decoded")
         val oriented = applyExifOrientation(decoded, encodedImage)
         if (oriented !== decoded) decoded.recycle()
         return try {
-            preprocess(oriented)
+            preprocess(oriented, normalization)
         } finally {
             oriented.recycle()
         }
     }
 
-    fun preprocess(bitmap: Bitmap): FloatArray {
+    fun preprocess(
+        bitmap: Bitmap,
+        normalization: ScannerAcceptancePolicy.QueryNormalization = ScannerAcceptancePolicy.QueryNormalization.NONE,
+    ): FloatArray {
         require(bitmap.width > 0 && bitmap.height > 0) { "image dimensions must be positive" }
+        if (normalization == ScannerAcceptancePolicy.QueryNormalization.GREY_WORLD_AUTOCONTRAST) {
+            // Colour statistics come from the crop the encoder will see, so the
+            // normalization precedes the geometric contract.
+            val normalized = QueryColorNormalization.normalized(bitmap)
+            return try {
+                preprocessGeometry(normalized)
+            } finally {
+                normalized.recycle()
+            }
+        }
+        return preprocessGeometry(bitmap)
+    }
+
+    private fun preprocessGeometry(bitmap: Bitmap): FloatArray {
         val size = ArcFaceModelContract.imageSize
         val scale = max(
             ArcFaceModelContract.resizedShortestEdge.toDouble() / min(bitmap.width, bitmap.height),

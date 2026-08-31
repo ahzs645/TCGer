@@ -43,9 +43,23 @@ data class ScannerAcceptancePolicy(
      * (blank, glare-saturated, mis-rectified) do. 0 disables.
      */
     val hubSimilarity: Double = 0.90,
-    val hubDistinctNames: Int = 3,
+    val hubDistinctNames: Int = 2,
     val hubTopK: Int = 5,
+    /**
+     * Colour normalization applied to every query crop before the encoder's
+     * resize contract ([QueryColorNormalization]). Per game because it depends
+     * on what the encoder was trained on: the catalog-only Magic encoder gains
+     * (108 labeled frames: correct family first on 79 raw vs 104 normalized
+     * crops), the Pokémon encoder trained toward camera captures loses.
+     */
+    val queryNormalization: QueryNormalization = QueryNormalization.NONE,
 ) {
+    @Serializable
+    enum class QueryNormalization {
+        @SerialName("none") NONE,
+        @SerialName("grey-world-autocontrast") GREY_WORLD_AUTOCONTRAST,
+    }
+
     @Serializable
     enum class TitleGate {
         @SerialName("never") NEVER,
@@ -108,6 +122,7 @@ data class ScannerAcceptancePolicy(
                 strongAcceptanceScore = 0.70,
                 ambiguityMargin = ArcFaceModelContract.ambiguityMargin,
                 titleGate = TitleGate.BINDER_PAGE,
+                queryNormalization = QueryNormalization.GREY_WORLD_AUTOCONTRAST,
             )
             else -> fallback
         }

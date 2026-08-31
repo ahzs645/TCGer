@@ -220,8 +220,12 @@ export async function loadAcceptancePolicy(game, overridePath = null) {
     if (typeof result[key] !== "boolean") throw new Error(`Acceptance policy ${key} must be boolean`);
   }
   result.hubSimilarity ??= 0.9;
-  result.hubDistinctNames ??= 3;
+  result.hubDistinctNames ??= 2;
   result.hubTopK ??= 5;
+  result.queryNormalization ??= "none";
+  if (!["none", "grey-world-autocontrast"].includes(result.queryNormalization)) {
+    throw new Error("Acceptance policy queryNormalization is invalid");
+  }
   if (!(result.hubSimilarity >= 0 && result.hubSimilarity <= 1)) throw new Error("Acceptance policy hubSimilarity must be within [0, 1]");
   if (!(Number.isInteger(result.hubDistinctNames) && result.hubDistinctNames >= 0)) throw new Error("Acceptance policy hubDistinctNames must be a non-negative integer");
   if (!(Number.isInteger(result.hubTopK) && result.hubTopK >= 1)) throw new Error("Acceptance policy hubTopK must be a positive integer");

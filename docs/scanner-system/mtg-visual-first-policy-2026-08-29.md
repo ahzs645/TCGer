@@ -118,7 +118,7 @@ what fails on hand-held captures either.
 device build with hub rejection) accepted 21/29 with 0 wrong. Its eight
 abstentions were audited crop by crop, and five of them share one cause that
 also explains six frames of the 23:37 hand-held session and one of the 20:02
-photo session — **12 of the 86 labeled Magic frames**: the crop handed to the
+photo session — **12 of the 108 labeled Magic frames**: the crop handed to the
 encoder was the card's **art panel**, not the card. The panel embeds as
 garbage (0.55–0.68 "Swamp", "Call Forth the Tenebrous", "Lessons"), while the
 same frames rank the correct card first at 0.76–0.93 from the plain detector
@@ -198,6 +198,96 @@ cards in frame and belong to a multi-card path; four family fallbacks
 because OCR is not consulted once the visual score clears strong accept —
 pinning the printing from the footer on strong accepts is an OCR-on-only
 refinement and is deliberately not part of the visual path.
+
+## Two cards in frame: the framed card wins (2026-08-30)
+
+On 171145 frames 22 and 27 a second card lying on the table out-scored the
+held card in the detector (0.96 vs 0.95, 0.94 vs 0.89) and was cropped
+instead — frame 27's Darksteel Ingot was the session's one wrong accept.
+The single-card flow shows a centred framing guide and feeds the guide crop
+to the pipeline, so the card the user framed is the one under the frame
+centre: `CardCropper.preferredDetectionIndex` now takes the most confident
+detection that contains the frame centre, and falls back to confidence
+order when none does. Replays: 171145 24/29 with **0 wrong** (frame 27 now
+abstains on the half-occluded Crosis's Charm rather than accepting the
+Ingot); the 49-frame set (39/49), 23:37 set (18/30) and Pokémon library
+(53/76) are unchanged. A frame with two fully visible framed cards is still
+a multi-card capture and belongs to the binder path.
+
+## Query colour normalization — the camera-domain gap was colour and contrast (2026-08-30)
+
+Chasing the Tranquil Cove → Island 0.95 accept with the released encoder
+offline, one probe settled where the "camera-domain model failure" lives:
+the raw crop ranks Tranquil Cove **10,947th** (0.10) behind Plains/Oasis/
+Forest at 0.83–0.85; a grey-world white balance of the same pixels ranks it
+first at 0.67, a 1 % autocontrast at 0.76. The gallery is embedded from
+clean, white-balanced, full-range renders; hand-held crops arrive
+low-contrast under a room colour cast, and the encoder was never trained to
+ignore either (its augmentations are geometric, brightness/saturation/
+contrast, blur and noise — no cast).
+
+Measured on every labeled frame, identical Vision document-quad crops,
+released encoders (`.artifacts/camera-corpus/probe/colour_eval.py`):
+
+| Query preprocessing | Magic top-1 (108) | would accept, correct | would accept, wrong | Pokémon top-1 (52) | would accept, correct |
+|---|---:|---:|---:|---:|---:|
+| raw (shipped) | 79 | 61 | 1 | 42 | 27 |
+| grey-world | 96 | 75 | 3 | 35 | 24 |
+| autocontrast 1 % | 100 | 91 | 1 | 43 | 31 |
+| **grey-world + autocontrast** | **104** | **93** | 1 | 43 | 31 |
+
+("would accept" = top-1 ≥ 0.70 with a 0.05 family margin; the Magic
+"wrong" under normalization is a same-name family of Crosis's Charm, and
+the raw wrongs are the attractor hits — Dark Ritual 0.91, Dust Bowl 0.98,
+Shivan Gorge 0.998 — that hub rejection exists for.) All eight Rage into
+the Valley frames (rank 4–52 → 0 at 0.81–0.90), all six Stone Quarry frames
+(rank ∞ → 0 at 0.67–0.83), Bilbo's Deadly Slice, Forsaken Sanctuary ×5,
+Eagle of the Great Shelf and Tranquil Cove are recovered by normalization
+alone. Clean renders are near-invariant (self-similarity 0.94–0.997), so
+the shipped gallery stays valid.
+
+Shipped as `QueryColorNormalization.swift`: grey-world gains, then Pillow's
+per-channel 1 % autocontrast, applied to every crop before the encoder's
+resize/centre-crop contract (`SCANNER_QUERY_NORMALIZATION=0` restores raw
+queries for A/B). The arithmetic is a pixel-exact port so the offline
+evaluator and the device agree. The trainer gained the same stage
+(`--query-normalization grey-world-autocontrast`, applied to training
+views, gallery renders and evaluation queries), a colour-cast augmentation
+(warm ↔ cool channel gains up to 1.25× with gamma, `apply_colour_cast`),
+and a weights-only `--finetune-from` mode with a fresh schedule (Hub resume
+would restore a finished cosine schedule and learn nothing); both HF job
+wrappers forward `--lr`, `--query-normalization` and
+`--finetune-from-hub-path`.
+
+It is **per game**, declared as `queryNormalization` in the acceptance
+policy (`none` | `grey-world-autocontrast`): the Pokémon `physical-v2`
+encoder was trained toward camera captures and *loses* under the same
+normalization (76-label replay 53 → 49, 0 wrong), so it stays `none`;
+Magic is `grey-world-autocontrast`. Android applies the identical
+arithmetic (`QueryColorNormalization.kt`, driven by the runtime's policy);
+the browser runtime still embeds raw queries and must adopt the same stage
+for Magic before its gallery is republished (its matcher is mid-edit in
+another workstream, so it is not touched here).
+
+| Replay (Simulator) | multi-card rule only | + query normalization (Magic) + hub 2 | Wrong |
+|---|---:|---:|---:|
+| 171145 hand-held (29) | 24/29 | **27/29** (22 exact + 5 family) | 0 → 0 |
+| MTG 49-frame set | 39/49 | **47/49** (41 exact + 6 family) | 0 → 0 |
+| MTG 23:37 hand-held (30) | 18/30 | **28/30** (22 exact + 6 family) | 0 → **1** |
+| Pokémon 76-label library | 53/76 | 53/76 (`none`; identical outcomes) | 0 → 0 |
+
+The 23:37 wrong accept is frame 4: Vision finds no card-shaped quad, the
+crop falls back to the plain detector box (card plus hand and background),
+and the normalized box crop hits the yellow full-art Island at 0.94. Its
+sibling frame 3 used to fail the same way; with `hubDistinctNames` lowered
+from 3 to 2 its box crop is voided (Plains 0.99 / Forest 0.99 — two
+different names at hub similarity, which no correct crop of the 160 labeled
+ever shows) and the frame resolves correctly through the whole-frame
+hypothesis. Frame 4's twin orientation is not a hub (Plains 0.84), so the
+remaining lever there is the crop itself — the game-specific segmentation
+model — not a threshold. Session-level: 108 labeled Magic frames went from
+72 correct at the start of 2026-08-30 to **102** (0 → 1 wrong).
+
 
 ## Does this need a retrain?
 

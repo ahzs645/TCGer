@@ -322,11 +322,19 @@ final class DevModeSessionReplayTests: XCTestCase {
                     "candidate scanner release is missing \(requiredURL.lastPathComponent)"
                 )
             }
+            // The release directory carries no manifest, so the game's built-in
+            // policy supplies the query normalization the app would apply.
+            // `DEVMODE_SCANNER_GAME` names it explicitly; otherwise the
+            // directory path does ("…/magic-…", "…/pokemon-…").
+            let releaseGame: TCGGame = environment["DEVMODE_SCANNER_GAME"].flatMap(TCGGame.init(rawValue:))
+                ?? [TCGGame.magic, .pokemon, .yugioh].first { releaseDirectory.lowercased().contains($0.rawValue) }
+                ?? .pokemon
             coordinator = CardScannerCoordinator(
                 strategies: [BoardCardEmbeddingScannerStrategy(
                     variant: .arcface,
                     encoder: CardEmbeddingEncoder(
-                        modelLoader: FileCardEmbeddingModelLoader(modelURL: modelURL)
+                        modelLoader: FileCardEmbeddingModelLoader(modelURL: modelURL),
+                        queryNormalization: ScannerGameAcceptancePolicy.builtin(for: releaseGame).queryNormalization
                     ),
                     indexStore: AnnoyIndexStore(fileURL: vectorsURL),
                     metadataStore: CardIndexMetadataStore(fileURL: metadataURL)

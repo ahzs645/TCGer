@@ -468,3 +468,73 @@ class ArcFaceImageLibraryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ColourCastAugmentationTests(unittest.TestCase):
+    def test_gains_are_bounded_and_opposed(self):
+        import random
+
+        rng = random.Random(7)
+        for _ in range(500):
+            (red, green, blue), gamma = trainer.colour_cast_gains(rng)
+            for gain in (red, green, blue):
+                self.assertGreaterEqual(gain, 1 / trainer.COLOUR_CAST_MAX_GAIN - 1e-9)
+                self.assertLessEqual(gain, trainer.COLOUR_CAST_MAX_GAIN + 1e-9)
+            # Warm casts raise red and lower blue (and vice versa); the two
+            # channels move symmetrically around unity on a log scale.
+            self.assertAlmostEqual(red * blue, 1.0, places=9)
+            self.assertGreaterEqual(gamma, 1 / trainer.COLOUR_CAST_MAX_GAMMA - 1e-9)
+            self.assertLessEqual(gamma, trainer.COLOUR_CAST_MAX_GAMMA + 1e-9)
+
+    def test_cast_tints_a_grey_image_without_clipping_midtones(self):
+        from PIL import Image
+
+        class Draws:
+            """Feeds predetermined draws: temperature, green wobble, gamma."""
+
+            def __init__(self, values):
+                self.values = list(values)
+
+            def uniform(self, low, high):
+                return self.values.pop(0)
+
+        grey = Image.new("RGB", (8, 8), (128, 128, 128))
+        # Strongest warm cast, neutral green, unit gamma.
+        warm = trainer.apply_colour_cast(grey, Draws([__import__("math").log(trainer.COLOUR_CAST_MAX_GAIN), 0.0, 0.0]))
+        red, green, blue = warm.getpixel((0, 0))
+        self.assertGreater(red, 128)
+        self.assertLess(blue, 128)
+        self.assertEqual(green, 128)
+        self.assertEqual(warm.size, grey.size)
+        # A neutral draw leaves the image untouched.
+        untouched = trainer.apply_colour_cast(grey, Draws([0.0, 0.0, 0.0]))
+        self.assertEqual(untouched.getpixel((3, 3)), (128, 128, 128))
+
+
+class QueryNormalizationTests(unittest.TestCase):
+    def test_none_is_identity_and_unknown_modes_fail(self):
+        from PIL import Image
+
+        img = Image.new("RGB", (4, 4), (150, 128, 100))
+        self.assertIs(trainer.normalize_query_colors(img, "none"), img)
+        with self.assertRaises(ValueError):
+            trainer.normalize_query_colors(img, "sepia")
+
+    def test_grey_world_autocontrast_neutralizes_a_warm_cast(self):
+        from PIL import Image
+
+        # Warm-cast card: a flat field with a dark and a bright pixel so the
+        # autocontrast has a range to stretch.
+        img = Image.new("RGB", (10, 10), (150, 128, 100))
+        img.putpixel((0, 0), (60, 51, 40))
+        img.putpixel((9, 9), (240, 205, 160))
+        out = trainer.normalize_query_colors(img, "grey-world-autocontrast")
+        red, green, blue = out.getpixel((5, 5))
+        # Channels are balanced to within rounding after grey-world.
+        self.assertLessEqual(abs(red - green), 2)
+        self.assertLessEqual(abs(green - blue), 2)
+        # The 1 % cutoff removes exactly the single extreme pixel at each end
+        # of the 100-pixel histogram, so the flat field is left at full range
+        # only if something remains to stretch; here the field is the range.
+        self.assertEqual(out.size, img.size)
+        self.assertEqual(out.mode, "RGB")

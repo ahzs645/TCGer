@@ -36,15 +36,19 @@ struct CardEmbeddingEncoder {
     private let modelLoader: CardEmbeddingModelLoading
     private let inputName: String
     private let outputName: String
+    /// The game's declared query normalization (`ScannerGameAcceptancePolicy`).
+    let queryNormalization: ScannerGameAcceptancePolicy.QueryNormalization
 
     init(
         modelLoader: CardEmbeddingModelLoading = BundleCardEmbeddingModelLoader(),
         inputName: String = "image",
-        outputName: String = "embedding"
+        outputName: String = "embedding",
+        queryNormalization: ScannerGameAcceptancePolicy.QueryNormalization = .none
     ) {
         self.modelLoader = modelLoader
         self.inputName = inputName
         self.outputName = outputName
+        self.queryNormalization = queryNormalization
     }
 
     var isAvailable: Bool {
@@ -57,7 +61,7 @@ struct CardEmbeddingEncoder {
             throw EncoderError.imageConstraintUnavailable
         }
 
-        guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh) else {
+        guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh, normalization: queryNormalization) else {
             throw EncoderError.featureValueCreationFailed
         }
 
@@ -86,7 +90,7 @@ struct CardEmbeddingEncoder {
         }
 
         let providers = try images.map { image -> MLDictionaryFeatureProvider in
-            guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh) else {
+            guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh, normalization: queryNormalization) else {
                 throw EncoderError.featureValueCreationFailed
             }
             return try MLDictionaryFeatureProvider(dictionary: [
@@ -207,8 +211,17 @@ private enum DINOv2Preprocessing {
 }
 
 private extension CGImage {
-    func pixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
-        guard let preprocessed = centerCroppedAfterResize(
+    func pixelBuffer(
+        width: Int,
+        height: Int,
+        normalization: ScannerGameAcceptancePolicy.QueryNormalization
+    ) -> CVPixelBuffer? {
+        // Query-side colour normalization precedes the geometric contract so
+        // the statistics come from the crop the encoder will actually see.
+        let source = QueryColorNormalization.applies(normalization)
+            ? (QueryColorNormalization.normalized(self) ?? self)
+            : self
+        guard let preprocessed = source.centerCroppedAfterResize(
             shortestEdge: DINOv2Preprocessing.resizedShortestEdge,
             cropWidth: width,
             cropHeight: height

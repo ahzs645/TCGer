@@ -12,7 +12,8 @@
     "calibration": "Free text: what the numbers were measured on.",
     "hubSimilarity": "Hub rejection: similarity at which neighbours count as hub hits.",
     "hubDistinctNames": "Abstain when at least this many DIFFERENT card names sit at or above hubSimilarity within the top hubTopK neighbours; genuine matches never look like that, degenerate crops (blank, glare-saturated, mis-rectified) do. 0 disables.",
-    "hubTopK": "Neighbours inspected by hub rejection."
+    "hubTopK": "Neighbours inspected by hub rejection.",
+    "queryNormalization": "Colour normalization applied to every query crop before the encoder's resize contract: none | grey-world-autocontrast (grey-world white balance, then per-channel 1% autocontrast — Pillow semantics). Per game because it depends on what the encoder was trained on: a catalog-only encoder gains from pulling phone crops toward render statistics, an encoder trained toward camera captures loses."
   },
   "games": {
     "pokemon": {
@@ -23,10 +24,11 @@
       "uniqueTitleRescue": true,
       "titleAgreementRescue": true,
       "collectorNumberScope": "family",
-      "calibration": "physical-v2-107fe33b; 76-label reference replay 2026-08-29: 0.65 is the smallest point above the pack/empty negatives (0.6285/0.6476).",
+      "calibration": "physical-v2-107fe33b; 76-label reference replay 2026-08-29: 0.65 is the smallest point above the pack/empty negatives (0.6285/0.6476). Query normalization measured OFF 2026-08-30: physical-v2 was trained toward camera captures; normalizing queries drops the 76-label replay 53 -> 49.",
       "hubSimilarity": 0.9,
-      "hubDistinctNames": 3,
-      "hubTopK": 5
+      "hubDistinctNames": 2,
+      "hubTopK": 5,
+      "queryNormalization": "none"
     },
     "magic": {
       "strongAcceptanceScore": 0.7,
@@ -36,10 +38,11 @@
       "uniqueTitleRescue": true,
       "titleAgreementRescue": true,
       "collectorNumberScope": "family",
-      "calibration": "visual-style-v2-5c27e506-r2; 49 labeled frames (sessions 2026-08-27 and 2026-08-29): plain-visual 0.65 admitted three wrong accepts at 0.64-0.69, 0.70 admitted none; simulator replay 28 -> 36 correct, 0 wrong. Hub rejection: 0 false positives on 364 verified real-camera crops, fires on 8/12 degenerate Stone Quarry attempts (2026-08-29).",
+      "calibration": "visual-style-v2-5c27e506-r2; 49 labeled frames (sessions 2026-08-27 and 2026-08-29): plain-visual 0.65 admitted three wrong accepts at 0.64-0.69, 0.70 admitted none; simulator replay 28 -> 36 correct, 0 wrong. Hub rejection: 0 false positives on 364 verified real-camera crops, fires on 8/12 degenerate Stone Quarry attempts (2026-08-29). Query normalization 2026-08-30: on 108 labeled frames the same encoder ranks the correct family first on 79 raw vs 104 normalized crops; simulator replays 24 -> 27/29, 39 -> 47/49, 18 -> 27/30. hubDistinctNames 2: no correct crop of 160 labeled shows two different names >= 0.90; degenerate box crops do.",
       "hubSimilarity": 0.9,
-      "hubDistinctNames": 3,
-      "hubTopK": 5
+      "hubDistinctNames": 2,
+      "hubTopK": 5,
+      "queryNormalization": "grey-world-autocontrast"
     },
     "yugioh": {
       "strongAcceptanceScore": 0.65,
@@ -51,8 +54,9 @@
       "collectorNumberScope": "family",
       "calibration": "Inherits the encoder-level ArcFace point; no labeled phone sessions yet.",
       "hubSimilarity": 0.9,
-      "hubDistinctNames": 3,
-      "hubTopK": 5
+      "hubDistinctNames": 2,
+      "hubTopK": 5,
+      "queryNormalization": "none"
     }
   },
   "default": {
@@ -65,7 +69,8 @@
     "collectorNumberScope": "family",
     "calibration": "Conservative profile for a game with no replay evidence: the highest measured strong-accept point, visual-first, bounded OCR rescues.",
     "hubSimilarity": 0.9,
-    "hubDistinctNames": 3,
-    "hubTopK": 5
+    "hubDistinctNames": 2,
+    "hubTopK": 5,
+    "queryNormalization": "none"
   }
 }

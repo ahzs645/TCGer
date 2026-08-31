@@ -199,6 +199,20 @@ def main() -> None:
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--limit-per-game", type=int)
     parser.add_argument("--batch", type=int, default=256)
+    parser.add_argument("--lr", type=float, help="Trainer learning rate (trainer default when omitted)")
+    parser.add_argument(
+        "--query-normalization",
+        choices=("none", "grey-world-autocontrast"),
+        help="Forwarded to the trainer; must match the runtime QueryColorNormalization setting",
+    )
+    parser.add_argument(
+        "--finetune-from-hub-path",
+        help=(
+            "Checkpoint path inside --hub-repo (e.g. exports/magic/full/<variant>/"
+            "arcface-checkpoint.pt) whose encoder/head weights start this run with "
+            "a fresh optimizer and schedule"
+        ),
+    )
     parser.add_argument(
         "--training-views-per-card",
         type=int,
@@ -632,6 +646,17 @@ def main() -> None:
         trainer_command.extend([
             "--pokemon-baseline-onnx", str(pokemon_baseline_path),
         ])
+    if args.lr is not None:
+        trainer_command.extend(["--lr", str(args.lr)])
+    if args.query_normalization:
+        trainer_command.extend(["--query-normalization", args.query_normalization])
+    if args.finetune_from_hub_path:
+        finetune_checkpoint = Path(hf_hub_download(
+            repo_id=args.hub_repo,
+            filename=args.finetune_from_hub_path,
+            repo_type="model",
+        ))
+        trainer_command.extend(["--finetune-from", str(finetune_checkpoint)])
     if image_library_root:
         trainer_command.extend([
             "--image-library-root", str(image_library_root),

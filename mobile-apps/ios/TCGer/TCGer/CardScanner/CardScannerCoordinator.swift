@@ -81,7 +81,11 @@ final class CardScannerCoordinator: @unchecked Sendable {
             strategies.append(BoardCardEmbeddingScannerStrategy(
                 variant: .arcface,
                 encoder: CardEmbeddingEncoder(
-                    modelLoader: FileCardEmbeddingModelLoader(modelURL: runtime.modelURL)
+                    modelLoader: FileCardEmbeddingModelLoader(modelURL: runtime.modelURL),
+                    queryNormalization: ScannerGameAcceptancePolicy.resolve(
+                        game: game,
+                        declared: runtime.acceptancePolicy
+                    ).queryNormalization
                 ),
                 indexStore: AnnoyIndexStore(fileURL: runtime.vectorsURL),
                 metadataStore: CardIndexMetadataStore(fileURL: runtime.metadataURL),

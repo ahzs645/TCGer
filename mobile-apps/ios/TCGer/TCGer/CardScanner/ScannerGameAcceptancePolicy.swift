@@ -65,6 +65,18 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
     var hubSimilarity: Double
     var hubDistinctNames: Int
     var hubTopK: Int
+    /// Colour normalization applied to every query crop before the encoder's
+    /// resize contract. Per game because it depends on what the encoder was
+    /// trained on: the catalog-only Magic encoder gains (108 labeled frames:
+    /// correct family first on 79 raw vs 104 normalized crops), while the
+    /// Pokémon encoder, trained toward camera captures, loses (76-label
+    /// replay 53 → 49). See `QueryColorNormalization`.
+    var queryNormalization: QueryNormalization
+
+    enum QueryNormalization: String, Decodable, Sendable {
+        case none
+        case greyWorldAutocontrast = "grey-world-autocontrast"
+    }
 
     init(
         strongAcceptanceScore: Double,
@@ -75,9 +87,11 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
         titleAgreementRescue: Bool = true,
         collectorNumberScope: CollectorNumberScope = .family,
         hubSimilarity: Double = 0.90,
-        hubDistinctNames: Int = 3,
-        hubTopK: Int = 5
+        hubDistinctNames: Int = 2,
+        hubTopK: Int = 5,
+        queryNormalization: QueryNormalization = .none
     ) {
+        self.queryNormalization = queryNormalization
         self.hubSimilarity = hubSimilarity
         self.hubDistinctNames = hubDistinctNames
         self.hubTopK = hubTopK
@@ -102,6 +116,7 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
         case hubSimilarity
         case hubDistinctNames
         case hubTopK
+        case queryNormalization
     }
 
     /// Missing keys take the `fallback` value so a manifest may declare only
@@ -127,6 +142,8 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
         hubSimilarity = try container.decodeIfPresent(Double.self, forKey: .hubSimilarity) ?? defaults.hubSimilarity
         hubDistinctNames = try container.decodeIfPresent(Int.self, forKey: .hubDistinctNames) ?? defaults.hubDistinctNames
         hubTopK = try container.decodeIfPresent(Int.self, forKey: .hubTopK) ?? defaults.hubTopK
+        queryNormalization = try container.decodeIfPresent(QueryNormalization.self, forKey: .queryNormalization)
+            ?? defaults.queryNormalization
     }
 
     private var declaredSchema: String?
@@ -172,7 +189,8 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
             return ScannerGameAcceptancePolicy(
                 strongAcceptanceScore: 0.70,
                 ambiguityMargin: variant.ambiguityMargin,
-                titleGate: .binderPage
+                titleGate: .binderPage,
+                queryNormalization: .greyWorldAutocontrast
             )
         case (.dinov2, _):
             // Historical DINOv2 calibration; its rejection gate and thresholds

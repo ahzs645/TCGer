@@ -29,7 +29,7 @@ class ArcFaceCardRecognizer private constructor(
         setCode: String? = null,
     ): ArcFaceRecognitionResult {
         lateinit var input: FloatArray
-        val preprocessNs = measureNanoTime { input = ArcFaceImagePreprocessor.preprocess(imageBytes) }
+        val preprocessNs = measureNanoTime { input = ArcFaceImagePreprocessor.preprocess(imageBytes, acceptancePolicy.queryNormalization) }
         lateinit var embedding: FloatArray
         val inferenceNs = measureNanoTime { embedding = encoder.encode(input) }
         lateinit var matches: List<CardEmbeddingMatch>

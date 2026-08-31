@@ -224,6 +224,9 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertEqual(ScannerGameAcceptancePolicy.builtin(for: .all), .fallback)
         XCTAssertEqual(ScannerGameAcceptancePolicy.fallback.strongAcceptanceScore, 0.70, accuracy: 1e-9)
         XCTAssertEqual(ScannerGameAcceptancePolicy.fallback.titleGate, .never)
+        XCTAssertEqual(ScannerGameAcceptancePolicy.builtin(for: .magic).queryNormalization, .greyWorldAutocontrast)
+        XCTAssertEqual(ScannerGameAcceptancePolicy.builtin(for: .pokemon).queryNormalization, .none)
+        XCTAssertEqual(ScannerGameAcceptancePolicy.fallback.queryNormalization, .none)
     }
 
     func testDeclaredAcceptancePolicyDecodesWithDefaultsAndWinsOverBuiltIn() throws {
@@ -237,6 +240,11 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         // Unstated fields take the fallback values, not zero.
         XCTAssertEqual(declared.ambiguityMargin, ScannerGameAcceptancePolicy.fallback.ambiguityMargin, accuracy: 1e-9)
         XCTAssertEqual(declared.collectorNumberScope, .family)
+        XCTAssertEqual(declared.queryNormalization, .none)
+        let normalized = try JSONDecoder().decode(ScannerGameAcceptancePolicy.self, from: Data("""
+        {"schema":"tcger-scanner-acceptance-policy-v1","strongAcceptanceScore":0.7,"queryNormalization":"grey-world-autocontrast"}
+        """.utf8))
+        XCTAssertEqual(normalized.queryNormalization, .greyWorldAutocontrast)
 
         let resolved = ScannerGameAcceptancePolicy.resolve(game: .magic, declared: declared, environment: [:])
         XCTAssertEqual(resolved.strongAcceptanceScore, 0.68, accuracy: 1e-9)
@@ -295,6 +303,12 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertTrue(policy.isHubCollapse([
             ("Radha, Heart of Keld", 0.995), ("Instill Energy", 0.954),
             ("The Bath Song", 0.934), ("Song of Eärendil", 0.911), ("Forest", 0.91),
+        ]))
+        // Two DIFFERENT names at hub similarity is already impossible for a
+        // real card (23:37 frame 3's box crop: Plains 0.99 / Forest 0.99);
+        // measured on 160 labeled genuine crops, no correct crop ever shows two.
+        XCTAssertTrue(policy.isHubCollapse([
+            ("Plains", 0.99), ("Forest", 0.99), ("Forest", 0.99), ("Plains", 0.99), ("Plains", 0.99),
         ]))
         // A genuine strong match with same-name printings and distant rivals.
         XCTAssertFalse(policy.isHubCollapse([
@@ -412,6 +426,61 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         // Identical boxes never suppress each other; empty boxes are dropped.
         XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([card, card]), [0, 1])
         XCTAssertEqual(CardObjectDetector.indicesSuppressingNestedBoxes([.zero, card]), [1])
+    }
+
+    func testQueryColorNormalizationMatchesPillowSemantics() {
+        // Autocontrast: a histogram occupying [64, 191] stretches to [0, 255];
+        // with a 1 % cutoff the outermost 1 % of pixels are discarded first.
+        var histogram = [Int](repeating: 0, count: 256)
+        for value in 64...191 { histogram[value] = 100 }
+        let table = QueryColorNormalization.autocontrastTable(histogram: histogram, cutoffPercent: 0)
+        XCTAssertEqual(table[64], 0)
+        XCTAssertEqual(table[191], 255)
+        XCTAssertEqual(table[0], 0)
+        XCTAssertEqual(table[255], 255)
+        XCTAssertEqual(Int(table[128]), Int(Double(128 - 64) * 255.0 / 127.0))
+        // 12,800 pixels; 1 % = 128 pixels = bins 64 and part of 65 from the
+        // low end, so the new low is 65 (Pillow leaves the partial bin).
+        let cut = QueryColorNormalization.autocontrastTable(histogram: histogram, cutoffPercent: 1)
+        XCTAssertEqual(cut[65], 0)
+        XCTAssertEqual(cut[190], 255)
+        // A flat (single-value) histogram is left as identity.
+        var flat = [Int](repeating: 0, count: 256); flat[100] = 500
+        XCTAssertEqual(QueryColorNormalization.autocontrastTable(histogram: flat, cutoffPercent: 1)[100], 100)
+
+        // Grey world: a warm cast (R 150, G 128, B 100) is pulled to a common mean.
+        let gains = QueryColorNormalization.greyWorldGains(means: [150, 128, 100])
+        XCTAssertEqual(gains[0] * 150, 126, accuracy: 0.01)
+        XCTAssertEqual(gains[2] * 100, 126, accuracy: 0.01)
+        XCTAssertEqual(QueryColorNormalization.greyWorldGains(means: [0, 10, 20])[0], 1)
+
+        // End to end on RGBA pixels: a warm-cast flat field with two extreme
+        // pixels becomes neutral and full-range; alpha is untouched.
+        var pixels: [UInt8] = []
+        for _ in 0..<98 { pixels += [150, 128, 100, 255] }
+        pixels += [200, 178, 150, 255, 100, 78, 50, 255]
+        QueryColorNormalization.normalizeRGBA(&pixels, pixelCount: 100)
+        let mid = Array(pixels[0..<3])
+        XCTAssertEqual(Int(mid[0]), Int(mid[1]), accuracy: 2)
+        XCTAssertEqual(Int(mid[1]), Int(mid[2]), accuracy: 2)
+        XCTAssertEqual(pixels[3], 255)
+    }
+
+    func testTheFramedDetectionBeatsAMoreConfidentBystanderCard() {
+        // scan-session-20260830-171145 frame 27 (guide crop): Darksteel Ingot
+        // on the table at 0.94, off-centre; the held Crosis's Charm at 0.89
+        // under the frame centre.
+        let ingot = CGRect(x: 0.48, y: 0.0, width: 0.51, height: 0.45)
+        let charm = CGRect(x: 0.15, y: 0.41, width: 0.66, height: 0.42)
+        XCTAssertEqual(CardCropper.preferredDetectionIndex([ingot, charm]), 1)
+        XCTAssertEqual(CardCropper.preferredDetectionIndex([charm, ingot]), 0)
+        // Two framed cards: confidence order decides.
+        let overlapping = CGRect(x: 0.3, y: 0.3, width: 0.4, height: 0.4)
+        XCTAssertEqual(CardCropper.preferredDetectionIndex([charm, overlapping]), 0)
+        // Nothing under the centre: confidence order stands.
+        let corner = CGRect(x: 0.0, y: 0.0, width: 0.3, height: 0.3)
+        XCTAssertEqual(CardCropper.preferredDetectionIndex([ingot, corner]), 0)
+        XCTAssertNil(CardCropper.preferredDetectionIndex([]))
     }
 
     func testFullFrameQuadsMustShareTheDetectorBoxOrientation() {

@@ -62,6 +62,67 @@ COVERAGE_REPORT = OUT_DIR / "image-coverage.json"
 IMNET_MEAN = [0.485, 0.456, 0.406]
 IMNET_STD = [0.229, 0.224, 0.225]
 IMG_SIZE = 224
+
+# Colour-cast augmentation bounds. Hand-held captures under warm/cool room
+# light shift the channel means by up to ~15 % (measured 0.85–0.89 channel
+# ratios in the 2026-08-29 augmentation bank); the released encoder had no
+# colour-cast invariance at all — a warm-cast Tranquil Cove crop ranked its
+# own card 10,947th and a yellow full-art Island first at 0.95, while a
+# grey-world white balance of the same pixels ranked it first. Gains are
+# sampled on a log scale so warm and cool casts are equally likely.
+COLOUR_CAST_MAX_GAIN = 1.25
+COLOUR_CAST_MAX_GAMMA = 1.25
+
+
+QUERY_NORMALIZATIONS = ("none", "grey-world-autocontrast")
+
+
+def normalize_query_colors(img, mode="grey-world-autocontrast"):
+    """Query-side colour normalization, identical to the runtime's
+    `QueryColorNormalization.swift`: float grey-world gains with truncating
+    conversion, then Pillow's per-channel 1 % autocontrast. Applied to
+    training views, gallery renders and evaluation queries alike so the model
+    is trained on the distribution it is queried with."""
+    if mode == "none":
+        return img
+    if mode != "grey-world-autocontrast":
+        raise ValueError(f"unknown query normalization: {mode}")
+    import numpy as np
+    from PIL import Image, ImageOps
+
+    pixels = np.asarray(img.convert("RGB"), dtype=np.float32)
+    means = pixels.reshape(-1, 3).mean(axis=0)
+    gains = np.where(means > 0, means.mean() / np.where(means > 0, means, 1.0), 1.0)
+    balanced = Image.fromarray(np.clip(pixels * gains, 0, 255).astype(np.uint8))
+    return ImageOps.autocontrast(balanced, cutoff=1)
+
+
+def colour_cast_gains(rng):
+    """Per-channel (R, G, B) multipliers and a gamma for one colour cast.
+
+    A cast is a smooth tint, not a hue rotation: red and blue move in
+    opposite directions (warm ↔ cool) around a green channel that stays
+    near unity, with an independent small green wobble so casts are not
+    confined to a single axis.
+    """
+    log_gain = math.log(COLOUR_CAST_MAX_GAIN)
+    temperature = rng.uniform(-log_gain, log_gain)
+    green = rng.uniform(-log_gain / 3, log_gain / 3)
+    gamma = math.exp(rng.uniform(-math.log(COLOUR_CAST_MAX_GAMMA), math.log(COLOUR_CAST_MAX_GAMMA)))
+    return (math.exp(temperature), math.exp(green), math.exp(-temperature)), gamma
+
+
+def apply_colour_cast(img, rng):
+    """Apply one sampled colour cast to a PIL RGB image."""
+    (red, green, blue), gamma = colour_cast_gains(rng)
+    lut = []
+    for gain in (red, green, blue):
+        lut.extend(
+            int(round(255.0 * min(1.0, max(0.0, (value / 255.0) ** gamma * gain))))
+            for value in range(256)
+        )
+    return img.convert("RGB").point(lut)
+
 EMBED_DIM = 384
 ARC_S, ARC_M = 16.0, 0.50  # s=16: s=30 with AdamW saturates and never lifts off (measured)
 SEED = 22
@@ -867,6 +928,25 @@ def main():
     )
     parser.add_argument("--hub-path-prefix", default="training")
     parser.add_argument(
+        "--query-normalization",
+        choices=QUERY_NORMALIZATIONS,
+        default="none",
+        help=(
+            "Colour normalization applied to every training view, gallery "
+            "render and evaluation query before the resize contract; must "
+            "match the runtime's QueryColorNormalization setting"
+        ),
+    )
+    parser.add_argument(
+        "--finetune-from",
+        type=Path,
+        help=(
+            "Start from this checkpoint's encoder and head weights with a "
+            "fresh optimizer and schedule (use with a small --lr and few "
+            "--epochs). Unlike Hub resume, the schedule is not continued."
+        ),
+    )
+    parser.add_argument(
         "--pokemon-baseline-onnx",
         type=Path,
         help=(
@@ -1028,9 +1108,12 @@ def main():
                     img = ImageEnhance.Color(img).enhance(random.uniform(0.6, 1.4))
                     img = ImageEnhance.Contrast(img).enhance(random.uniform(0.7, 1.3))
                 if random.random() < 0.5:
+                    img = apply_colour_cast(img, random)
+                if random.random() < 0.5:
                     img = img.filter(ImageFilter.GaussianBlur(random.uniform(0.5, 2.2)))
                 elif random.random() < 0.3:
                     img = ImageEnhance.Sharpness(img).enhance(random.uniform(1.2, 2.5))
+            img = normalize_query_colors(img, args.query_normalization)
             x = TF.to_tensor(contract_resize(img))
             if self.train and random.random() < 0.5:
                 x = (x + torch.randn_like(x) * random.uniform(0.005, 0.03)).clamp(0, 1)
@@ -1080,6 +1163,7 @@ def main():
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
     scaler = torch.amp.GradScaler()
     start_epoch = 0
+    finetuned_from = None
     run_catalog_fingerprint = catalog_fingerprint(entries)
     image_library_fingerprint = image_coverage["imageLibraryFingerprint"]
     hub_checkpoint_path = f"{args.hub_path_prefix}/arcface-checkpoint.pt"
@@ -1120,6 +1204,26 @@ def main():
         sched.load_state_dict(ck["sched"])
         start_epoch = ck["epoch"] + 1
         print(f"resumed after epoch {ck['epoch']}", flush=True)
+    elif args.finetune_from:
+        ck = torch.load(args.finetune_from, map_location=device)
+        if ck.get("catalogFingerprint") != run_catalog_fingerprint:
+            raise ValueError("fine-tune checkpoint catalog does not match supplied metadata")
+        if ck.get("imageLibraryFingerprint") != image_library_fingerprint:
+            raise ValueError(
+                "fine-tune checkpoint image library does not match the validated training bytes"
+            )
+        model.load_state_dict(ck["model"])
+        head.load_state_dict(ck["head"])
+        finetuned_from = {
+            "epoch": ck.get("epoch"),
+            "config": ck.get("config", {}),
+            "sha256": hashlib.sha256(args.finetune_from.read_bytes()).hexdigest(),
+        }
+        print(
+            f"fine-tuning from {args.finetune_from.name} (epoch {ck.get('epoch')}) "
+            f"with a fresh schedule: lr={args.lr} epochs={args.epochs}",
+            flush=True,
+        )
 
     loader = DataLoader(
         CardViews(
@@ -1185,6 +1289,10 @@ def main():
                         "trainingRows": len(training_indices),
                         "heldOutEvaluationRows": len(held_out_eval_indices),
                         "trainingViewsPerCard": training_views_per_card,
+        "queryNormalization": args.query_normalization,
+        "finetunedFrom": finetuned_from,
+                        "queryNormalization": args.query_normalization,
+                        "finetunedFrom": finetuned_from,
                         "evaluationViewsPerCard": args.views_per_card,
                         "coverageSchema": image_coverage["schema"],
                     }}, CKPT)
@@ -1293,6 +1401,8 @@ def main():
         "epochs": args.epochs,
         "backbone": args.backbone,
         "trainingViewsPerCard": training_views_per_card,
+        "queryNormalization": args.query_normalization,
+        "finetunedFrom": finetuned_from,
         "evaluationViewsPerCard": args.views_per_card,
         "optimizerStepsPerEpoch": len(loader),
         "configuredOptimizerSteps": len(loader) * args.epochs,

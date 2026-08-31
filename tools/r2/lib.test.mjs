@@ -52,7 +52,8 @@ test("shared acceptance policies publish per game with the conservative default 
 test("acceptance policies carry hub rejection and gallery exclusions drop non-card rows", async () => {
   const magic = await loadAcceptancePolicy("magic");
   assert.equal(magic.hubSimilarity, 0.9);
-  assert.equal(magic.hubDistinctNames, 3);
+  assert.equal(magic.hubDistinctNames, 2);
+  assert.equal(magic.queryNormalization, "grey-world-autocontrast");
   assert.equal(magic.hubTopK, 5);
 
   const exclusions = await loadGalleryExclusions("magic");

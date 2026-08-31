@@ -154,9 +154,11 @@ nonisolated struct CardCropper {
         // location. Vision then refines the corners, but only candidates that
         // agree with the detector are allowed to suppress its fallback box.
         let detections = (try? detectorSource.detector?.detections(in: image)) ?? []
-        let detectedCard = CardObjectDetector.indicesSuppressingNestedBoxes(
+        let cardBoxes = CardObjectDetector.indicesSuppressingNestedBoxes(
             detections.map(\.boundingBox)
-        ).first.map { detections[$0] }
+        ).map { detections[$0] }
+        let detectedCard = Self.preferredDetectionIndex(cardBoxes.map(\.boundingBox))
+            .map { cardBoxes[$0] }
 
         // Primary: VNDetectDocumentSegmentationRequest — ANE-accelerated,
         // real-time, iOS 15+. Returns a VNRectangleObservation with corners, so
@@ -238,6 +240,24 @@ nonisolated struct CardCropper {
             return (refined, fallbackBox, detectedCard.boundingBox)
         }
         return ([fallbackBox], nil, detectedCard.boundingBox)
+    }
+
+    /// Which of several (non-nested) card detections is the card being
+    /// scanned. Confidence cannot say: on `scan-session-20260830-171145`
+    /// frames 22 and 27 a second card lying on the table out-scored the held
+    /// card (0.96 vs 0.95, 0.94 vs 0.89) and was recognized instead. The
+    /// single-card flow gives the user a centred framing guide and the
+    /// pipeline input is the guide crop, so the card the user framed is the
+    /// one under the frame centre. Among detections containing the centre
+    /// the most confident wins; when none does, confidence order stands.
+    /// `boxes` are in Vision-normalized coordinates in their input order
+    /// (highest confidence first).
+    static func preferredDetectionIndex(_ boxes: [CGRect]) -> Int? {
+        let centre = CGPoint(x: 0.5, y: 0.5)
+        if let framed = boxes.indices.first(where: { boxes[$0].standardized.contains(centre) }) {
+            return framed
+        }
+        return boxes.indices.first
     }
 
     /// Bounding-box IoU is not enough to keep interior panels out: on a tilted

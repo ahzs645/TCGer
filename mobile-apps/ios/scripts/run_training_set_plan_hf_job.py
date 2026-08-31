@@ -260,6 +260,9 @@ def main() -> None:
     parser.add_argument("--artifact-variant", required=True)
     parser.add_argument("--epochs", type=int, default=12)
     parser.add_argument("--batch", type=int, default=256)
+    parser.add_argument("--lr", type=float)
+    parser.add_argument("--query-normalization", choices=("none", "grey-world-autocontrast"))
+    parser.add_argument("--finetune-from-hub-path")
     parser.add_argument("--workdir", type=Path, default=Path("/tmp/tcger-plan-training"))
     args = parser.parse_args()
     for label, revision in (
@@ -345,6 +348,12 @@ def main() -> None:
         "--batch", str(args.batch),
         "--skip-pokemon-baseline",
     ]
+    if args.lr is not None:
+        command.extend(["--lr", str(args.lr)])
+    if args.query_normalization:
+        command.extend(["--query-normalization", args.query_normalization])
+    if args.finetune_from_hub_path:
+        command.extend(["--finetune-from-hub-path", args.finetune_from_hub_path])
     subprocess.run(command, check=True)
 
 
