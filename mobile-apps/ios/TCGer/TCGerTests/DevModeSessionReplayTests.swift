@@ -175,6 +175,39 @@ final class DevModeSessionReplayTests: XCTestCase {
         "scan-session-20260829-233753/frame-0027.jpg": "8651958c-3b94-47a9-a751-faf8f6236a42",
         "scan-session-20260829-233753/frame-0028.jpg": "8651958c-3b94-47a9-a751-faf8f6236a42",
         "scan-session-20260829-233753/frame-0029.jpg": "97caaa92-2a7d-4f79-8d42-86733c902072",
+        // August 30 17:11 MTG session: the same deck, hand-held over a desk
+        // and jeans, captured on a build carrying hub rejection. Labeled from
+        // the readable title and footer; frames 22 and 27 hold two cards
+        // (the front card is the label).
+        "scan-session-20260830-171145/frame-0000.jpg": "8651958c-3b94-47a9-a751-faf8f6236a42",
+        "scan-session-20260830-171145/frame-0001.jpg": "8d4f3eb5-fedf-45d6-8bd8-aacbe0ce33b2",
+        "scan-session-20260830-171145/frame-0002.jpg": "17892c93-b9b2-4720-933b-998ed0200492",
+        "scan-session-20260830-171145/frame-0003.jpg": "ea174cea-40e5-424e-9734-e39aae6c6b17",
+        "scan-session-20260830-171145/frame-0004.jpg": "3685c783-d837-4466-a960-ab3098db64c3",
+        "scan-session-20260830-171145/frame-0005.jpg": "3c64d130-2864-4e1e-9024-58821eec3be5",
+        "scan-session-20260830-171145/frame-0006.jpg": "3c64d130-2864-4e1e-9024-58821eec3be5",
+        "scan-session-20260830-171145/frame-0007.jpg": "80658042-3998-49ca-88ef-f87320a5bd43",
+        "scan-session-20260830-171145/frame-0008.jpg": "540f84af-f247-42a2-a4d5-bf3dab4da647",
+        "scan-session-20260830-171145/frame-0009.jpg": "92fb453e-6cbe-48c6-98ef-86069791c341",
+        "scan-session-20260830-171145/frame-0010.jpg": "0bd86cac-08c1-4db0-ab54-4bb65a771efe",
+        "scan-session-20260830-171145/frame-0011.jpg": "ee198ea7-729a-47ce-89dd-43f77f60247b",
+        "scan-session-20260830-171145/frame-0012.jpg": "ee198ea7-729a-47ce-89dd-43f77f60247b",
+        "scan-session-20260830-171145/frame-0013.jpg": "ee198ea7-729a-47ce-89dd-43f77f60247b",
+        "scan-session-20260830-171145/frame-0014.jpg": "baa5d34b-b052-47f4-95e1-42a9c2d21cdf",
+        "scan-session-20260830-171145/frame-0015.jpg": "74c9c315-1cf4-468e-a74a-b5f3be4a63a1",
+        "scan-session-20260830-171145/frame-0016.jpg": "08f33c8a-8e93-4296-964b-da132a854b3b",
+        "scan-session-20260830-171145/frame-0017.jpg": "08f33c8a-8e93-4296-964b-da132a854b3b",
+        "scan-session-20260830-171145/frame-0018.jpg": "9eb94908-4f4a-487e-87ac-8d5bdefe9983",
+        "scan-session-20260830-171145/frame-0019.jpg": "d833fd8f-8d1f-4a4d-a42a-58af63c17186",
+        "scan-session-20260830-171145/frame-0020.jpg": "d833fd8f-8d1f-4a4d-a42a-58af63c17186",
+        "scan-session-20260830-171145/frame-0021.jpg": "99806615-2f4a-4fe4-82f8-83445ae93a97",
+        "scan-session-20260830-171145/frame-0022.jpg": "3dcdedb6-3c24-4a29-b9b9-27cc47d8ee56",
+        "scan-session-20260830-171145/frame-0023.jpg": "3dcdedb6-3c24-4a29-b9b9-27cc47d8ee56",
+        "scan-session-20260830-171145/frame-0024.jpg": "36c70a1d-c129-4c97-a190-6b3eaa83d48c",
+        "scan-session-20260830-171145/frame-0025.jpg": "784a5915-bc42-49d6-8a1b-45da7749f03a",
+        "scan-session-20260830-171145/frame-0026.jpg": "5fb4c2b7-8714-496e-a981-844e8e5b81ea",
+        "scan-session-20260830-171145/frame-0027.jpg": "a586e329-b1e2-4b60-a914-7b9aa2c645c2",
+        "scan-session-20260830-171145/frame-0028.jpg": "a586e329-b1e2-4b60-a914-7b9aa2c645c2",
     ]
     /// Frames that must NOT match anything (accidental shutter presses).
     private static let expectedNoMatch: Set<String> = [
