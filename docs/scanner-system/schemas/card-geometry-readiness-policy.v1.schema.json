@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/card-geometry-readiness-policy/v1",
+  "title": "TCGer CardGeometryReadinessPolicy v1",
+  "description": "Minimum content a card-geometry corpus release must contain before a preflight may report it ready. A release binds to exactly one policy by id and file hash; the training wrapper additionally requires the policy hash it expects, so a release cannot lower its own bar.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "policyId",
+    "requiredSplits",
+    "minimumRecordsPerSplit",
+    "minimumInstancesPerSplit",
+    "minimumRealEvaluationSessions",
+    "realOnlySplits",
+    "requiredSceneSlices",
+    "requiredLeakageKeys"
+  ],
+  "properties": {
+    "schema": {
+      "const": "https://tcger.app/schemas/card-geometry-readiness-policy/v1"
+    },
+    "policyId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "description": { "type": "string", "maxLength": 2000 },
+    "requiredSplits": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/split" }
+    },
+    "minimumRecordsPerSplit": { "$ref": "#/$defs/perSplitCount" },
+    "minimumInstancesPerSplit": { "$ref": "#/$defs/perSplitCount" },
+    "minimumRealEvaluationSessions": {
+      "description": "Distinct real-capture session ids that must appear in the `test` split.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "realOnlySplits": {
+      "description": "Splits in which synthetic records are forbidden.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/split" }
+    },
+    "requiredSceneSlices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sceneSlice", "split", "minimumInstances"],
+        "properties": {
+          "sceneSlice": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+          },
+          "split": { "$ref": "#/$defs/split" },
+          "minimumInstances": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "requiredLeakageKeys": {
+      "description": "Leakage keys every record of the given source kind must carry so split disjointness can be checked.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["real", "synthetic"],
+      "properties": {
+        "real": { "$ref": "#/$defs/leakageKeyList" },
+        "synthetic": { "$ref": "#/$defs/leakageKeyList" }
+      }
+    }
+  },
+  "$defs": {
+    "split": { "enum": ["train", "validation", "test"] },
+    "perSplitCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "train": { "type": "integer", "minimum": 0 },
+        "validation": { "type": "integer", "minimum": 0 },
+        "test": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "leakageKeyList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["sessionId", "physicalCardIds", "sourceAssetIds"] }
+    }
+  }
+}

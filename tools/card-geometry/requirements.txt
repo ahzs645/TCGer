@@ -1,0 +1,7 @@
+# Pinned dependencies for the card-geometry preflight and its Hugging Face smoke.
+# `reference_geometry.py` and `build_fixture_releases.py` need nothing beyond the
+# standard library; `preflight.py` needs the Draft 2020-12 validator, and the
+# smoke orchestrator needs the Hub client. Install with:
+#   uv pip install -r tools/card-geometry/requirements.txt
+jsonschema==4.23.0
+huggingface_hub==1.28.0

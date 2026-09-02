@@ -1,0 +1,113 @@
+{
+  "grouping": {
+    "sourceArchiveId": "fixture-compositor"
+  },
+  "instances": [
+    {
+      "container": "rawCard",
+      "corners": [
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": 0.1,
+            "y": 0.15
+          },
+          "visibility": "visible"
+        },
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": 0.55,
+            "y": 0.12
+          },
+          "visibility": "visible"
+        },
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": 0.58,
+            "y": 0.8
+          },
+          "visibility": "visible"
+        },
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": 0.12,
+            "y": 0.83
+          },
+          "visibility": "visible"
+        }
+      ],
+      "detectionClass": "card",
+      "instanceId": "card-0",
+      "occlusionOrder": 0,
+      "orientationKnown": true,
+      "side": "faceUp",
+      "sourceAssetId": "asset-0001"
+    },
+    {
+      "container": "rawCard",
+      "corners": [
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": -0.06,
+            "y": 0.3
+          },
+          "visibility": "outsideFrame"
+        },
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": 0.35,
+            "y": 0.28
+          },
+          "visibility": "occluded"
+        },
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": 0.38,
+            "y": 0.95
+          },
+          "visibility": "visible"
+        },
+        {
+          "coordinateKnown": true,
+          "point": {
+            "x": -0.03,
+            "y": 0.97
+          },
+          "visibility": "outsideFrame"
+        }
+      ],
+      "detectionClass": "card",
+      "instanceId": "card-1",
+      "occlusionOrder": 1,
+      "orientationKnown": true,
+      "side": "faceDown",
+      "sourceAssetId": "asset-0002"
+    }
+  ],
+  "recordId": "fx-train-synthetic-001",
+  "schema": "https://tcger.app/schemas/card-geometry-corpus-record/v1",
+  "source": {
+    "height": 8,
+    "kind": "synthetic",
+    "path": "images/fx-train-synthetic-001.png",
+    "sha256": "f1d4a8ebb214a57b5bd2096be1b7ab6202326bc7ff58f961a30f503153d0ad23",
+    "width": 8
+  },
+  "synthetic": {
+    "compositorRevision": "fixture0",
+    "contextMarginPixels": {
+      "bottom": 1,
+      "left": 1,
+      "right": 1,
+      "top": 1
+    },
+    "sceneSeed": 7,
+    "transformationSeed": 11
+  }
+}

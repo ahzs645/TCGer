@@ -1,0 +1,55 @@
+{
+  "description": "Draft production minimums. Values are placeholders until the first real geometry corpus release sets them from measured counts.",
+  "minimumInstancesPerSplit": {
+    "test": 150,
+    "train": 1000,
+    "validation": 100
+  },
+  "minimumRealEvaluationSessions": 3,
+  "minimumRecordsPerSplit": {
+    "test": 100,
+    "train": 500,
+    "validation": 50
+  },
+  "policyId": "training-minimums-draft-v1",
+  "realOnlySplits": [
+    "test"
+  ],
+  "requiredLeakageKeys": {
+    "real": [
+      "sessionId",
+      "physicalCardIds"
+    ],
+    "synthetic": [
+      "sourceAssetIds"
+    ]
+  },
+  "requiredSceneSlices": [
+    {
+      "minimumInstances": 50,
+      "sceneSlice": "single_handheld",
+      "split": "test"
+    },
+    {
+      "minimumInstances": 20,
+      "sceneSlice": "steep_playmat",
+      "split": "test"
+    },
+    {
+      "minimumInstances": 30,
+      "sceneSlice": "duel_field",
+      "split": "test"
+    },
+    {
+      "minimumInstances": 20,
+      "sceneSlice": "binder_page",
+      "split": "test"
+    }
+  ],
+  "requiredSplits": [
+    "train",
+    "validation",
+    "test"
+  ],
+  "schema": "https://tcger.app/schemas/card-geometry-readiness-policy/v1"
+}

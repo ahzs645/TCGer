@@ -385,6 +385,23 @@ The contracts above are frozen only when all three have landed.
    The first implementation commit is therefore: the two JSON schemas, the
    validation/NMS fixtures, and the context-padding and inverse-coordinate
    fixtures.
+
+   **Release manifest and readiness gate.** A corpus release binds to a
+   readiness policy by id and file hash and declares a `releasePurpose` of
+   `fixture`, `smoke`, or `training`. The model-independent preflight
+   (`tools/card-geometry/preflight.py`) validates schemas, hashes, split
+   leakage, the frozen-session denylist, and the policy minimums, and reports
+   `readyFor: none | tooling | training`. Only a `training`-purpose release
+   with every check passing is ready for training, and the GPU wrapper must
+   additionally pass the policy hash it expects, so a release cannot lower its
+   own bar by binding a weaker policy. The corpus hash is the canonical
+   manifest without its own hash member; every record and image hash is a
+   manifest member.
+
+   Until a geometry corpus release exists at a pinned dataset revision (none
+   did on 2026-09-02), every preflight run is a tooling test against the
+   checked-in fixture releases. The first meaningful preflight is the output
+   of publishing the first real release, not of the smoke.
 2. **Benchmark extension**
    - annotate every card in the selected duel-field and binder subset;
    - implement one-to-one prediction-to-truth matching;
