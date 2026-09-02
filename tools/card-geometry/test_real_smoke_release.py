@@ -19,22 +19,20 @@ from preflight import Expectations, run_preflight  # noqa: E402
 
 class MaskFitTests(unittest.TestCase):
     def test_conservative_fit_requires_all_four_quality_gates(self):
-        accepted, reason = conservative_mask_quad(
-            [(2, 1), (8, 1), (8, 9), (2, 9)], 10, 10
-        )
+        accepted, reason = conservative_mask_quad([(2, 1), (8, 1), (8, 9), (2, 9)])
         self.assertEqual(reason, "accepted")
         self.assertEqual(len(accepted or []), 4)
 
         self.assertEqual(
-            conservative_mask_quad([(2, 1), (8, 1), (8, 9), (5, 8), (2, 9)], 10, 10)[1],
+            conservative_mask_quad([(2, 1), (8, 1), (8, 9), (5, 8), (2, 9)])[1],
             "residual",
         )
         self.assertEqual(
-            conservative_mask_quad([(1, 1), (9, 1), (2, 2), (1, 9)], 10, 10)[1],
+            conservative_mask_quad([(1, 1), (9, 1), (2, 2), (1, 9)])[1],
             "convexity",
         )
         self.assertEqual(
-            conservative_mask_quad([(1, 1), (9, 1), (9, 9), (1, 9)], 10, 10)[1],
+            conservative_mask_quad([(1, 1), (9, 1), (9, 9), (1, 9)])[1],
             "aspect",
         )
 
@@ -117,7 +115,7 @@ class RealReleaseAdapterTests(unittest.TestCase):
                 4,
             )
 
-    def test_devmode_fixed_quad_is_human_and_denylisted(self):
+    def test_devmode_fixed_quad_provenance_controls_metric_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             corpus, raw, image = self._canonical_source(root)
@@ -138,6 +136,25 @@ class RealReleaseAdapterTests(unittest.TestCase):
                                 ],
                                 "fixedQuadSource": "selected-alt-detector",
                             },
+                            {
+                                "imageFile": "frame.png",
+                                "fixedQuad": [
+                                    {"x": 0.2, "y": 0.1},
+                                    {"x": 0.8, "y": 0.1},
+                                    {"x": 0.8, "y": 0.9},
+                                    {"x": 0.2, "y": 0.9},
+                                ],
+                                "fixedQuadSource": "manual",
+                            },
+                            {
+                                "imageFile": "frame.png",
+                                "fixedQuad": [
+                                    {"x": 0.2, "y": 0.1},
+                                    {"x": 0.8, "y": 0.1},
+                                    {"x": 0.8, "y": 0.9},
+                                    {"x": 0.2, "y": 0.9},
+                                ],
+                            },
                             {"imageFile": "frame.png", "expectedCardId": "replay-only"},
                         ]
                     }
@@ -145,7 +162,7 @@ class RealReleaseAdapterTests(unittest.TestCase):
                 encoding="utf-8",
             )
             output = root / "release"
-            build_release(
+            summary = build_release(
                 canonical_corpus=corpus,
                 raw_dir=raw,
                 archive_splits={"annotations.v7i.coco-segmentation.zip": "test"},
@@ -154,20 +171,38 @@ class RealReleaseAdapterTests(unittest.TestCase):
             )
             manifest = load_json(output / "manifest.json")
             self.assertEqual(manifest["evaluationSessionDenylist"], [session.name])
-            dev_entry = next(
+            dev_entries = [
                 item
                 for item in manifest["records"]
                 if item["recordId"].startswith("devmode-")
-            )
-            record = load_json(output / dev_entry["path"])
+            ]
+            self.assertEqual(len(dev_entries), 2)
+            records = [load_json(output / item["path"]) for item in dev_entries]
             self.assertEqual(
-                {
-                    corner["cornerSource"]
-                    for corner in record["instances"][0]["corners"]
-                },
-                {"human"},
+                [
+                    {
+                        corner["cornerSource"]
+                        for corner in record["instances"][0]["corners"]
+                    }
+                    for record in records
+                ],
+                [{"detector"}, {"human"}],
             )
-            self.assertNotIn("physicalCardId", record["instances"][0])
+            self.assertTrue(
+                all(
+                    "physicalCardId" not in record["instances"][0] for record in records
+                )
+            )
+            self.assertEqual(summary["stats"]["devmodeCornerSource:detector"], 1)
+            self.assertEqual(summary["stats"]["devmodeCornerSource:human"], 1)
+            self.assertEqual(
+                summary["stats"]["devmodeFixedQuadSkippedUnknownSource"], 1
+            )
+            report = run_preflight(output, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], [])
+            real_counts = report["cornerCounts"]["bySourceKind"]["real"]
+            self.assertEqual(real_counts["metricEligible"], 4)
+            self.assertEqual(real_counts["metricExcluded"], 8)
 
     def test_known_forks_cannot_be_assigned_to_different_splits(self):
         with tempfile.TemporaryDirectory() as tmp:

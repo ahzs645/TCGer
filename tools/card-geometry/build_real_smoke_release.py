@@ -120,7 +120,7 @@ def _convex(points: list[tuple[float, float]]) -> bool:
 
 
 def conservative_mask_quad(
-    points: list[tuple[float, float]], width: int, height: int
+    points: list[tuple[float, float]],
 ) -> tuple[list[tuple[float, float]] | None, str]:
     """Accept only a lossless four-vertex mask fit with explicit quality gates.
 
@@ -129,6 +129,10 @@ def conservative_mask_quad(
     left without corners; approximation belongs in a separately versioned fit
     adapter with measured thresholds.
     """
+    # Requiring the source mask itself to have exactly four unique vertices is
+    # the residual gate: an accepted fit reproduces the boundary with zero
+    # residual by construction. Approximation belongs in a separately
+    # versioned adapter with measured thresholds.
     if len(points) != 4 or len(set(points)) != 4:
         return None, "residual"
     ordered = _order_quad(points)
@@ -149,10 +153,6 @@ def conservative_mask_quad(
     quad_area = abs(_signed_area(ordered))
     if quad_area <= 0 or polygon_area / quad_area < 0.95:
         return None, "occlusion"
-    diagonal = math.hypot(width, height)
-    residual = 0.0 / diagonal
-    if residual > 0.01:
-        return None, "residual"
     return ordered, "accepted"
 
 
@@ -214,9 +214,7 @@ def _mask_instance(
         stats["maskMissingExcluded"] += 1
         return None
     corners = _unknown_corners()
-    fit, outcome = (
-        conservative_mask_quad(polygon, width, height) if polygon else (None, "rle")
-    )
+    fit, outcome = conservative_mask_quad(polygon) if polygon else (None, "rle")
     stats[f"maskFit:{outcome}"] += 1
     if fit:
         corners = [
@@ -407,6 +405,14 @@ def add_devmode_session(
         quad = _quad_points(frame.get("fixedQuad"))
         if quad is None:
             continue
+        fixed_quad_source = frame.get("fixedQuadSource")
+        if not isinstance(fixed_quad_source, str) or not fixed_quad_source.strip():
+            # Older writebacks can contain a quad without durable provenance.
+            # Do not silently promote unknown or detector precision to human
+            # corner-error ground truth.
+            stats["devmodeFixedQuadSkippedUnknownSource"] += 1
+            continue
+        corner_source = "human" if fixed_quad_source.strip() == "manual" else "detector"
         image_file = frame.get("imageFile")
         image_path = session / str(image_file)
         if not image_path.is_file():
@@ -419,7 +425,7 @@ def add_devmode_session(
                 "point": {"x": x, "y": y},
                 "visibility": "visible",
                 "coordinateKnown": True,
-                "cornerSource": "human",
+                "cornerSource": corner_source,
             }
             for x, y in quad
         ]
@@ -455,7 +461,8 @@ def add_devmode_session(
                 scene_slice,
             )
         )
-        stats["devmodeHumanQuadRecords"] += 1
+        stats["devmodeQuadRecords"] += 1
+        stats[f"devmodeCornerSource:{corner_source}"] += 1
     return entries, session_id if entries else None
 
 
@@ -559,7 +566,7 @@ def build_release(
         "policySha256": manifest["readiness"]["readinessPolicySha256"],
         "records": len(entries),
         "instances": sum(stats[key] for key in stats if key.startswith("maskFit:"))
-        + stats["devmodeHumanQuadRecords"],
+        + stats["devmodeQuadRecords"],
         "archiveSplits": dict(sorted(archive_splits.items())),
         "maxRecordsPerArchive": max_records_per_archive,
         "stats": dict(sorted(stats.items())),

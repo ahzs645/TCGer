@@ -106,8 +106,9 @@ rules are intentionally conservative:
 - only a lossless four-vertex mask fit passing residual, convexity, aspect, and
   occlusion gates receives known `maskFit` corners (which policy excludes from
   corner-error ground truth);
-- only persisted, human-confirmed Dev Mode `fixedQuad` values become `human`
-  corners; detector output and identity-only verdicts are ignored;
+- Dev Mode `fixedQuadSource: manual` becomes `human`; any other named source
+  becomes `detector` and is metric-excluded, while missing provenance is
+  skipped. Identity-only verdicts remain replay evidence;
 - source archives are assigned wholesale to one split, known forks share a
   split, and TCGX defaults to `test` regardless of its inherited COCO split.
 
