@@ -7,7 +7,7 @@
   },
   "generation": {
     "recordsPerSplitScene": {
-      "train": {"binder_page": 200, "duel_field": 550, "single_handheld": 350, "steep_playmat": 450},
+      "train": {"binder_page": 200, "duel_field": 550, "single_handheld": 475, "steep_playmat": 575},
       "validation": {"binder_page": 25, "duel_field": 75, "single_handheld": 50, "steep_playmat": 50}
     },
     "seedBase": 20260902

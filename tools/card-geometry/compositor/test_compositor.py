@@ -44,6 +44,12 @@ def write_background(path: Path, color: tuple[int, int, int]):
 
 
 class CompositorTests(unittest.TestCase):
+    def test_checked_in_smoke_config_has_two_thousand_records(self):
+        config = load_json(HERE / "config.smoke-v1.json")
+        counts = config["generation"]["recordsPerSplitScene"]
+        self.assertEqual(sum(sum(slices.values()) for slices in counts.values()), 2_000)
+        self.assertEqual(sum(counts["validation"].values()), 200)
+
     def _inputs(self, root: Path):
         assets = root / "assets"
         assets.mkdir()
