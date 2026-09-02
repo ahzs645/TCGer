@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/card-geometry-predictions/v1",
+  "title": "TCGer CardGeometryPredictions v1 record",
+  "description": "One localizer's CardGeometryResult array for one pinned corpus record. A predictions JSONL file contains exactly one line for every record and exactly one localizerId.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["recordId", "localizerId", "results"],
+  "properties": {
+    "recordId": { "$ref": "#/$defs/id" },
+    "localizerId": { "$ref": "#/$defs/id" },
+    "results": {
+      "type": "array",
+      "items": {
+        "$ref": "https://tcger.app/schemas/card-geometry-result/v1"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    }
+  }
+}

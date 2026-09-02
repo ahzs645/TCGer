@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import hashlib
 import json
 import re
 import subprocess
@@ -46,9 +47,32 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_camera_corpus import Runtime, dedupe_roboflow, normalized_name  # noqa: E402
+from build_camera_corpus import Runtime, dedupe_roboflow  # noqa: E402
 
 CARD_W, CARD_H = 720, 1000
+GEOMETRY_RESULT_SCHEMA = "https://tcger.app/schemas/card-geometry-result/v1"
+
+
+def sha256_path(path: Path) -> str:
+    """Content identity for a model file or directory, independent of mtimes."""
+    digest = hashlib.sha256()
+    if path.is_file():
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    if path.is_dir():
+        for child in sorted(item for item in path.rglob("*") if item.is_file()):
+            relative = child.relative_to(path)
+            if {".cache", ".git", "__pycache__"} & set(relative.parts):
+                continue
+            digest.update(str(relative).encode("utf-8"))
+            digest.update(b"\0")
+            with child.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1 << 20), b""):
+                    digest.update(chunk)
+        return digest.hexdigest()
+    return hashlib.sha256(f"unresolved:{path}".encode()).hexdigest()
 
 
 # ---------- geometry ----------
@@ -106,7 +130,8 @@ def mask_to_quad(mask: np.ndarray) -> np.ndarray | None:
 def warp(image: np.ndarray, quad: np.ndarray) -> np.ndarray:
     q = order_quad(quad).astype(np.float32)
     # Portrait card: if the quad is wider than tall, rotate the corner order.
-    top = np.linalg.norm(q[1] - q[0]); side = np.linalg.norm(q[3] - q[0])
+    top = np.linalg.norm(q[1] - q[0])
+    side = np.linalg.norm(q[3] - q[0])
     if top > side:
         q = np.roll(q, -1, axis=0)
     dst = np.array([[0, 0], [CARD_W, 0], [CARD_W, CARD_H], [0, CARD_H]], dtype=np.float32)
@@ -118,9 +143,14 @@ def warp(image: np.ndarray, quad: np.ndarray) -> np.ndarray:
 
 class Localizer:
     name = "base"
+    release_version = 1
+    artifact_sha256 = hashlib.sha256(b"localizer:base").hexdigest()
 
     def quads(self, image_bgr: np.ndarray, path: str) -> list[np.ndarray]:
         raise NotImplementedError
+
+    def scored_quads(self, image_bgr: np.ndarray, path: str):
+        return [(quad, 1.0) for quad in self.quads(image_bgr, path)]
 
 
 class UltralyticsLocalizer(Localizer):
@@ -131,27 +161,41 @@ class UltralyticsLocalizer(Localizer):
         self.kind = kind
         self.model = YOLO(weights)
         self.conf = conf
+        self.artifact_sha256 = sha256_path(Path(weights))
 
-    def quads(self, image_bgr, path):
+    def scored_quads(self, image_bgr, path):
         result = self.model.predict(image_bgr, conf=self.conf, verbose=False, imgsz=640)[0]
         out = []
         if self.kind == "seg" and result.masks is not None:
             h, w = image_bgr.shape[:2]
-            for polygon in result.masks.xy:
+            confidences = (
+                result.boxes.conf.cpu().numpy()
+                if result.boxes is not None
+                else np.ones(len(result.masks.xy))
+            )
+            for polygon, confidence in zip(result.masks.xy, confidences):
                 if len(polygon) < 3:
                     continue
                 mask = np.zeros((h, w), dtype=np.uint8)
                 cv2.fillPoly(mask, [polygon.astype(np.int32)], 1)
                 quad = mask_to_quad(mask)
                 if quad is not None:
-                    out.append(quad)
+                    out.append((quad, float(confidence)))
         elif self.kind == "obb" and result.obb is not None:
-            for corners in result.obb.xyxyxyxy.cpu().numpy():
-                out.append(order_quad(corners))
+            for corners, confidence in zip(
+                result.obb.xyxyxyxy.cpu().numpy(), result.obb.conf.cpu().numpy()
+            ):
+                out.append((order_quad(corners), float(confidence)))
         elif result.boxes is not None:
-            for x1, y1, x2, y2 in result.boxes.xyxy.cpu().numpy():
-                out.append(box_to_quad(x1, y1, x2 - x1, y2 - y1))
+            for box, confidence in zip(
+                result.boxes.xyxy.cpu().numpy(), result.boxes.conf.cpu().numpy()
+            ):
+                x1, y1, x2, y2 = box
+                out.append((box_to_quad(x1, y1, x2 - x1, y2 - y1), float(confidence)))
         return out
+
+    def quads(self, image_bgr, path):
+        return [quad for quad, _ in self.scored_quads(image_bgr, path)]
 
 
 class DetrLocalizer(Localizer):
@@ -164,15 +208,24 @@ class DetrLocalizer(Localizer):
         self.model = AutoModelForObjectDetection.from_pretrained(model_dir).eval()
         self.threshold = threshold
         self.torch = torch
+        self.artifact_sha256 = sha256_path(Path(model_dir))
 
-    def quads(self, image_bgr, path):
+    def scored_quads(self, image_bgr, path):
         image = Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
         inputs = self.processor(images=image, return_tensors="pt")
         with self.torch.no_grad():
             outputs = self.model(**inputs)
         target = self.torch.tensor([[image.height, image.width]])
         results = self.processor.post_process_object_detection(outputs, threshold=self.threshold, target_sizes=target)[0]
-        return [box_to_quad(x1, y1, x2 - x1, y2 - y1) for x1, y1, x2, y2 in results["boxes"].numpy()]
+        return [
+            (box_to_quad(x1, y1, x2 - x1, y2 - y1), float(score))
+            for (x1, y1, x2, y2), score in zip(
+                results["boxes"].numpy(), results["scores"].numpy()
+            )
+        ]
+
+    def quads(self, image_bgr, path):
+        return [quad for quad, _ in self.scored_quads(image_bgr, path)]
 
 
 class ContourLocalizer(Localizer):
@@ -186,6 +239,7 @@ class ContourLocalizer(Localizer):
         self.name = "contour-tmikonen"
         self.detector = mcd.MagicCardDetector()
         self.clahe = getattr(self.detector, "clahe", None) or cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        self.artifact_sha256 = sha256_path(Path(repo))
 
     def quads(self, image_bgr, path):
         try:
@@ -204,10 +258,11 @@ class ContourLocalizer(Localizer):
 class VisionLocalizer(Localizer):
     """Apple Vision stages from vision-quads.swift, cached per image path."""
 
-    def __init__(self, stage: str, cache: dict):
+    def __init__(self, stage: str, cache: dict, artifact_sha256: str):
         self.name = stage
         self.stage = stage
         self.cache = cache
+        self.artifact_sha256 = artifact_sha256
 
     def quads(self, image_bgr, path):
         record = self.cache.get(path)
@@ -239,19 +294,89 @@ class VisionLocalizer(Localizer):
             return agreeing or [box_quad]
         return candidates
 
+    def scored_quads(self, image_bgr, path):
+        quads = self.quads(image_bgr, path)
+        record = self.cache.get(path) or {}
+        h, w = image_bgr.shape[:2]
+        document = record.get("document")
+        document_quad = vision_quad_to_pixels(document, w, h) if document else None
+        box = record.get("detector")
+        box_quad = None
+        if box:
+            x, y, bw, bh = box
+            box_quad = order_quad(
+                [
+                    [x * w, (1 - y - bh) * h],
+                    [(x + bw) * w, (1 - y - bh) * h],
+                    [(x + bw) * w, (1 - y) * h],
+                    [x * w, (1 - y) * h],
+                ]
+            )
+        scored = []
+        for quad in quads:
+            if document_quad is not None and np.allclose(quad, document_quad):
+                confidence = float(record.get("documentConfidence") or 0.5)
+            elif box_quad is not None and np.allclose(quad, box_quad):
+                confidence = float(record.get("detectorConfidence") or 0.5)
+            else:
+                confidence = 0.5
+            scored.append((quad, confidence))
+        return scored
+
 
 class DeviceLocalizer(Localizer):
     name = "device"
 
-    def __init__(self, frames):
+    def __init__(self, frames, artifact_sha256=None):
         self.by_path = {f["path"]: f.get("deviceQuad") for f in frames}
+        self.by_sha256 = {}
+        for frame in frames:
+            frame_path = Path(frame["path"])
+            if frame_path.is_file() and frame.get("deviceQuad"):
+                self.by_sha256[sha256_path(frame_path)] = frame["deviceQuad"]
+        self.artifact_sha256 = artifact_sha256 or hashlib.sha256(
+            b"device-quad-evidence"
+        ).hexdigest()
 
     def quads(self, image_bgr, path):
         q = self.by_path.get(path)
+        if not q and Path(path).is_file():
+            q = self.by_sha256.get(sha256_path(Path(path)))
         if not q:
             return []
         h, w = image_bgr.shape[:2]
         return [vision_quad_to_pixels(q, w, h)]
+
+
+def load_device_session_frames(sessions_root: Path):
+    """Load the phone-recorded quads without treating them as human truth."""
+    frames = []
+    identity_rows = []
+    for session in sorted(sessions_root.glob("scan-session-*")):
+        results_path = session / "results.json"
+        if not results_path.is_file():
+            continue
+        document = json.loads(results_path.read_text())
+        for frame in document.get("frames", []):
+            quad = frame.get("quad")
+            image_file = frame.get("imageFile")
+            if not quad or not image_file:
+                continue
+            image_path = session / image_file
+            if not image_path.is_file():
+                continue
+            key = f"{session.name}/{image_file}"
+            frames.append({"key": key, "path": str(image_path), "deviceQuad": quad})
+            identity_rows.append({"key": key, "deviceQuad": quad})
+    identity = hashlib.sha256(
+        json.dumps(
+            identity_rows,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    return frames, identity
 
 
 def run_vision(swift: str, detector: str | None, paths: list[str]) -> dict:
@@ -266,6 +391,96 @@ def run_vision(swift: str, detector: str | None, paths: list[str]) -> dict:
             record = json.loads(line)
             cache[record["path"]] = record
     return cache
+
+
+# ---------- portable geometry prediction export ----------
+
+def load_geometry_release(root: Path):
+    manifest = json.loads((root / "manifest.json").read_text())
+    items = []
+    for entry in manifest["records"]:
+        if not entry.get("images"):
+            raise ValueError(f"geometry release record has no image: {entry['recordId']}")
+        image_path = (root / entry["images"][0]["path"]).resolve()
+        if not image_path.is_file():
+            raise FileNotFoundError(image_path)
+        items.append({"recordId": entry["recordId"], "path": str(image_path)})
+    return manifest, items
+
+
+def geometry_result(quad, confidence, width, height, localizer):
+    ordered = order_quad(quad)
+    normalized = [(float(x / width), float(y / height)) for x, y in ordered]
+    minimum_x = max(0.0, min(point[0] for point in normalized))
+    minimum_y = max(0.0, min(point[1] for point in normalized))
+    maximum_x = min(1.0, max(point[0] for point in normalized))
+    maximum_y = min(1.0, max(point[1] for point in normalized))
+    confidence = min(1.0, max(0.0, float(confidence)))
+    return {
+        "schema": GEOMETRY_RESULT_SCHEMA,
+        "detectionClass": "card",
+        "corners": [
+            {"point": {"x": x, "y": y}, "confidence": confidence}
+            for x, y in normalized
+        ],
+        "confidence": confidence,
+        "cornerOrderConfidence": None,
+        "containment": (
+            "inside"
+            if all(0 <= value <= 1 for point in normalized for value in point)
+            else "partiallyOutside"
+        ),
+        "side": "unknown",
+        "container": "unknown",
+        "boundingBox": {
+            "x": minimum_x,
+            "y": minimum_y,
+            "width": max(0.0, maximum_x - minimum_x),
+            "height": max(0.0, maximum_y - minimum_y),
+        },
+        "releaseVersion": localizer.release_version,
+        "artifactSha256": localizer.artifact_sha256,
+    }
+
+
+def export_geometry_predictions(localizers, items, output_dir: Path):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    names = [localizer.name for localizer in localizers]
+    duplicates = [name for name, count in collections.Counter(names).items() if count > 1]
+    if duplicates:
+        raise ValueError(f"duplicate localizer names cannot be exported: {duplicates}")
+    outputs = {}
+    for localizer in sorted(localizers, key=lambda value: value.name):
+        safe_name = re.sub(r"[^A-Za-z0-9._:-]", "-", localizer.name).strip("-.")
+        if not safe_name:
+            raise ValueError(f"invalid localizer name: {localizer.name!r}")
+        rows = []
+        for item in sorted(items, key=lambda value: value["recordId"]):
+            image = cv2.imread(item["path"])
+            if image is None:
+                raise ValueError(f"could not read geometry release image: {item['path']}")
+            height, width = image.shape[:2]
+            results = [
+                geometry_result(quad, confidence, width, height, localizer)
+                for quad, confidence in localizer.scored_quads(image, item["path"])
+            ]
+            rows.append(
+                json.dumps(
+                    {
+                        "recordId": item["recordId"],
+                        "localizerId": safe_name,
+                        "results": results,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+            )
+        output = output_dir / f"{safe_name}.predictions.jsonl"
+        output.write_text("\n".join(rows) + "\n")
+        outputs[safe_name] = output
+        print(f"wrote {output}", file=sys.stderr)
+    return outputs
 
 
 # ---------- evaluation ----------
@@ -448,7 +663,8 @@ def evaluate_recognition(localizers, frames, runtimes, strong_thresholds, deck_s
                 if target_key is not None:
                     for r, i in enumerate(order[:2000]):
                         if runtime.family_of(int(i)) == target_key:
-                            rank, sim = int(r), float(scores[i]); break
+                            rank, sim = int(r), float(scores[i])
+                            break
                 top1 = float(scores[order[0]])
                 rival = next((float(scores[i]) for i in order[1:10] if runtime.family_of(int(i)) != runtime.family_of(int(order[0]))), None)
                 candidate = {"rank": rank, "sim": sim, "top1": top1, "margin": (top1 - rival) if rival is not None else None, "galleryRows": int(len(gallery_indices))}
@@ -481,6 +697,11 @@ def main():
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--coco", action="append", default=[])
     parser.add_argument("--sessions", type=Path)
+    parser.add_argument(
+        "--device-sessions-root",
+        type=Path,
+        help="scan archived results.json files for phone-recorded device quads",
+    )
     parser.add_argument("--runtime", action="append", default=[], help="GAME=DIR")
     parser.add_argument("--onnx", action="append", default=[], help="GAME=PATH")
     parser.add_argument("--yolo-seg", action="append", default=[])
@@ -490,21 +711,39 @@ def main():
     parser.add_argument("--contour-repo")
     parser.add_argument("--vision-swift")
     parser.add_argument("--detector-mlmodelc")
+    parser.add_argument(
+        "--geometry-release-root",
+        type=Path,
+        help="preflighted card-geometry release whose images are localized",
+    )
+    parser.add_argument(
+        "--export-predictions",
+        type=Path,
+        help="write one portable predictions JSONL per localizer into this directory",
+    )
     parser.add_argument("--strong-threshold", action="append", default=[], help="GAME=COSINE acceptance threshold")
     parser.add_argument("--deck-scoped", action="store_true", help="also evaluate frames with deckExternalIds against only those identities")
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
+    if args.export_predictions and not args.geometry_release_root:
+        parser.error("--export-predictions requires --geometry-release-root")
+    if args.export_predictions and args.limit:
+        parser.error("--limit cannot be used with a complete predictions export")
     args.out.mkdir(parents=True, exist_ok=True)
 
     localizers: list[Localizer] = []
     for spec in args.yolo_seg:
-        n, w = spec.split("=", 1); localizers.append(UltralyticsLocalizer(n, w, "seg"))
+        n, w = spec.split("=", 1)
+        localizers.append(UltralyticsLocalizer(n, w, "seg"))
     for spec in args.yolo_obb:
-        n, w = spec.split("=", 1); localizers.append(UltralyticsLocalizer(n, w, "obb"))
+        n, w = spec.split("=", 1)
+        localizers.append(UltralyticsLocalizer(n, w, "obb"))
     for spec in args.yolo_det:
-        n, w = spec.split("=", 1); localizers.append(UltralyticsLocalizer(n, w, "det"))
+        n, w = spec.split("=", 1)
+        localizers.append(UltralyticsLocalizer(n, w, "det"))
     for spec in args.detr:
-        n, d = spec.split("=", 1); localizers.append(DetrLocalizer(n, d))
+        n, d = spec.split("=", 1)
+        localizers.append(DetrLocalizer(n, d))
     if args.contour_repo:
         try:
             localizers.append(ContourLocalizer(args.contour_repo))
@@ -520,28 +759,81 @@ def main():
             items = items[: args.limit]
         coco_items.append((name, items))
     frames = json.loads(args.sessions.read_text()) if args.sessions else []
+    device_identities = []
+    if args.sessions:
+        device_identities.append(sha256_path(args.sessions))
+    if args.device_sessions_root:
+        device_frames, device_identity = load_device_session_frames(
+            args.device_sessions_root
+        )
+        by_path = {frame["path"]: frame for frame in frames}
+        by_path.update({frame["path"]: frame for frame in device_frames})
+        frames = list(by_path.values())
+        device_identities.append(device_identity)
     if args.limit:
         frames = frames[: args.limit]
 
-    all_paths = sorted({p for _, items in coco_items for p, _ in items} | {f["path"] for f in frames})
+    geometry_items = []
+    if args.geometry_release_root:
+        _, geometry_items = load_geometry_release(args.geometry_release_root)
+
+    all_paths = sorted(
+        {p for _, items in coco_items for p, _ in items}
+        | ({f["path"] for f in frames} if args.runtime else set())
+        | {item["path"] for item in geometry_items}
+    )
     vision_cache = {}
     if args.vision_swift:
         vision_cache = run_vision(args.vision_swift, args.detector_mlmodelc, all_paths)
+        swift_identity = bytes.fromhex(sha256_path(Path(args.vision_swift)))
+        detector_identity = (
+            bytes.fromhex(sha256_path(Path(args.detector_mlmodelc)))
+            if args.detector_mlmodelc
+            else None
+        )
         for stage in ("vision-app", "vision-doc", "vision-rect", "app-detector-box"):
-            localizers.append(VisionLocalizer(stage, vision_cache))
+            stage_identity = hashlib.sha256()
+            stage_identity.update(swift_identity)
+            if detector_identity is not None and stage in {
+                "vision-app",
+                "app-detector-box",
+            }:
+                stage_identity.update(detector_identity)
+            stage_identity.update(stage.encode("utf-8"))
+            localizers.append(
+                VisionLocalizer(stage, vision_cache, stage_identity.hexdigest())
+            )
+
+    device_localizer = (
+        DeviceLocalizer(
+            frames,
+            artifact_sha256=(
+                hashlib.sha256("".join(device_identities).encode()).hexdigest()
+                if device_identities
+                else None
+            ),
+        )
+        if frames
+        else None
+    )
+    if args.export_predictions:
+        export_localizers = ([device_localizer] if device_localizer else []) + localizers
+        export_geometry_predictions(
+            export_localizers, geometry_items, args.export_predictions
+        )
 
     report = {"localization": {}, "recognition": {}, "recognitionSummary": {}}
     for name, items in coco_items:
         print(f"== localization: {name} ({len(items)} images)", file=sys.stderr)
         report["localization"][name] = evaluate_localization(localizers, items)
 
-    if frames:
+    if frames and args.runtime:
         runtimes = {}
         onnx = dict(s.split("=", 1) for s in args.onnx)
         for spec in args.runtime:
             game, d = spec.split("=", 1)
             runtimes[game] = LabeledRuntime(Path(d), Path(onnx[game]))
-        session_localizers = [DeviceLocalizer(frames)] + localizers
+        session_localizers = ([device_localizer] if device_localizer else []) + localizers
         strong_thresholds = {"magic": 0.70, "pokemon": 0.65, "yugioh": 0.65}
         for spec in args.strong_threshold:
             game, value = spec.split("=", 1)

@@ -124,12 +124,44 @@ snapshot from `backup_labels.py`; `--devmode-sessions-root` resolves its stable
 `session/image` keys. This path deliberately ingests only `manual` quads and
 does not rewrite the canonical session library.
 
+## Geometry benchmark
+
+`benchmark_geometry.py` scores one localizer's portable predictions against a
+preflighted release. The JSONL wrapper is
+`card-geometry-predictions.v1`: exactly one row per release record, one
+`localizerId` per file, and `results` containing the existing
+`CardGeometryResult` objects. The scorer requires the expected corpus hash,
+reruns preflight, performs deterministic greedy one-to-one quad matching, and
+reports recall at 0.5/0.75/0.9, duplicate/extra/miss rates, pixel and normalized
+corner-error percentiles, orientation accuracy, and reconciled corner counts.
+Reports contain no timestamp.
+
+Until the crop-parity experiment freezes the mapping, pixel error uses
+`x * width` and `y * height`; the report records that provisional convention.
+For orientation-unknown truth, cyclic prediction rolls are aligned by minimum
+corner error and the pair is excluded from orientation accuracy.
+
+```sh
+python3 tools/card-geometry/benchmark_geometry.py \
+  --release-root <pinned-release> \
+  --predictions <localizer>.predictions.jsonl \
+  --expected-corpus-hash <sha256> \
+  --report <localizer>.benchmark.json
+```
+
+`tools/camera-corpus/bench_localizers.py --geometry-release-root ...
+--export-predictions <directory>` emits one complete predictions JSONL per
+configured localizer. `--device-sessions-root` reconstructs phone-recorded
+quads from archived session `results.json` files and matches them to release
+images by content hash; those quads remain predictions, never ground truth.
+
 ## Running the checks
 
 ```sh
 uv pip install -r tools/card-geometry/requirements.txt
 cd tools/card-geometry && python3 -m unittest \
-  test_reference_geometry test_preflight test_real_smoke_release
+  test_reference_geometry test_preflight test_real_smoke_release \
+  test_benchmark_geometry
 ```
 
 `reference_geometry.py` and `build_fixture_releases.py` need only the standard
