@@ -118,6 +118,12 @@ archives. The builder refuses to replace a non-empty output directory. The
 generated `build-summary.json` records inclusion, sampling, and fit-gate counts
 but is not part of the hashed release contract.
 
+When the local FiftyOne database is ahead of synchronized session
+`results.json`, `--devmode-label-backup` accepts a read-only `labels-*.json`
+snapshot from `backup_labels.py`; `--devmode-sessions-root` resolves its stable
+`session/image` keys. This path deliberately ingests only `manual` quads and
+does not rewrite the canonical session library.
+
 ## Running the checks
 
 ```sh

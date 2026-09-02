@@ -6,8 +6,9 @@ The adapter intentionally has a narrow trust boundary:
   visible masks; `bbox-derived` annotations are excluded from geometry v1;
 * a polygon contributes `maskFit` corners only when an explicit conservative
   four-point fit passes residual, convexity, aspect, and occlusion checks;
-* Dev Mode contributes corners only from a persisted `fixedQuad`, which is a
-  human-confirmed boundary and is therefore tagged `human`;
+* Dev Mode contributes persisted `fixedQuad` corners with their durable
+  provenance: `manual` is human ground truth, named detector sources remain
+  metric-excluded detector evidence, and unknown provenance is skipped;
 * inherited source-dataset splits are ignored. Every source archive is assigned
   wholesale to one release split, and known forks must share that split.
 
@@ -38,6 +39,7 @@ from corpus_release import (  # noqa: E402
     leakage_keys_from_record,
     pretty_json,
     sha256_bytes,
+    sha256_file,
 )
 
 DEFAULT_TCGX_ARCHIVE = "annotations.v7i.coco-segmentation.zip"
@@ -389,81 +391,155 @@ def _quad_points(value: Any) -> list[tuple[float, float]] | None:
             points.append((float(item[0]), float(item[1])))
         else:
             return None
-    if any(not (0 <= x <= 1 and 0 <= y <= 1) for x, y in points):
+    if any(not (math.isfinite(x) and math.isfinite(y)) for x, y in points):
         return None
     return points
+
+
+def _devmode_entry(
+    *,
+    root: Path,
+    session_id: str,
+    record_suffix: str,
+    image_path: Path,
+    quad: list[tuple[float, float]],
+    fixed_quad_source: Any,
+    capture_mode: str | None,
+    stats: Counter,
+) -> dict[str, Any] | None:
+    if not isinstance(fixed_quad_source, str) or not fixed_quad_source.strip():
+        # Older writebacks can contain a quad without durable provenance. Do
+        # not promote unknown or detector precision to human ground truth.
+        stats["devmodeFixedQuadSkippedUnknownSource"] += 1
+        return None
+    corner_source = "human" if fixed_quad_source.strip() == "manual" else "detector"
+    if not image_path.is_file():
+        stats["devmodeMissingImage"] += 1
+        return None
+    image_bytes = image_path.read_bytes()
+    width, height = _image_dimensions(image_bytes)
+    corners = [
+        {
+            "point": {"x": x, "y": y},
+            "visibility": (
+                "visible" if 0 <= x <= 1 and 0 <= y <= 1 else "outsideFrame"
+            ),
+            "coordinateKnown": True,
+            "cornerSource": corner_source,
+        }
+        for x, y in quad
+    ]
+    record = {
+        "schema": RECORD_SCHEMA_ID,
+        "recordId": _safe_id(f"devmode-{session_id}-{record_suffix}"),
+        "source": {"kind": "real", "width": width, "height": height},
+        "grouping": {
+            "sourceArchiveId": _safe_id(f"devmode:{session_id}"),
+            "sessionId": session_id,
+        },
+        "instances": [
+            {
+                "instanceId": "card-0",
+                "detectionClass": "card",
+                "corners": corners,
+                "orientationKnown": False,
+                "side": "unknown",
+                "container": "unknown",
+                "occlusionOrder": 0,
+            }
+        ],
+    }
+    scene_slice = (
+        "binder_page"
+        if capture_mode in {"binder", "binder_page"}
+        else "single_handheld"
+    )
+    stats["devmodeQuadRecords"] += 1
+    stats[f"devmodeCornerSource:{corner_source}"] += 1
+    stats["devmodeOutsideFrameCorners"] += sum(
+        corner["visibility"] == "outsideFrame" for corner in corners
+    )
+    return _write_record(
+        root,
+        record,
+        image_bytes,
+        image_path.suffix or ".jpg",
+        "test",
+        scene_slice,
+    )
 
 
 def add_devmode_session(
     root: Path, session: Path, stats: Counter
 ) -> tuple[list[dict[str, Any]], str | None]:
-    results_path = session / "results.json"
-    document = json.loads(results_path.read_text(encoding="utf-8"))
+    document = json.loads((session / "results.json").read_text(encoding="utf-8"))
     entries = []
     session_id = _safe_id(session.name)
     for index, frame in enumerate(document.get("frames", [])):
         quad = _quad_points(frame.get("fixedQuad"))
         if quad is None:
             continue
-        fixed_quad_source = frame.get("fixedQuadSource")
-        if not isinstance(fixed_quad_source, str) or not fixed_quad_source.strip():
-            # Older writebacks can contain a quad without durable provenance.
-            # Do not silently promote unknown or detector precision to human
-            # corner-error ground truth.
-            stats["devmodeFixedQuadSkippedUnknownSource"] += 1
-            continue
-        corner_source = "human" if fixed_quad_source.strip() == "manual" else "detector"
-        image_file = frame.get("imageFile")
-        image_path = session / str(image_file)
-        if not image_path.is_file():
-            stats["devmodeMissingImage"] += 1
-            continue
-        image_bytes = image_path.read_bytes()
-        width, height = _image_dimensions(image_bytes)
-        corners = [
-            {
-                "point": {"x": x, "y": y},
-                "visibility": "visible",
-                "coordinateKnown": True,
-                "cornerSource": corner_source,
-            }
-            for x, y in quad
-        ]
-        record = {
-            "schema": RECORD_SCHEMA_ID,
-            "recordId": _safe_id(f"devmode-{session_id}-{index:05d}"),
-            "source": {"kind": "real", "width": width, "height": height},
-            "grouping": {
-                "sourceArchiveId": _safe_id(f"devmode:{session_id}"),
-                "sessionId": session_id,
-            },
-            "instances": [
-                {
-                    "instanceId": "card-0",
-                    "detectionClass": "card",
-                    "corners": corners,
-                    "orientationKnown": False,
-                    "side": "unknown",
-                    "container": "unknown",
-                    "occlusionOrder": 0,
-                }
-            ],
-        }
-        capture_mode = frame.get("captureMode")
-        scene_slice = "binder_page" if capture_mode == "binder" else "single_handheld"
-        entries.append(
-            _write_record(
-                root,
-                record,
-                image_bytes,
-                image_path.suffix or ".jpg",
-                "test",
-                scene_slice,
-            )
+        entry = _devmode_entry(
+            root=root,
+            session_id=session_id,
+            record_suffix=f"{index:05d}",
+            image_path=session / str(frame.get("imageFile")),
+            quad=quad,
+            fixed_quad_source=frame.get("fixedQuadSource"),
+            capture_mode=frame.get("captureMode"),
+            stats=stats,
         )
-        stats["devmodeQuadRecords"] += 1
-        stats[f"devmodeCornerSource:{corner_source}"] += 1
+        if entry:
+            entries.append(entry)
     return entries, session_id if entries else None
+
+
+def add_manual_devmode_backup(
+    root: Path, backup_path: Path, sessions_root: Path, stats: Counter
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Ingest manual quads from a read-only FiftyOne label backup.
+
+    This avoids rewriting canonical session `results.json` merely to build a
+    release. The backup contains the stable `session/image` key and quad; image
+    bytes still come from the canonical session library.
+    """
+    records = json.loads(backup_path.read_text(encoding="utf-8"))
+    if not isinstance(records, list):
+        raise ValueError(f"Dev Mode label backup is not a JSON array: {backup_path}")
+    entries = []
+    session_ids = set()
+    for item in sorted(records, key=lambda value: str(value.get("key", ""))):
+        if item.get("fixed_quad_source") != "manual":
+            continue
+        raw_quad = item.get("fixed_quad_json")
+        if isinstance(raw_quad, str):
+            try:
+                raw_quad = json.loads(raw_quad)
+            except json.JSONDecodeError:
+                stats["devmodeBackupInvalidQuad"] += 1
+                continue
+        quad = _quad_points(raw_quad)
+        key = item.get("key")
+        if quad is None or not isinstance(key, str) or "/" not in key:
+            stats["devmodeBackupInvalidQuad"] += 1
+            continue
+        raw_session_id, image_file = key.split("/", 1)
+        session_id = _safe_id(raw_session_id)
+        entry = _devmode_entry(
+            root=root,
+            session_id=session_id,
+            record_suffix=sha256_bytes(key.encode("utf-8"))[:16],
+            image_path=sessions_root / raw_session_id / image_file,
+            quad=quad,
+            fixed_quad_source="manual",
+            capture_mode=None,
+            stats=stats,
+        )
+        if entry:
+            entries.append(entry)
+            session_ids.add(session_id)
+            stats["devmodeBackupManualRecords"] += 1
+    return entries, sorted(session_ids)
 
 
 def _validate_archive_splits(archive_splits: dict[str, str]) -> None:
@@ -503,6 +579,9 @@ def build_release(
     devmode_sessions: list[Path],
     output: Path,
     max_records_per_archive: int | None = None,
+    devmode_label_backups: list[Path] | None = None,
+    devmode_sessions_root: Path | None = None,
+    release_id: str = "real-geometry-ingestion-smoke-v1",
 ) -> dict[str, Any]:
     _validate_archive_splits(archive_splits)
     if output.exists() and any(output.iterdir()):
@@ -533,12 +612,22 @@ def build_release(
                 max_records=max_records_per_archive,
             )
         )
-    denylist = []
+    denylist: set[str] = set()
     for session in sorted(devmode_sessions):
         session_entries, session_id = add_devmode_session(output, session, stats)
         entries.extend(session_entries)
         if session_id:
-            denylist.append(session_id)
+            denylist.add(session_id)
+    backup_paths = sorted(devmode_label_backups or [])
+    if backup_paths and devmode_sessions_root is None:
+        raise ValueError("devmode_sessions_root is required with label backups")
+    for backup_path in backup_paths:
+        assert devmode_sessions_root is not None
+        backup_entries, session_ids = add_manual_devmode_backup(
+            output, backup_path, devmode_sessions_root, stats
+        )
+        entries.extend(backup_entries)
+        denylist.update(session_ids)
     if not entries:
         raise ValueError("no geometry records were produced")
     splits = {entry["split"] for entry in entries}
@@ -547,7 +636,7 @@ def build_release(
     (output / "policy.json").write_text(policy_text, encoding="utf-8")
     manifest: dict[str, Any] = {
         "schema": MANIFEST_SCHEMA_ID,
-        "releaseId": "real-geometry-ingestion-smoke-v1",
+        "releaseId": _safe_id(release_id),
         "releasePurpose": "smoke",
         "readiness": {
             "readinessPolicyPath": "policy.json",
@@ -569,6 +658,9 @@ def build_release(
         + stats["devmodeQuadRecords"],
         "archiveSplits": dict(sorted(archive_splits.items())),
         "maxRecordsPerArchive": max_records_per_archive,
+        "devmodeLabelBackups": [
+            {"path": str(path), "sha256": sha256_file(path)} for path in backup_paths
+        ],
         "stats": dict(sorted(stats.items())),
     }
     (output / "build-summary.json").write_text(pretty_json(summary), encoding="utf-8")
@@ -598,11 +690,24 @@ def main() -> int:
     )
     parser.add_argument("--devmode-session", type=Path, action="append", default=[])
     parser.add_argument(
+        "--devmode-label-backup",
+        type=Path,
+        action="append",
+        default=[],
+        help="FiftyOne labels-*.json backup; only manual fixed quads are ingested",
+    )
+    parser.add_argument(
+        "--devmode-sessions-root",
+        type=Path,
+        help="Canonical sessions directory used to resolve backup session/image keys",
+    )
+    parser.add_argument(
         "--max-records-per-archive",
         type=int,
         help="Deterministic smoke sample after sorting by record id; omit for a complete archive",
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--release-id", default="real-geometry-ingestion-smoke-v1")
     args = parser.parse_args()
     archive_splits = dict(args.archive_split or [(DEFAULT_TCGX_ARCHIVE, "test")])
     if args.max_records_per_archive is not None and args.max_records_per_archive < 1:
@@ -614,6 +719,9 @@ def main() -> int:
         devmode_sessions=args.devmode_session,
         output=args.output,
         max_records_per_archive=args.max_records_per_archive,
+        devmode_label_backups=args.devmode_label_backup,
+        devmode_sessions_root=args.devmode_sessions_root,
+        release_id=args.release_id,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

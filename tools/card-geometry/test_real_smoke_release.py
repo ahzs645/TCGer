@@ -204,6 +204,90 @@ class RealReleaseAdapterTests(unittest.TestCase):
             self.assertEqual(real_counts["metricEligible"], 4)
             self.assertEqual(real_counts["metricExcluded"], 8)
 
+    def test_manual_fiftyone_backup_ingests_without_rewriting_results(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, image = self._canonical_source(root)
+            sessions_root = root / "sessions"
+            session = sessions_root / "scan-session-20260902-020304"
+            session.mkdir(parents=True)
+            (session / "frame.png").write_bytes(image)
+            backup = root / "labels.json"
+            backup.write_text(
+                json.dumps(
+                    [
+                        {
+                            "key": f"{session.name}/frame.png",
+                            "fixed_quad_json": json.dumps(
+                                [
+                                    [-0.1, 0.1],
+                                    [0.8, 0.1],
+                                    [0.8, 0.9],
+                                    [0.2, 0.9],
+                                ]
+                            ),
+                            "fixed_quad_source": "manual",
+                        },
+                        {
+                            "key": f"{session.name}/frame.png",
+                            "fixed_quad_json": json.dumps(
+                                [
+                                    [0.2, 0.1],
+                                    [0.8, 0.1],
+                                    [0.8, 0.9],
+                                    [0.2, 0.9],
+                                ]
+                            ),
+                            "fixed_quad_source": "webobb+sam 1.00",
+                        },
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = root / "release"
+            summary = build_release(
+                canonical_corpus=corpus,
+                raw_dir=raw,
+                archive_splits={"annotations.v7i.coco-segmentation.zip": "test"},
+                devmode_sessions=[],
+                output=output,
+                devmode_label_backups=[backup],
+                devmode_sessions_root=sessions_root,
+                release_id="real-geometry-devmode-smoke-v2",
+            )
+            manifest = load_json(output / "manifest.json")
+            self.assertEqual(manifest["releaseId"], "real-geometry-devmode-smoke-v2")
+            self.assertEqual(manifest["evaluationSessionDenylist"], [session.name])
+            dev_entries = [
+                item
+                for item in manifest["records"]
+                if item["recordId"].startswith("devmode-")
+            ]
+            self.assertEqual(len(dev_entries), 1)
+            record = load_json(output / dev_entries[0]["path"])
+            self.assertEqual(
+                {
+                    corner["cornerSource"]
+                    for corner in record["instances"][0]["corners"]
+                },
+                {"human"},
+            )
+            self.assertEqual(
+                [corner["visibility"] for corner in record["instances"][0]["corners"]],
+                ["outsideFrame", "visible", "visible", "visible"],
+            )
+            self.assertEqual(summary["stats"]["devmodeBackupManualRecords"], 1)
+            self.assertEqual(summary["stats"]["devmodeOutsideFrameCorners"], 1)
+            self.assertEqual(
+                summary["devmodeLabelBackups"][0]["sha256"],
+                sha256_bytes(backup.read_bytes()),
+            )
+            report = run_preflight(output, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], [])
+            real_counts = report["cornerCounts"]["bySourceKind"]["real"]
+            self.assertEqual(real_counts["metricEligible"], 4)
+            self.assertEqual(real_counts["metricExcluded"], 4)
+
     def test_known_forks_cannot_be_assigned_to_different_splits(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError, "known fork archives"):
