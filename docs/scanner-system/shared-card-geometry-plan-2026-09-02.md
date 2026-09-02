@@ -341,6 +341,24 @@ Winner rule, in order:
 Do not select on aggregate IoU alone. The bake-off has already shown that
 localizer IoU and downstream acceptance can disagree.
 
+### Proposed geometry regression budgets
+
+The first shared baseline on corpus
+`d14c97a428e7295e10e75644189528dce297d5990d9c76435eeb9e1cf64dc242`
+supports the following proposed budgets. They remain pending human approval.
+If approved, record the approval before any candidate result is viewed; never
+tune these values after a candidate is evaluated.
+
+- recall at quad IoU 0.5 at least 0.98 and recall at 0.75 at least 0.85;
+- normalized corner-error p50 at most 0.03, p90 at most 0.10, and p95 at most
+  0.15;
+- `outsideFrame` normalized corner-error p50 at most 0.08;
+- zero duplicates and at most three extras on the 61-frame frozen release;
+- no increase in wrong accepts through the full recognition replay.
+
+These are candidate regression budgets, not `training-minimums-v1`; corpus
+coverage targets remain a separate human decision.
+
 ## Orientation rule
 
 Ordered corners make the 0° and 180° double inference removable, but the

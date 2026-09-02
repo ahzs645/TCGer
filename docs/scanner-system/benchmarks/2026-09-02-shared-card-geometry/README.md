@@ -50,10 +50,69 @@ room for a true corner model. The low Vision-rectangles median is selection
 bias from scoring only 32 matches; its recall and duplicate/extra counts make
 it unsuitable as the winner.
 
+Normalized by mean truth-card side, Vision document reports p50 0.051, p90
+0.256, p95 0.426, and mean matched IoU 0.816. Its visible-corner p50 is 0.042
+and its `outsideFrame` p50 is 0.138. The device quad is behind the same offline
+Vision request on every comparable axis: R@0.5 0.803, normalized p50 0.088,
+p90 0.522, and mean matched IoU 0.745. This is consistent with the earlier
+device-versus-offline replay gap. Guide-crop handling and platform Vision
+behavior are plausible contributors, but this benchmark does not isolate
+their individual effects.
+
 All current truth instances have `orientationKnown: false`. The scorer used
 the minimum-error cyclic roll and excluded every match from orientation
 accuracy, as required. This release contains no multi-card frames, so these
 reports do not claim duel-field or binder performance.
+
+### Manual orientation audit
+
+The manual labeler records the first click as the printed card's top-left and
+then TL, TR, BR, BL. A zero-roll audit warped ten stored manual quads directly
+in that order without geometric reordering. All ten crops were upright. The
+sample spans all seven contributing sessions and includes four frames with
+outside-frame corners. The [audit report](reports/manual-orientation-audit.json)
+records the stable frame keys; its contact sheet remains local because it
+contains card imagery.
+
+The pinned v2 release and its reports remain unchanged. The ingestion adapter
+now marks manual quads orientation-known for the next release; detector-derived
+quads remain orientation-unknown. Baselines must be rerun on that next corpus
+hash before orientation accuracy is quoted.
+
+### Geometry error versus device outcome
+
+The [device outcome report](reports/device-geometry-outcomes.json) joins each
+manual frame's device geometry to the archived `identified` decision and human
+identity verdict. The primary bucket value is the mean of the four normalized
+corner errors after the same minimum cyclic roll as the frozen benchmark.
+
+| Mean normalized error | Frames | Known outcomes | Correct | Wrong | Abstain | Unknown | Abstention rate |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| [0.00, 0.05) | 5 | 5 | 1 | 1 | 3 | 0 | 60.0% |
+| [0.05, 0.10) | 16 | 15 | 7 | 0 | 8 | 1 | 53.3% |
+| [0.10, 0.20) | 12 | 12 | 3 | 1 | 8 | 0 | 66.7% |
+| [0.20, infinity) | 16 | 16 | 0 | 1 | 15 | 0 | 93.8% |
+| unmatched at IoU 0.5 | 8 | 8 | 0 | 1 | 7 | 0 | 87.5% |
+
+Abstention concentrates above 0.20: 15 of 16 known outcomes, versus 19 of 32
+below it. That is a useful breakpoint for calibrating a crop-quality proxy,
+not a runtime gate by itself: true corner error requires ground truth and is
+not observable on-device. The four wrong accepts are also too few and not
+monotonic in geometry error, so geometry quality cannot replace the existing
+recognition safety checks.
+
+### Proposed candidate budgets
+
+These values are proposed pending human approval. If approved, they are frozen
+before any candidate is evaluated and must not be tuned after candidate
+results are visible:
+
+- R@0.5 at least 0.98 and R@0.75 at least 0.85;
+- normalized corner-error p50 at most 0.03, p90 at most 0.10, and p95 at most
+  0.15;
+- `outsideFrame` normalized p50 at most 0.08;
+- zero duplicates and at most three extras on these 61 frames; and
+- no increase in wrong accepts through the full recognition replay.
 
 ## Artifacts
 

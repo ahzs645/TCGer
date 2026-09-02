@@ -188,6 +188,10 @@ class RealReleaseAdapterTests(unittest.TestCase):
                 ],
                 [{"detector"}, {"human"}],
             )
+            self.assertEqual(
+                [record["instances"][0]["orientationKnown"] for record in records],
+                [False, True],
+            )
             self.assertTrue(
                 all(
                     "physicalCardId" not in record["instances"][0] for record in records
@@ -272,6 +276,7 @@ class RealReleaseAdapterTests(unittest.TestCase):
                 },
                 {"human"},
             )
+            self.assertTrue(record["instances"][0]["orientationKnown"])
             self.assertEqual(
                 [corner["visibility"] for corner in record["instances"][0]["corners"]],
                 ["outsideFrame", "visible", "visible", "visible"],

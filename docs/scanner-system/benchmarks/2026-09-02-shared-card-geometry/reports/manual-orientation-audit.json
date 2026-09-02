@@ -1,0 +1,32 @@
+{
+  "schema": "https://tcger.app/reports/manual-quad-orientation-audit/v1",
+  "corpusHash": "d14c97a428e7295e10e75644189528dce297d5990d9c76435eeb9e1cf64dc242",
+  "releaseId": "real-geometry-devmode-smoke-v2",
+  "method": {
+    "sampleSelection": "ten manual fixed quads spanning all seven contributing Dev Mode sessions, including four frames with at least one outsideFrame corner",
+    "warp": "stored manual point order mapped directly to destination TL,TR,BR,BL at 720 by 1000; no geometric reordering",
+    "criterion": "the printed card title is at the top of the zero-roll crop",
+    "localContactSheet": ".artifacts/card-geometry/orientation-check-2026-09-02/zero-roll-contact-sheet.jpg"
+  },
+  "result": {
+    "audited": 10,
+    "upright": 10,
+    "rotated180": 0,
+    "ambiguous": 0,
+    "sessionsRepresented": 7,
+    "outsideFrameExamples": 4,
+    "conclusion": "manual fixed quads preserve card-relative TL,TR,BR,BL order and may set orientationKnown true in the next corpus release"
+  },
+  "sample": [
+    {"recordId": "devmode-scan-session-20260809-160556-c868b9c065b452fa", "sessionFrameKey": "scan-session-20260809-160556/frame-0007.jpg", "outsideFrameCorners": 1, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260809-175313-d349694e4fd57128", "sessionFrameKey": "scan-session-20260809-175313/frame-0001.jpg", "outsideFrameCorners": 2, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260809-183843-7a46273ad99a761b", "sessionFrameKey": "scan-session-20260809-183843/frame-0004.jpg", "outsideFrameCorners": 2, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260809-190752-438ab0fd42462149", "sessionFrameKey": "scan-session-20260809-190752/frame-0004.jpg", "outsideFrameCorners": 0, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260827-223150-abb342bc426ce62a", "sessionFrameKey": "scan-session-20260827-223150/frame-0010.jpg", "outsideFrameCorners": 0, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260829-200235-47d7e26a958f2518", "sessionFrameKey": "scan-session-20260829-200235/frame-0017.jpg", "outsideFrameCorners": 0, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260829-233753-074639ea9a443c5d", "sessionFrameKey": "scan-session-20260829-233753/frame-0005.jpg", "outsideFrameCorners": 1, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260809-160556-2c9e525d7ce86e91", "sessionFrameKey": "scan-session-20260809-160556/frame-0001.jpg", "outsideFrameCorners": 0, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260809-175313-21b0a8fc50528e8c", "sessionFrameKey": "scan-session-20260809-175313/frame-0015.jpg", "outsideFrameCorners": 0, "inspection": "upright"},
+    {"recordId": "devmode-scan-session-20260809-183843-cc51d2125efc6a9e", "sessionFrameKey": "scan-session-20260809-183843/frame-0015.jpg", "outsideFrameCorners": 0, "inspection": "upright"}
+  ]
+}

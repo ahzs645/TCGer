@@ -442,7 +442,11 @@ def _devmode_entry(
                 "instanceId": "card-0",
                 "detectionClass": "card",
                 "corners": corners,
-                "orientationKnown": False,
+                # Manual quads preserve the labeler's card-relative click
+                # order (TL, TR, BR, BL). Named detector sources are only
+                # geometrically ordered and therefore do not establish card
+                # orientation.
+                "orientationKnown": corner_source == "human",
                 "side": "unknown",
                 "container": "unknown",
                 "occlusionOrder": 0,
