@@ -176,11 +176,26 @@ does not predict slab classification.
 
 Rules that are part of the contract and shared as code, not prose:
 
-- input letterboxing (padding value, alignment, resize kernel, and any
-  exterior margin). If a candidate was trained on a padded canvas so that
-  amodal corners fall inside normalized range, the inference letterbox must
-  carry the identical margin; train and run coordinate spaces are one
-  contract;
+- the input transform chain, in this fixed order:
+
+  ```
+  source capture coordinates
+    -> add fixed exterior context margin
+    -> resize / letterbox to model input
+    -> inference
+    -> undo letterbox
+    -> undo context margin
+    -> source coordinates, possibly outside [0, 1]
+  ```
+
+  Context padding and letterboxing are two separate transforms and must stay
+  separate in code. Letterboxing (padding value, alignment, resize kernel)
+  fits the aspect ratio to the model input. The context margin is a fixed
+  exterior border added so that amodal corners can be expressed inside the
+  model canvas; training and inference must share its value, fill policy,
+  and position in the transform order. Because the margin lowers the source
+  image's effective model resolution, its value is a benchmarked choice, not
+  a default;
 - coordinate conversion back to source space (Vision's bottom-left origin is
   converted inside the iOS adapter only). Normalized source coordinates need
   an explicit pixel mapping: pixel-center (`x × (width − 1)`) or image-edge
@@ -238,23 +253,26 @@ One annotation feeds every candidate. Each card instance records:
   corner is genuinely unknowable; such a corner has `coordinateKnown: false`
   and receives no coordinate loss;
 - `visibility` takes the semantic values `unlabeled`, `occluded`, `visible`,
-  and `outsideFrame`. These labels are annotation only and do not appear in
-  the runtime contract. The canonical corpus always preserves the original
-  coordinate, including out-of-frame ones; export policy is
-  candidate-specific:
+  and `outsideFrame`. `outsideFrame` is defined relative to the original
+  capture, never to the padded model canvas. These labels are annotation only
+  and do not appear in the runtime contract. The canonical corpus always
+  preserves the original coordinate, including out-of-frame ones; export
+  policy is candidate-specific:
 
   ```
   visible                    -> 2
   occluded, in frame         -> 1
   unlabeled                  -> 0, no supervised coordinate
-  outsideFrame               -> 0 for a standard pose export, because the
-                                toolchain's label loader rejects coordinates
-                                outside normalized range; or supervised via a
-                                padded canvas / compatible custom head, with
-                                the same margin applied at inference
+  outsideFrame               -> 0 for a standard pose export with no context
+                                margin, because the toolchain's label loader
+                                rejects coordinates outside normalized range;
+                                or, after the context margin is applied and
+                                the corner lands in range, exported as an
+                                in-range label with value 1 while the
+                                canonical record keeps `outsideFrame`
   ```
 
-  Padded-canvas export is the default for synthetic data, since the
+  Context-margin export is the default for synthetic data, since the
   compositor controls the canvas and out-of-frame corners are the cases table
   scenes most need supervised;
 - visible polygon or mask;
@@ -294,8 +312,9 @@ Extend the benchmark with:
 - one-to-one matching between predictions and ground truth;
 - corner error in source pixels and normalized, at p50, p90, and p95;
 - visible-corner versus occluded-corner accuracy, computed only over corners
-  with `coordinateKnown: true` and reporting the number skipped, so real and
-  synthetic slices stay comparable;
+  with `coordinateKnown: true`, reporting `evaluated / eligible / skipped`
+  corner counts per source and per scene slice rather than one global count,
+  with synthetic and real corner results kept separately visible;
 - multi-card recall at quad IoU 0.75;
 - duplicate and extra-detection rate;
 - orientation accuracy where orientation is knowable;
@@ -356,10 +375,18 @@ The contracts above are frozen only when all three have landed.
    - commit model-agnostic golden fixtures for the stage
      `decoded candidates -> validation/NMS -> CardGeometryResult[]` (exact
      after canonical rounding), including NMS threshold boundaries and
-     invalid, crossed, tiny, out-of-frame, and partially-outside quads, plus
-     crop fixtures (tolerance). Raw-tensor-to-candidate fixtures are
+     invalid, crossed, tiny, out-of-frame, and partially-outside quads;
+   - commit context-padding and inverse-coordinate fixtures: source
+     coordinates through margin and letterbox and back, including corners
+     that leave `[0, 1]`, so every platform proves the transform chain
+     round-trips before any model exists;
+   - commit crop fixtures (tolerance). Raw-tensor-to-candidate fixtures are
      model-specific and are added per trained model in export step 3, so this
      workstream stays independent of the licensing decision.
+
+   The first implementation commit is therefore: the two JSON schemas, the
+   validation/NMS fixtures, and the context-padding and inverse-coordinate
+   fixtures.
 2. **Benchmark extension**
    - annotate every card in the selected duel-field and binder subset;
    - implement one-to-one prediction-to-truth matching;
