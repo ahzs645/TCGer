@@ -257,8 +257,6 @@ One annotation feeds every candidate. Each card instance records:
   capture, never to the padded model canvas. These labels are annotation only
   and do not appear in the runtime contract. The canonical corpus always
   preserves the original coordinate, including out-of-frame ones; export
-  policy is candidate-specific:
-
   ```
   visible                    -> 2
   occluded, in frame         -> 1

@@ -1,0 +1,44 @@
+{
+  "schema": "tcger-card-geometry-coordinate-roundtrip-fixture-v1",
+  "roundingDecimals": 6,
+  "coordinateConvention": "continuous source pixels; normalized source mapping remains a crop-parity decision",
+  "transform": {
+    "sourceSize": { "width": 800, "height": 600 },
+    "contextMarginPixels": { "left": 80, "top": 60, "right": 80, "bottom": 60 },
+    "contextSize": { "width": 960, "height": 720 },
+    "modelInputSize": { "width": 640, "height": 640 },
+    "letterbox": {
+      "scale": 0.6666666666666666,
+      "resizedWidth": 640,
+      "resizedHeight": 480,
+      "offsetX": 0,
+      "offsetY": 80
+    }
+  },
+  "cases": [
+    {
+      "name": "source center",
+      "sourcePixel": [400, 300],
+      "modelPixel": [320, 320],
+      "recoveredSourcePixel": [400, 300]
+    },
+    {
+      "name": "known corner outside the original left edge",
+      "sourcePixel": [-40, 300],
+      "modelPixel": [26.666667, 320],
+      "recoveredSourcePixel": [-40, 300]
+    },
+    {
+      "name": "known corner outside the original top-right",
+      "sourcePixel": [850, -30],
+      "modelPixel": [620, 100],
+      "recoveredSourcePixel": [850, -30]
+    },
+    {
+      "name": "last source pixel center",
+      "sourcePixel": [799, 599],
+      "modelPixel": [586, 519.333333],
+      "recoveredSourcePixel": [799, 599]
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/card-geometry-corpus-record/v1",
+  "title": "TCGer CardGeometryCorpusRecord v1",
+  "description": "One source frame and its candidate-independent card geometry annotations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "recordId", "source", "grouping", "instances"],
+  "properties": {
+    "schema": {
+      "const": "https://tcger.app/schemas/card-geometry-corpus-record/v1"
+    },
+    "recordId": { "$ref": "#/$defs/id" },
+    "source": { "$ref": "#/$defs/source" },
+    "grouping": { "$ref": "#/$defs/grouping" },
+    "instances": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/cardInstance" }
+    },
+    "synthetic": { "$ref": "#/$defs/syntheticMetadata" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "properties": { "kind": { "const": "synthetic" } },
+            "required": ["kind"]
+          }
+        },
+        "required": ["source"]
+      },
+      "then": {
+        "required": ["synthetic"],
+        "properties": {
+          "instances": {
+            "items": {
+              "properties": {
+                "corners": {
+                  "items": {
+                    "properties": { "coordinateKnown": { "const": true } },
+                    "required": ["coordinateKnown", "point"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sourcePoint": {
+      "description": "Normalized, top-left-origin coordinates in the original capture. Values may lie outside [0, 1] within the active contract's exterior margin.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "visiblePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256", "width", "height"],
+      "properties": {
+        "kind": { "enum": ["real", "synthetic"] },
+        "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "licenseId": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "licenseUrl": { "type": "string", "format": "uri", "maxLength": 2048 }
+      }
+    },
+    "grouping": {
+      "description": "Stable leakage-control keys. Additional physical-card keys live on individual instances.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceArchiveId"],
+      "properties": {
+        "sourceArchiveId": { "$ref": "#/$defs/id" },
+        "sessionId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "annotationCorner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visibility", "coordinateKnown"],
+      "properties": {
+        "point": { "$ref": "#/$defs/sourcePoint" },
+        "visibility": {
+          "enum": ["unlabeled", "occluded", "visible", "outsideFrame"]
+        },
+        "coordinateKnown": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "coordinateKnown": { "const": true } },
+            "required": ["coordinateKnown"]
+          },
+          "then": { "required": ["point"] },
+          "else": { "not": { "required": ["point"] } }
+        }
+      ]
+    },
+    "visibleMask": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "points"],
+          "properties": {
+            "kind": { "const": "polygon" },
+            "points": {
+              "type": "array",
+              "minItems": 3,
+              "items": { "$ref": "#/$defs/visiblePoint" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "width", "height", "counts"],
+          "properties": {
+            "kind": { "const": "cocoRle" },
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "counts": {
+              "oneOf": [
+                { "type": "string", "minLength": 1 },
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "integer", "minimum": 0 }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "cardInstance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "detectionClass",
+        "corners",
+        "orientationKnown",
+        "side",
+        "container",
+        "occlusionOrder"
+      ],
+      "properties": {
+        "instanceId": { "$ref": "#/$defs/id" },
+        "detectionClass": { "const": "card" },
+        "corners": {
+          "description": "Printed-card TL, TR, BR, BL order.",
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/annotationCorner" }
+        },
+        "orientationKnown": { "type": "boolean" },
+        "side": { "enum": ["faceUp", "faceDown", "unknown"] },
+        "container": { "enum": ["rawCard", "slab", "unknown"] },
+        "visibleMask": { "$ref": "#/$defs/visibleMask" },
+        "occlusionOrder": { "type": "integer", "minimum": 0 },
+        "physicalCardId": { "$ref": "#/$defs/id" },
+        "sourceAssetId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "pixelMargins": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "top", "right", "bottom"],
+      "properties": {
+        "left": { "type": "integer", "minimum": 0 },
+        "top": { "type": "integer", "minimum": 0 },
+        "right": { "type": "integer", "minimum": 0 },
+        "bottom": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "syntheticMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sceneSeed", "transformationSeed", "contextMarginPixels"],
+      "properties": {
+        "sceneSeed": { "type": "integer", "minimum": 0 },
+        "transformationSeed": { "type": "integer", "minimum": 0 },
+        "contextMarginPixels": { "$ref": "#/$defs/pixelMargins" },
+        "compositorRevision": { "type": "string", "minLength": 7, "maxLength": 64 }
+      }
+    }
+  }
+}

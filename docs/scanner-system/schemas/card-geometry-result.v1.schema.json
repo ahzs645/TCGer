@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/card-geometry-result/v1",
+  "title": "TCGer CardGeometryResult v1",
+  "description": "Portable, post-decoder card geometry returned by every detector candidate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "detectionClass",
+    "corners",
+    "confidence",
+    "cornerOrderConfidence",
+    "containment",
+    "side",
+    "container",
+    "boundingBox",
+    "releaseVersion",
+    "artifactSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "https://tcger.app/schemas/card-geometry-result/v1"
+    },
+    "detectionClass": { "const": "card" },
+    "corners": {
+      "description": "Printed-card TL, TR, BR, BL order. Points use normalized, top-left-origin source-image coordinates and may lie outside [0, 1] within the active geometry contract's exterior margin.",
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/runtimeCorner" }
+    },
+    "confidence": { "$ref": "#/$defs/confidence" },
+    "cornerOrderConfidence": {
+      "description": "Calibrated confidence that the four corner identities are in printed-card order. Null means unknown and requires the 0/180 recognition safety path.",
+      "oneOf": [
+        { "$ref": "#/$defs/confidence" },
+        { "type": "null" }
+      ]
+    },
+    "containment": { "enum": ["inside", "partiallyOutside"] },
+    "side": { "enum": ["faceUp", "faceDown", "unknown"] },
+    "container": { "enum": ["rawCard", "slab", "unknown"] },
+    "boundingBox": {
+      "description": "Derived axis-aligned source-image box clipped to [0, 1].",
+      "$ref": "#/$defs/clippedBox"
+    },
+    "mask": {
+      "description": "Optional lazy mask reference. It is excluded from the hot-path fixture contract.",
+      "$ref": "#/$defs/maskReference"
+    },
+    "releaseVersion": {
+      "description": "Monotonic asset-store release number.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "artifactSha256": {
+      "description": "SHA-256 of the platform-specific model artifact that produced the result.",
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "sourcePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "runtimeCorner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["point", "confidence"],
+      "properties": {
+        "point": { "$ref": "#/$defs/sourcePoint" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "clippedBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "width": { "type": "number", "minimum": 0, "maximum": 1 },
+        "height": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "maskReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sha256"],
+      "properties": {
+        "kind": { "const": "asset" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "mediaType": { "type": "string", "minLength": 1, "maxLength": 100 }
+      }
+    }
+  }
+}
