@@ -148,7 +148,11 @@ def _frame_errors(match, eligible_sources: set[str]) -> tuple[float, float, int]
     prediction_points = _prediction_pixel_points(match)
     rolls = _roll_errors(truth_points, prediction_points)
     scores = [_roll_score(errors) for errors in rolls]
-    chosen_roll = min(range(4), key=lambda index: scores[index])
+    chosen_roll = (
+        0
+        if match.truth.instance.get("orientationKnown")
+        else min(range(4), key=lambda index: scores[index])
+    )
     denominator = _mean_truth_side_length(truth_points)
     if denominator is None:
         raise BenchmarkError(

@@ -75,9 +75,10 @@ records the stable frame keys; its contact sheet remains local because it
 contains card imagery.
 
 The pinned v2 release and its reports remain unchanged. The ingestion adapter
-now marks manual quads orientation-known for the next release; detector-derived
-quads remain orientation-unknown. Baselines must be rerun on that next corpus
-hash before orientation accuracy is quoted.
+now marks manual quads orientation-known; detector-derived quads remain
+orientation-unknown. The resulting pinned v3 corpus and its
+[orientation-aware baseline rerun](../2026-09-02-shared-card-geometry-orientation-v3/README.md)
+measure the previously excluded orientation accuracy.
 
 ### Geometry error versus device outcome
 
