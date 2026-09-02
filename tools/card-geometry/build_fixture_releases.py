@@ -65,6 +65,7 @@ FIXTURE_POLICY: dict[str, Any] = {
         "real": ["sessionId", "physicalCardIds"],
         "synthetic": ["sourceAssetIds"],
     },
+    "metricEligibleCornerSources": ["human", "synthetic"],
 }
 
 TRAINING_POLICY: dict[str, Any] = {
@@ -89,6 +90,7 @@ TRAINING_POLICY: dict[str, Any] = {
         "real": ["sessionId", "physicalCardIds"],
         "synthetic": ["sourceAssetIds"],
     },
+    "metricEligibleCornerSources": ["human", "synthetic"],
 }
 
 
@@ -114,12 +116,23 @@ def tiny_png(width: int, height: int, rgb: tuple[int, int, int]) -> bytes:
     )
 
 
-def corner(x: float, y: float, visibility: str = "visible") -> dict[str, Any]:
+def corner(
+    x: float, y: float, visibility: str = "visible", source: str = "human"
+) -> dict[str, Any]:
     return {
         "point": {"x": x, "y": y},
         "visibility": visibility,
         "coordinateKnown": True,
+        "cornerSource": source,
     }
+
+
+def _stamp_corner_source(record: dict[str, Any], source: str) -> None:
+    """Set the provenance of every known corner in a record."""
+    for instance in record["instances"]:
+        for item in instance["corners"]:
+            if item.get("coordinateKnown"):
+                item["cornerSource"] = source
 
 
 def unknown_corner(visibility: str = "occluded") -> dict[str, Any]:
@@ -172,6 +185,7 @@ def base_release() -> dict[str, Any]:
             "compositorRevision": "fixture0",
         },
     }
+    _stamp_corner_source(train_record, "synthetic")
     validation_record = {
         "schema": RECORD_SCHEMA_ID,
         "recordId": "fx-validation-real-001",
@@ -188,7 +202,7 @@ def base_release() -> dict[str, Any]:
                     corner(0.20, 0.10),
                     corner(0.80, 0.12),
                     unknown_corner("occluded"),
-                    corner(0.18, 0.90),
+                    corner(0.18, 0.90, source="maskFit"),
                 ],
                 "orientationKnown": True,
                 "side": "faceUp",

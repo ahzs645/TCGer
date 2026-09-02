@@ -246,7 +246,15 @@ canonical rounding.
 One annotation feeds every candidate. Each card instance records:
 
 - four corners in source-image space, each
-  `{ point?, visibility, coordinateKnown }`. Corners may lie outside `[0, 1]`
+  `{ point?, visibility, coordinateKnown, cornerSource? }`. `cornerSource` is
+  per corner, because a partially visible card can mix provenance (three
+  human-confirmed corners and one fitted or unknown one). It is required
+  whenever `coordinateKnown` is true and takes `human`, `synthetic`,
+  `maskFit`, or `detector`; absent means unknown. Only sources listed in the
+  bound readiness policy's `metricEligibleCornerSources` enter corner-error
+  metrics, and the policy schema limits that list to `human` and
+  `synthetic`, so fitted or detected corners are reported but can never
+  become ground truth by configuration. Corners may lie outside `[0, 1]`
   within the same bounded margin the runtime validator allows. A full amodal
   quad is required for synthetic frames, where every hidden or out-of-frame
   corner is known by construction, and optional for real annotations where a
@@ -310,9 +318,11 @@ Extend the benchmark with:
 - one-to-one matching between predictions and ground truth;
 - corner error in source pixels and normalized, at p50, p90, and p95;
 - visible-corner versus occluded-corner accuracy, computed only over corners
-  with `coordinateKnown: true`, reporting `evaluated / eligible / skipped`
-  corner counts per source and per scene slice rather than one global count,
-  with synthetic and real corner results kept separately visible;
+  with `coordinateKnown: true` and a metric-eligible `cornerSource`,
+  reporting `eligible / evaluated / skipped` and
+  `metricEligible / metricExcluded` corner counts per source and per scene
+  slice rather than one global count, with synthetic and real corner results
+  kept separately visible;
 - multi-card recall at quad IoU 0.75;
 - duplicate and extra-detection rate;
 - orientation accuracy where orientation is knowable;

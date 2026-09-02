@@ -47,7 +47,7 @@ structured `checks` list. Check codes, in report order:
 | `EVAL_DENYLIST` | a frozen evaluation session appears outside the `test` split |
 | `SPLIT_REAL_ONLY` | a synthetic record sits in a real-only split |
 | `SHARED_FIXTURES` | the contract fixtures above do not reproduce in this environment |
-| `CORNER_COUNTS` | never; it records `evaluated / eligible / skipped` corners per source kind, scene slice, and split |
+| `CORNER_COUNTS` | never; it records `eligible / evaluated / skipped` corners per source kind, scene slice, and split, and divides the evaluated corners into `metricEligible` (known coordinate whose per-corner `cornerSource` is in the policy's `metricEligibleCornerSources`) and `metricExcluded` (`maskFit`, `detector`, or absent). `maskFit` and `detector` corners are reported but can never become corner-error ground truth |
 | `READINESS_MINIMUMS` | the release does not meet its policy's minimums |
 | `RELEASE_PURPOSE` | the release purpose differs from the caller's `--expected-purpose` |
 

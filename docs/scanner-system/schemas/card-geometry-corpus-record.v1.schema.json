@@ -104,6 +104,10 @@
         "sessionId": { "$ref": "#/$defs/id" }
       }
     },
+    "cornerSource": {
+      "description": "Provenance of a known corner coordinate. `human` is a person-confirmed corner, `synthetic` comes from the compositor by construction, `maskFit` was fitted from a visible mask, `detector` was emitted by a model. Absent means unknown. Only sources listed in the bound readiness policy's `metricEligibleCornerSources` may enter corner-error metrics; `maskFit` and `detector` are reported but never metric ground truth.",
+      "enum": ["human", "synthetic", "maskFit", "detector"]
+    },
     "annotationCorner": {
       "type": "object",
       "additionalProperties": false,
@@ -113,7 +117,8 @@
         "visibility": {
           "enum": ["unlabeled", "occluded", "visible", "outsideFrame"]
         },
-        "coordinateKnown": { "type": "boolean" }
+        "coordinateKnown": { "type": "boolean" },
+        "cornerSource": { "$ref": "#/$defs/cornerSource" }
       },
       "allOf": [
         {
@@ -121,7 +126,7 @@
             "properties": { "coordinateKnown": { "const": true } },
             "required": ["coordinateKnown"]
           },
-          "then": { "required": ["point"] },
+          "then": { "required": ["point", "cornerSource"] },
           "else": { "not": { "required": ["point"] } }
         }
       ]

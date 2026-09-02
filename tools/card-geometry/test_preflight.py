@@ -157,6 +157,55 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(counts["bySourceKind"]["real"]["skipped"], 1)
         self.assertEqual(counts["bySceneSlice"]["single_handheld"]["evaluated"], 7)
 
+        # Corner provenance: the synthetic frame is metric-eligible in full, the
+        # real validation frame carries one maskFit corner that is reported but
+        # excluded, and evaluated always equals metricEligible + metricExcluded.
+        self.assertEqual(counts["metricEligibleCornerSources"], ["human", "synthetic"])
+        synthetic = counts["bySourceKind"]["synthetic"]
+        self.assertEqual(synthetic["metricEligible"], 8)
+        self.assertEqual(synthetic["metricExcluded"], 0)
+        self.assertEqual(synthetic["cornerSource:synthetic"], 8)
+        real = counts["bySourceKind"]["real"]
+        self.assertEqual(real["evaluated"], 7)
+        self.assertEqual(real["metricEligible"], 6)
+        self.assertEqual(real["metricExcluded"], 1)
+        self.assertEqual(real["cornerSource:human"], 6)
+        self.assertEqual(real["cornerSource:maskFit"], 1)
+        for bucket in (*counts["bySourceKind"].values(), *counts["bySplit"].values()):
+            self.assertEqual(
+                bucket["evaluated"], bucket["metricEligible"] + bucket["metricExcluded"]
+            )
+
+    def test_known_corner_requires_a_corner_source(self):
+        from corpus_release import RECORD_SCHEMA_FILE
+
+        validator = make_validator(load_schema(RECORD_SCHEMA_FILE))
+        record = load_json(
+            RELEASES_DIR / "valid-fixture" / "records" / "fx-test-real-001.json"
+        )
+        self.assertEqual(validation_errors(validator, record), [])
+        del record["instances"][0]["corners"][0]["cornerSource"]
+        errors = validation_errors(validator, record)
+        self.assertTrue(any("cornerSource" in error for error in errors), errors)
+
+        record["instances"][0]["corners"][0]["cornerSource"] = "detector"
+        self.assertEqual(validation_errors(validator, record), [])
+
+    def test_policy_cannot_admit_fitted_or_detected_corners_to_metrics(self):
+        validator = make_validator(load_schema(POLICY_SCHEMA_FILE))
+        policy = copy.deepcopy(FIXTURE_POLICY)
+        for source in ("maskFit", "detector"):
+            policy["metricEligibleCornerSources"] = ["human", source]
+            errors = validation_errors(validator, policy)
+            self.assertTrue(
+                any("metricEligibleCornerSources" in error for error in errors), errors
+            )
+        del policy["metricEligibleCornerSources"]
+        errors = validation_errors(validator, policy)
+        self.assertTrue(
+            any("metricEligibleCornerSources" in error for error in errors), errors
+        )
+
     def test_source_archive_is_a_cross_split_leakage_key(self):
         report = self.run_release("invalid-source-archive-leakage")
         self.assertEqual(report["failedChecks"], ["LEAKAGE_DISJOINT"])
@@ -185,9 +234,7 @@ class PreflightTests(unittest.TestCase):
 
             report = run_preflight(release, tooling_revision="test")
 
-        self.assertEqual(
-            report["failedChecks"], ["MANIFEST_RECORD_CONSISTENCY"]
-        )
+        self.assertEqual(report["failedChecks"], ["MANIFEST_RECORD_CONSISTENCY"])
         consistency = next(
             check
             for check in report["checks"]
@@ -199,6 +246,7 @@ class PreflightTests(unittest.TestCase):
                 for detail in consistency["details"]["failures"]["<manifest>"]
             )
         )
+
     def test_missing_release_is_unreadable(self):
         with tempfile.TemporaryDirectory() as tmp:
             report = run_preflight(Path(tmp) / "nowhere", tooling_revision="test")

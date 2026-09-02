@@ -14,7 +14,8 @@
     "minimumRealEvaluationSessions",
     "realOnlySplits",
     "requiredSceneSlices",
-    "requiredLeakageKeys"
+    "requiredLeakageKeys",
+    "metricEligibleCornerSources"
   ],
   "properties": {
     "schema": {
@@ -63,6 +64,13 @@
           "minimumInstances": { "type": "integer", "minimum": 1 }
         }
       }
+    },
+    "metricEligibleCornerSources": {
+      "description": "Corner provenance values whose known coordinates may enter corner-error metrics. The schema limits this to `human` and `synthetic`; `maskFit` and `detector` corners are reported but can never become ground truth through policy configuration.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["human", "synthetic"] }
     },
     "requiredLeakageKeys": {
       "description": "Leakage keys every record of the given source kind must carry so split disjointness can be checked.",

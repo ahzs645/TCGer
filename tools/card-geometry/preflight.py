@@ -620,9 +620,23 @@ def check_shared_fixtures(ctx: Context) -> None:
 
 
 def corner_counts(ctx: Context) -> dict[str, Any]:
-    """Annotation-side corner counts: evaluated = coordinate known, skipped = unknown."""
+    """Annotation-side corner counts.
+
+    `eligible` is every corner, `evaluated` those with a known coordinate,
+    `skipped` those without. The evaluated corners divide further into
+    `metricEligible` (known coordinate whose `cornerSource` is listed in the
+    policy's `metricEligibleCornerSources`) and `metricExcluded` (known
+    coordinate from any other or absent source). `evaluated` always equals
+    `metricEligible + metricExcluded`. Per-source and per-visibility
+    breakdowns are reported alongside.
+    """
     if not ctx.manifest_valid:
         return {}
+    eligible_sources: set[str] = (
+        set(ctx.policy["metricEligibleCornerSources"])
+        if ctx.policy_valid and ctx.policy is not None
+        else set()
+    )
     by_kind: dict[str, Counter] = defaultdict(Counter)
     by_slice: dict[str, Counter] = defaultdict(Counter)
     by_split: dict[str, Counter] = defaultdict(Counter)
@@ -633,6 +647,7 @@ def corner_counts(ctx: Context) -> dict[str, Any]:
         for instance in record.get("instances", []):
             for corner in instance.get("corners", []):
                 known = bool(corner.get("coordinateKnown"))
+                source = corner.get("cornerSource")
                 for bucket in (
                     by_kind[kind],
                     by_slice[entry["sceneSlice"]],
@@ -640,19 +655,29 @@ def corner_counts(ctx: Context) -> dict[str, Any]:
                 ):
                     bucket["eligible"] += 1
                     bucket["evaluated" if known else "skipped"] += 1
+                    if known:
+                        bucket[
+                            "metricEligible"
+                            if source in eligible_sources
+                            else "metricExcluded"
+                        ] += 1
+                        bucket[f"cornerSource:{source or 'unknown'}"] += 1
                     bucket[f"visibility:{corner.get('visibility')}"] += 1
 
     def complete(bucket: Counter) -> dict[str, int]:
-        # Always emit the three headline counts, even when zero, so consumers
-        # never have to treat a missing key as zero.
+        # Always emit the headline counts, even when zero, so consumers never
+        # have to treat a missing key as zero.
         return {
             "eligible": 0,
             "evaluated": 0,
             "skipped": 0,
+            "metricEligible": 0,
+            "metricExcluded": 0,
             **dict(sorted(bucket.items())),
         }
 
     return {
+        "metricEligibleCornerSources": sorted(eligible_sources),
         "bySourceKind": {
             key: complete(value) for key, value in sorted(by_kind.items())
         },

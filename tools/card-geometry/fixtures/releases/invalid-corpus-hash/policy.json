@@ -1,5 +1,9 @@
 {
   "description": "Minimums small enough for the checked-in fixture releases. A release bound to this policy can validate tooling but its purpose keeps it from ever being ready for training.",
+  "metricEligibleCornerSources": [
+    "human",
+    "synthetic"
+  ],
   "minimumInstancesPerSplit": {
     "test": 1,
     "train": 1,

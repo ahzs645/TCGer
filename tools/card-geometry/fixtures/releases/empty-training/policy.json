@@ -1,5 +1,9 @@
 {
   "description": "Draft production minimums. Values are placeholders until the first real geometry corpus release sets them from measured counts.",
+  "metricEligibleCornerSources": [
+    "human",
+    "synthetic"
+  ],
   "minimumInstancesPerSplit": {
     "test": 150,
     "train": 1000,
