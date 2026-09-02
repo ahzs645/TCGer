@@ -1,7 +1,7 @@
 {
   "grouping": {
     "sessionId": "scan-session-20260901-100000",
-    "sourceArchiveId": "fixture-devmode"
+    "sourceArchiveId": "fixture-devmode-validation"
   },
   "instances": [
     {

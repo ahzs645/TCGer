@@ -58,6 +58,10 @@ EXIT_MARKER = "PREFLIGHT_EXIT="
 
 PINNED_JSONSCHEMA = "jsonschema==4.23.0"
 PINNED_HUB = "huggingface_hub==1.28.0"
+PINNED_CPU_IMAGE = (
+    "python:3.12-slim@"
+    "sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea"
+)
 
 
 def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -267,7 +271,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--hub-repo", default="ahzs645/tcger-universal-arcface")
     parser.add_argument("--flavor", default="cpu-basic")
-    parser.add_argument("--image", default="python:3.12-slim")
+    parser.add_argument("--image", default=PINNED_CPU_IMAGE)
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument(
         "--negative-release",
@@ -291,6 +295,9 @@ def main() -> int:
         help="Print the job scripts and exit without uploading or submitting",
     )
     args = parser.parse_args()
+
+    if not re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", args.image):
+        parser.error("--image must be pinned by sha256 digest")
 
     if not EXPECTED_FAILED_CHECKS[args.negative_release]:
         parser.error("--negative-release must name a release that is expected to fail")

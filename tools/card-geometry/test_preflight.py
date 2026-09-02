@@ -1,4 +1,6 @@
+import copy
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,11 +22,13 @@ from corpus_release import (  # noqa: E402
     MANIFEST_SCHEMA_FILE,
     POLICY_SCHEMA_FILE,
     RELEASES_DIR,
+    corpus_hash,
     load_json,
     load_schema,
     make_validator,
     sha256_file,
     validation_errors,
+    write_json,
 )
 from preflight import (  # noqa: E402
     CHECK_ORDER,
@@ -153,6 +157,48 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(counts["bySourceKind"]["real"]["skipped"], 1)
         self.assertEqual(counts["bySceneSlice"]["single_handheld"]["evaluated"], 7)
 
+    def test_source_archive_is_a_cross_split_leakage_key(self):
+        report = self.run_release("invalid-source-archive-leakage")
+        self.assertEqual(report["failedChecks"], ["LEAKAGE_DISJOINT"])
+        leakage = next(
+            check for check in report["checks"] if check["code"] == "LEAKAGE_DISJOINT"
+        )
+        self.assertEqual(
+            leakage["details"]["leaks"],
+            {
+                "sourceArchiveId:fixture-devmode-validation": [
+                    "test",
+                    "validation",
+                ]
+            },
+        )
+
+    def test_duplicate_manifest_records_cannot_inflate_readiness(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "duplicate-record"
+            shutil.copytree(RELEASES_DIR / "valid-fixture", release)
+            manifest_path = release / "manifest.json"
+            manifest = load_json(manifest_path)
+            manifest["records"].append(copy.deepcopy(manifest["records"][0]))
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(manifest_path, manifest)
+
+            report = run_preflight(release, tooling_revision="test")
+
+        self.assertEqual(
+            report["failedChecks"], ["MANIFEST_RECORD_CONSISTENCY"]
+        )
+        consistency = next(
+            check
+            for check in report["checks"]
+            if check["code"] == "MANIFEST_RECORD_CONSISTENCY"
+        )
+        self.assertTrue(
+            any(
+                detail.startswith("duplicate record recordId")
+                for detail in consistency["details"]["failures"]["<manifest>"]
+            )
+        )
     def test_missing_release_is_unreadable(self):
         with tempfile.TemporaryDirectory() as tmp:
             report = run_preflight(Path(tmp) / "nowhere", tooling_revision="test")
@@ -197,6 +243,22 @@ class PreflightCliTests(unittest.TestCase):
 
             unreadable = self.run_cli("--release-root", str(Path(tmp) / "missing"))
             self.assertEqual(unreadable.returncode, EXIT_UNREADABLE)
+
+    def test_hf_smoke_rejects_mutable_container_tags(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "hf_preflight_smoke.py"),
+                "--dry-run",
+                "--image",
+                "python:3.12-slim",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--image must be pinned by sha256 digest", result.stderr)
 
 
 if __name__ == "__main__":

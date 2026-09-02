@@ -1,5 +1,5 @@
 {
-  "corpusHash": "52ed6305212a4993fff26a28e23000033da100d1c1597708c3b02249f5a3aacf",
+  "corpusHash": "cdb3b933ee16fa57ef8630891d846a4383e220d4612c56ab6d4941323b9e65fa",
   "evaluationSessionDenylist": [
     "scan-session-20260829-200235"
   ],
@@ -65,14 +65,14 @@
           "physical-card-200"
         ],
         "sessionId": "scan-session-20260829-200235",
-        "sourceArchiveId": "fixture-devmode-test",
+        "sourceArchiveId": "fixture-devmode-validation",
         "sourceAssetIds": [],
         "sourceKind": "real"
       },
       "path": "records/fx-test-real-001.json",
       "recordId": "fx-test-real-001",
       "sceneSlice": "single_handheld",
-      "sha256": "b115a9280368a4bf5def0ab061b1680711419ee5937e6b4e8a4ff8af31f89f72",
+      "sha256": "9efdda214b7444285bd4bd99e0e10444af96e0b920027f5d6493ed3ef2732ed2",
       "split": "test"
     }
   ],

@@ -177,7 +177,7 @@ def base_release() -> dict[str, Any]:
         "recordId": "fx-validation-real-001",
         "source": {"kind": "real", "width": IMAGE_SIZE, "height": IMAGE_SIZE},
         "grouping": {
-            "sourceArchiveId": "fixture-devmode",
+            "sourceArchiveId": "fixture-devmode-validation",
             "sessionId": VALIDATION_SESSION,
         },
         "instances": [
@@ -203,7 +203,7 @@ def base_release() -> dict[str, Any]:
         "recordId": "fx-test-real-001",
         "source": {"kind": "real", "width": IMAGE_SIZE, "height": IMAGE_SIZE},
         "grouping": {
-            "sourceArchiveId": "fixture-devmode",
+            "sourceArchiveId": "fixture-devmode-test",
             "sessionId": DENYLISTED_SESSION,
         },
         "instances": [
@@ -337,6 +337,14 @@ def build_invalid_leakage(root: Path) -> None:
     materialize(root, release)
 
 
+def build_invalid_source_archive_leakage(root: Path) -> None:
+    release = base_release()
+    _record(release, "fx-test-real-001")["grouping"]["sourceArchiveId"] = (
+        "fixture-devmode-validation"
+    )
+    materialize(root, release)
+
+
 def build_invalid_image_hash(root: Path) -> None:
     release = base_release()
     wrong = tiny_png(IMAGE_SIZE, IMAGE_SIZE, (0, 0, 0))
@@ -377,6 +385,7 @@ def build_empty_training(root: Path) -> None:
 BUILDERS = {
     "valid-fixture": build_valid_fixture,
     "invalid-leakage": build_invalid_leakage,
+    "invalid-source-archive-leakage": build_invalid_source_archive_leakage,
     "invalid-image-hash": build_invalid_image_hash,
     "invalid-corpus-hash": build_invalid_corpus_hash,
     "invalid-denylist": build_invalid_denylist,
@@ -389,6 +398,7 @@ BUILDERS = {
 EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
     "valid-fixture": frozenset(),
     "invalid-leakage": frozenset({"LEAKAGE_DISJOINT"}),
+    "invalid-source-archive-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-image-hash": frozenset({"IMAGE_HASH"}),
     "invalid-corpus-hash": frozenset({"CORPUS_HASH"}),
     "invalid-denylist": frozenset({"EVAL_DENYLIST"}),
@@ -399,6 +409,7 @@ EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
 EXPECTED_READY_FOR: dict[str, str] = {
     "valid-fixture": "tooling",
     "invalid-leakage": "none",
+    "invalid-source-archive-leakage": "none",
     "invalid-image-hash": "none",
     "invalid-corpus-hash": "none",
     "invalid-denylist": "none",

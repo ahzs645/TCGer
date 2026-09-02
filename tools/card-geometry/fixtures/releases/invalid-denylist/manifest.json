@@ -1,5 +1,5 @@
 {
-  "corpusHash": "b0fbd3cc885b8bea10232d9fdd26b077effd41b021e5adabc995adcd2c76ad5f",
+  "corpusHash": "8d81ca3cf4c92f83e34cd2ce5094ebc5df98c1e397f7941ae796e8df226d17dc",
   "evaluationSessionDenylist": [
     "scan-session-20260829-200235"
   ],
@@ -43,14 +43,14 @@
           "physical-card-100"
         ],
         "sessionId": "scan-session-20260829-200235",
-        "sourceArchiveId": "fixture-devmode",
+        "sourceArchiveId": "fixture-devmode-validation",
         "sourceAssetIds": [],
         "sourceKind": "real"
       },
       "path": "records/fx-validation-real-001.json",
       "recordId": "fx-validation-real-001",
       "sceneSlice": "single_handheld",
-      "sha256": "58327cf5ad942997d19e4038a329f4bdd3e127bc95e917bc28b53a68db438668",
+      "sha256": "24d47da066948a443bba2ca66033e02c47bbc4791ac36cb420dd071ac43a81cb",
       "split": "validation"
     },
     {
@@ -65,14 +65,14 @@
           "physical-card-200"
         ],
         "sessionId": "scan-session-20260901-120000",
-        "sourceArchiveId": "fixture-devmode",
+        "sourceArchiveId": "fixture-devmode-test",
         "sourceAssetIds": [],
         "sourceKind": "real"
       },
       "path": "records/fx-test-real-001.json",
       "recordId": "fx-test-real-001",
       "sceneSlice": "single_handheld",
-      "sha256": "d95b52562f303698ef8e31655accf55951dbbe0ff9ce5410aea66713a701d612",
+      "sha256": "22fd8025bbf6ee519b0abf532eee6127354e5fec7a4758617e34a421e6a8403c",
       "split": "test"
     }
   ],

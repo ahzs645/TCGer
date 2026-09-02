@@ -292,6 +292,23 @@ def check_records(ctx: Context) -> None:
     image_failures: dict[str, list[str]] = defaultdict(list)
     consistency_failures: dict[str, list[str]] = defaultdict(list)
 
+    # A manifest entry is one source frame. Repeating an identity, record
+    # path, or record payload could inflate readiness counts without adding
+    # corpus coverage, so reject those duplicates even within one split.
+    unique_fields = {
+        "recordId": [entry["recordId"] for entry in ctx.manifest["records"]],
+        "path": [entry["path"] for entry in ctx.manifest["records"]],
+        "sha256": [entry["sha256"] for entry in ctx.manifest["records"]],
+    }
+    for field_name, values in unique_fields.items():
+        duplicates = sorted(
+            value for value, count in Counter(values).items() if count > 1
+        )
+        if duplicates:
+            consistency_failures["<manifest>"].append(
+                f"duplicate record {field_name}: {duplicates}"
+            )
+
     for entry in ctx.manifest["records"]:
         record_id = entry["recordId"]
         path = _safe_path(ctx.root, entry["path"])
@@ -483,6 +500,7 @@ def check_leakage(ctx: Context) -> None:
     for entry in ctx.manifest["records"]:
         split = entry["split"]
         keys = entry["leakageKeys"]
+        seen[("sourceArchiveId", keys["sourceArchiveId"])].add(split)
         if keys.get("sessionId"):
             seen[("sessionId", keys["sessionId"])].add(split)
         for value in keys.get("physicalCardIds", []):

@@ -43,7 +43,7 @@ structured `checks` list. Check codes, in report order:
 | `IMAGE_HASH` | an image is missing, differs from its manifest or record hash, or a PNG's IHDR size differs from the record |
 | `MANIFEST_RECORD_CONSISTENCY` | manifest leakage keys or record ids disagree with record content |
 | `LEAKAGE_KEYS_PRESENT` | a record lacks a leakage key its source kind requires under the policy |
-| `LEAKAGE_DISJOINT` | a session, physical card, source asset, record hash, or image hash appears in more than one split |
+| `LEAKAGE_DISJOINT` | a source archive, session, physical card, source asset, record hash, or image hash appears in more than one split |
 | `EVAL_DENYLIST` | a frozen evaluation session appears outside the `test` split |
 | `SPLIT_REAL_ONLY` | a synthetic record sits in a real-only split |
 | `SHARED_FIXTURES` | the contract fixtures above do not reproduce in this environment |
@@ -81,7 +81,8 @@ clean HEAD, uploads it to the private model repo, submits a CPU Job that must
 reject `invalid-leakage` with exactly `LEAKAGE_DISJOINT`, and only then submits
 a Job that must accept `valid-fixture` with `readyFor: tooling`. Each Job
 downloads the tooling at the captured Hub commit and verifies its hash before
-running. An authentication, download, or dependency failure surfaces as a
+running. The default CPU image is pinned by OCI digest; mutable image tags are
+rejected. An authentication, download, or dependency failure surfaces as a
 different exit code or a missing report and is never counted as a passing
 rejection. `--dry-run` prints the Job scripts without submitting.
 
