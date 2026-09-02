@@ -63,6 +63,7 @@ the required encoders separately and merging calibrated candidates.
 | [GamePackageManifest v1](game-package-manifest.md) | Implemented user-URL contract, filter model, trust boundary, schema, and publisher example |
 | [Dynamic scanner runtime audit](dynamic-scanner-runtime-audit.md) | Safe activation contract, platform refactors, trust rollout, and conformance tests for community scanner models |
 | [Dynamic offline-pack runtime audit](dynamic-offline-pack-runtime-audit.md) | Declarative collation schema, cache/activation semantics, hard-coded blockers, and rollout tests |
+| [Shared card-geometry plan](shared-card-geometry-plan-2026-09-02.md) | Approved direction for one shared detector/corner/crop stack across iOS, Android, and web: licensing gate, geometry and crop contracts, corpus schema, benchmark, winner rule, and execution order |
 | [Game-package hardening roadmap](game-package-hardening-roadmap.md) | Validator parity, atomic/streamed installs, publisher authority, identity, lifecycle, and future capabilities |
 
 Supporting implementation-specific documentation remains in:
