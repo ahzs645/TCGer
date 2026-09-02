@@ -1,6 +1,8 @@
 # Shared card-geometry plan — 2026-09-02
 
-**Status:** approved direction, not yet implemented
+**Status:** approved direction. The geometry, crop, and benchmark contracts
+below are drafts and are not frozen until the "Work that starts now" items
+land.
 
 **Scope:** card detection, corner localization, and crop rectification for
 iOS, Android, and web. Recognition stays per game and is out of scope here
@@ -115,6 +117,13 @@ pretrained-backbone, and dataset licenses need their own provenance records;
 FastViT's license is Apple's custom redistributable license and its
 acknowledgements must be audited.
 
+Recommendation: for a long-lived shared scanner, take option 3 and replace
+the Ultralytics dependency, unless an Enterprise license is deliberately
+purchased. AGPL must not become the product license by accident. Enterprise
+is the fastest route if its cost and terms are acceptable. Replacement costs
+more engineering but leaves the detector, its exports, and the release process
+under clearer control.
+
 Every shipped geometry model records the same provenance the encoder releases
 already do: corpus release hash, code revision, checkpoint hash, export hash,
 input contract, and evaluation artifact.
@@ -140,17 +149,29 @@ downstream runs.
 
 ```
 CardGeometryResult
-- quad: four points, normalized, top-left-origin source-image space
-- order: printed-card TL, TR, BR, BL
-- confidence
-- orientationConfidence            (may be unknown)
-- cornerVisibility[4]              (see corpus schema)
-- class: faceUp | faceDown | slab
-- boundingBox                      (derived, axis-aligned)
+- detectionClass: card             (the only detection class)
+- corners[4]: { point, confidence } normalized, top-left-origin source-image
+                                   space, ordered printed-card TL, TR, BR, BL
+- confidence                       (instance confidence)
+- cornerOrderConfidence            (may be unknown; see Orientation rule)
+- containment: inside | partiallyOutside
+- side: faceUp | faceDown | unknown
+- container: rawCard | slab
+- boundingBox                      (derived, axis-aligned, clipped to frame)
 - mask                             (optional, lazy, off the hot path)
 - releaseVersion                   (asset-store release, monotonic)
 - artifactSha256                   (immutable identity of the model bytes)
 ```
+
+Runtime output is separate from annotation. Pose-style models return corner
+coordinates plus a per-keypoint confidence, not categorical visibility, so the
+runtime carries `corners[4].confidence` and nothing more. The semantic
+visibility labels live in the corpus schema only. An optional estimated
+visibility field may be added later if a model explicitly predicts it.
+
+`side` and `container` are properties, not detection classes. Geometry must
+not fail because side classification is uncertain, and slabs need their own
+aspect-ratio validation band.
 
 Rules that are part of the contract and shared as code, not prose:
 
@@ -158,8 +179,11 @@ Rules that are part of the contract and shared as code, not prose:
 - coordinate conversion back to source space (Vision's bottom-left origin is
   converted inside the iOS adapter only);
 - corner ordering and orientation assignment;
-- quad validation: finite, convex, non-self-intersecting, in range, aspect
-  ratio within the card band;
+- quad validation: finite, convex, non-self-intersecting, aspect ratio within
+  the card band (or the slab band when `container` is `slab`). Amodal corners
+  may legitimately fall outside `[0, 1]`, so validation permits a bounded
+  exterior margin and records `containment` separately rather than rejecting
+  the quad;
 - quad NMS on the quads themselves, not on axis-aligned boxes;
 - overlap handling and duplicate suppression;
 - stable result ordering.
@@ -170,15 +194,24 @@ The warp output is part of the contract because the encoder gallery was
 embedded through one preprocessing path and the bake-off measured one crop
 size. Today iOS and Android produce 720 × 1000, the web produces 480 × 670,
 the bake-off uses 720 × 1000 with cubic interpolation, and Android uses a
-filtered bitmap draw. The contract fixes:
+filtered bitmap draw.
+
+Two values are decided now:
 
 - destination size: 720 × 1000, portrait;
-- destination corner pixel convention (pixel centers versus edges);
+- destination corners are pixel centers `(0, 0)`, `(719, 0)`, `(719, 999)`,
+  `(0, 999)`, mapped from the source corners TL, TR, BR, BL respectively.
+  Width and height coordinates are not used as destination corners.
+
+The remaining values are listed here so nothing is forgotten, but they are
+undecided until a small crop-parity experiment runs the same source quads
+through the iOS, Android, web, and bake-off warps and measures the encoder
+similarity shift of each choice:
+
 - inset or padding applied to the source quad before warping;
 - interpolation kernel;
 - border behavior for source pixels outside the frame;
-- color space and bit depth handed to the encoder;
-- orientation handling: which quad corner maps to the destination top-left.
+- color space and bit depth handed to the encoder.
 
 Golden crop fixtures compare with tolerances, not pixel equality, because the
 warp implementations are platform-native. Decoder fixtures (raw tensor in,
@@ -189,13 +222,16 @@ canonical rounding.
 
 One annotation feeds every candidate. Each card instance records:
 
-- full amodal quad in source-image space;
+- full amodal quad in source-image space; corners may lie outside `[0, 1]`
+  within the same bounded margin the runtime validator allows;
 - `cornerVisibility[4]` with semantic values `unlabeled`, `occluded`,
-  `visible`, and optionally `outsideFrame`; export adapters map the first three
-  to the pose toolchain's `{0, 1, 2}`;
+  `visible`, and `outsideFrame`; export adapters map these to the pose
+  toolchain's `{0, 1, 2}` (with `outsideFrame` mapped to the occluded value).
+  These labels are annotation only and do not appear in the runtime contract;
 - visible polygon or mask;
 - card-relative corner order and an orientation-known flag;
-- face-up, face-down, or slab;
+- `side` (face-up, face-down, unknown) and `container` (raw card, slab) as
+  separate fields; the detection label is always `card`;
 - occlusion order within the scene;
 - physical-card, session, and source-archive grouping for split assignment;
 - scene and transformation seed for synthetic frames.
@@ -216,7 +252,15 @@ to close the synthetic-to-camera gap.
 ## Benchmark and winner rule
 
 `tools/camera-corpus/bench_localizers.py` already measures IoU, recall at
-0.75, latency, and downstream correct and wrong accepts. Extend it with:
+0.75, latency, and downstream correct and wrong accepts. Its real annotations
+cannot yet measure multi-card behavior: the Yu-Gi-Oh acceptance schema carries
+one `targetQuad` per record, which is insufficient for one-to-one matching,
+duplicate rate, and full-scene recall. Before the evaluation set is frozen,
+every relevant card in a selected duel-field and binder subset must be
+annotated with the full corpus schema. This changes labels only, not the
+frozen images, and can start immediately.
+
+Extend the benchmark with:
 
 - one-to-one matching between predictions and ground truth;
 - corner error in source pixels and normalized, at p50, p90, and p95;
@@ -247,25 +291,57 @@ remaining hand-held wrong accept and voids degenerate crops nothing else
 catches. The final rule is:
 
 ```
-high, calibrated orientationConfidence
+high, calibrated cornerOrderConfidence
     -> single recognition orientation
 
-unknown or low orientationConfidence
+unknown or low cornerOrderConfidence
     -> retain 0°/180° recognition and contradiction rejection
 ```
 
-"High" is calibrated against the frozen real-camera sessions. Removing the
-second inference requires showing that wrong accepts do not increase, not
-merely good orientation accuracy.
+`cornerOrderConfidence` needs an implementation definition before it can gate
+anything. Ordinary per-keypoint confidence says how well each corner was
+located, not whether the four identities were assigned in the right order, so
+it does not prove orientation. Two acceptable implementations:
+
+1. an explicit orientation or order-confidence head trained alongside the
+   corners; or
+2. a derived score, calibrated on the frozen real-camera sessions, that is
+   shown to predict 180° ordering errors.
+
+Until one of these exists and is measured, `cornerOrderConfidence` is reported
+as unknown and double inference remains mandatory. Removing the second
+inference requires showing that wrong accepts do not increase, not merely good
+orientation accuracy.
+
+## Work that starts now
+
+Three workstreams are unblocked and independent of the licensing decision.
+The contracts above are frozen only when all three have landed.
+
+1. **Contract freeze**
+   - commit JSON schemas for `CardGeometryResult` and the corpus record;
+   - run the crop-kernel and parity experiment and fill in the undecided crop
+     values;
+   - commit decoder golden fixtures (exact) and crop fixtures (tolerance),
+     including NMS threshold boundaries and invalid, crossed, tiny,
+     out-of-frame, and partially-outside quads.
+2. **Benchmark extension**
+   - annotate every card in the selected duel-field and binder subset;
+   - implement one-to-one prediction-to-truth matching;
+   - add corner, orientation, duplication, and downstream recognition metrics;
+   - define numeric regression budgets before any training run.
+3. **Synthetic compositor**
+   - deterministic from seeds, checked into the repository with a pinned
+     configuration;
+   - source-image and background licenses and hashes tracked per asset;
+   - emits amodal quads, occlusion relationships, and corner visibility;
+   - prevents physical-card and source leakage across splits.
 
 ## Execution order
 
 1. In parallel, none blocking the others:
    - resolve licensing and create the model/data provenance manifest;
-   - freeze the geometry, crop, and benchmark contracts and the evaluation
-     sessions;
-   - check in the deterministic compositor and the corpus schema, and build
-     one versioned corpus release.
+   - the three workstreams above.
 2. After the licensing decision:
    - select the allowed training family;
    - train the candidate batch (pose primary with OBB and segmentation
@@ -284,12 +360,18 @@ merely good orientation accuracy.
 
 ## Non-goals
 
-- Shipping MobileSAM or FastSAM on device. The stray `FastSAM-s.pt` at the
-  repository root is referenced by nothing and should be deleted.
+- Shipping MobileSAM or FastSAM on device.
 - Another third-party localizer bake-off. The 2026-08-30 run settled it.
 - Maintaining four independent production croppers. Candidates are trained
   and compared; one ships.
 - Lowering recognition thresholds to absorb crop error.
+
+## Cleanup items
+
+Tracked separately from the plan; none of these gate it.
+
+- Delete the stray `FastSAM-s.pt` at the repository root. It is referenced by
+  no code, script, or document.
 
 ## Related records
 
