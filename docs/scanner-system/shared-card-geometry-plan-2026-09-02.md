@@ -240,6 +240,11 @@ similarity shift of each choice:
 - border behavior for source pixels outside the frame;
 - color space and bit depth handed to the encoder.
 
+The experiment is tracked in
+[Crop parity experiment — 2026-09-02](crop-parity-2026-09-02.md). Its bench
+and web rows are measured; the native rows and downstream Job are still
+required before this section can be frozen.
+
 Golden crop fixtures compare with tolerances, not pixel equality, because the
 warp implementations are platform-native. Decoder fixtures (raw tensor in,
 `CardGeometryResult[]` out) are deterministic and compare exactly after
