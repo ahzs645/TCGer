@@ -1,0 +1,27 @@
+{
+  "containerImage": "pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee",
+  "corpusHash": "544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393",
+  "datasetRepo": "ahzs645/tcger-scanner-images",
+  "datasetRevision": "b4ef746b06c725cbe196e709d518dc53eea0ad13",
+  "gpu": "NVIDIA A10G",
+  "localizers": {
+    "detr-pokemon": {
+      "artifactSha256": "6eb48a3fb6538105d8f3268a67c6c6db181b994e8d0300fc69f99f9071f19118",
+      "detections": 4633,
+      "modelRepo": "Matthieu68857/pokemon-cards-detection",
+      "modelRevision": "54330f9a0a671167dcf133e36304dcb58a5d9d76",
+      "predictionsSha256": "780d4099548a47e90662bc1e7e973a4d6f6d594ca0e3ee9a7f8d0d7b97acde0e"
+    },
+    "draw2-ygo-obb": {
+      "artifactSha256": "037e71a818fc76c65b63d9d81addb28dae306e1b2754151385b18d3555de9cb7",
+      "detections": 2885,
+      "modelRepo": "HichTala/draw2",
+      "modelRevision": "ff62fec32e0c1c2104d548b6f8dfcc0b3c46d26f",
+      "predictionsSha256": "71f7e61447bb818c80524fdf0da6112da98fbf4cd11804976c49eedeaae94523"
+    }
+  },
+  "records": 2000,
+  "releasePath": "geometry/releases/synthetic-geometry-smoke-v1",
+  "schema": "https://tcger.app/reports/card-geometry-gpu-baseline/v1",
+  "toolingRevision": "e54dc1de80fe915ccbef71f0005839b17aa2699e"
+}

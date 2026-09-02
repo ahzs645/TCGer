@@ -66,6 +66,7 @@ the required encoders separately and merging calibrated candidates.
 | [Shared card-geometry plan](shared-card-geometry-plan-2026-09-02.md) | Approved direction for one shared detector/corner/crop stack across iOS, Android, and web: licensing gate, geometry and crop contracts, corpus schema, benchmark, winner rule, and execution order |
 | [Shared card-geometry baselines](benchmarks/2026-09-02-shared-card-geometry/README.md) | Pinned predictions and deterministic geometry reports for device, Vision/app detector, DETR, and DRAW2 on the first 228 human-corner evaluation set |
 | [Card-geometry orientation baselines](benchmarks/2026-09-02-shared-card-geometry-orientation-v3/README.md) | Orientation-known rerun of the same predictions, including fixed-order tail errors, orientation accuracy, and the pinned fail-first Hub smoke |
+| [Synthetic card-geometry smoke](benchmarks/2026-09-02-synthetic-card-geometry-smoke/README.md) | Deterministic 2,000-frame compositor release, pinned Hub smoke, and the first single-handheld and multi-card baseline results |
 | [Game-package hardening roadmap](game-package-hardening-roadmap.md) | Validator parity, atomic/streamed installs, publisher authority, identity, lifecycle, and future capabilities |
 
 Supporting implementation-specific documentation remains in:

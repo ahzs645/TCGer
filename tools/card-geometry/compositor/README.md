@@ -91,3 +91,10 @@ art panels.
 This is a smoke release. Its generated minimums are tooling-only and cannot
 authorize training. A future `training` release must bind the separately
 approved `training-minimums-v1` policy by hash.
+
+The first published run is pinned at dataset revision
+`b4ef746b06c725cbe196e709d518dc53eea0ad13`, release path
+`geometry/releases/synthetic-geometry-smoke-v1`, and corpus hash
+`544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393`.
+Its counts, Hub smoke, and baseline results are recorded in the
+[dated benchmark](../../../docs/scanner-system/benchmarks/2026-09-02-synthetic-card-geometry-smoke/README.md).
