@@ -156,7 +156,7 @@ CardGeometryResult
 - cornerOrderConfidence            (may be unknown; see Orientation rule)
 - containment: inside | partiallyOutside
 - side: faceUp | faceDown | unknown
-- container: rawCard | slab
+- container: rawCard | slab | unknown
 - boundingBox                      (derived, axis-aligned, clipped to frame)
 - mask                             (optional, lazy, off the hot path)
 - releaseVersion                   (asset-store release, monotonic)
@@ -171,13 +171,21 @@ visibility field may be added later if a model explicitly predicts it.
 
 `side` and `container` are properties, not detection classes. Geometry must
 not fail because side classification is uncertain, and slabs need their own
-aspect-ratio validation band.
+aspect-ratio validation band. `container` is `unknown` for any candidate that
+does not predict slab classification.
 
 Rules that are part of the contract and shared as code, not prose:
 
-- input letterboxing (padding value, alignment, resize kernel);
+- input letterboxing (padding value, alignment, resize kernel, and any
+  exterior margin). If a candidate was trained on a padded canvas so that
+  amodal corners fall inside normalized range, the inference letterbox must
+  carry the identical margin; train and run coordinate spaces are one
+  contract;
 - coordinate conversion back to source space (Vision's bottom-left origin is
-  converted inside the iOS adapter only);
+  converted inside the iOS adapter only). Normalized source coordinates need
+  an explicit pixel mapping: pixel-center (`x × (width − 1)`) or image-edge
+  (`x × width`). The crop-parity experiment selects one and it is documented
+  beside the destination-corner convention;
 - corner ordering and orientation assignment;
 - quad validation: finite, convex, non-self-intersecting, aspect ratio within
   the card band (or the slab band when `container` is `slab`). Amodal corners
@@ -222,12 +230,33 @@ canonical rounding.
 
 One annotation feeds every candidate. Each card instance records:
 
-- full amodal quad in source-image space; corners may lie outside `[0, 1]`
-  within the same bounded margin the runtime validator allows;
-- `cornerVisibility[4]` with semantic values `unlabeled`, `occluded`,
-  `visible`, and `outsideFrame`; export adapters map these to the pose
-  toolchain's `{0, 1, 2}` (with `outsideFrame` mapped to the occluded value).
-  These labels are annotation only and do not appear in the runtime contract;
+- four corners in source-image space, each
+  `{ point?, visibility, coordinateKnown }`. Corners may lie outside `[0, 1]`
+  within the same bounded margin the runtime validator allows. A full amodal
+  quad is required for synthetic frames, where every hidden or out-of-frame
+  corner is known by construction, and optional for real annotations where a
+  corner is genuinely unknowable; such a corner has `coordinateKnown: false`
+  and receives no coordinate loss;
+- `visibility` takes the semantic values `unlabeled`, `occluded`, `visible`,
+  and `outsideFrame`. These labels are annotation only and do not appear in
+  the runtime contract. The canonical corpus always preserves the original
+  coordinate, including out-of-frame ones; export policy is
+  candidate-specific:
+
+  ```
+  visible                    -> 2
+  occluded, in frame         -> 1
+  unlabeled                  -> 0, no supervised coordinate
+  outsideFrame               -> 0 for a standard pose export, because the
+                                toolchain's label loader rejects coordinates
+                                outside normalized range; or supervised via a
+                                padded canvas / compatible custom head, with
+                                the same margin applied at inference
+  ```
+
+  Padded-canvas export is the default for synthetic data, since the
+  compositor controls the canvas and out-of-frame corners are the cases table
+  scenes most need supervised;
 - visible polygon or mask;
 - card-relative corner order and an orientation-known flag;
 - `side` (face-up, face-down, unknown) and `container` (raw card, slab) as
@@ -264,7 +293,9 @@ Extend the benchmark with:
 
 - one-to-one matching between predictions and ground truth;
 - corner error in source pixels and normalized, at p50, p90, and p95;
-- visible-corner versus occluded-corner accuracy;
+- visible-corner versus occluded-corner accuracy, computed only over corners
+  with `coordinateKnown: true` and reporting the number skipped, so real and
+  synthetic slices stay comparable;
 - multi-card recall at quad IoU 0.75;
 - duplicate and extra-detection rate;
 - orientation accuracy where orientation is knowable;
@@ -320,11 +351,15 @@ The contracts above are frozen only when all three have landed.
 
 1. **Contract freeze**
    - commit JSON schemas for `CardGeometryResult` and the corpus record;
-   - run the crop-kernel and parity experiment and fill in the undecided crop
-     values;
-   - commit decoder golden fixtures (exact) and crop fixtures (tolerance),
-     including NMS threshold boundaries and invalid, crossed, tiny,
-     out-of-frame, and partially-outside quads.
+   - run the crop-kernel and parity experiment, fill in the undecided crop
+     values, and select the normalized-to-pixel source mapping;
+   - commit model-agnostic golden fixtures for the stage
+     `decoded candidates -> validation/NMS -> CardGeometryResult[]` (exact
+     after canonical rounding), including NMS threshold boundaries and
+     invalid, crossed, tiny, out-of-frame, and partially-outside quads, plus
+     crop fixtures (tolerance). Raw-tensor-to-candidate fixtures are
+     model-specific and are added per trained model in export step 3, so this
+     workstream stays independent of the licensing decision.
 2. **Benchmark extension**
    - annotate every card in the selected duel-field and binder subset;
    - implement one-to-one prediction-to-truth matching;
@@ -346,9 +381,10 @@ The contracts above are frozen only when all three have landed.
    - select the allowed training family;
    - train the candidate batch (pose primary with OBB and segmentation
      challengers, or RTMDet/RTMPose plus the custom FastViT corner head).
-3. Export raw heads to Core ML and ONNX; implement the decoder in Swift,
-   Kotlin, and TypeScript against shared golden fixtures; add crop fixtures
-   with tolerances.
+3. Export raw heads to Core ML and ONNX; implement each model's
+   raw-tensor-to-candidate decoder in Swift, Kotlin, and TypeScript and add
+   its model-specific golden fixtures beside the shared validation/NMS
+   fixtures.
 4. Run offline geometry evaluation, full recognition replay on the labeled
    Magic, Pokémon, and Yu-Gi-Oh sessions, and physical-device latency and
    thermal tests.
