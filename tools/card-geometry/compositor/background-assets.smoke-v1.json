@@ -1,0 +1,30 @@
+{
+  "assets": [
+    {
+      "assetId": "tcger-cc0-wood-train-v1",
+      "licenseId": "CC0-1.0",
+      "path": "assets/background-train-wood.ppm",
+      "provenance": {
+        "author": "TCGer project",
+        "description": "Project-authored procedural wood-color texture released as CC0",
+        "redistributionStatus": "CC0"
+      },
+      "sha256": "93acfaf40b15bcec5ce3ccde6ab0d9d80c35a12d3086dd1da39a201a78278408",
+      "split": "train"
+    },
+    {
+      "assetId": "tcger-cc0-cloth-validation-v1",
+      "licenseId": "CC0-1.0",
+      "path": "assets/background-validation-cloth.ppm",
+      "provenance": {
+        "author": "TCGer project",
+        "description": "Project-authored procedural cloth-color texture released as CC0",
+        "redistributionStatus": "CC0"
+      },
+      "sha256": "3ecec629f3f9a034158b0d6dff6d9a0556372bf246759db5f8e62475a6a31393",
+      "split": "validation"
+    }
+  ],
+  "role": "background",
+  "schema": "https://tcger.app/manifests/card-geometry-compositor-assets/v1"
+}

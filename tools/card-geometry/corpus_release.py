@@ -132,11 +132,22 @@ def instance_leakage_ids(record: dict[str, Any], key: str) -> list[str]:
 def leakage_keys_from_record(record: dict[str, Any]) -> dict[str, Any]:
     """Derive the manifest `leakageKeys` block from a record's own content."""
     grouping = record.get("grouping", {})
+    source_asset_ids = set(instance_leakage_ids(record, "sourceAssetId"))
+    synthetic = record.get("synthetic", {})
+    if isinstance(synthetic, dict):
+        background = synthetic.get("backgroundAssetId")
+        if isinstance(background, str):
+            source_asset_ids.add(background)
+        distractors = synthetic.get("distractorSourceAssetIds", [])
+        if isinstance(distractors, list):
+            source_asset_ids.update(
+                value for value in distractors if isinstance(value, str)
+            )
     keys: dict[str, Any] = {
         "sourceKind": record.get("source", {}).get("kind"),
         "sourceArchiveId": grouping.get("sourceArchiveId"),
         "physicalCardIds": instance_leakage_ids(record, "physicalCardId"),
-        "sourceAssetIds": instance_leakage_ids(record, "sourceAssetId"),
+        "sourceAssetIds": sorted(source_asset_ids),
     }
     if "sessionId" in grouping:
         keys["sessionId"] = grouping["sessionId"]

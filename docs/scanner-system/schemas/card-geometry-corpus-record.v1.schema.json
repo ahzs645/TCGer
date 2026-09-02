@@ -218,7 +218,13 @@
         "sceneSeed": { "type": "integer", "minimum": 0 },
         "transformationSeed": { "type": "integer", "minimum": 0 },
         "contextMarginPixels": { "$ref": "#/$defs/pixelMargins" },
-        "compositorRevision": { "type": "string", "minLength": 7, "maxLength": 64 }
+        "compositorRevision": { "type": "string", "minLength": 7, "maxLength": 64 },
+        "backgroundAssetId": { "$ref": "#/$defs/id" },
+        "distractorSourceAssetIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
       }
     }
   }

@@ -51,6 +51,13 @@ plan's decision to keep 0/180 recognition and orientation-contradiction
 rejection until a calibrated `cornerOrderConfidence` exists. High aggregate
 orientation accuracy alone is not enough to remove that safety net.
 
+In particular, Vision document's normalized p95 moves from 0.426 to 0.875
+without any change to its quads: the change is the four fixed-order roll
+errors, not worse localization precision. Across the plausible 93–98%
+baselines, removing double inference would expose roughly 2–7% of matched
+cards to a silent wrong orientation. Confidence must be calibrated per
+candidate against these tail errors, not inferred from aggregate accuracy.
+
 Vision rectangles' perfect orientation number is conditional on only 28
 matched pairs and must not be read without its 0.525 recall. As before, this
 release is single-card and smoke-purpose; it is not training authorization and

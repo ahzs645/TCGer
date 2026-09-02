@@ -102,6 +102,12 @@ not observable on-device. The four wrong accepts are also too few and not
 monotonic in geometry error, so geometry quality cannot replace the existing
 recognition safety checks.
 
+Geometry is therefore necessary but not sufficient. A corner model can attack
+the high-error bucket and the eight unmatched frames, but abstention remains
+53–60% below 0.10 where geometry is already good. The 2026-08-30 bake-off
+isolated that residual as the encoder's camera-domain gap; reducing it requires
+the separate camera fine-tune rather than more detector tuning.
+
 ### Proposed candidate budgets
 
 These values are proposed pending human approval. If approved, they are frozen

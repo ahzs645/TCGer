@@ -155,13 +155,15 @@ configured localizer. `--device-sessions-root` reconstructs phone-recorded
 quads from archived session `results.json` files and matches them to release
 images by content hash; those quads remain predictions, never ground truth.
 
+The [deterministic compositor](compositor/README.md) emits synthetic scenes as
+ordinary smoke-purpose releases through these same contracts and checks.
+
 ## Running the checks
 
 ```sh
 uv pip install -r tools/card-geometry/requirements.txt
-cd tools/card-geometry && python3 -m unittest \
-  test_reference_geometry test_preflight test_real_smoke_release \
-  test_benchmark_geometry
+uv pip install -r tools/card-geometry/compositor/requirements.txt
+python3 -m unittest discover -s tools/card-geometry -p 'test_*.py'
 ```
 
 `reference_geometry.py` and `build_fixture_releases.py` need only the standard
