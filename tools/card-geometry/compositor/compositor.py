@@ -35,7 +35,13 @@ from corpus_release import (  # noqa: E402
 
 ASSET_MANIFEST_SCHEMA = "https://tcger.app/manifests/card-geometry-compositor-assets/v1"
 BUILD_SUMMARY_SCHEMA = "https://tcger.app/reports/card-geometry-compositor-build/v1"
-SCENE_SLICES = ("single_handheld", "binder_page", "duel_field", "steep_playmat")
+SCENE_SLICES = (
+    "single_handheld",
+    "single_handheld_distractor_free",
+    "binder_page",
+    "duel_field",
+    "steep_playmat",
+)
 SPLITS = ("train", "validation")
 
 
@@ -392,11 +398,18 @@ def _background(asset: Asset, size: tuple[int, int]) -> Image.Image:
 
 
 def _draw_distractors(
-    canvas: Image.Image, rng: np.random.Generator, art_asset: Asset
-) -> list[str]:
+    canvas: Image.Image,
+    rng: np.random.Generator,
+    art_asset: Asset,
+    *,
+    enabled: bool = True,
+) -> tuple[list[str], int]:
+    if not enabled:
+        return [], 0
     draw = ImageDraw.Draw(canvas, "RGBA")
     width, height = canvas.size
-    for _ in range(int(rng.integers(1, 5))):
+    procedural_count = int(rng.integers(1, 5))
+    for _ in range(procedural_count):
         x = int(rng.uniform(0, width * 0.85))
         y = int(rng.uniform(0, height * 0.85))
         w = int(rng.uniform(70, 260))
@@ -416,8 +429,8 @@ def _draw_distractors(
         x = int(rng.uniform(0, max(1, width - crop.width)))
         y = int(rng.uniform(0, max(1, height - crop.height)))
         canvas.alpha_composite(crop.convert("RGBA"), (x, y))
-        return [art_asset.asset_id]
-    return []
+        return [art_asset.asset_id], procedural_count + 1
+    return [], procedural_count
 
 
 def _draw_scene_surface(
@@ -567,6 +580,11 @@ def render_record(
     card_assets: list[Asset],
     background_assets: list[Asset],
 ) -> tuple[dict[str, Any], bytes]:
+    layout_slice = (
+        "single_handheld"
+        if scene_slice == "single_handheld_distractor_free"
+        else scene_slice
+    )
     canvas_config = config["canvas"]
     width = int(canvas_config["width"])
     height = int(canvas_config["height"])
@@ -579,10 +597,23 @@ def render_record(
         raise CompositorError(f"no background assets assigned to {split}")
     background = backgrounds[int(rng.integers(0, len(backgrounds)))]
     canvas = _background(background, padded_size)
-    _draw_scene_surface(canvas, scene_slice, margins, width, height)
-    quads, add_hand = _layout(scene_slice, rng, config, padded_size[0], padded_size[1], width, height, margins)
+    _draw_scene_surface(canvas, layout_slice, margins, width, height)
+    quads, add_hand = _layout(
+        layout_slice,
+        rng,
+        config,
+        padded_size[0],
+        padded_size[1],
+        width,
+        height,
+        margins,
+    )
     selected = []
-    face_down_probability = float(config["scenes"].get(scene_slice, {}).get(f"faceDownProbability{split.title()}", 0))
+    face_down_probability = float(
+        config["scenes"].get(layout_slice, {}).get(
+            f"faceDownProbability{split.title()}", 0
+        )
+    )
     for quad in quads:
         side = "faceDown" if rng.random() < face_down_probability else "faceUp"
         asset = _select_asset(card_assets, split, side, rng)
@@ -590,7 +621,12 @@ def render_record(
         if rng.random() < 0.35:
             tint = (int(rng.uniform(40, 190)), int(rng.uniform(50, 200)), int(rng.uniform(80, 220)), int(rng.uniform(8, 35)))
         selected.append(SceneCard(asset=asset, quad=quad, side=side, sleeve_tint=tint))
-    distractor_ids = _draw_distractors(canvas, rng, selected[0].asset)
+    distractor_ids, distractor_count = _draw_distractors(
+        canvas,
+        rng,
+        selected[0].asset,
+        enabled=scene_slice != "single_handheld_distractor_free",
+    )
     full_masks = []
     for card in selected:
         warped, mask = _warp_asset(card.asset, card.quad, padded_size, card.sleeve_tint)
@@ -665,6 +701,7 @@ def render_record(
             "compositorRevision": revision,
             "backgroundAssetId": background.asset_id,
             "distractorSourceAssetIds": sorted(set(distractor_ids)),
+            "distractorCount": distractor_count,
         },
     }
     return record, image_bytes
@@ -727,6 +764,9 @@ def build_release(
 
     entries = []
     counts = Counter()
+    distractors_by_scene: dict[str, Counter[str]] = {
+        scene: Counter() for scene in SCENE_SLICES
+    }
     for split in SPLITS:
         for scene_slice in SCENE_SLICES:
             count = int(records_per_split_scene.get(split, {}).get(scene_slice, 0))
@@ -765,6 +805,11 @@ def build_release(
                 counts["instances"] += len(record["instances"])
                 counts[f"split:{split}"] += 1
                 counts[f"scene:{scene_slice}"] += 1
+                distractor_count = int(record["synthetic"]["distractorCount"])
+                distractors_by_scene[scene_slice]["records"] += 1
+                distractors_by_scene[scene_slice]["distractors"] += distractor_count
+                if distractor_count:
+                    distractors_by_scene[scene_slice]["recordsWithDistractors"] += 1
                 for instance in record["instances"]:
                     for corner in instance["corners"]:
                         counts[f"visibility:{corner['visibility']}"] += 1
@@ -793,6 +838,25 @@ def build_release(
         "resolvedConfigSha256": config_sha,
         "assetManifestSha256": {"cards": card_manifest_sha, "backgrounds": background_manifest_sha},
         "counts": dict(sorted(counts.items())),
+        "distractorPrevalenceBySceneSlice": {
+            scene: {
+                "records": values["records"],
+                "recordsWithDistractors": values["recordsWithDistractors"],
+                "recordPrevalence": (
+                    values["recordsWithDistractors"] / values["records"]
+                    if values["records"]
+                    else 0.0
+                ),
+                "distractorCount": values["distractors"],
+                "meanDistractorsPerRecord": (
+                    values["distractors"] / values["records"]
+                    if values["records"]
+                    else 0.0
+                ),
+            }
+            for scene, values in distractors_by_scene.items()
+            if values["records"]
+        },
     }
     (output / "build-summary.json").write_text(pretty_json(summary), encoding="utf-8")
     return summary

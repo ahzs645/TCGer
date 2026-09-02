@@ -50,6 +50,14 @@ class CompositorTests(unittest.TestCase):
         self.assertEqual(sum(sum(slices.values()) for slices in counts.values()), 2_000)
         self.assertEqual(sum(counts["validation"].values()), 200)
 
+    def test_smoke_v2_preserves_size_and_adds_distractor_free_slice(self):
+        config = load_json(HERE / "config.smoke-v2.json")
+        counts = config["generation"]["recordsPerSplitScene"]
+        self.assertEqual(sum(sum(slices.values()) for slices in counts.values()), 2_000)
+        self.assertEqual(sum(counts["validation"].values()), 200)
+        self.assertEqual(counts["train"]["single_handheld_distractor_free"], 50)
+        self.assertEqual(counts["validation"]["single_handheld_distractor_free"], 25)
+
     def _inputs(self, root: Path):
         assets = root / "assets"
         assets.mkdir()
@@ -109,7 +117,7 @@ class CompositorTests(unittest.TestCase):
             "generation": {
                 "seedBase": 17,
                 "recordsPerSplitScene": {
-                    "train": {"single_handheld": 1, "binder_page": 0, "duel_field": 1, "steep_playmat": 1},
+                    "train": {"single_handheld": 1, "single_handheld_distractor_free": 1, "binder_page": 0, "duel_field": 1, "steep_playmat": 1},
                     "validation": {"single_handheld": 1, "binder_page": 1, "duel_field": 0, "steep_playmat": 0},
                 },
             },
@@ -157,7 +165,13 @@ class CompositorTests(unittest.TestCase):
             self.assertEqual(first_files, second_files)
             for relative in first_files:
                 self.assertEqual((first / relative).read_bytes(), (second / relative).read_bytes(), relative)
-            self.assertEqual(summaries[0]["counts"]["records"], 5)
+            self.assertEqual(summaries[0]["counts"]["records"], 6)
+            clean = summaries[0]["distractorPrevalenceBySceneSlice"][
+                "single_handheld_distractor_free"
+            ]
+            self.assertEqual(clean["records"], 1)
+            self.assertEqual(clean["distractorCount"], 0)
+            self.assertEqual(clean["recordPrevalence"], 0.0)
             manifest = load_json(first / "manifest.json")
             self.assertEqual({entry["split"] for entry in manifest["records"]}, {"train", "validation"})
             self.assertNotIn("test", {entry["split"] for entry in manifest["records"]})

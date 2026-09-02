@@ -1,0 +1,5 @@
+# Pinned stack for crop pixels and released-encoder sensitivity measurements.
+numpy==2.1.3
+Pillow==11.1.0
+opencv-python-headless==4.10.0.84
+onnxruntime==1.29.0

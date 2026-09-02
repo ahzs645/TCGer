@@ -29,7 +29,7 @@ export interface RgbaImage {
   height: number;
 }
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
@@ -365,9 +365,12 @@ function solve8(A: number[][], b: number[]): number[] | null {
  * Warp the quad region of `image` into a flat card rectangle
  * (TARGET_WIDTH x card aspect) with bilinear sampling.
  */
-export function warpQuadToCard(image: RgbaImage, quad: Point[]): RgbaImage | null {
-  const targetW = TARGET_WIDTH;
-  const targetH = Math.round(TARGET_WIDTH * CARD_ASPECT);
+export function warpQuadToCard(
+  image: RgbaImage,
+  quad: Point[],
+  targetW = TARGET_WIDTH,
+  targetH = Math.round(targetW * CARD_ASPECT),
+): RgbaImage | null {
   const h = homographyToQuad(quad, targetW, targetH);
   if (!h) return null;
 

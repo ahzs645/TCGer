@@ -224,6 +224,11 @@
           "type": "array",
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/id" }
+        },
+        "distractorCount": {
+          "description": "Number of unlabeled distractor objects composited into the capture. This counts procedural distractors as well as card-derived art panels; sourceAssetIds records only distractors backed by an asset.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

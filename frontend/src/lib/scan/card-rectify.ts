@@ -33,7 +33,7 @@ export interface RgbaImage {
   height: number;
 }
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
@@ -402,9 +402,9 @@ function solve8(A: number[][], b: number[]): number[] | null {
 export function warpQuadToCard(
   image: RgbaImage,
   quad: Point[],
+  targetW = TARGET_WIDTH,
+  targetH = Math.round(targetW * CARD_ASPECT),
 ): RgbaImage | null {
-  const targetW = TARGET_WIDTH;
-  const targetH = Math.round(TARGET_WIDTH * CARD_ASPECT);
   const h = homographyToQuad(quad, targetW, targetH);
   if (!h) return null;
 

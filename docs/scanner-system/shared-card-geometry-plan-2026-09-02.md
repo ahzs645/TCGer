@@ -42,6 +42,10 @@ The evidence for changing this is already recorded:
   parity, not single-card box quality.
 - Android has no detector at all, and the web detector cannot be retrained
   from its original weights.
+- On the first 3,157-card synthetic duel-field benchmark, every existing
+  localizer misses at least 2,278 cards. This is the first quantified
+  multi-card evidence and rules out treating the shared detector as only a
+  single-card crop cleanup.
 
 A shared corner-predicting model addresses all four at once.
 
@@ -301,6 +305,14 @@ the repository with a pinned configuration. Compositing yields every full
 quad, occlusion order, and hidden corner for free. Real sessions stay frozen
 for evaluation; a session-separated real-overlap training set is added later
 to close the synthetic-to-camera gap.
+
+The first two-background, 71-render compositor release is tooling smoke only.
+Before a training-purpose release, the pool expands to several thousand
+Pokémon, Magic, and Yu-Gi-Oh renders (including 59:86 Yu-Gi-Oh cards), three
+game backs, and 50–100 self-captured surface photographs. Backgrounds remain
+self-captured or explicitly CC0. A distractor-free single-handheld synthetic
+sub-slice and per-frame `distractorCount` separate distractor-density failures
+from transformation-range failures before those distributions are tuned.
 
 ## Benchmark and winner rule
 

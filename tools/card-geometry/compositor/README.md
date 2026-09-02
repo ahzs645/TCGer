@@ -21,8 +21,10 @@ data. Generated images are not a parallel training format.
 - Visible masks are exact uncompressed COCO RLE masks after later cards, the
   optional hand occluder, and the capture frame are applied.
 - The release records the background asset and any card-derived art-panel
-  distractor. Shared leakage-key derivation includes those ids as well as the
-  instance card assets.
+  distractor. It also records `distractorCount`, including procedural objects,
+  so prevalence can be reported without confusing asset-backed provenance
+  with scene difficulty. Shared leakage-key derivation includes asset ids as
+  well as the instance card assets.
 - No wall-clock value enters an image, record, manifest, config, or summary.
 
 The pinned stack is in `requirements.txt`. A five-record test generates two
@@ -44,6 +46,13 @@ photo assets for a later training release; do not scrape backgrounds.
 Card backs are private training assets. The first smoke uses the checked-in
 Pokémon back only in `train`; validation disables face-down cards so the same
 back bytes never cross the split boundary.
+
+The checked-in assets are intentionally a smoke pool, not a training pool. A
+training-purpose synthetic release must first contain several thousand renders
+across Pokémon, Magic, and Yu-Gi-Oh (including the 59:86 Yu-Gi-Oh aspect), all
+three game backs, and 50–100 self-captured photos of representative desks,
+playmats, binder pages, carpet, hands, and sleeves. Background provenance stays
+self-captured or explicitly CC0; scraped backgrounds are forbidden.
 
 ## Build the bounded card pack
 
@@ -87,6 +96,13 @@ bank supplies contrast 0.71/0.97/1.28, sharpness 0.06/0.64/1.67, saturation
 sampled effects are warm/cool gains up to 1.25, gamma, recompression,
 vignette, glare, sleeve tint, non-card rectangles, phones, paper, and cropped
 art panels.
+
+`config.smoke-v2.json` preserves the same 2,000-frame size while splitting 75
+single-handheld frames into `single_handheld_distractor_free`. That subset has
+the same geometry and photometric distributions as `single_handheld`, but an
+exact distractor count of zero. The build summary reports record prevalence and
+mean distractor count for every scene slice. Compare the two single-handheld
+slices before changing either distractor density or transformation ranges.
 
 This is a smoke release. Its generated minimums are tooling-only and cannot
 authorize training. A future `training` release must bind the separately
