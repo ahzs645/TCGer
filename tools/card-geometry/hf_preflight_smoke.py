@@ -9,14 +9,16 @@ its report, and only then decides whether to submit the next Job.
        `geometry/tooling/<git-sha>/`. The Hub commit oid is captured so the
        Jobs download exactly those bytes.
     2. Submit a CPU Job that runs the preflight against a release that must
-       fail with one specific check code. The run is accepted only if the
+       fail with one specific check code. For a pinned dataset release, the
+       Job changes one image byte and requires exactly `IMAGE_HASH`. The run is accepted only if the
        preflight exit code is 2 and `failedChecks` equals the expected set.
        An authentication, download, or dependency failure produces a
        different exit code or a missing report and is reported as such,
        never as a passing rejection test.
     3. Only if step 2 behaved, submit the positive Job against the valid
        fixture release and require exit 0 with `readyFor: tooling`.
-    4. Write a local summary with job ids, the tooling oid, and both reports.
+    4. Upload both reports under a path containing the corpus hash, capture the
+       returned commit oids, and write a local summary with all provenance.
 
 Requires `HF_TOKEN` (or a logged-in `hf` CLI) with write access to the model
 repo. Run with `--dry-run` to print the Job commands without submitting.
@@ -103,8 +105,16 @@ def job_script(
     tooling_path: str,
     tooling_oid: str,
     tooling_sha256: str,
-    release_name: str,
+    release_name: str | None,
     git_revision: str,
+    dataset_repo: str | None = None,
+    dataset_revision: str | None = None,
+    release_path: str | None = None,
+    expected_corpus_hash: str | None = None,
+    expected_policy_sha256: str | None = None,
+    expected_policy_id: str | None = None,
+    expected_purpose: str | None = None,
+    mutate_image: bool = False,
 ) -> str:
     """Bash executed inside the Job. Downloads pinned bytes, verifies, runs the preflight."""
     download = f"""
@@ -120,20 +130,67 @@ if digest != {tooling_sha256!r}:
     sys.exit(97)
 print(path)
 """
-    return "\n".join(
-        [
-            "set -u",
-            "mkdir -p /work/download /work/src",
-            f"pip install -q {PINNED_HUB} {PINNED_JSONSCHEMA} || exit 96",
-            f"TARBALL=$(python - <<'PY'\n{download}\nPY\n) || exit $?",
-            'tar -xzf "$TARBALL" -C /work/src || exit 95',
-            "cd /work/src",
+    commands = [
+        "set -u",
+        "mkdir -p /work/download /work/src",
+        f"pip install -q {PINNED_HUB} {PINNED_JSONSCHEMA} || exit 96",
+        f"TARBALL=$(python - <<'PY'\n{download}\nPY\n) || exit $?",
+        'tar -xzf "$TARBALL" -C /work/src || exit 95',
+        "cd /work/src",
+    ]
+    if dataset_repo:
+        dataset_download = f"""
+import os
+from pathlib import Path
+from huggingface_hub import snapshot_download
+root = snapshot_download(
+    repo_id={dataset_repo!r}, revision={dataset_revision!r}, repo_type="dataset",
+    token=os.environ["HF_TOKEN"], allow_patterns=[{release_path!r}, {f"{release_path}/**"!r}],
+)
+release = Path(root) / {release_path!r}
+if not (release / "manifest.json").is_file():
+    raise SystemExit(f"release not found at {{release}}")
+print(release)
+"""
+        commands.extend(
+            [
+                f"DATASET_RELEASE=$(python - <<'PY'\n{dataset_download}\nPY\n) || exit $?",
+                'cp -R "$DATASET_RELEASE" /work/release || exit 94',
+            ]
+        )
+        if mutate_image:
+            commands.append(
+                "python - <<'PY'\n"
+                "import json\n"
+                "from pathlib import Path\n"
+                "root = Path('/work/release')\n"
+                "manifest = json.loads((root / 'manifest.json').read_text())\n"
+                "image = root / manifest['records'][0]['images'][0]['path']\n"
+                "data = bytearray(image.read_bytes())\n"
+                "data[len(data) // 2] ^= 1\n"
+                "image.write_bytes(data)\n"
+                "print('MUTATED_IMAGE', image)\n"
+                "PY"
+            )
+        expected_args = [
+            f"--expected-corpus-hash {expected_corpus_hash}",
+            f"--expected-policy-sha256 {expected_policy_sha256}",
+            f"--expected-purpose {expected_purpose}",
+        ]
+        if expected_policy_id:
+            expected_args.append(f"--expected-policy-id {expected_policy_id}")
+        commands.append(
+            "python tools/card-geometry/preflight.py --release-root /work/release "
+            f"{' '.join(expected_args)} --tooling-revision {git_revision} --print-report"
+        )
+    else:
+        commands.append(
             "python tools/card-geometry/preflight.py "
             f"--release-root tools/card-geometry/fixtures/releases/{release_name} "
-            f"--tooling-revision {git_revision} --print-report",
-            f'echo "{EXIT_MARKER}$?"',
-        ]
-    )
+            f"--tooling-revision {git_revision} --print-report"
+        )
+    commands.append(f'echo "{EXIT_MARKER}$?"')
+    return "\n".join(commands)
 
 
 def parse_logs(lines: list[str]) -> tuple[int | None, dict[str, Any] | None]:
@@ -215,9 +272,13 @@ def submit_and_collect(
     }
 
 
-def evaluate_negative(result: dict[str, Any], release_name: str) -> list[str]:
+def evaluate_negative(
+    result: dict[str, Any],
+    release_name: str | None,
+    expected_checks: set[str] | None = None,
+) -> list[str]:
     problems = []
-    expected = set(EXPECTED_FAILED_CHECKS[release_name])
+    expected = expected_checks or set(EXPECTED_FAILED_CHECKS[release_name])
     if result["preflightExit"] != EXIT_CHECKS_FAILED:
         problems.append(
             f"expected preflight exit {EXIT_CHECKS_FAILED}, got {result['preflightExit']!r}"
@@ -232,9 +293,12 @@ def evaluate_negative(result: dict[str, Any], release_name: str) -> list[str]:
         problems.append(
             f"expected failedChecks {sorted(expected)}, got {report['failedChecks']}"
         )
-    if report["readyFor"] != EXPECTED_READY_FOR[release_name]:
+    expected_ready = (
+        "none" if expected_checks is not None else EXPECTED_READY_FOR[release_name]
+    )
+    if report["readyFor"] != expected_ready:
         problems.append(
-            f"expected readyFor {EXPECTED_READY_FOR[release_name]!r}, got {report['readyFor']!r}"
+            f"expected readyFor {expected_ready!r}, got {report['readyFor']!r}"
         )
     if (
         "MANIFEST_LOAD" in report["failedChecks"]
@@ -246,7 +310,9 @@ def evaluate_negative(result: dict[str, Any], release_name: str) -> list[str]:
     return problems
 
 
-def evaluate_positive(result: dict[str, Any], release_name: str) -> list[str]:
+def evaluate_positive(
+    result: dict[str, Any], release_name: str | None, expected_ready: str | None = None
+) -> list[str]:
     problems = []
     if result["preflightExit"] != EXIT_OK:
         problems.append(
@@ -258,10 +324,9 @@ def evaluate_positive(result: dict[str, Any], release_name: str) -> list[str]:
         return problems
     if report["failedChecks"]:
         problems.append(f"unexpected failed checks {report['failedChecks']}")
-    if report["readyFor"] != EXPECTED_READY_FOR[release_name]:
-        problems.append(
-            f"expected readyFor {EXPECTED_READY_FOR[release_name]!r}, got {report['readyFor']!r}"
-        )
+    ready = expected_ready or EXPECTED_READY_FOR[release_name]
+    if report["readyFor"] != ready:
+        problems.append(f"expected readyFor {ready!r}, got {report['readyFor']!r}")
     if report["readyFor"] == "training":
         problems.append("a fixture release must never be ready for training")
     return problems
@@ -270,6 +335,21 @@ def evaluate_positive(result: dict[str, Any], release_name: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--hub-repo", default="ahzs645/tcger-universal-arcface")
+    parser.add_argument(
+        "--dataset-repo", help="Private Hub dataset containing a real release"
+    )
+    parser.add_argument(
+        "--dataset-revision",
+        help="Immutable 40-hex Hub commit oid for --dataset-repo",
+    )
+    parser.add_argument(
+        "--release-path",
+        help="Directory inside the pinned dataset revision containing manifest.json",
+    )
+    parser.add_argument("--expected-corpus-hash")
+    parser.add_argument("--expected-policy-sha256")
+    parser.add_argument("--expected-policy-id")
+    parser.add_argument("--expected-purpose", choices=("fixture", "smoke", "training"))
     parser.add_argument("--flavor", default="cpu-basic")
     parser.add_argument("--image", default=PINNED_CPU_IMAGE)
     parser.add_argument("--timeout-seconds", type=int, default=900)
@@ -299,9 +379,37 @@ def main() -> int:
     if not re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", args.image):
         parser.error("--image must be pinned by sha256 digest")
 
-    if not EXPECTED_FAILED_CHECKS[args.negative_release]:
+    dataset_fields = (
+        args.dataset_repo,
+        args.dataset_revision,
+        args.release_path,
+        args.expected_corpus_hash,
+        args.expected_policy_sha256,
+        args.expected_purpose,
+    )
+    dataset_mode = any(dataset_fields)
+    if dataset_mode and not all(dataset_fields):
+        parser.error(
+            "real-release smoke requires --dataset-repo, --dataset-revision, "
+            "--release-path, --expected-corpus-hash, --expected-policy-sha256, "
+            "and --expected-purpose"
+        )
+    if dataset_mode:
+        if not re.fullmatch(r"[0-9a-f]{40}", args.dataset_revision):
+            parser.error("--dataset-revision must be an immutable 40-hex commit oid")
+        release_parts = Path(args.release_path).parts
+        if Path(args.release_path).is_absolute() or ".." in release_parts:
+            parser.error("--release-path must be a safe dataset-relative path")
+        for name, value in (
+            ("--expected-corpus-hash", args.expected_corpus_hash),
+            ("--expected-policy-sha256", args.expected_policy_sha256),
+        ):
+            if not re.fullmatch(r"[0-9a-f]{64}", value):
+                parser.error(f"{name} must be a lowercase SHA-256")
+
+    if not dataset_mode and not EXPECTED_FAILED_CHECKS[args.negative_release]:
         parser.error("--negative-release must name a release that is expected to fail")
-    if EXPECTED_FAILED_CHECKS[args.positive_release]:
+    if not dataset_mode and EXPECTED_FAILED_CHECKS[args.positive_release]:
         parser.error("--positive-release must name a release that is expected to pass")
 
     revision = git_head(args.allow_dirty)
@@ -312,7 +420,10 @@ def main() -> int:
         tooling_sha256 = archive_tooling(revision, tarball)
 
         if args.dry_run:
-            for name in (args.negative_release, args.positive_release):
+            for label, name in (
+                ("negative", args.negative_release),
+                ("positive", args.positive_release),
+            ):
                 print(f"# --- job script for {name} ---")
                 print(
                     job_script(
@@ -322,6 +433,14 @@ def main() -> int:
                         tooling_sha256=tooling_sha256,
                         release_name=name,
                         git_revision=revision,
+                        dataset_repo=args.dataset_repo,
+                        dataset_revision=args.dataset_revision,
+                        release_path=args.release_path,
+                        expected_corpus_hash=args.expected_corpus_hash,
+                        expected_policy_sha256=args.expected_policy_sha256,
+                        expected_policy_id=args.expected_policy_id,
+                        expected_purpose=args.expected_purpose,
+                        mutate_image=dataset_mode and label == "negative",
                     )
                 )
             print(
@@ -352,6 +471,13 @@ def main() -> int:
     summary: dict[str, Any] = {
         "gitRevision": revision,
         "hubRepo": args.hub_repo,
+        "datasetRepo": args.dataset_repo,
+        "datasetRevision": args.dataset_revision,
+        "releasePath": args.release_path,
+        "expectedCorpusHash": args.expected_corpus_hash,
+        "expectedPolicySha256": args.expected_policy_sha256,
+        "expectedPolicyId": args.expected_policy_id,
+        "expectedPurpose": args.expected_purpose,
         "toolingPath": tooling_path,
         "toolingOid": tooling_oid,
         "toolingSha256": tooling_sha256,
@@ -360,7 +486,7 @@ def main() -> int:
         "runs": {},
     }
 
-    def submit(name: str) -> dict[str, Any]:
+    def submit(label: str, name: str) -> dict[str, Any]:
         script = job_script(
             hub_repo=args.hub_repo,
             tooling_path=tooling_path,
@@ -368,6 +494,14 @@ def main() -> int:
             tooling_sha256=tooling_sha256,
             release_name=name,
             git_revision=revision,
+            dataset_repo=args.dataset_repo,
+            dataset_revision=args.dataset_revision,
+            release_path=args.release_path,
+            expected_corpus_hash=args.expected_corpus_hash,
+            expected_policy_sha256=args.expected_policy_sha256,
+            expected_policy_id=args.expected_policy_id,
+            expected_purpose=args.expected_purpose,
+            mutate_image=dataset_mode and label == "negative",
         )
         print(f"submitting {args.flavor} job for {name} ...")
         result = submit_and_collect(
@@ -381,6 +515,29 @@ def main() -> int:
         print(
             f"  job {result['jobId']} {result['stage']} preflight exit {result['preflightExit']}"
         )
+        if result["report"] is not None:
+            corpus = result["report"].get("declaredCorpusHash") or "unknown-corpus"
+            report_path = f"geometry/preflight-reports/{corpus}/{revision}/{label}.json"
+            report_bytes = (
+                json.dumps(result["report"], indent=2, sort_keys=True) + "\n"
+            ).encode("utf-8")
+            report_commit = api.upload_file(
+                path_or_fileobj=report_bytes,
+                path_in_repo=report_path,
+                repo_id=args.hub_repo,
+                repo_type="model",
+                commit_message=f"card-geometry preflight {label} {corpus[:12]}",
+            )
+            report_oid = getattr(report_commit, "oid", None)
+            if not report_oid:
+                raise RuntimeError(
+                    f"report upload returned no commit oid: {report_commit!r}"
+                )
+            result["reportArtifact"] = {
+                "path": report_path,
+                "oid": report_oid,
+            }
+            print(f"  report {report_path} at commit {report_oid}")
         return result
 
     def finish(status: str) -> int:
@@ -392,9 +549,16 @@ def main() -> int:
         print(f"summary: {args.summary} ({status})")
         return 0 if status == "passed" else 1
 
-    negative = submit(args.negative_release)
-    negative["problems"] = evaluate_negative(negative, args.negative_release)
-    summary["runs"]["negative"] = {"release": args.negative_release, **negative}
+    negative = submit("negative", args.negative_release)
+    negative["problems"] = evaluate_negative(
+        negative,
+        None if dataset_mode else args.negative_release,
+        {"IMAGE_HASH"} if dataset_mode else None,
+    )
+    summary["runs"]["negative"] = {
+        "release": args.release_path if dataset_mode else args.negative_release,
+        **negative,
+    }
     if negative["problems"]:
         for problem in negative["problems"]:
             print(f"  negative run problem: {problem}")
@@ -403,9 +567,16 @@ def main() -> int:
         )
         return finish("failed-negative")
 
-    positive = submit(args.positive_release)
-    positive["problems"] = evaluate_positive(positive, args.positive_release)
-    summary["runs"]["positive"] = {"release": args.positive_release, **positive}
+    positive = submit("positive", args.positive_release)
+    positive["problems"] = evaluate_positive(
+        positive,
+        None if dataset_mode else args.positive_release,
+        "tooling" if dataset_mode else None,
+    )
+    summary["runs"]["positive"] = {
+        "release": args.release_path if dataset_mode else args.positive_release,
+        **positive,
+    }
     if positive["problems"]:
         for problem in positive["problems"]:
             print(f"  positive run problem: {problem}")

@@ -30,6 +30,7 @@ from corpus_release import (  # noqa: E402
     validation_errors,
     write_json,
 )
+from hf_preflight_smoke import job_script  # noqa: E402
 from preflight import (  # noqa: E402
     CHECK_ORDER,
     EXIT_CHECKS_FAILED,
@@ -133,6 +134,16 @@ class PreflightTests(unittest.TestCase):
             "valid-fixture", policy_id="training-minimums-draft-v1"
         )
         self.assertEqual(wrong_id["failedChecks"], ["POLICY_HASH"])
+
+    def test_corpus_hash_expectation_is_enforced(self):
+        declared = load_json(RELEASES_DIR / "valid-fixture" / "manifest.json")[
+            "corpusHash"
+        ]
+        matching = self.run_release("valid-fixture", corpus_hash=declared)
+        self.assertEqual(matching["failedChecks"], [])
+        mismatched = self.run_release("valid-fixture", corpus_hash="0" * 64)
+        self.assertEqual(mismatched["failedChecks"], ["CORPUS_HASH"])
+        self.assertEqual(mismatched["readyFor"], "none")
 
     def test_empty_training_release_fails_minimums_and_is_not_ready(self):
         report = self.run_release("empty-training", purpose="training")
@@ -307,6 +318,55 @@ class PreflightCliTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("--image must be pinned by sha256 digest", result.stderr)
+
+    def test_real_release_job_pins_dataset_and_mutates_only_an_image(self):
+        script = job_script(
+            hub_repo="owner/model",
+            tooling_path="geometry/tooling/rev/tooling.tar.gz",
+            tooling_oid="a" * 40,
+            tooling_sha256="b" * 64,
+            release_name=None,
+            git_revision="c" * 40,
+            dataset_repo="owner/private-data",
+            dataset_revision="d" * 40,
+            release_path="geometry/releases/smoke-v1",
+            expected_corpus_hash="e" * 64,
+            expected_policy_sha256="f" * 64,
+            expected_policy_id="real-ingestion-smoke-v1",
+            expected_purpose="smoke",
+            mutate_image=True,
+        )
+        self.assertIn("revision='dddddddddddddddddddddddddddddddddddddddd'", script)
+        self.assertIn("manifest['records'][0]['images'][0]['path']", script)
+        self.assertIn("--expected-corpus-hash " + "e" * 64, script)
+        self.assertIn("--expected-policy-sha256 " + "f" * 64, script)
+        self.assertNotIn("manifest.json').write", script)
+
+    def test_hf_smoke_rejects_mutable_dataset_revision(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "hf_preflight_smoke.py"),
+                "--dry-run",
+                "--dataset-repo",
+                "owner/data",
+                "--dataset-revision",
+                "main",
+                "--release-path",
+                "geometry/releases/smoke-v1",
+                "--expected-corpus-hash",
+                "e" * 64,
+                "--expected-policy-sha256",
+                "f" * 64,
+                "--expected-purpose",
+                "smoke",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("immutable 40-hex commit oid", result.stderr)
 
 
 if __name__ == "__main__":

@@ -113,6 +113,7 @@ class Check:
 
 @dataclass
 class Expectations:
+    corpus_hash: str | None = None
     policy_sha256: str | None = None
     policy_id: str | None = None
     purpose: str | None = None
@@ -257,20 +258,23 @@ def check_corpus_hash(ctx: Context) -> None:
     assert ctx.manifest is not None
     recomputed = corpus_hash(ctx.manifest)
     declared = ctx.manifest["corpusHash"]
-    if recomputed == declared:
+    expected = ctx.expectations.corpus_hash
+    if recomputed == declared and (expected is None or declared == expected):
         ctx.add(
             "CORPUS_HASH",
             PASS,
             "corpusHash matches canonical manifest content",
             corpusHash=declared,
+            expectedCorpusHash=expected,
         )
     else:
         ctx.add(
             "CORPUS_HASH",
             FAIL,
-            "corpusHash does not match canonical manifest content",
+            "corpusHash does not match canonical manifest content or caller expectation",
             declared=declared,
             recomputed=recomputed,
+            expected=expected,
         )
 
 
@@ -859,6 +863,7 @@ def run_preflight(
         if manifest
         else None,
         "expectations": {
+            "corpusHash": ctx.expectations.corpus_hash,
             "policySha256": ctx.expectations.policy_sha256,
             "policyId": ctx.expectations.policy_id,
             "purpose": ctx.expectations.purpose,
@@ -884,6 +889,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--release-root", type=Path, required=True)
     parser.add_argument("--report", type=Path, help="Write the JSON report here")
+    parser.add_argument(
+        "--expected-corpus-hash",
+        help="Fail CORPUS_HASH unless the release declares this corpus hash",
+    )
     parser.add_argument(
         "--expected-policy-sha256",
         help="Fail POLICY_HASH unless the bound policy file has this hash",
@@ -912,6 +921,7 @@ def main(argv: list[str] | None = None) -> int:
     report = run_preflight(
         args.release_root,
         expectations=Expectations(
+            corpus_hash=args.expected_corpus_hash,
             policy_sha256=args.expected_policy_sha256,
             policy_id=args.expected_policy_id,
             purpose=args.expected_purpose,

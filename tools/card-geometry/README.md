@@ -38,7 +38,7 @@ structured `checks` list. Check codes, in report order:
 | `MANIFEST_SCHEMA` | the manifest violates its schema |
 | `POLICY_LOAD` / `POLICY_SCHEMA` | the bound readiness policy is missing, outside the release, or invalid |
 | `POLICY_HASH` | the policy file hash or id differs from the manifest, or from the caller's `--expected-policy-sha256` / `--expected-policy-id` |
-| `CORPUS_HASH` | `corpusHash` differs from the canonical hash of the manifest without that member |
+| `CORPUS_HASH` | `corpusHash` differs from the canonical hash of the manifest without that member, or from the caller's `--expected-corpus-hash` |
 | `RECORD_SCHEMA` / `RECORD_HASH` | a record violates its schema or differs from its manifest hash |
 | `IMAGE_HASH` | an image is missing, differs from its manifest or record hash, or a PNG's IHDR size differs from the record |
 | `MANIFEST_RECORD_CONSISTENCY` | manifest leakage keys or record ids disagree with record content |
@@ -86,11 +86,43 @@ rejected. An authentication, download, or dependency failure surfaces as a
 different exit code or a missing report and is never counted as a passing
 rejection. `--dry-run` prints the Job scripts without submitting.
 
+For a real release, pass `--dataset-repo`, an immutable 40-hex
+`--dataset-revision`, `--release-path`, and the expected corpus hash, policy
+hash/id, and purpose. The fail-first Job copies the pinned release and flips one
+image byte; it must fail with exactly `IMAGE_HASH`. The pass-second Job uses the
+untouched release and must report `readyFor: tooling` for a smoke-purpose
+release. The orchestrator uploads both reports to
+`geometry/preflight-reports/<corpus-hash>/<tooling-revision>/` in the private
+model repo and records each upload's Hub commit oid in its summary.
+
+### First real-source adapter
+
+`build_real_smoke_release.py` converts the standardized segmentation corpus and
+optional Dev Mode sessions into a smoke-purpose geometry release. Its trust
+rules are intentionally conservative:
+
+- `source-polygon` and `source-rle` annotations provide `visibleMask`;
+- bbox-derived annotations never enter geometry v1;
+- only a lossless four-vertex mask fit passing residual, convexity, aspect, and
+  occlusion gates receives known `maskFit` corners (which policy excludes from
+  corner-error ground truth);
+- only persisted, human-confirmed Dev Mode `fixedQuad` values become `human`
+  corners; detector output and identity-only verdicts are ignored;
+- source archives are assigned wholesale to one split, known forks share a
+  split, and TCGX defaults to `test` regardless of its inherited COCO split.
+
+The optional `--max-records-per-archive` selects the first record ids after a
+stable sort for a small tooling smoke; omitting it ingests the complete selected
+archives. The builder refuses to replace a non-empty output directory. The
+generated `build-summary.json` records inclusion, sampling, and fit-gate counts
+but is not part of the hashed release contract.
+
 ## Running the checks
 
 ```sh
 uv pip install -r tools/card-geometry/requirements.txt
-cd tools/card-geometry && python3 -m unittest test_reference_geometry test_preflight
+cd tools/card-geometry && python3 -m unittest \
+  test_reference_geometry test_preflight test_real_smoke_release
 ```
 
 `reference_geometry.py` and `build_fixture_releases.py` need only the standard
