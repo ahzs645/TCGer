@@ -155,7 +155,9 @@ print(release)
         commands.extend(
             [
                 f"DATASET_RELEASE=$(python - <<'PY'\n{dataset_download}\nPY\n) || exit $?",
-                'cp -R "$DATASET_RELEASE" /work/release || exit 94',
+                # Hub snapshots use cache symlinks. Dereference them so the
+                # copied release remains readable outside the snapshot tree.
+                'cp -RL "$DATASET_RELEASE" /work/release || exit 94',
             ]
         )
         if mutate_image:
@@ -515,8 +517,10 @@ def main() -> int:
         print(
             f"  job {result['jobId']} {result['stage']} preflight exit {result['preflightExit']}"
         )
-        if result["report"] is not None:
-            corpus = result["report"].get("declaredCorpusHash") or "unknown-corpus"
+        if result["report"] is not None and re.fullmatch(
+            r"[0-9a-f]{64}", result["report"].get("declaredCorpusHash") or ""
+        ):
+            corpus = result["report"]["declaredCorpusHash"]
             report_path = f"geometry/preflight-reports/{corpus}/{revision}/{label}.json"
             report_bytes = (
                 json.dumps(result["report"], indent=2, sort_keys=True) + "\n"

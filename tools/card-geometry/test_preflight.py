@@ -337,6 +337,7 @@ class PreflightCliTests(unittest.TestCase):
             mutate_image=True,
         )
         self.assertIn("revision='dddddddddddddddddddddddddddddddddddddddd'", script)
+        self.assertIn('cp -RL "$DATASET_RELEASE" /work/release', script)
         self.assertIn("manifest['records'][0]['images'][0]['path']", script)
         self.assertIn("--expected-corpus-hash " + "e" * 64, script)
         self.assertIn("--expected-policy-sha256 " + "f" * 64, script)
