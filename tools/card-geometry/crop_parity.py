@@ -9,14 +9,14 @@ import json
 import math
 import shutil
 import struct
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import cv2
 import numpy as np
 from PIL import Image, ImageOps
-
 
 SCHEMA_ID = "https://tcger.app/reports/card-crop-parity/v1"
 CASES_SCHEMA_ID = "https://tcger.app/fixtures/card-crop-parity-cases/v1"
@@ -45,7 +45,7 @@ def sha256_file(path: Path) -> str:
 
 
 def config_id(mapping: str, kernel: str, inset: float, border: str) -> str:
-    return f"{mapping}-{kernel}-inset{int(round(inset * 100)):02d}-{border}"
+    return f"{mapping}-{kernel}-inset{round(inset * 100):02d}-{border}"
 
 
 def grid() -> list[dict[str, Any]]:
@@ -184,6 +184,19 @@ def comparable_pixel_metrics(
     if actual.shape != reference.shape:
         return None
     return pixel_metrics(actual, reference)
+
+
+def procedural_fixture_image(width: int, height: int, seed: int) -> np.ndarray:
+    """Create a license-free deterministic RGB source for crop-contract fixtures."""
+    y, x = np.mgrid[0:height, 0:width]
+    return np.stack(
+        [
+            (x * 17 + y * 3 + seed * 11) % 256,
+            (x * 5 + y * 19 + seed * 29) % 256,
+            ((x // 7) * 31 + (y // 9) * 47 + seed * 13) % 256,
+        ],
+        axis=-1,
+    ).astype(np.uint8)
 
 
 def normalize_query_colors(image: Image.Image, mode: str) -> Image.Image:
@@ -341,7 +354,7 @@ class EncoderRuntime:
         runtime_dir: Path,
         threshold: float,
         query_normalization: str = "none",
-    ) -> "EncoderRuntime":
+    ) -> EncoderRuntime:
         import onnxruntime as ort
 
         rows = json.loads((runtime_dir / "CardsIndexMetadata.json").read_text())

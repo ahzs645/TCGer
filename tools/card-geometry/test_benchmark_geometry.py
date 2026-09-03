@@ -174,6 +174,14 @@ class BenchmarkGeometryTests(unittest.TestCase):
             self.assertEqual(report["corpusHash"], manifest["corpusHash"])
             self.assertEqual(report["preflight"]["failedChecks"], [])
             self.assertEqual(report["toolingRevision"], "fixture-revision")
+            self.assertEqual(
+                report["coordinateConvention"]["pixelMapping"],
+                {"x": "x * width", "y": "y * height"},
+            )
+            self.assertEqual(
+                report["coordinateConvention"]["status"],
+                "frozen by crop-parity-2026-09-02",
+            )
 
     def test_exact_prediction_has_zero_error(self):
         metrics = evaluate_fixture([truth("exact")], {"exact": [result(QUAD)]})

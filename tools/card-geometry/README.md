@@ -136,8 +136,8 @@ reports recall at 0.5/0.75/0.9, duplicate/extra/miss rates, pixel and normalized
 corner-error percentiles, orientation accuracy, and reconciled corner counts.
 Reports contain no timestamp.
 
-Until the crop-parity experiment freezes the mapping, pixel error uses
-`x * width` and `y * height`; the report records that provisional convention.
+The crop-parity experiment froze pixel error at image-edge mapping,
+`x * width` and `y * height`. New reports record the frozen convention.
 For orientation-unknown truth, cyclic prediction rolls are aligned by minimum
 corner error and the pair is excluded from orientation accuracy.
 

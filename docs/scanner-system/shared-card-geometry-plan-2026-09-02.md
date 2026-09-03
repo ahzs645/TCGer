@@ -1,8 +1,8 @@
 # Shared card-geometry plan — 2026-09-02
 
 **Status:** approved direction. The geometry, crop, and benchmark contracts
-below are drafts and are not frozen until the "Work that starts now" items
-land.
+are frozen. Candidate training remains gated by licensing, approved coverage
+targets, and a training-purpose corpus release.
 
 **Scope:** card detection, corner localization, and crop rectification for
 iOS, Android, and web. Recognition stays per game and is out of scope here
@@ -201,10 +201,9 @@ Rules that are part of the contract and shared as code, not prose:
   image's effective model resolution, its value is a benchmarked choice, not
   a default;
 - coordinate conversion back to source space (Vision's bottom-left origin is
-  converted inside the iOS adapter only). Normalized source coordinates need
-  an explicit pixel mapping: pixel-center (`x × (width − 1)`) or image-edge
-  (`x × width`). The crop-parity experiment selects one and it is documented
-  beside the destination-corner convention;
+  converted inside the iOS adapter only). Normalized source coordinates use
+  the frozen image-edge mapping `x × width`, `y × height`, documented beside
+  the destination-corner convention;
 - corner ordering and orientation assignment;
 - quad validation: finite, convex, non-self-intersecting, aspect ratio within
   the card band (or the slab band when `container` is `slab`). Amodal corners
@@ -223,32 +222,37 @@ size. Today iOS and Android produce 720 × 1000, the web produces 480 × 670,
 the bake-off uses 720 × 1000 with cubic interpolation, and Android uses a
 filtered bitmap draw.
 
-Two values are decided now:
+The crop-parity experiment froze the contract as:
 
+- normalized source mapping: image-edge, `x × width`, `y × height`;
 - destination size: 720 × 1000, portrait;
 - destination corners are pixel centers `(0, 0)`, `(719, 0)`, `(719, 999)`,
   `(0, 999)`, mapped from the source corners TL, TR, BR, BL respectively.
-  Width and height coordinates are not used as destination corners.
+  Width and height coordinates are not used as destination corners;
+- inset: 0%;
+- interpolation: bilinear;
+- border behavior: constant black for source samples outside the frame; and
+- encoder input representation: untagged sRGB 8-bit RGB.
 
-The remaining values are listed here so nothing is forgotten, but they are
-undecided until a small crop-parity experiment runs the same source quads
-through the iOS, Android, web, and bake-off warps and measures the encoder
-similarity shift of each choice:
+With destination pixel centers at 0 and 719, the card edges land at -0.5 and
+719.5, which is a built-in half-pixel inset under the OpenCV convention. The
+same rule applies vertically at -0.5 and 999.5. Source image-edge mapping and
+destination pixel-center mapping are deliberately different conventions;
+their combination is part of the contract.
 
-- inset or padding applied to the source quad before warping;
-- interpolation kernel;
-- border behavior for source pixels outside the frame;
-- color space and bit depth handed to the encoder.
+The decision evidence is tracked in
+[Crop parity experiment — 2026-09-02](crop-parity-2026-09-02.md). The mapping
+remains the benchmark's prior `x × width`, `y × height`, so the three baseline
+sets do not require rescoring. New benchmark reports mark it frozen.
 
-The experiment is tracked in
-[Crop parity experiment — 2026-09-02](crop-parity-2026-09-02.md). Its bench
-and web rows are measured; the native rows and downstream Job are still
-required before this section can be frozen.
-
-Golden crop fixtures compare with tolerances, not pixel equality, because the
-warp implementations are platform-native. Decoder fixtures (raw tensor in,
-`CardGeometryResult[]` out) are deterministic and compare exactly after
-canonical rounding.
+Golden crop fixtures compare platform outputs with MAE at most `2/255` and
+encoder cosine at least `0.995`, because the warp implementations are
+platform-native. When a measured native implementation cannot meet the pixel
+tolerance, cosine remains binding and MAE becomes a recorded diagnostic; the
+pixel tolerance is not loosened retroactively. The eight license-free
+procedural fixtures live under `tools/card-geometry/fixtures/crop-parity.v1`.
+Decoder fixtures (raw tensor in, `CardGeometryResult[]` out) are deterministic
+and compare exactly after canonical rounding.
 
 ## Corpus schema
 
@@ -408,13 +412,14 @@ orientation accuracy.
 
 ## Work that starts now
 
-Three workstreams are unblocked and independent of the licensing decision.
-The contracts above are frozen only when all three have landed.
+Three workstreams were unblocked and independent of the licensing decision.
+The contract-freeze workstream is complete; benchmark and compositor tooling
+are also landed, while candidate training still waits on the human gates.
 
 1. **Contract freeze**
    - commit JSON schemas for `CardGeometryResult` and the corpus record;
-   - run the crop-kernel and parity experiment, fill in the undecided crop
-     values, and select the normalized-to-pixel source mapping;
+   - run the crop-kernel and parity experiment, freeze the crop values, and
+     select the normalized-to-pixel source mapping;
    - commit model-agnostic golden fixtures for the stage
      `decoded candidates -> validation/NMS -> CardGeometryResult[]` (exact
      after canonical rounding), including NMS threshold boundaries and

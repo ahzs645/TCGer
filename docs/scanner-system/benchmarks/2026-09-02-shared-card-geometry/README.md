@@ -29,9 +29,10 @@ images by content hash.
 ## Results
 
 Corner errors are conditional on IoU ≥ 0.5 matches, so they must be read with
-recall. Pixel conversion is provisionally `x * width`, `y * height` until the
-crop-parity experiment freezes the convention. R@0.75 and R@0.9 re-threshold
-the same R@0.5 greedy matches; they do not rematch.
+recall. These reports used `x * width`, `y * height`; the crop-parity
+experiment subsequently froze that same image-edge mapping, so no numerical
+rerun was required. R@0.75 and R@0.9 re-threshold the same R@0.5 greedy
+matches; they do not rematch.
 
 | Localizer | Predictions | R@0.5 | R@0.75 | R@0.9 | Duplicate | Extra | Miss | Scored corners | Pixel p50 | Pixel p90 | Outside scored | Outside p50 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|

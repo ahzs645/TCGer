@@ -667,7 +667,7 @@ def benchmark(
             "space": "normalizedSourceImage",
             "pixelMapping": {"x": "x * width", "y": "y * height"},
             "normalizedErrorDenominator": "mean truth-quad side length in source pixels",
-            "status": "provisional pending crop-parity experiment",
+            "status": "frozen by crop-parity-2026-09-02",
         },
         "matching": {
             "algorithm": "greedy one-to-one descending quad IoU",

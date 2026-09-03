@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import sys
 import unittest
@@ -15,9 +17,10 @@ from crop_parity import (  # noqa: E402
     WIDTH,
     comparable_pixel_metrics,
     inset_quad,
-    normalized_quad_to_pixels,
     normalize_query_colors,
+    normalized_quad_to_pixels,
     pixel_metrics,
+    procedural_fixture_image,
     warp_reference,
 )
 
@@ -75,6 +78,41 @@ class CropParityTests(unittest.TestCase):
         self.assertLessEqual(abs(green - blue), 2)
         self.assertEqual(result.size, image.size)
         self.assertIs(normalize_query_colors(image, "none"), image)
+
+    def test_frozen_contract_fixtures_reproduce_reference_hashes(self):
+        manifest_path = (
+            HERE / "fixtures" / "crop-parity.v1" / "manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text())
+        contract = manifest["contract"]
+        self.assertEqual(manifest["hashRepresentation"], "raw-rgb8-row-major")
+        self.assertEqual(contract["sourceMapping"], "imageEdge")
+        self.assertEqual(
+            contract["destinationPixelCenters"],
+            [[0, 0], [719, 0], [719, 999], [0, 999]],
+        )
+        self.assertEqual(contract["insetFraction"], 0)
+        self.assertEqual(contract["kernel"], "bilinear")
+        self.assertEqual(contract["border"], "black")
+        self.assertEqual(contract["color"], "srgb8-rgb")
+        for fixture in manifest["fixtures"]:
+            source = procedural_fixture_image(
+                fixture["sourceWidth"], fixture["sourceHeight"], fixture["seed"]
+            )
+            self.assertEqual(
+                hashlib.sha256(source.tobytes()).hexdigest(), fixture["sourceSha256"]
+            )
+            crop = warp_reference(
+                source,
+                fixture["quad"],
+                mapping=contract["sourceMapping"],
+                kernel=contract["kernel"],
+                inset=contract["insetFraction"],
+                border=contract["border"],
+            )
+            self.assertEqual(
+                hashlib.sha256(crop.tobytes()).hexdigest(), fixture["referenceCropSha256"]
+            )
 
 
 if __name__ == "__main__":

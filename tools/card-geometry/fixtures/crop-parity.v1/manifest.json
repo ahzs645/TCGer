@@ -1,0 +1,100 @@
+{
+  "schema": "tcger-crop-parity-fixtures-v1",
+  "contract": {
+    "sourceMapping": "imageEdge",
+    "destinationSize": {
+      "width": 720,
+      "height": 1000
+    },
+    "destinationPixelCenters": [
+      [0, 0],
+      [719, 0],
+      [719, 999],
+      [0, 999]
+    ],
+    "insetFraction": 0,
+    "kernel": "bilinear",
+    "border": "black",
+    "color": "srgb8-rgb"
+  },
+  "tolerances": {
+    "meanAbsoluteError": 0.00784313725490196,
+    "encoderCosine": 0.995
+  },
+  "sourceRecipe": "procedural-rgb-grid-v1",
+  "hashRepresentation": "raw-rgb8-row-major",
+  "fixtures": [
+    {
+      "caseId": "axis-aligned-inside",
+      "seed": 1,
+      "sourceWidth": 96,
+      "sourceHeight": 128,
+      "sourceSha256": "167a5044186d53664f1e003c7b7177996c6079500a9638a896480228881f0e1e",
+      "quad": [[0.1, 0.08], [0.85, 0.08], [0.85, 0.92], [0.1, 0.92]],
+      "referenceCropSha256": "e6c07c50b148b5166e14f42305984466849e5a7ac3450de85e4feee534ec335d"
+    },
+    {
+      "caseId": "perspective-inside",
+      "seed": 2,
+      "sourceWidth": 127,
+      "sourceHeight": 91,
+      "sourceSha256": "7cc32c3c57311ee5a4c6b5a9a1c2e40c8f2e10e964ea50210dc2860acf90a04f",
+      "quad": [[0.18, 0.05], [0.88, 0.17], [0.79, 0.94], [0.09, 0.8]],
+      "referenceCropSha256": "60dbd9ea3a54f329b9c66deda80b7b64548bc78bb2162a32666d720a08e8f647"
+    },
+    {
+      "caseId": "left-outside",
+      "seed": 3,
+      "sourceWidth": 83,
+      "sourceHeight": 119,
+      "sourceSha256": "50ed081165d579ab5ec0667a17a0214f87ce86069213a9493ebd5a32b6ecfe23",
+      "quad": [[-0.12, 0.12], [0.7, 0.06], [0.77, 0.91], [-0.05, 0.97]],
+      "referenceCropSha256": "57628fb08111cdaaceb04fee9314ae61fe6fec9a8e2da6dce114d8bcc1d92a7f"
+    },
+    {
+      "caseId": "right-outside",
+      "seed": 4,
+      "sourceWidth": 141,
+      "sourceHeight": 103,
+      "sourceSha256": "cf4a661f1302e856d376ee74ba294fef44c2ec350cfec24fa7ef85d69ef6d391",
+      "quad": [[0.28, 0.03], [1.14, 0.16], [1.08, 0.96], [0.2, 0.82]],
+      "referenceCropSha256": "95857e00c8114674acb1b62c21bcb821b42218568713cea849239d5728474b8c"
+    },
+    {
+      "caseId": "top-outside",
+      "seed": 5,
+      "sourceWidth": 109,
+      "sourceHeight": 137,
+      "sourceSha256": "772c90804e5b088af515c594adf728fdb1dac8a66a974129c2d9e967cde91f93",
+      "quad": [[0.12, -0.18], [0.82, -0.07], [0.9, 0.73], [0.2, 0.87]],
+      "referenceCropSha256": "6721a3fb114522595d38ee2343c45e39fbfbb933af214eaf9af1e36750348405"
+    },
+    {
+      "caseId": "bottom-outside",
+      "seed": 6,
+      "sourceWidth": 101,
+      "sourceHeight": 89,
+      "sourceSha256": "63da3cbdec34f174b54a04148d3b2189b140d40e7eb4afabbbbe210d8e8ceb6d",
+      "quad": [[0.08, 0.18], [0.88, 0.08], [0.96, 1.16], [0.16, 1.08]],
+      "referenceCropSha256": "a1eddfc524abbc40133767921e8d3092c8d784f376a425e2d18808d5bfe4f99f"
+    },
+    {
+      "caseId": "two-sides-outside",
+      "seed": 7,
+      "sourceWidth": 133,
+      "sourceHeight": 97,
+      "sourceSha256": "18a78049fa838c0454fdb41148623228cb3a11bea18689136f8bf612f1e2d873",
+      "quad": [[-0.09, -0.11], [0.74, 0.02], [0.83, 0.91], [-0.16, 0.79]],
+      "referenceCropSha256": "afa91c2ff55f464ede6b75bfb2b3308983060e9e840317f60c9466c18e3b9fc1"
+    },
+    {
+      "caseId": "steep-perspective",
+      "seed": 8,
+      "sourceWidth": 151,
+      "sourceHeight": 113,
+      "sourceSha256": "468e08f581e750992f8d24a2caf34d92cc9e3bfbd762a8bb424c9c68ad83f3d2",
+      "quad": [[0.32, 0.23], [0.79, 0.31], [0.94, 0.82], [0.07, 0.72]],
+      "referenceCropSha256": "4abb90302d72457b80ee7e3bab4f21c991042b2867eb4fec6f4b0934b9297e6e"
+    }
+  ]
+}

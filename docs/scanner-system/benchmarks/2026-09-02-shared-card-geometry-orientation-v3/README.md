@@ -66,6 +66,7 @@ does not establish multi-card performance.
 ## Artifacts
 
 The `reports/` directory contains all seven deterministic reports. The
-provisional `x * width`, `y * height` pixel mapping remains unchanged pending
-the crop-parity experiment. Proposed candidate budgets remain pending human
-approval and are not modified by this rerun.
+crop-parity experiment subsequently froze their existing `x * width`,
+`y * height` image-edge mapping, so no numerical rerun was required. Proposed
+candidate budgets remain pending human approval and are not modified by this
+rerun.
