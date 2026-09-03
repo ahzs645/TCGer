@@ -15,7 +15,7 @@ from typing import Any, Iterable
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 SCHEMA_ID = "https://tcger.app/reports/card-crop-parity/v1"
@@ -177,6 +177,23 @@ def pixel_metrics(actual: np.ndarray, reference: np.ndarray) -> dict[str, float]
     return {"mae": mae, "psnrDb": psnr}
 
 
+def normalize_query_colors(image: Image.Image, mode: str) -> Image.Image:
+    """Apply the released per-game query policy before encoder preprocessing."""
+    if mode == "none":
+        return image
+    if mode != "grey-world-autocontrast":
+        raise ValueError(f"unknown query normalization: {mode}")
+    pixels = np.asarray(image.convert("RGB"), dtype=np.float32)
+    means = pixels.reshape(-1, 3).mean(axis=0)
+    gains = np.where(
+        means > 0,
+        means.mean() / np.where(means > 0, means, 1.0),
+        1.0,
+    )
+    balanced = Image.fromarray(np.clip(pixels * gains, 0, 255).astype(np.uint8))
+    return ImageOps.autocontrast(balanced, cutoff=1)
+
+
 def load_cases(path: Path) -> dict[str, Any]:
     document = json.loads(path.read_text(encoding="utf-8"))
     if document.get("schema") != CASES_SCHEMA_ID:
@@ -305,10 +322,16 @@ class EncoderRuntime:
     input_name: str
     vectors: np.ndarray
     families: list[str]
+    query_normalization: str
 
     @classmethod
     def load(
-        cls, name: str, onnx_path: Path, runtime_dir: Path, threshold: float
+        cls,
+        name: str,
+        onnx_path: Path,
+        runtime_dir: Path,
+        threshold: float,
+        query_normalization: str = "none",
     ) -> "EncoderRuntime":
         import onnxruntime as ort
 
@@ -322,10 +345,20 @@ class EncoderRuntime:
             raise ValueError(f"{name}: vector and metadata row counts differ")
         session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
         families = [row.get("recognitionFamilyId") or row["cardId"] for row in rows]
-        return cls(name, threshold, session, session.get_inputs()[0].name, vectors, families)
+        if query_normalization not in {"none", "grey-world-autocontrast"}:
+            raise ValueError(f"unknown query normalization: {query_normalization}")
+        return cls(
+            name,
+            threshold,
+            session,
+            session.get_inputs()[0].name,
+            vectors,
+            families,
+            query_normalization,
+        )
 
     def embed(self, image: Image.Image) -> np.ndarray:
-        image = image.convert("RGB")
+        image = normalize_query_colors(image.convert("RGB"), self.query_normalization)
         scale = 256 / min(image.size)
         resized = image.resize(
             (math.ceil(image.width * scale), math.ceil(image.height * scale)),
@@ -358,13 +391,58 @@ def parse_encoder(value: str) -> EncoderRuntime:
     if len(parts) != 2:
         raise argparse.ArgumentTypeError("encoder must be name=onnx,runtime,threshold")
     fields = parts[1].split(",")
-    if len(fields) != 3:
-        raise argparse.ArgumentTypeError("encoder must be name=onnx,runtime,threshold")
-    return EncoderRuntime.load(parts[0], Path(fields[0]), Path(fields[1]), float(fields[2]))
+    if len(fields) not in {3, 4}:
+        raise argparse.ArgumentTypeError(
+            "encoder must be name=onnx,runtime,threshold[,queryNormalization]"
+        )
+    normalization = fields[3] if len(fields) == 4 else "none"
+    return EncoderRuntime.load(
+        parts[0], Path(fields[0]), Path(fields[1]), float(fields[2]), normalization
+    )
 
 
 def _mean(values: list[float]) -> float | None:
     return float(np.mean(values)) if values else None
+
+
+def _case_cohort(case: dict[str, Any]) -> str:
+    return (
+        "outsideFrame"
+        if any(not 0 <= coordinate <= 1 for point in case["quad"] for coordinate in point)
+        else "fullyInside"
+    )
+
+
+def _encoder_bucket(encoders: list[EncoderRuntime]) -> dict[str, dict[str, Any]]:
+    return {
+        runtime.name: {
+            "cosines": [],
+            "top1Agreement": 0,
+            "acceptAgreement": 0,
+            "evaluated": 0,
+        }
+        for runtime in encoders
+    }
+
+
+def _summarize_encoder_buckets(
+    values: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    summary = {}
+    for name, bucket in values.items():
+        evaluated = int(bucket["evaluated"])
+        summary[name] = {
+            "evaluated": evaluated,
+            "queryNormalization": bucket.get("queryNormalization"),
+            "meanCosine": _mean(bucket["cosines"]),
+            "top1Agreement": (
+                bucket["top1Agreement"] / evaluated if evaluated else None
+            ),
+            "acceptAgreement": (
+                bucket["acceptAgreement"] / evaluated if evaluated else None
+            ),
+        }
+    return summary
 
 
 def analyze(
@@ -384,17 +462,19 @@ def analyze(
         rows = []
         missing = []
         for configuration in grid():
-            maes: list[float] = []
-            psnrs: list[float] = []
-            encoder_values: dict[str, dict[str, list[float] | int]] = {
-                runtime.name: {
-                    "cosines": [],
-                    "top1Agreement": 0,
-                    "acceptAgreement": 0,
-                    "evaluated": 0,
-                }
-                for runtime in encoders
+            pixel_values: dict[str, dict[str, list[float]]] = {
+                cohort: {"maes": [], "psnrs": []}
+                for cohort in ("all", "outsideFrame", "fullyInside")
             }
+            encoder_values = {
+                cohort: _encoder_bucket(encoders)
+                for cohort in ("all", "outsideFrame", "fullyInside")
+            }
+            for cohort in encoder_values.values():
+                for runtime in encoders:
+                    cohort[runtime.name]["queryNormalization"] = (
+                        runtime.query_normalization
+                    )
             for case in cases:
                 actual_path = platform_root / f"{case['caseId']}.png"
                 reference_path = (
@@ -406,9 +486,11 @@ def analyze(
                 actual_image = Image.open(actual_path).convert("RGB")
                 reference_image = Image.open(reference_path).convert("RGB")
                 metrics = pixel_metrics(np.asarray(actual_image), np.asarray(reference_image))
-                maes.append(metrics["mae"])
-                if math.isfinite(metrics["psnrDb"]):
-                    psnrs.append(metrics["psnrDb"])
+                case_cohort = _case_cohort(case)
+                for cohort_name in ("all", case_cohort):
+                    pixel_values[cohort_name]["maes"].append(metrics["mae"])
+                    if math.isfinite(metrics["psnrDb"]):
+                        pixel_values[cohort_name]["psnrs"].append(metrics["psnrDb"])
                 for runtime in encoders:
                     actual_key = (platform_name, runtime.name, case["caseId"])
                     reference_key = (
@@ -430,33 +512,35 @@ def analyze(
                         )
                     actual_embedding = actual_embeddings[actual_key]
                     reference_embedding = reference_embeddings[reference_key]
-                    bucket = encoder_values[runtime.name]
-                    bucket["cosines"].append(float(actual_embedding @ reference_embedding))
                     actual_top1, actual_accept = actual_decisions[actual_key]
                     reference_top1, reference_accept = reference_decisions[reference_key]
-                    bucket["top1Agreement"] += int(actual_top1 == reference_top1)
-                    bucket["acceptAgreement"] += int(actual_accept == reference_accept)
-                    bucket["evaluated"] += 1
-            encoder_summary = {}
-            for name, bucket in encoder_values.items():
-                evaluated = int(bucket["evaluated"])
-                encoder_summary[name] = {
-                    "evaluated": evaluated,
-                    "meanCosine": _mean(bucket["cosines"]),
-                    "top1Agreement": (
-                        bucket["top1Agreement"] / evaluated if evaluated else None
-                    ),
-                    "acceptAgreement": (
-                        bucket["acceptAgreement"] / evaluated if evaluated else None
+                    for cohort_name in ("all", case_cohort):
+                        bucket = encoder_values[cohort_name][runtime.name]
+                        bucket["cosines"].append(
+                            float(actual_embedding @ reference_embedding)
+                        )
+                        bucket["top1Agreement"] += int(actual_top1 == reference_top1)
+                        bucket["acceptAgreement"] += int(
+                            actual_accept == reference_accept
+                        )
+                        bucket["evaluated"] += 1
+            cohorts = {}
+            for cohort_name, values in pixel_values.items():
+                cohorts[cohort_name] = {
+                    "evaluated": len(values["maes"]),
+                    "meanAbsoluteError": _mean(values["maes"]),
+                    "meanPsnrDb": _mean(values["psnrs"]),
+                    "encoders": _summarize_encoder_buckets(
+                        encoder_values[cohort_name]
                     ),
                 }
             rows.append(
                 {
                     "configId": configuration["id"],
-                    "evaluated": len(maes),
-                    "meanAbsoluteError": _mean(maes),
-                    "meanPsnrDb": _mean(psnrs),
-                    "encoders": encoder_summary,
+                    **cohorts["all"],
+                    "cohorts": {
+                        name: value for name, value in cohorts.items() if name != "all"
+                    },
                 }
             )
         report_platforms[platform_name] = {

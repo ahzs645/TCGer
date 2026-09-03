@@ -101,12 +101,14 @@ def main() -> None:
             paths["pokemon_onnx"],
             paths["pokemon_metadata"].parent,
             0.65,
+            "none",
         ),
         module.EncoderRuntime.load(
             "magic",
             Path("models/magic-visual-style-v2-5c27e506-r2.onnx"),
             paths["magic_metadata"].parent,
             0.70,
+            "grey-world-autocontrast",
         ),
     ]
     report = module.analyze(
@@ -129,6 +131,7 @@ def main() -> None:
         path_in_repo=args.report_path,
         repo_id=args.model_repo,
         commit_message="Add crop parity encoder-grid report",
+        create_pr=True,
     )
     print(json.dumps({"reportPath": args.report_path, "commitOid": commit.oid}, sort_keys=True))
 

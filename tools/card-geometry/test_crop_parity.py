@@ -15,6 +15,7 @@ from crop_parity import (  # noqa: E402
     WIDTH,
     inset_quad,
     normalized_quad_to_pixels,
+    normalize_query_colors,
     pixel_metrics,
     warp_reference,
 )
@@ -55,6 +56,19 @@ class CropParityTests(unittest.TestCase):
         metrics = pixel_metrics(actual, reference)
         self.assertAlmostEqual(metrics["mae"], 0.2)
         self.assertAlmostEqual(metrics["psnrDb"], 20 * math.log10(5))
+
+    def test_magic_query_normalization_matches_grey_world_autocontrast_contract(self):
+        from PIL import Image
+
+        image = Image.new("RGB", (10, 10), (150, 128, 100))
+        image.putpixel((0, 0), (60, 51, 40))
+        image.putpixel((9, 9), (240, 205, 160))
+        result = normalize_query_colors(image, "grey-world-autocontrast")
+        red, green, blue = result.getpixel((5, 5))
+        self.assertLessEqual(abs(red - green), 2)
+        self.assertLessEqual(abs(green - blue), 2)
+        self.assertEqual(result.size, image.size)
+        self.assertIs(normalize_query_colors(image, "none"), image)
 
 
 if __name__ == "__main__":
