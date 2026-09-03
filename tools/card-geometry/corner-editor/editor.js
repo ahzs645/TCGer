@@ -9,7 +9,7 @@ const state = {
   samples: [], index: 0, sample: null, image: null, activeCard: 0,
   activeCorner: 0, dragging: false, dragSnapshot: null, dragMetadataSnapshot: null,
   progress: {minimum: 20, finalizedInstances: 0, ready: false},
-  sourcePixels: null, previewFrame: null, reviewedCorners: new Set(),
+  sourcePixels: null, previewFrame: null, reviewedCorners: new Set(), dirty: false,
 };
 const editor = document.querySelector("#editor");
 const ctx = editor.getContext("2d");
@@ -285,6 +285,7 @@ async function endDrag(event) {
   }
   const unchanged = JSON.stringify(state.sample.quads[state.activeCard]) === JSON.stringify(state.dragSnapshot);
   if (unchanged && state.sample.draftSource !== "detector") return;
+  state.dirty = true;
   if (!unchanged) renderControls();
   if (state.sample.draftSource === "detector") {
     state.reviewedCorners.add(`${state.activeCard}:${state.activeCorner}`);
@@ -323,6 +324,7 @@ async function persist(finalize, message) {
         finalize,
       }),
     });
+    state.dirty = false;
     state.sample.finalized = finalize;
     await refreshProgress();
     status(message, "ok");
@@ -374,14 +376,14 @@ function renderControls() {
   const side = document.createElement("select");
   ["faceUp", "faceDown", "unknown"].forEach((value) => side.add(new Option(value, value)));
   side.value = item.side;
-  side.onchange = () => { item.side = side.value; };
+  side.onchange = () => { item.side = side.value; state.dirty = true; };
   sideLabel.append(side);
   metadata.append(sideLabel);
   const orientation = document.createElement("label");
   const check = document.createElement("input");
   check.type = "checkbox";
   check.checked = item.orientationKnown;
-  check.onchange = () => { item.orientationKnown = check.checked; };
+  check.onchange = () => { item.orientationKnown = check.checked; state.dirty = true; };
   orientation.append(check, "Orientation known");
   metadata.append(orientation);
   CORNERS.forEach((name, cornerIndex) => {
@@ -390,7 +392,10 @@ function renderControls() {
     const select = document.createElement("select");
     ["visible", "occluded", "outsideFrame"].forEach((value) => select.add(new Option(value, value)));
     select.value = item.cornerVisibility[cornerIndex];
-    select.onchange = () => { item.cornerVisibility[cornerIndex] = select.value; };
+    select.onchange = () => {
+      item.cornerVisibility[cornerIndex] = select.value;
+      state.dirty = true;
+    };
     label.append(select);
     metadata.append(label);
   });
@@ -410,6 +415,7 @@ function addCard() {
   });
   state.activeCard = index;
   state.activeCorner = 0;
+  state.dirty = true;
   renderControls();
   draw();
   status("New card added. Drag its four corners into place.");
@@ -419,18 +425,23 @@ document.querySelector("#add-card-top").onclick = addCard;
 document.querySelector("#scene-slice").onchange = (event) => {
   if (!state.sample) return;
   state.sample.sceneSlice = event.target.value;
+  state.dirty = true;
   status(`This frame will save as ${event.target.selectedOptions[0].text}.`);
 };
 document.querySelector("#delete").onclick = async () => {
   if (!state.sample?.quads.length) return;
+  if (state.sample.quads.length === 1) {
+    status("A frame must keep at least one card. Adjust this outline instead.", "error");
+    return;
+  }
   state.sample.quads.splice(state.activeCard, 1);
   state.sample.metadata.splice(state.activeCard, 1);
   state.sample.metadata.forEach((item, index) => { item.occlusionOrder = index; });
   state.activeCard = Math.max(0, Math.min(state.activeCard, state.sample.quads.length - 1));
+  state.dirty = true;
   renderControls();
   draw();
-  if (state.sample.quads.length) await persist(false, "Card deleted and saved");
-  else status("A page must keep at least one card", "error");
+  await persist(false, "Card deleted and remaining draft saved");
 };
 document.querySelector("#save").onclick = () => {
   const required = state.sample.quads.length * 4;
@@ -448,6 +459,7 @@ async function loadSample(index) {
   const summary = state.samples[state.index];
   status("Loading page…");
   state.sample = await jsonRequest(`/api/sample/${summary.id}`);
+  state.dirty = false;
   state.reviewedCorners = new Set();
   document.querySelector("#scene-slice").value = state.sample.sceneSlice;
   state.sourcePixels = null;
@@ -475,11 +487,24 @@ async function loadSample(index) {
   document.querySelector("#sample").value = summary.id;
   document.querySelector("#page-count").textContent = `Page ${state.index + 1} of ${state.samples.length}`;
 }
-document.querySelector("#previous").onclick = () => loadSample(state.index - 1);
-document.querySelector("#next").onclick = () => loadSample(state.index + 1);
-document.querySelector("#sample").onchange = (event) => loadSample(
-  state.samples.findIndex((sample) => sample.id === event.target.value),
-);
+function confirmDiscard() {
+  return !state.dirty || window.confirm("Unsaved corner work will be discarded. Leave this frame?");
+}
+function requestSample(index) {
+  if (confirmDiscard()) loadSample(index);
+}
+document.querySelector("#previous").onclick = () => requestSample(state.index - 1);
+document.querySelector("#next").onclick = () => requestSample(state.index + 1);
+document.querySelector("#sample").onchange = (event) => {
+  const index = state.samples.findIndex((sample) => sample.id === event.target.value);
+  if (confirmDiscard()) loadSample(index);
+  else event.target.value = state.sample.id;
+};
+window.addEventListener("beforeunload", (event) => {
+  if (!state.dirty) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
 async function start() {
   try {
     const payload = await jsonRequest("/api/samples");

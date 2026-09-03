@@ -106,13 +106,21 @@ class CornerEditorServerTest(unittest.TestCase):
 
     def test_detection_quads_can_seed_an_unfinalized_draft(self):
         class _Polyline:
-            points = [[[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]]
+            def __init__(self, label, left):
+                self.label = label
+                self.points = [
+                    [[left, 0.1], [0.9, 0.1], [0.9, 0.9], [left, 0.9]]
+                ]
 
         class _Polylines:
-            polylines = [_Polyline()]
+            polylines = [_Polyline("attempt", 0.2), _Polyline("decisive", 0.1)]
 
         sample = _Sample(detection_quads=_Polylines())
-        self.assertEqual(len(SERVER.polyline_quads(sample, "detection_quads")), 1)
+        quads = SERVER.polyline_quads(
+            sample, "detection_quads", preferred_label="decisive", limit=1
+        )
+        self.assertEqual(len(quads), 1)
+        self.assertEqual(quads[0][0][0], 0.1)
 
 
 if __name__ == "__main__":

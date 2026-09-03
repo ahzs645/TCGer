@@ -80,12 +80,20 @@ def load_editor_metadata(sample, quads):
     return metadata
 
 
-def polyline_quads(sample, field):
+def polyline_quads(sample, field, *, preferred_label=None, limit=None):
     """Read four-point quads from a FiftyOne polyline field."""
     try:
-        lines = sample[field].polylines
+        lines = list(sample[field].polylines)
     except Exception:
         return []
+    if preferred_label is not None:
+        lines.sort(
+            key=lambda line: 0
+            if getattr(line, "label", None) == preferred_label
+            else 1
+        )
+    if limit is not None:
+        lines = lines[:limit]
     result = []
     for line in lines:
         points = line.points[0] if line.points else []
@@ -249,7 +257,9 @@ class EditorStore:
             quads = manual_quads(sample)
             draft_source = None
             if not quads:
-                quads = polyline_quads(sample, "detection_quads")
+                quads = polyline_quads(
+                    sample, "detection_quads", preferred_label="decisive", limit=1
+                )
                 draft_source = "detector"
             result.append(
                 {
@@ -293,7 +303,9 @@ class EditorStore:
         quads = manual_quads(sample)
         draft_source = None
         if not quads:
-            quads = polyline_quads(sample, "detection_quads")
+            quads = polyline_quads(
+                sample, "detection_quads", preferred_label="decisive", limit=1
+            )
             draft_source = "detector"
         with Image.open(sample.filepath) as image:
             width, height = image.size
