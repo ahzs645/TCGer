@@ -1,0 +1,1505 @@
+{
+  "coordinateConvention": "image-edge: x * width, y * height",
+  "coverage": {
+    "metricEligibleCornerSources": [
+      "human",
+      "synthetic"
+    ],
+    "metricEligibleCorners": 228,
+    "minimumRealEvaluationSessions": 3,
+    "observedSceneSliceInstances": {
+      "test:single_card_archive": 4,
+      "test:single_handheld": 57
+    },
+    "policyId": "training-minimums-draft-v1",
+    "policyStatus": "draft-unapproved",
+    "realEvaluationSessionShortfall": 0,
+    "realEvaluationSessions": 7,
+    "requiredSceneSlices": [
+      {
+        "actualInstances": 57,
+        "meetsMinimum": true,
+        "minimumInstances": 50,
+        "sceneSlice": "single_handheld",
+        "shortfall": 0,
+        "split": "test"
+      },
+      {
+        "actualInstances": 0,
+        "meetsMinimum": false,
+        "minimumInstances": 20,
+        "sceneSlice": "steep_playmat",
+        "shortfall": 20,
+        "split": "test"
+      },
+      {
+        "actualInstances": 0,
+        "meetsMinimum": false,
+        "minimumInstances": 30,
+        "sceneSlice": "duel_field",
+        "shortfall": 30,
+        "split": "test"
+      },
+      {
+        "actualInstances": 0,
+        "meetsMinimum": false,
+        "minimumInstances": 20,
+        "sceneSlice": "binder_page",
+        "shortfall": 20,
+        "split": "test"
+      }
+    ],
+    "splits": {
+      "test": {
+        "instanceShortfall": 89,
+        "instances": 61,
+        "minimumInstances": 150,
+        "minimumRecords": 100,
+        "recordShortfall": 39,
+        "records": 61
+      },
+      "train": {
+        "instanceShortfall": 1000,
+        "instances": 0,
+        "minimumInstances": 1000,
+        "minimumRecords": 500,
+        "recordShortfall": 500,
+        "records": 0
+      },
+      "validation": {
+        "instanceShortfall": 100,
+        "instances": 0,
+        "minimumInstances": 100,
+        "minimumRecords": 50,
+        "recordShortfall": 50,
+        "records": 0
+      }
+    }
+  },
+  "export": {
+    "exportedAt": "2026-09-02T19:49:20-07:00",
+    "labeledSamples": 160,
+    "path": "TCGer-Labeling/fiftyone-sessions/backups/labels-20260902-194920.json",
+    "sha256": "308faca4d2e7ca1d2b4e60cd36e7ee70708f1b935c5b1552292f1243e5041f5c"
+  },
+  "pinnedRelease": {
+    "corpusHash": "97780e7e96cbd98da91173a00b37e6304514f758a9046f5bd98adf30c418820e",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "65017ce8da9137fea491739bd06388ab513831a2",
+    "releaseId": "real-geometry-devmode-orientation-smoke-v3"
+  },
+  "provenanceCounts": {
+    "detector": 28,
+    "human": 57,
+    "skippedMissingSource": 0
+  },
+  "provenanceMapping": {
+    "manual": "human",
+    "missingSource": "skipped",
+    "otherNamedSource": "detector"
+  },
+  "releaseChangeRequired": false,
+  "schema": "https://tcger.app/schemas/fiftyone-geometry-release-diff/v1",
+  "sessions": [
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-145850",
+      "stillUnlabeled": [
+        "scan-session-20260809-145850/frame-0000.jpg",
+        "scan-session-20260809-145850/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 1,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-145947",
+      "stillUnlabeled": [
+        "scan-session-20260809-145947/frame-0000.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 2,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 10,
+        "unchangedManualQuad": 5
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260809-160556/frame-0012.jpg",
+        "scan-session-20260809-160556/frame-0014.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-160556",
+      "stillUnlabeled": [
+        "scan-session-20260809-160556/frame-0000.jpg",
+        "scan-session-20260809-160556/frame-0002.jpg",
+        "scan-session-20260809-160556/frame-0004.jpg",
+        "scan-session-20260809-160556/frame-0005.jpg",
+        "scan-session-20260809-160556/frame-0006.jpg",
+        "scan-session-20260809-160556/frame-0008.jpg",
+        "scan-session-20260809-160556/frame-0010.jpg",
+        "scan-session-20260809-160556/frame-0012.jpg",
+        "scan-session-20260809-160556/frame-0013.jpg",
+        "scan-session-20260809-160556/frame-0014.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-160556/frame-0001.jpg",
+        "scan-session-20260809-160556/frame-0003.jpg",
+        "scan-session-20260809-160556/frame-0007.jpg",
+        "scan-session-20260809-160556/frame-0009.jpg",
+        "scan-session-20260809-160556/frame-0011.jpg"
+      ]
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 2,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 15,
+        "unchangedManualQuad": 18
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260809-175313/frame-0005.jpg",
+        "scan-session-20260809-175313/frame-0030.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-175313",
+      "stillUnlabeled": [
+        "scan-session-20260809-175313/frame-0000.jpg",
+        "scan-session-20260809-175313/frame-0003.jpg",
+        "scan-session-20260809-175313/frame-0005.jpg",
+        "scan-session-20260809-175313/frame-0007.jpg",
+        "scan-session-20260809-175313/frame-0010.jpg",
+        "scan-session-20260809-175313/frame-0011.jpg",
+        "scan-session-20260809-175313/frame-0012.jpg",
+        "scan-session-20260809-175313/frame-0020.jpg",
+        "scan-session-20260809-175313/frame-0021.jpg",
+        "scan-session-20260809-175313/frame-0025.jpg",
+        "scan-session-20260809-175313/frame-0026.jpg",
+        "scan-session-20260809-175313/frame-0027.jpg",
+        "scan-session-20260809-175313/frame-0029.jpg",
+        "scan-session-20260809-175313/frame-0030.jpg",
+        "scan-session-20260809-175313/frame-0032.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-175313/frame-0001.jpg",
+        "scan-session-20260809-175313/frame-0002.jpg",
+        "scan-session-20260809-175313/frame-0004.jpg",
+        "scan-session-20260809-175313/frame-0006.jpg",
+        "scan-session-20260809-175313/frame-0008.jpg",
+        "scan-session-20260809-175313/frame-0009.jpg",
+        "scan-session-20260809-175313/frame-0013.jpg",
+        "scan-session-20260809-175313/frame-0014.jpg",
+        "scan-session-20260809-175313/frame-0015.jpg",
+        "scan-session-20260809-175313/frame-0016.jpg",
+        "scan-session-20260809-175313/frame-0017.jpg",
+        "scan-session-20260809-175313/frame-0018.jpg",
+        "scan-session-20260809-175313/frame-0019.jpg",
+        "scan-session-20260809-175313/frame-0022.jpg",
+        "scan-session-20260809-175313/frame-0023.jpg",
+        "scan-session-20260809-175313/frame-0024.jpg",
+        "scan-session-20260809-175313/frame-0028.jpg",
+        "scan-session-20260809-175313/frame-0031.jpg"
+      ]
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 8,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-175804",
+      "stillUnlabeled": [
+        "scan-session-20260809-175804/frame-0000.jpg",
+        "scan-session-20260809-175804/frame-0001.jpg",
+        "scan-session-20260809-175804/frame-0002.jpg",
+        "scan-session-20260809-175804/frame-0003.jpg",
+        "scan-session-20260809-175804/frame-0004.jpg",
+        "scan-session-20260809-175804/frame-0005.jpg",
+        "scan-session-20260809-175804/frame-0006.jpg",
+        "scan-session-20260809-175804/frame-0007.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 1,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 12,
+        "unchangedManualQuad": 12
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260809-183843/frame-0000.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-183843",
+      "stillUnlabeled": [
+        "scan-session-20260809-183843/frame-0000.jpg",
+        "scan-session-20260809-183843/frame-0001.jpg",
+        "scan-session-20260809-183843/frame-0002.jpg",
+        "scan-session-20260809-183843/frame-0005.jpg",
+        "scan-session-20260809-183843/frame-0008.jpg",
+        "scan-session-20260809-183843/frame-0009.jpg",
+        "scan-session-20260809-183843/frame-0010.jpg",
+        "scan-session-20260809-183843/frame-0011.jpg",
+        "scan-session-20260809-183843/frame-0012.jpg",
+        "scan-session-20260809-183843/frame-0016.jpg",
+        "scan-session-20260809-183843/frame-0017.jpg",
+        "scan-session-20260809-183843/frame-0023.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-183843/frame-0003.jpg",
+        "scan-session-20260809-183843/frame-0004.jpg",
+        "scan-session-20260809-183843/frame-0006.jpg",
+        "scan-session-20260809-183843/frame-0007.jpg",
+        "scan-session-20260809-183843/frame-0013.jpg",
+        "scan-session-20260809-183843/frame-0014.jpg",
+        "scan-session-20260809-183843/frame-0015.jpg",
+        "scan-session-20260809-183843/frame-0018.jpg",
+        "scan-session-20260809-183843/frame-0019.jpg",
+        "scan-session-20260809-183843/frame-0020.jpg",
+        "scan-session-20260809-183843/frame-0021.jpg",
+        "scan-session-20260809-183843/frame-0022.jpg"
+      ]
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 7,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-184048",
+      "stillUnlabeled": [
+        "scan-session-20260809-184048/frame-0000.jpg",
+        "scan-session-20260809-184048/frame-0001.jpg",
+        "scan-session-20260809-184048/frame-0002.jpg",
+        "scan-session-20260809-184048/frame-0003.jpg",
+        "scan-session-20260809-184048/frame-0004.jpg",
+        "scan-session-20260809-184048/frame-0005.jpg",
+        "scan-session-20260809-184048/frame-0006.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 28,
+        "unchangedManualQuad": 6
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-190752",
+      "stillUnlabeled": [
+        "scan-session-20260809-190752/frame-0000.jpg",
+        "scan-session-20260809-190752/frame-0001.jpg",
+        "scan-session-20260809-190752/frame-0002.jpg",
+        "scan-session-20260809-190752/frame-0003.jpg",
+        "scan-session-20260809-190752/frame-0006.jpg",
+        "scan-session-20260809-190752/frame-0008.jpg",
+        "scan-session-20260809-190752/frame-0010.jpg",
+        "scan-session-20260809-190752/frame-0011.jpg",
+        "scan-session-20260809-190752/frame-0012.jpg",
+        "scan-session-20260809-190752/frame-0013.jpg",
+        "scan-session-20260809-190752/frame-0016.jpg",
+        "scan-session-20260809-190752/frame-0017.jpg",
+        "scan-session-20260809-190752/frame-0018.jpg",
+        "scan-session-20260809-190752/frame-0019.jpg",
+        "scan-session-20260809-190752/frame-0020.jpg",
+        "scan-session-20260809-190752/frame-0021.jpg",
+        "scan-session-20260809-190752/frame-0022.jpg",
+        "scan-session-20260809-190752/frame-0023.jpg",
+        "scan-session-20260809-190752/frame-0024.jpg",
+        "scan-session-20260809-190752/frame-0025.jpg",
+        "scan-session-20260809-190752/frame-0026.jpg",
+        "scan-session-20260809-190752/frame-0027.jpg",
+        "scan-session-20260809-190752/frame-0028.jpg",
+        "scan-session-20260809-190752/frame-0029.jpg",
+        "scan-session-20260809-190752/frame-0030.jpg",
+        "scan-session-20260809-190752/frame-0031.jpg",
+        "scan-session-20260809-190752/frame-0032.jpg",
+        "scan-session-20260809-190752/frame-0033.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-190752/frame-0004.jpg",
+        "scan-session-20260809-190752/frame-0005.jpg",
+        "scan-session-20260809-190752/frame-0007.jpg",
+        "scan-session-20260809-190752/frame-0009.jpg",
+        "scan-session-20260809-190752/frame-0014.jpg",
+        "scan-session-20260809-190752/frame-0015.jpg"
+      ]
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 16,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-210958",
+      "stillUnlabeled": [
+        "scan-session-20260809-210958/frame-0000.jpg",
+        "scan-session-20260809-210958/frame-0001.jpg",
+        "scan-session-20260809-210958/frame-0002.jpg",
+        "scan-session-20260809-210958/frame-0003.jpg",
+        "scan-session-20260809-210958/frame-0004.jpg",
+        "scan-session-20260809-210958/frame-0005.jpg",
+        "scan-session-20260809-210958/frame-0006.jpg",
+        "scan-session-20260809-210958/frame-0007.jpg",
+        "scan-session-20260809-210958/frame-0008.jpg",
+        "scan-session-20260809-210958/frame-0009.jpg",
+        "scan-session-20260809-210958/frame-0010.jpg",
+        "scan-session-20260809-210958/frame-0011.jpg",
+        "scan-session-20260809-210958/frame-0012.jpg",
+        "scan-session-20260809-210958/frame-0013.jpg",
+        "scan-session-20260809-210958/frame-0014.jpg",
+        "scan-session-20260809-210958/frame-0015.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 22,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-211223",
+      "stillUnlabeled": [
+        "scan-session-20260809-211223/frame-0000.jpg",
+        "scan-session-20260809-211223/frame-0001.jpg",
+        "scan-session-20260809-211223/frame-0002.jpg",
+        "scan-session-20260809-211223/frame-0003.jpg",
+        "scan-session-20260809-211223/frame-0004.jpg",
+        "scan-session-20260809-211223/frame-0005.jpg",
+        "scan-session-20260809-211223/frame-0006.jpg",
+        "scan-session-20260809-211223/frame-0007.jpg",
+        "scan-session-20260809-211223/frame-0008.jpg",
+        "scan-session-20260809-211223/frame-0009.jpg",
+        "scan-session-20260809-211223/frame-0010.jpg",
+        "scan-session-20260809-211223/frame-0011.jpg",
+        "scan-session-20260809-211223/frame-0012.jpg",
+        "scan-session-20260809-211223/frame-0013.jpg",
+        "scan-session-20260809-211223/frame-0014.jpg",
+        "scan-session-20260809-211223/frame-0015.jpg",
+        "scan-session-20260809-211223/frame-0016.jpg",
+        "scan-session-20260809-211223/frame-0017.jpg",
+        "scan-session-20260809-211223/frame-0018.jpg",
+        "scan-session-20260809-211223/frame-0019.jpg",
+        "scan-session-20260809-211223/frame-0020.jpg",
+        "scan-session-20260809-211223/frame-0021.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-215559",
+      "stillUnlabeled": [
+        "scan-session-20260809-215559/frame-0000.jpg",
+        "scan-session-20260809-215559/frame-0001.jpg",
+        "scan-session-20260809-215559/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 41,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-223944",
+      "stillUnlabeled": [
+        "scan-session-20260809-223944/frame-0000.jpg",
+        "scan-session-20260809-223944/frame-0001.jpg",
+        "scan-session-20260809-223944/frame-0002.jpg",
+        "scan-session-20260809-223944/frame-0003.jpg",
+        "scan-session-20260809-223944/frame-0004.jpg",
+        "scan-session-20260809-223944/frame-0005.jpg",
+        "scan-session-20260809-223944/frame-0006.jpg",
+        "scan-session-20260809-223944/frame-0007.jpg",
+        "scan-session-20260809-223944/frame-0008.jpg",
+        "scan-session-20260809-223944/frame-0009.jpg",
+        "scan-session-20260809-223944/frame-0010.jpg",
+        "scan-session-20260809-223944/frame-0011.jpg",
+        "scan-session-20260809-223944/frame-0012.jpg",
+        "scan-session-20260809-223944/frame-0013.jpg",
+        "scan-session-20260809-223944/frame-0014.jpg",
+        "scan-session-20260809-223944/frame-0015.jpg",
+        "scan-session-20260809-223944/frame-0016.jpg",
+        "scan-session-20260809-223944/frame-0017.jpg",
+        "scan-session-20260809-223944/frame-0018.jpg",
+        "scan-session-20260809-223944/frame-0019.jpg",
+        "scan-session-20260809-223944/frame-0020.jpg",
+        "scan-session-20260809-223944/frame-0021.jpg",
+        "scan-session-20260809-223944/frame-0022.jpg",
+        "scan-session-20260809-223944/frame-0023.jpg",
+        "scan-session-20260809-223944/frame-0024.jpg",
+        "scan-session-20260809-223944/frame-0025.jpg",
+        "scan-session-20260809-223944/frame-0026.jpg",
+        "scan-session-20260809-223944/frame-0027.jpg",
+        "scan-session-20260809-223944/frame-0028.jpg",
+        "scan-session-20260809-223944/frame-0029.jpg",
+        "scan-session-20260809-223944/frame-0030.jpg",
+        "scan-session-20260809-223944/frame-0031.jpg",
+        "scan-session-20260809-223944/frame-0032.jpg",
+        "scan-session-20260809-223944/frame-0033.jpg",
+        "scan-session-20260809-223944/frame-0034.jpg",
+        "scan-session-20260809-223944/frame-0035.jpg",
+        "scan-session-20260809-223944/frame-0036.jpg",
+        "scan-session-20260809-223944/frame-0037.jpg",
+        "scan-session-20260809-223944/frame-0038.jpg",
+        "scan-session-20260809-223944/frame-0039.jpg",
+        "scan-session-20260809-223944/frame-0040.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-230224",
+      "stillUnlabeled": [
+        "scan-session-20260809-230224/frame-0000.jpg",
+        "scan-session-20260809-230224/frame-0001.jpg",
+        "scan-session-20260809-230224/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 6,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260810-112257",
+      "stillUnlabeled": [
+        "scan-session-20260810-112257/frame-0000.jpg",
+        "scan-session-20260810-112257/frame-0001.jpg",
+        "scan-session-20260810-112257/frame-0002.jpg",
+        "scan-session-20260810-112257/frame-0003.jpg",
+        "scan-session-20260810-112257/frame-0004.jpg",
+        "scan-session-20260810-112257/frame-0005.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260810-173108",
+      "stillUnlabeled": [
+        "scan-session-20260810-173108/frame-0000.jpg",
+        "scan-session-20260810-173108/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 23,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260810-220315",
+      "stillUnlabeled": [
+        "scan-session-20260810-220315/frame-0000.jpg",
+        "scan-session-20260810-220315/frame-0001.jpg",
+        "scan-session-20260810-220315/frame-0002.jpg",
+        "scan-session-20260810-220315/frame-0003.jpg",
+        "scan-session-20260810-220315/frame-0004.jpg",
+        "scan-session-20260810-220315/frame-0005.jpg",
+        "scan-session-20260810-220315/frame-0006.jpg",
+        "scan-session-20260810-220315/frame-0007.jpg",
+        "scan-session-20260810-220315/frame-0008.jpg",
+        "scan-session-20260810-220315/frame-0009.jpg",
+        "scan-session-20260810-220315/frame-0010.jpg",
+        "scan-session-20260810-220315/frame-0011.jpg",
+        "scan-session-20260810-220315/frame-0012.jpg",
+        "scan-session-20260810-220315/frame-0013.jpg",
+        "scan-session-20260810-220315/frame-0014.jpg",
+        "scan-session-20260810-220315/frame-0015.jpg",
+        "scan-session-20260810-220315/frame-0016.jpg",
+        "scan-session-20260810-220315/frame-0017.jpg",
+        "scan-session-20260810-220315/frame-0018.jpg",
+        "scan-session-20260810-220315/frame-0019.jpg",
+        "scan-session-20260810-220315/frame-0020.jpg",
+        "scan-session-20260810-220315/frame-0021.jpg",
+        "scan-session-20260810-220315/frame-0022.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 9,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260811-114121",
+      "stillUnlabeled": [
+        "scan-session-20260811-114121/frame-0000.jpg",
+        "scan-session-20260811-114121/frame-0001.jpg",
+        "scan-session-20260811-114121/frame-0002.jpg",
+        "scan-session-20260811-114121/frame-0003.jpg",
+        "scan-session-20260811-114121/frame-0004.jpg",
+        "scan-session-20260811-114121/frame-0005.jpg",
+        "scan-session-20260811-114121/frame-0006.jpg",
+        "scan-session-20260811-114121/frame-0007.jpg",
+        "scan-session-20260811-114121/frame-0008.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 15,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260812-220107",
+      "stillUnlabeled": [
+        "scan-session-20260812-220107/frame-0000.jpg",
+        "scan-session-20260812-220107/frame-0001.jpg",
+        "scan-session-20260812-220107/frame-0002.jpg",
+        "scan-session-20260812-220107/frame-0003.jpg",
+        "scan-session-20260812-220107/frame-0004.jpg",
+        "scan-session-20260812-220107/frame-0005.jpg",
+        "scan-session-20260812-220107/frame-0006.jpg",
+        "scan-session-20260812-220107/frame-0007.jpg",
+        "scan-session-20260812-220107/frame-0008.jpg",
+        "scan-session-20260812-220107/frame-0009.jpg",
+        "scan-session-20260812-220107/frame-0010.jpg",
+        "scan-session-20260812-220107/frame-0011.jpg",
+        "scan-session-20260812-220107/frame-0012.jpg",
+        "scan-session-20260812-220107/frame-0013.jpg",
+        "scan-session-20260812-220107/frame-0014.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260812-224415",
+      "stillUnlabeled": [
+        "scan-session-20260812-224415/frame-0000.jpg",
+        "scan-session-20260812-224415/frame-0001.jpg",
+        "scan-session-20260812-224415/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260813-062035",
+      "stillUnlabeled": [
+        "scan-session-20260813-062035/frame-0000.jpg",
+        "scan-session-20260813-062035/frame-0001.jpg",
+        "scan-session-20260813-062035/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 5,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260813-183749",
+      "stillUnlabeled": [
+        "scan-session-20260813-183749/frame-0000.jpg",
+        "scan-session-20260813-183749/frame-0001.jpg",
+        "scan-session-20260813-183749/frame-0002.jpg",
+        "scan-session-20260813-183749/frame-0003.jpg",
+        "scan-session-20260813-183749/frame-0004.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260813-220015",
+      "stillUnlabeled": [
+        "scan-session-20260813-220015/frame-0000.jpg",
+        "scan-session-20260813-220015/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 6,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260814-081249",
+      "stillUnlabeled": [
+        "scan-session-20260814-081249/frame-0000.jpg",
+        "scan-session-20260814-081249/frame-0001.jpg",
+        "scan-session-20260814-081249/frame-0002.jpg",
+        "scan-session-20260814-081249/frame-0003.jpg",
+        "scan-session-20260814-081249/frame-0004.jpg",
+        "scan-session-20260814-081249/frame-0005.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260814-124705",
+      "stillUnlabeled": [
+        "scan-session-20260814-124705/frame-0000.jpg",
+        "scan-session-20260814-124705/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260815-090217",
+      "stillUnlabeled": [
+        "scan-session-20260815-090217/frame-0000.jpg",
+        "scan-session-20260815-090217/frame-0001.jpg",
+        "scan-session-20260815-090217/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260815-115155",
+      "stillUnlabeled": [
+        "scan-session-20260815-115155/frame-0000.jpg",
+        "scan-session-20260815-115155/frame-0001.jpg",
+        "scan-session-20260815-115155/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 9,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260816-165452",
+      "stillUnlabeled": [
+        "scan-session-20260816-165452/frame-0000.jpg",
+        "scan-session-20260816-165452/frame-0001.jpg",
+        "scan-session-20260816-165452/frame-0002.jpg",
+        "scan-session-20260816-165452/frame-0003.jpg",
+        "scan-session-20260816-165452/frame-0004.jpg",
+        "scan-session-20260816-165452/frame-0005.jpg",
+        "scan-session-20260816-165452/frame-0006.jpg",
+        "scan-session-20260816-165452/frame-0007.jpg",
+        "scan-session-20260816-165452/frame-0008.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260816-204703",
+      "stillUnlabeled": [
+        "scan-session-20260816-204703/frame-0000.jpg",
+        "scan-session-20260816-204703/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 5,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260817-214446",
+      "stillUnlabeled": [
+        "scan-session-20260817-214446/frame-0000.jpg",
+        "scan-session-20260817-214446/frame-0001.jpg",
+        "scan-session-20260817-214446/frame-0002.jpg",
+        "scan-session-20260817-214446/frame-0003.jpg",
+        "scan-session-20260817-214446/frame-0004.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 62,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260818-103659",
+      "stillUnlabeled": [
+        "scan-session-20260818-103659/frame-0000.jpg",
+        "scan-session-20260818-103659/frame-0001.jpg",
+        "scan-session-20260818-103659/frame-0002.jpg",
+        "scan-session-20260818-103659/frame-0003.jpg",
+        "scan-session-20260818-103659/frame-0004.jpg",
+        "scan-session-20260818-103659/frame-0005.jpg",
+        "scan-session-20260818-103659/frame-0006.jpg",
+        "scan-session-20260818-103659/frame-0007.jpg",
+        "scan-session-20260818-103659/frame-0008.jpg",
+        "scan-session-20260818-103659/frame-0009.jpg",
+        "scan-session-20260818-103659/frame-0010.jpg",
+        "scan-session-20260818-103659/frame-0011.jpg",
+        "scan-session-20260818-103659/frame-0012.jpg",
+        "scan-session-20260818-103659/frame-0013.jpg",
+        "scan-session-20260818-103659/frame-0014.jpg",
+        "scan-session-20260818-103659/frame-0015.jpg",
+        "scan-session-20260818-103659/frame-0016.jpg",
+        "scan-session-20260818-103659/frame-0017.jpg",
+        "scan-session-20260818-103659/frame-0018.jpg",
+        "scan-session-20260818-103659/frame-0019.jpg",
+        "scan-session-20260818-103659/frame-0020.jpg",
+        "scan-session-20260818-103659/frame-0021.jpg",
+        "scan-session-20260818-103659/frame-0022.jpg",
+        "scan-session-20260818-103659/frame-0023.jpg",
+        "scan-session-20260818-103659/frame-0024.jpg",
+        "scan-session-20260818-103659/frame-0025.jpg",
+        "scan-session-20260818-103659/frame-0026.jpg",
+        "scan-session-20260818-103659/frame-0027.jpg",
+        "scan-session-20260818-103659/frame-0028.jpg",
+        "scan-session-20260818-103659/frame-0029.jpg",
+        "scan-session-20260818-103659/frame-0030.jpg",
+        "scan-session-20260818-103659/frame-0031.jpg",
+        "scan-session-20260818-103659/frame-0032.jpg",
+        "scan-session-20260818-103659/frame-0033.jpg",
+        "scan-session-20260818-103659/frame-0034.jpg",
+        "scan-session-20260818-103659/frame-0035.jpg",
+        "scan-session-20260818-103659/frame-0036.jpg",
+        "scan-session-20260818-103659/frame-0037.jpg",
+        "scan-session-20260818-103659/frame-0038.jpg",
+        "scan-session-20260818-103659/frame-0039.jpg",
+        "scan-session-20260818-103659/frame-0040.jpg",
+        "scan-session-20260818-103659/frame-0041.jpg",
+        "scan-session-20260818-103659/frame-0042.jpg",
+        "scan-session-20260818-103659/frame-0043.jpg",
+        "scan-session-20260818-103659/frame-0044.jpg",
+        "scan-session-20260818-103659/frame-0045.jpg",
+        "scan-session-20260818-103659/frame-0046.jpg",
+        "scan-session-20260818-103659/frame-0047.jpg",
+        "scan-session-20260818-103659/frame-0048.jpg",
+        "scan-session-20260818-103659/frame-0049.jpg",
+        "scan-session-20260818-103659/frame-0050.jpg",
+        "scan-session-20260818-103659/frame-0051.jpg",
+        "scan-session-20260818-103659/frame-0052.jpg",
+        "scan-session-20260818-103659/frame-0053.jpg",
+        "scan-session-20260818-103659/frame-0054.jpg",
+        "scan-session-20260818-103659/frame-0055.jpg",
+        "scan-session-20260818-103659/frame-0056.jpg",
+        "scan-session-20260818-103659/frame-0057.jpg",
+        "scan-session-20260818-103659/frame-0058.jpg",
+        "scan-session-20260818-103659/frame-0059.jpg",
+        "scan-session-20260818-103659/frame-0060.jpg",
+        "scan-session-20260818-103659/frame-0061.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 37,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260818-144857",
+      "stillUnlabeled": [
+        "scan-session-20260818-144857/frame-0000.jpg",
+        "scan-session-20260818-144857/frame-0001.jpg",
+        "scan-session-20260818-144857/frame-0002.jpg",
+        "scan-session-20260818-144857/frame-0003.jpg",
+        "scan-session-20260818-144857/frame-0004.jpg",
+        "scan-session-20260818-144857/frame-0005.jpg",
+        "scan-session-20260818-144857/frame-0006.jpg",
+        "scan-session-20260818-144857/frame-0007.jpg",
+        "scan-session-20260818-144857/frame-0008.jpg",
+        "scan-session-20260818-144857/frame-0009.jpg",
+        "scan-session-20260818-144857/frame-0010.jpg",
+        "scan-session-20260818-144857/frame-0011.jpg",
+        "scan-session-20260818-144857/frame-0012.jpg",
+        "scan-session-20260818-144857/frame-0013.jpg",
+        "scan-session-20260818-144857/frame-0014.jpg",
+        "scan-session-20260818-144857/frame-0015.jpg",
+        "scan-session-20260818-144857/frame-0016.jpg",
+        "scan-session-20260818-144857/frame-0017.jpg",
+        "scan-session-20260818-144857/frame-0018.jpg",
+        "scan-session-20260818-144857/frame-0019.jpg",
+        "scan-session-20260818-144857/frame-0020.jpg",
+        "scan-session-20260818-144857/frame-0021.jpg",
+        "scan-session-20260818-144857/frame-0022.jpg",
+        "scan-session-20260818-144857/frame-0023.jpg",
+        "scan-session-20260818-144857/frame-0024.jpg",
+        "scan-session-20260818-144857/frame-0025.jpg",
+        "scan-session-20260818-144857/frame-0026.jpg",
+        "scan-session-20260818-144857/frame-0027.jpg",
+        "scan-session-20260818-144857/frame-0028.jpg",
+        "scan-session-20260818-144857/frame-0029.jpg",
+        "scan-session-20260818-144857/frame-0030.jpg",
+        "scan-session-20260818-144857/frame-0031.jpg",
+        "scan-session-20260818-144857/frame-0032.jpg",
+        "scan-session-20260818-144857/frame-0033.jpg",
+        "scan-session-20260818-144857/frame-0034.jpg",
+        "scan-session-20260818-144857/frame-0035.jpg",
+        "scan-session-20260818-144857/frame-0036.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 1,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260820-135949",
+      "stillUnlabeled": [
+        "scan-session-20260820-135949/frame-0000.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 1,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-121821",
+      "stillUnlabeled": [
+        "scan-session-20260821-121821/frame-0000.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 26,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-211659",
+      "stillUnlabeled": [
+        "scan-session-20260821-211659/frame-0000.jpg",
+        "scan-session-20260821-211659/frame-0001.jpg",
+        "scan-session-20260821-211659/frame-0002.jpg",
+        "scan-session-20260821-211659/frame-0003.jpg",
+        "scan-session-20260821-211659/frame-0004.jpg",
+        "scan-session-20260821-211659/frame-0005.jpg",
+        "scan-session-20260821-211659/frame-0006.jpg",
+        "scan-session-20260821-211659/frame-0007.jpg",
+        "scan-session-20260821-211659/frame-0008.jpg",
+        "scan-session-20260821-211659/frame-0009.jpg",
+        "scan-session-20260821-211659/frame-0010.jpg",
+        "scan-session-20260821-211659/frame-0011.jpg",
+        "scan-session-20260821-211659/frame-0012.jpg",
+        "scan-session-20260821-211659/frame-0013.jpg",
+        "scan-session-20260821-211659/frame-0014.jpg",
+        "scan-session-20260821-211659/frame-0015.jpg",
+        "scan-session-20260821-211659/frame-0016.jpg",
+        "scan-session-20260821-211659/frame-0017.jpg",
+        "scan-session-20260821-211659/frame-0018.jpg",
+        "scan-session-20260821-211659/frame-0019.jpg",
+        "scan-session-20260821-211659/frame-0020.jpg",
+        "scan-session-20260821-211659/frame-0021.jpg",
+        "scan-session-20260821-211659/frame-0022.jpg",
+        "scan-session-20260821-211659/frame-0023.jpg",
+        "scan-session-20260821-211659/frame-0024.jpg",
+        "scan-session-20260821-211659/frame-0025.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 5,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-215651",
+      "stillUnlabeled": [
+        "scan-session-20260821-215651/frame-0000.jpg",
+        "scan-session-20260821-215651/frame-0001.jpg",
+        "scan-session-20260821-215651/frame-0002.jpg",
+        "scan-session-20260821-215651/frame-0003.jpg",
+        "scan-session-20260821-215651/frame-0004.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 42,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-231419",
+      "stillUnlabeled": [
+        "scan-session-20260821-231419/frame-0000.jpg",
+        "scan-session-20260821-231419/frame-0001.jpg",
+        "scan-session-20260821-231419/frame-0002.jpg",
+        "scan-session-20260821-231419/frame-0003.jpg",
+        "scan-session-20260821-231419/frame-0004.jpg",
+        "scan-session-20260821-231419/frame-0005.jpg",
+        "scan-session-20260821-231419/frame-0006.jpg",
+        "scan-session-20260821-231419/frame-0007.jpg",
+        "scan-session-20260821-231419/frame-0008.jpg",
+        "scan-session-20260821-231419/frame-0009.jpg",
+        "scan-session-20260821-231419/frame-0010.jpg",
+        "scan-session-20260821-231419/frame-0011.jpg",
+        "scan-session-20260821-231419/frame-0012.jpg",
+        "scan-session-20260821-231419/frame-0013.jpg",
+        "scan-session-20260821-231419/frame-0014.jpg",
+        "scan-session-20260821-231419/frame-0015.jpg",
+        "scan-session-20260821-231419/frame-0016.jpg",
+        "scan-session-20260821-231419/frame-0017.jpg",
+        "scan-session-20260821-231419/frame-0018.jpg",
+        "scan-session-20260821-231419/frame-0019.jpg",
+        "scan-session-20260821-231419/frame-0020.jpg",
+        "scan-session-20260821-231419/frame-0021.jpg",
+        "scan-session-20260821-231419/frame-0022.jpg",
+        "scan-session-20260821-231419/frame-0023.jpg",
+        "scan-session-20260821-231419/frame-0024.jpg",
+        "scan-session-20260821-231419/frame-0025.jpg",
+        "scan-session-20260821-231419/frame-0026.jpg",
+        "scan-session-20260821-231419/frame-0027.jpg",
+        "scan-session-20260821-231419/frame-0028.jpg",
+        "scan-session-20260821-231419/frame-0029.jpg",
+        "scan-session-20260821-231419/frame-0030.jpg",
+        "scan-session-20260821-231419/frame-0031.jpg",
+        "scan-session-20260821-231419/frame-0032.jpg",
+        "scan-session-20260821-231419/frame-0033.jpg",
+        "scan-session-20260821-231419/frame-0034.jpg",
+        "scan-session-20260821-231419/frame-0035.jpg",
+        "scan-session-20260821-231419/frame-0036.jpg",
+        "scan-session-20260821-231419/frame-0037.jpg",
+        "scan-session-20260821-231419/frame-0038.jpg",
+        "scan-session-20260821-231419/frame-0039.jpg",
+        "scan-session-20260821-231419/frame-0040.jpg",
+        "scan-session-20260821-231419/frame-0041.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 27,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260826-143226",
+      "stillUnlabeled": [
+        "scan-session-20260826-143226/frame-0000.jpg",
+        "scan-session-20260826-143226/frame-0001.jpg",
+        "scan-session-20260826-143226/frame-0002.jpg",
+        "scan-session-20260826-143226/frame-0003.jpg",
+        "scan-session-20260826-143226/frame-0004.jpg",
+        "scan-session-20260826-143226/frame-0005.jpg",
+        "scan-session-20260826-143226/frame-0006.jpg",
+        "scan-session-20260826-143226/frame-0007.jpg",
+        "scan-session-20260826-143226/frame-0008.jpg",
+        "scan-session-20260826-143226/frame-0009.jpg",
+        "scan-session-20260826-143226/frame-0010.jpg",
+        "scan-session-20260826-143226/frame-0011.jpg",
+        "scan-session-20260826-143226/frame-0012.jpg",
+        "scan-session-20260826-143226/frame-0013.jpg",
+        "scan-session-20260826-143226/frame-0014.jpg",
+        "scan-session-20260826-143226/frame-0015.jpg",
+        "scan-session-20260826-143226/frame-0016.jpg",
+        "scan-session-20260826-143226/frame-0017.jpg",
+        "scan-session-20260826-143226/frame-0018.jpg",
+        "scan-session-20260826-143226/frame-0019.jpg",
+        "scan-session-20260826-143226/frame-0020.jpg",
+        "scan-session-20260826-143226/frame-0021.jpg",
+        "scan-session-20260826-143226/frame-0022.jpg",
+        "scan-session-20260826-143226/frame-0023.jpg",
+        "scan-session-20260826-143226/frame-0024.jpg",
+        "scan-session-20260826-143226/frame-0025.jpg",
+        "scan-session-20260826-143226/frame-0026.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 9,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 25,
+        "unchangedManualQuad": 7
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260827-223150/frame-0001.jpg",
+        "scan-session-20260827-223150/frame-0009.jpg",
+        "scan-session-20260827-223150/frame-0012.jpg",
+        "scan-session-20260827-223150/frame-0013.jpg",
+        "scan-session-20260827-223150/frame-0016.jpg",
+        "scan-session-20260827-223150/frame-0017.jpg",
+        "scan-session-20260827-223150/frame-0018.jpg",
+        "scan-session-20260827-223150/frame-0019.jpg",
+        "scan-session-20260827-223150/frame-0020.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260827-223150",
+      "stillUnlabeled": [
+        "scan-session-20260827-223150/frame-0000.jpg",
+        "scan-session-20260827-223150/frame-0001.jpg",
+        "scan-session-20260827-223150/frame-0002.jpg",
+        "scan-session-20260827-223150/frame-0003.jpg",
+        "scan-session-20260827-223150/frame-0008.jpg",
+        "scan-session-20260827-223150/frame-0009.jpg",
+        "scan-session-20260827-223150/frame-0012.jpg",
+        "scan-session-20260827-223150/frame-0013.jpg",
+        "scan-session-20260827-223150/frame-0014.jpg",
+        "scan-session-20260827-223150/frame-0016.jpg",
+        "scan-session-20260827-223150/frame-0017.jpg",
+        "scan-session-20260827-223150/frame-0018.jpg",
+        "scan-session-20260827-223150/frame-0019.jpg",
+        "scan-session-20260827-223150/frame-0020.jpg",
+        "scan-session-20260827-223150/frame-0021.jpg",
+        "scan-session-20260827-223150/frame-0022.jpg",
+        "scan-session-20260827-223150/frame-0023.jpg",
+        "scan-session-20260827-223150/frame-0024.jpg",
+        "scan-session-20260827-223150/frame-0025.jpg",
+        "scan-session-20260827-223150/frame-0026.jpg",
+        "scan-session-20260827-223150/frame-0027.jpg",
+        "scan-session-20260827-223150/frame-0028.jpg",
+        "scan-session-20260827-223150/frame-0029.jpg",
+        "scan-session-20260827-223150/frame-0030.jpg",
+        "scan-session-20260827-223150/frame-0031.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260827-223150/frame-0004.jpg",
+        "scan-session-20260827-223150/frame-0005.jpg",
+        "scan-session-20260827-223150/frame-0006.jpg",
+        "scan-session-20260827-223150/frame-0007.jpg",
+        "scan-session-20260827-223150/frame-0010.jpg",
+        "scan-session-20260827-223150/frame-0011.jpg",
+        "scan-session-20260827-223150/frame-0015.jpg"
+      ]
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 5,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 7,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260829-155957/frame-0001.jpg",
+        "scan-session-20260829-155957/frame-0002.jpg",
+        "scan-session-20260829-155957/frame-0003.jpg",
+        "scan-session-20260829-155957/frame-0005.jpg",
+        "scan-session-20260829-155957/frame-0006.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260829-155957",
+      "stillUnlabeled": [
+        "scan-session-20260829-155957/frame-0000.jpg",
+        "scan-session-20260829-155957/frame-0001.jpg",
+        "scan-session-20260829-155957/frame-0002.jpg",
+        "scan-session-20260829-155957/frame-0003.jpg",
+        "scan-session-20260829-155957/frame-0004.jpg",
+        "scan-session-20260829-155957/frame-0005.jpg",
+        "scan-session-20260829-155957/frame-0006.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 4,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 22,
+        "unchangedManualQuad": 5
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260829-200235/frame-0003.jpg",
+        "scan-session-20260829-200235/frame-0012.jpg",
+        "scan-session-20260829-200235/frame-0013.jpg",
+        "scan-session-20260829-200235/frame-0014.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260829-200235",
+      "stillUnlabeled": [
+        "scan-session-20260829-200235/frame-0000.jpg",
+        "scan-session-20260829-200235/frame-0001.jpg",
+        "scan-session-20260829-200235/frame-0002.jpg",
+        "scan-session-20260829-200235/frame-0003.jpg",
+        "scan-session-20260829-200235/frame-0004.jpg",
+        "scan-session-20260829-200235/frame-0005.jpg",
+        "scan-session-20260829-200235/frame-0006.jpg",
+        "scan-session-20260829-200235/frame-0007.jpg",
+        "scan-session-20260829-200235/frame-0008.jpg",
+        "scan-session-20260829-200235/frame-0009.jpg",
+        "scan-session-20260829-200235/frame-0010.jpg",
+        "scan-session-20260829-200235/frame-0011.jpg",
+        "scan-session-20260829-200235/frame-0012.jpg",
+        "scan-session-20260829-200235/frame-0013.jpg",
+        "scan-session-20260829-200235/frame-0014.jpg",
+        "scan-session-20260829-200235/frame-0015.jpg",
+        "scan-session-20260829-200235/frame-0016.jpg",
+        "scan-session-20260829-200235/frame-0018.jpg",
+        "scan-session-20260829-200235/frame-0020.jpg",
+        "scan-session-20260829-200235/frame-0021.jpg",
+        "scan-session-20260829-200235/frame-0025.jpg",
+        "scan-session-20260829-200235/frame-0026.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260829-200235/frame-0017.jpg",
+        "scan-session-20260829-200235/frame-0019.jpg",
+        "scan-session-20260829-200235/frame-0022.jpg",
+        "scan-session-20260829-200235/frame-0023.jpg",
+        "scan-session-20260829-200235/frame-0024.jpg"
+      ]
+    },
+    {
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "detectorQuadFrames": 5,
+        "gainingManualQuad": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 26,
+        "unchangedManualQuad": 4
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260829-233753/frame-0002.jpg",
+        "scan-session-20260829-233753/frame-0004.jpg",
+        "scan-session-20260829-233753/frame-0006.jpg",
+        "scan-session-20260829-233753/frame-0014.jpg",
+        "scan-session-20260829-233753/frame-0015.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260829-233753",
+      "stillUnlabeled": [
+        "scan-session-20260829-233753/frame-0000.jpg",
+        "scan-session-20260829-233753/frame-0001.jpg",
+        "scan-session-20260829-233753/frame-0002.jpg",
+        "scan-session-20260829-233753/frame-0004.jpg",
+        "scan-session-20260829-233753/frame-0006.jpg",
+        "scan-session-20260829-233753/frame-0007.jpg",
+        "scan-session-20260829-233753/frame-0008.jpg",
+        "scan-session-20260829-233753/frame-0009.jpg",
+        "scan-session-20260829-233753/frame-0010.jpg",
+        "scan-session-20260829-233753/frame-0011.jpg",
+        "scan-session-20260829-233753/frame-0014.jpg",
+        "scan-session-20260829-233753/frame-0015.jpg",
+        "scan-session-20260829-233753/frame-0016.jpg",
+        "scan-session-20260829-233753/frame-0017.jpg",
+        "scan-session-20260829-233753/frame-0018.jpg",
+        "scan-session-20260829-233753/frame-0019.jpg",
+        "scan-session-20260829-233753/frame-0020.jpg",
+        "scan-session-20260829-233753/frame-0021.jpg",
+        "scan-session-20260829-233753/frame-0022.jpg",
+        "scan-session-20260829-233753/frame-0023.jpg",
+        "scan-session-20260829-233753/frame-0024.jpg",
+        "scan-session-20260829-233753/frame-0025.jpg",
+        "scan-session-20260829-233753/frame-0026.jpg",
+        "scan-session-20260829-233753/frame-0027.jpg",
+        "scan-session-20260829-233753/frame-0028.jpg",
+        "scan-session-20260829-233753/frame-0029.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260829-233753/frame-0003.jpg",
+        "scan-session-20260829-233753/frame-0005.jpg",
+        "scan-session-20260829-233753/frame-0012.jpg",
+        "scan-session-20260829-233753/frame-0013.jpg"
+      ]
+    }
+  ],
+  "summary": {
+    "changedManualQuad": 0,
+    "currentManualQuadFrames": 57,
+    "detectorQuadFrames": 28,
+    "gainingManualQuad": 0,
+    "inventoryFrames": 604,
+    "losingManualQuad": 0,
+    "sessions": 41,
+    "stillUnlabeled": 547,
+    "unchangedManualQuad": 57
+  },
+  "supersedes": {
+    "exportedAt": "2026-08-30T13:13:35-07:00",
+    "path": "TCGer-Labeling/fiftyone-sessions/backups/labels-20260830-131335.json",
+    "sha256": "308faca4d2e7ca1d2b4e60cd36e7ee70708f1b935c5b1552292f1243e5041f5c"
+  }
+}

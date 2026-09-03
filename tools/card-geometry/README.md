@@ -124,6 +124,14 @@ snapshot from `backup_labels.py`; `--devmode-sessions-root` resolves its stable
 `session/image` keys. This path deliberately ingests only `manual` quads and
 does not rewrite the canonical session library.
 
+`diff_fiftyone_release.py` compares a fresh `backup_labels.py` snapshot to an
+immutable geometry release. It reports manual-quad gains, pixel deltas for
+changed corners, losses, detector-derived quads, and frames still lacking
+human geometry per session. It also projects the current release against a
+specified readiness policy. A non-empty gain/change/loss set requires a new
+release and corpus hash; the pinned release and its existing reports remain
+immutable.
+
 ## Geometry benchmark
 
 `benchmark_geometry.py` scores one localizer's portable predictions against a
