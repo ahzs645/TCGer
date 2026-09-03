@@ -281,15 +281,18 @@ async function endDrag(event) {
     draw();
     return;
   }
-  if (JSON.stringify(state.sample.quads[state.activeCard]) === JSON.stringify(state.dragSnapshot)) return;
-  renderControls();
+  const unchanged = JSON.stringify(state.sample.quads[state.activeCard]) === JSON.stringify(state.dragSnapshot);
+  if (unchanged && state.sample.draftSource !== "detector") return;
+  if (!unchanged) renderControls();
   if (state.sample.draftSource === "detector") {
     state.reviewedCorners.add(`${state.activeCard}:${state.activeCorner}`);
     const required = state.sample.quads.length * 4;
     if (state.reviewedCorners.size < required) {
-      status(`Detector draft: ${state.reviewedCorners.size}/${required} corners adjusted. Adjust every corner before saving.`);
+      status(`Detector draft: ${state.reviewedCorners.size}/${required} corners reviewed. Click or drag every corner before saving.`);
       return;
     }
+    await persist(false, "All detector-draft corners reviewed. Ready to save frame.");
+    return;
   }
   await persist(false, `Saved Card ${state.activeCard + 1} ${CORNERS[state.activeCorner]}`);
 }
@@ -428,7 +431,7 @@ document.querySelector("#delete").onclick = async () => {
 document.querySelector("#save").onclick = () => {
   const required = state.sample.quads.length * 4;
   if (state.sample.draftSource === "detector" && state.reviewedCorners.size < required) {
-    status(`Adjust all four detector-draft corners first (${state.reviewedCorners.size}/${required} done).`, "error");
+    status(`Review all four detector-draft corners first (${state.reviewedCorners.size}/${required} done). Click a correct corner; drag one that needs correction.`, "error");
     return;
   }
   persist(true, `Frame saved (${state.sample.quads.length} cards)`);
@@ -459,7 +462,7 @@ async function loadSample(index) {
     renderControls();
     draw();
     const draft = state.sample.draftSource === "detector"
-      ? " Detector corners are a starting draft—review all four before saving."
+      ? " Detector corners are a starting draft—click each correct corner or drag it to correct it before saving."
       : "";
     status(`Ready — choose a card; Tab / Shift+Tab switches cards while editing.${draft}`, "ok");
   };
