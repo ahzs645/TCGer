@@ -1,12 +1,12 @@
 {
-  "corpusHash": "b055b85ac887cff1a218cbb1ccbbc59e8eb3d2a8155136949921076f47ca505e",
+  "corpusHash": "e1a79bdd1d491b2e10beb855a2e5bcf0815a29ff1a22a787a82006e2748fae00",
   "evaluationSessionDenylist": [
     "scan-session-20260829-200235"
   ],
   "readiness": {
     "readinessPolicyId": "training-minimums-draft-v1",
     "readinessPolicyPath": "policy.json",
-    "readinessPolicySha256": "3391de450e1164f663e0a28db1d207380f29aa8d415c5ece08a10cfc3b31f435"
+    "readinessPolicySha256": "1eb2a5294578c4897f9cdb0b828a13d68700753ded89202af77e1229a72b3ada"
   },
   "records": [],
   "releaseId": "empty-training-release",

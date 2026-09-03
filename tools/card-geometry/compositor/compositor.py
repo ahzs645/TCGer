@@ -722,6 +722,8 @@ def _smoke_policy(records_per_split_scene: dict[str, dict[str, int]]) -> dict[st
         "requiredSplits": required_splits,
         "minimumRecordsPerSplit": {split: 1 for split in required_splits},
         "minimumInstancesPerSplit": {split: 1 for split in required_splits},
+        "minimumMetricEligibleInstances": {split: 1 for split in required_splits},
+        "allowedSourceTiers": ["shippable"],
         "minimumRealEvaluationSessions": 0,
         "realOnlySplits": ["test"],
         "requiredSceneSlices": required_slices,
@@ -797,6 +799,7 @@ def build_release(
                         "sha256": sha256_bytes(record_text.encode("utf-8")),
                         "split": split,
                         "sceneSlice": scene_slice,
+                        "sourceTier": "shippable",
                         "leakageKeys": leakage_keys_from_record(record),
                         "images": [{"path": image_rel, "sha256": sha256_bytes(image_bytes)}],
                     }

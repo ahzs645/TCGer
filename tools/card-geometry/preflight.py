@@ -88,6 +88,7 @@ CHECK_ORDER = (
     "LEAKAGE_DISJOINT",
     "EVAL_DENYLIST",
     "SPLIT_REAL_ONLY",
+    "SOURCE_TIER",
     "SHARED_FIXTURES",
     "CORNER_COUNTS",
     "READINESS_MINIMUMS",
@@ -456,6 +457,7 @@ def check_leakage(ctx: Context) -> None:
         "LEAKAGE_DISJOINT",
         "EVAL_DENYLIST",
         "SPLIT_REAL_ONLY",
+        "SOURCE_TIER",
     )
     if not ctx.manifest_valid:
         for code in codes:
@@ -582,6 +584,49 @@ def check_leakage(ctx: Context) -> None:
     else:
         ctx.add("SPLIT_REAL_ONLY", SKIP, "policy invalid")
 
+    # Immutable legacy smoke releases predate source tiers. New policies opt
+    # into the gate; every record must then declare an admitted tier.
+    if ctx.policy_valid:
+        assert ctx.policy is not None
+        allowed = ctx.policy.get("allowedSourceTiers")
+        if allowed is None:
+            if ctx.manifest["releasePurpose"] == "training":
+                ctx.add(
+                    "SOURCE_TIER",
+                    FAIL,
+                    "training policy must declare allowedSourceTiers",
+                )
+            else:
+                ctx.add(
+                    "SOURCE_TIER",
+                    SKIP,
+                    "legacy policy does not declare allowedSourceTiers",
+                )
+        else:
+            allowed_set = set(allowed)
+            offenders = {
+                entry["recordId"]: entry.get("sourceTier", "missing")
+                for entry in ctx.manifest["records"]
+                if entry.get("sourceTier") not in allowed_set
+            }
+            if offenders:
+                ctx.add(
+                    "SOURCE_TIER",
+                    FAIL,
+                    f"{len(offenders)} records have a missing or disallowed source tier",
+                    allowedSourceTiers=sorted(allowed_set),
+                    offenders=offenders,
+                )
+            else:
+                ctx.add(
+                    "SOURCE_TIER",
+                    PASS,
+                    "every record belongs to a source tier admitted by policy",
+                    allowedSourceTiers=sorted(allowed_set),
+                )
+    else:
+        ctx.add("SOURCE_TIER", SKIP, "policy invalid")
+
 
 def check_shared_fixtures(ctx: Context) -> None:
     """Re-run the model-agnostic contract fixtures inside this environment."""
@@ -700,6 +745,7 @@ def check_readiness(ctx: Context) -> None:
     policy = ctx.policy
     records_per_split: Counter = Counter()
     instances_per_split: Counter = Counter()
+    metric_eligible_instances_per_split: Counter = Counter()
     slice_instances: Counter = Counter()
     test_real_sessions: set[str] = set()
     for entry, record in _entries_with_records(ctx):
@@ -707,6 +753,17 @@ def check_readiness(ctx: Context) -> None:
         records_per_split[split] += 1
         count = len(record.get("instances", [])) if isinstance(record, dict) else 0
         instances_per_split[split] += count
+        eligible_sources = set(policy["metricEligibleCornerSources"])
+        if isinstance(record, dict):
+            metric_eligible_instances_per_split[split] += sum(
+                len(instance.get("corners", [])) == 4
+                and all(
+                    corner.get("coordinateKnown")
+                    and corner.get("cornerSource") in eligible_sources
+                    for corner in instance.get("corners", [])
+                )
+                for instance in record.get("instances", [])
+            )
         slice_instances[(entry["sceneSlice"], split)] += count
         if (
             split == "test"
@@ -716,6 +773,11 @@ def check_readiness(ctx: Context) -> None:
             test_real_sessions.add(entry["leakageKeys"]["sessionId"])
 
     shortfalls: list[str] = []
+    if (
+        ctx.manifest["releasePurpose"] == "training"
+        and "minimumMetricEligibleInstances" not in policy
+    ):
+        shortfalls.append("training policy omits minimumMetricEligibleInstances")
     for split in policy["requiredSplits"]:
         if records_per_split[split] == 0:
             shortfalls.append(f"required split {split} has no records")
@@ -728,6 +790,11 @@ def check_readiness(ctx: Context) -> None:
         if instances_per_split[split] < minimum:
             shortfalls.append(
                 f"{split}: {instances_per_split[split]} instances < {minimum}"
+            )
+    for split, minimum in policy.get("minimumMetricEligibleInstances", {}).items():
+        if metric_eligible_instances_per_split[split] < minimum:
+            shortfalls.append(
+                f"{split}: {metric_eligible_instances_per_split[split]} metric-eligible instances < {minimum}"
             )
     if len(test_real_sessions) < policy["minimumRealEvaluationSessions"]:
         shortfalls.append(
@@ -744,6 +811,9 @@ def check_readiness(ctx: Context) -> None:
         "policyId": policy["policyId"],
         "recordsPerSplit": {split: records_per_split[split] for split in SPLITS},
         "instancesPerSplit": {split: instances_per_split[split] for split in SPLITS},
+        "metricEligibleInstancesPerSplit": {
+            split: metric_eligible_instances_per_split[split] for split in SPLITS
+        },
         "testRealSessions": sorted(test_real_sessions),
         "sceneSliceInstances": {
             f"{split}/{scene}": count

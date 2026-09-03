@@ -1,12 +1,12 @@
 {
-  "corpusHash": "83979b50d12a33457d0e4c8651a9910e21f9d0cba1ce4dadf11a9a86c25e33b5",
+  "corpusHash": "f6b72d16a9f2f462bbddf14c54f30256b89b0c4991b4df3818c8def95a794037",
   "evaluationSessionDenylist": [
     "scan-session-20260829-200235"
   ],
   "readiness": {
     "readinessPolicyId": "fixture-minimums-v1",
     "readinessPolicyPath": "policy.json",
-    "readinessPolicySha256": "46daf9abbe63c05e5ab73b4421e3a191610968decb36b5ace0b9cdd5a5dd9c63"
+    "readinessPolicySha256": "37adb53e6fe2fcee157fa04d407ad18ae7ba3873d33170ea05cd5727165ca9c3"
   },
   "records": [
     {
@@ -29,6 +29,7 @@
       "recordId": "fx-train-synthetic-001",
       "sceneSlice": "duel_field",
       "sha256": "77df3d0c5cbe348dc93a903505e508526ad05ddc882d41484b6ad9918bd100c5",
+      "sourceTier": "shippable",
       "split": "train"
     },
     {
@@ -51,6 +52,7 @@
       "recordId": "fx-validation-real-001",
       "sceneSlice": "single_handheld",
       "sha256": "645b9c901b43c2a500b5abfe4411165e4a8a2876f686bf903a9f0e10fc8fd857",
+      "sourceTier": "shippable",
       "split": "validation"
     },
     {
@@ -73,6 +75,7 @@
       "recordId": "fx-test-real-001",
       "sceneSlice": "single_handheld",
       "sha256": "d9e755f0b8ec2371b639e087788ee9ee7a8bbc0f3635a21c5aee55f2077a149a",
+      "sourceTier": "shippable",
       "split": "test"
     }
   ],

@@ -123,6 +123,10 @@
           "description": "Evaluation slice this frame belongs to, for example `single_handheld`, `steep_playmat`, `duel_field`, `binder_page`.",
           "$ref": "#/$defs/id"
         },
+        "sourceTier": {
+          "description": "License/use tier assigned by the source adapter. Required whenever the bound readiness policy declares allowedSourceTiers; omitted only by immutable legacy releases.",
+          "enum": ["shippable", "research-only", "evaluation-external"]
+        },
         "leakageKeys": { "$ref": "#/$defs/leakageKeys" },
         "images": {
           "type": "array",

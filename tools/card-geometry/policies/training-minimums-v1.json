@@ -2,7 +2,7 @@
   "allowedSourceTiers": [
     "shippable"
   ],
-  "description": "Draft production minimums. Values are placeholders until the first real geometry corpus release sets them from measured counts.",
+  "description": "Approved minimum coverage for the first shared card-geometry training bake-off. Frozen before candidates are trained; synthetic data is forbidden from test and only shippable-tier sources may enter the release.",
   "metricEligibleCornerSources": [
     "human",
     "synthetic"
@@ -23,16 +23,14 @@
     "train": 500,
     "validation": 50
   },
-  "policyId": "training-minimums-draft-v1",
+  "policyId": "training-minimums-v1",
   "realOnlySplits": [
     "test"
   ],
   "requiredLeakageKeys": {
-    "real": [
-      "sessionId",
-      "physicalCardIds"
-    ],
+    "real": [],
     "synthetic": [
+      "physicalCardIds",
       "sourceAssetIds"
     ]
   },

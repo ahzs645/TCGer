@@ -166,15 +166,17 @@ def fiftyone_inventory(dataset_name: str) -> list[dict[str, Any]]:
         with Image.open(sample.filepath) as image:
             width, height = image.size
         frame_type = sample.get_field("frame_type")
+        capture_mode = "binder" if frame_type == "binder" else "single"
+        game = sample.get_field("game") or "unknown"
         result.append(
             {
                 "key": key,
                 "sessionId": key.split("/", 1)[0],
                 "width": width,
                 "height": height,
-                "sceneSlice": (
-                    "binder_page" if frame_type == "binder" else "single_handheld"
-                ),
+                "captureMode": capture_mode,
+                "game": game,
+                "sceneSlice": "binder_page" if capture_mode == "binder" else "single_handheld",
             }
         )
     return sorted(result, key=lambda item: item["key"])
@@ -217,12 +219,23 @@ def coverage_report(
     record_counts: Counter[str] = Counter()
     instance_counts: Counter[str] = Counter()
     slice_instances: Counter[tuple[str, str]] = Counter()
+    metric_eligible_instances: Counter[str] = Counter()
+    eligible_sources = set(policy["metricEligibleCornerSources"])
     for item in release["nonDevmode"]:
         entry, record = item["entry"], item["record"]
         record_counts[entry["split"]] += 1
         instance_counts[entry["split"]] += len(record["instances"])
         slice_instances[(entry["split"], entry["sceneSlice"])] += len(
             record["instances"]
+        )
+        metric_eligible_instances[entry["split"]] += sum(
+            len(instance.get("corners", [])) == 4
+            and all(
+                corner.get("coordinateKnown")
+                and corner.get("cornerSource") in eligible_sources
+                for corner in instance.get("corners", [])
+            )
+            for instance in record["instances"]
         )
     for key in current_manual:
         inventory = inventory_by_key.get(key)
@@ -231,6 +244,7 @@ def coverage_report(
         record_counts["test"] += 1
         instance_counts["test"] += 1
         slice_instances[("test", inventory["sceneSlice"])] += 1
+        metric_eligible_instances["test"] += 1
 
     required_slices = []
     for requirement in policy["requiredSceneSlices"]:
@@ -271,6 +285,18 @@ def coverage_report(
             "draft-unapproved" if "draft" in policy["policyId"] else "approved"
         ),
         "metricEligibleCorners": len(current_manual) * 4,
+        "metricEligibleInstances": {
+            split: {
+                "actual": metric_eligible_instances[split],
+                "minimum": policy.get("minimumMetricEligibleInstances", {}).get(split, 0),
+                "shortfall": max(
+                    0,
+                    policy.get("minimumMetricEligibleInstances", {}).get(split, 0)
+                    - metric_eligible_instances[split],
+                ),
+            }
+            for split in policy["requiredSplits"]
+        },
         "metricEligibleCornerSources": policy["metricEligibleCornerSources"],
         "realEvaluationSessions": len(sessions),
         "minimumRealEvaluationSessions": minimum_sessions,
@@ -321,6 +347,9 @@ def build_report(
         and isinstance(item.get("fixed_quad_source"), str)
         and item.get("fixed_quad_source") not in {"", "manual"}
     }
+    inventory_by_session: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in inventory_by_key.values():
+        inventory_by_session[item["sessionId"]].append(item)
     for key in all_keys:
         session_id = inventory_by_key[key]["sessionId"]
         before = baseline.get(key)
@@ -350,10 +379,63 @@ def build_report(
         if key in detector_keys:
             sessions[session_id]["detectorQuadFrames"].append(key)
 
+    def breakdown(
+        frames: list[dict[str, Any]], field: str
+    ) -> dict[str, dict[str, int]]:
+        values: dict[str, dict[str, int]] = {}
+        for value in sorted({str(frame.get(field) or "unknown") for frame in frames}):
+            keys = {frame["key"] for frame in frames if str(frame.get(field) or "unknown") == value}
+            values[value] = {
+                "frames": len(keys),
+                "manualQuadFrames": len(keys & set(current_manual)),
+                "detectorQuadFrames": len(keys & detector_keys),
+                "stillUnlabeled": len(keys - set(current_manual)),
+            }
+        return values
+
+    ordered_sessions = sorted(
+        sessions,
+        key=lambda session_id: (
+            not any(
+                frame.get("captureMode") == "binder"
+                for frame in inventory_by_session[session_id]
+            ),
+            -sum(
+                frame.get("captureMode") == "binder"
+                and frame["key"] not in current_manual
+                for frame in inventory_by_session[session_id]
+            ),
+            session_id,
+        ),
+    )
     session_rows = []
-    for session_id, values in sorted(sessions.items()):
+    for session_id in ordered_sessions:
+        values = sessions[session_id]
         counts = {name: len(items) for name, items in values.items()}
-        session_rows.append({"sessionId": session_id, "counts": counts, **values})
+        frames = inventory_by_session[session_id]
+        session_rows.append(
+            {
+                "sessionId": session_id,
+                "counts": counts,
+                "breakdown": {
+                    "captureMode": breakdown(frames, "captureMode"),
+                    "game": breakdown(frames, "game"),
+                },
+                **values,
+            }
+        )
+    binder_sessions = []
+    for row in session_rows:
+        binder = row["breakdown"]["captureMode"].get("binder")
+        if binder is None:
+            continue
+        binder_sessions.append(
+            {
+                "sessionId": row["sessionId"],
+                "games": sorted(row["breakdown"]["game"]),
+                **binder,
+            }
+        )
     summary = {
         "sessions": len(session_rows),
         "inventoryFrames": len(all_keys),
@@ -364,6 +446,10 @@ def build_report(
         "unchangedManualQuad": sum(row["counts"]["unchangedManualQuad"] for row in session_rows),
         "stillUnlabeled": sum(row["counts"]["stillUnlabeled"] for row in session_rows),
         "detectorQuadFrames": sum(row["counts"]["detectorQuadFrames"] for row in session_rows),
+        "breakdown": {
+            "captureMode": breakdown(list(inventory_by_key.values()), "captureMode"),
+            "game": breakdown(list(inventory_by_key.values()), "game"),
+        },
     }
     release_change_required = any(
         summary[name] for name in ("gainingManualQuad", "changedManualQuad", "losingManualQuad")
@@ -398,6 +484,7 @@ def build_report(
         "provenanceCounts": provenance_counts(current_records),
         "summary": summary,
         "releaseChangeRequired": release_change_required,
+        "binderSessionsFirst": binder_sessions,
         "sessions": session_rows,
         "coverage": coverage_report(
             release, current_manual, inventory_by_key, policy

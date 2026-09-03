@@ -1,0 +1,183 @@
+{
+  "bySource": {
+    "card-detector-wmbbb": {
+      "cardInstances": 48,
+      "closingPointNormalized": 38,
+      "geometryQuality:source-polygon": 48,
+      "quadFit:accepted": 38,
+      "quadFit:residual": 10,
+      "sceneCandidate:multi_card_unclassified": 2,
+      "sceneCandidate:single_card_archive": 41,
+      "sceneCandidate:unannotated": 3,
+      "sourcePolygonInstances": 48
+    },
+    "card-scanner-seg": {
+      "cardInstances": 2721,
+      "closingPointNormalized": 2721,
+      "geometryQuality:source-polygon": 2721,
+      "quadFit:accepted": 2137,
+      "quadFit:aspect": 559,
+      "quadFit:residual": 25,
+      "sceneCandidate:single_card_archive": 2721,
+      "sceneCandidate:unannotated": 16,
+      "sourcePolygonInstances": 2721
+    },
+    "card-seg-j74w1": {
+      "cardInstances": 309,
+      "closingPointNormalized": 309,
+      "geometryQuality:source-polygon": 309,
+      "quadFit:accepted": 94,
+      "quadFit:residual": 215,
+      "sceneCandidate:single_card_archive": 309,
+      "sourcePolygonInstances": 309
+    },
+    "card-seg-j74w1-q8yst": {
+      "cardInstances": 589,
+      "closingPointNormalized": 589,
+      "geometryQuality:source-polygon": 589,
+      "quadFit:accepted": 100,
+      "quadFit:residual": 489,
+      "sceneCandidate:single_card_archive": 589,
+      "sourcePolygonInstances": 589
+    },
+    "card-segmentation-gldmt": {
+      "cardInstances": 78,
+      "closingPointNormalized": 78,
+      "geometryQuality:source-polygon": 78,
+      "quadFit:accepted": 1,
+      "quadFit:aspect": 42,
+      "quadFit:residual": 35,
+      "sceneCandidate:single_card_archive": 78,
+      "sourcePolygonInstances": 78
+    },
+    "carddetection-hegxe": {
+      "cardInstances": 1209,
+      "geometryQuality:bbox-derived": 1209,
+      "sceneCandidate:multi_card_unclassified": 115,
+      "sceneCandidate:single_card_archive": 2
+    },
+    "labelyolo": {
+      "cardInstances": 99,
+      "geometryQuality:bbox-derived": 99,
+      "sceneCandidate:multi_card_unclassified": 5,
+      "sceneCandidate:single_card_archive": 88
+    },
+    "mtg-rqful": {
+      "cardInstances": 800,
+      "geometryQuality:bbox-derived": 800,
+      "sceneCandidate:single_card_archive": 800
+    },
+    "mtg-scanner-bughx": {
+      "cardInstances": 211,
+      "geometryQuality:bbox-derived": 211,
+      "sceneCandidate:multi_card_unclassified": 34,
+      "sceneCandidate:single_card_archive": 2
+    },
+    "pk-detect": {
+      "cardInstances": 227,
+      "geometryQuality:bbox-derived": 227,
+      "sceneCandidate:multi_card_unclassified": 33,
+      "sceneCandidate:single_card_archive": 15
+    },
+    "pokefolio": {
+      "cardInstances": 464,
+      "geometryQuality:bbox-derived": 464,
+      "sceneCandidate:multi_card_unclassified": 44,
+      "sceneCandidate:single_card_archive": 238,
+      "sceneCandidate:unannotated": 3
+    },
+    "pokemon-card-outliner": {
+      "cardInstances": 523,
+      "geometryQuality:bbox-derived": 523,
+      "sceneCandidate:multi_card_unclassified": 33,
+      "sceneCandidate:single_card_archive": 307,
+      "sceneCandidate:unannotated": 7
+    },
+    "pokemon_card_detector": {
+      "cardInstances": 389,
+      "geometryQuality:bbox-derived": 389,
+      "sceneCandidate:multi_card_unclassified": 16,
+      "sceneCandidate:single_card_archive": 272,
+      "sceneCandidate:unannotated": 3
+    },
+    "tcgx-annotations": {
+      "cardInstances": 561,
+      "closingPointNormalized": 561,
+      "geometryQuality:source-polygon": 561,
+      "quadFit:accepted": 512,
+      "quadFit:aspect": 1,
+      "quadFit:residual": 48,
+      "sceneCandidate:multi_card_unclassified": 22,
+      "sceneCandidate:single_card_archive": 480,
+      "sourcePolygonInstances": 561
+    }
+  },
+  "bySplit": {
+    "test": {
+      "cardInstances": 873,
+      "closingPointNormalized": 389,
+      "geometryQuality:bbox-derived": 484,
+      "geometryQuality:source-polygon": 389,
+      "quadFit:accepted": 253,
+      "quadFit:aspect": 56,
+      "quadFit:residual": 80,
+      "sceneCandidate:multi_card_unclassified": 42,
+      "sceneCandidate:single_card_archive": 543,
+      "sceneCandidate:unannotated": 2,
+      "sourcePolygonInstances": 389
+    },
+    "train": {
+      "cardInstances": 6473,
+      "closingPointNormalized": 3429,
+      "geometryQuality:bbox-derived": 3035,
+      "geometryQuality:source-polygon": 3438,
+      "quadFit:accepted": 2306,
+      "quadFit:aspect": 473,
+      "quadFit:residual": 659,
+      "sceneCandidate:multi_card_unclassified": 230,
+      "sceneCandidate:single_card_archive": 4764,
+      "sceneCandidate:unannotated": 24,
+      "sourcePolygonInstances": 3438
+    },
+    "validation": {
+      "cardInstances": 882,
+      "closingPointNormalized": 478,
+      "geometryQuality:bbox-derived": 403,
+      "geometryQuality:source-polygon": 479,
+      "quadFit:accepted": 323,
+      "quadFit:aspect": 73,
+      "quadFit:residual": 83,
+      "sceneCandidate:multi_card_unclassified": 32,
+      "sceneCandidate:single_card_archive": 635,
+      "sceneCandidate:unannotated": 6,
+      "sourcePolygonInstances": 479
+    }
+  },
+  "input": "corpus.jsonl",
+  "inputSha256": "aaf98c7f4c81bf36948dda98db905140bd785e964af9980a1d82aef2f905c2c6",
+  "sceneCandidates": {
+    "multi_card_unclassified": 304,
+    "single_card_archive": 5942,
+    "unannotated": 32
+  },
+  "sceneClassification": {
+    "multi_card_unclassified": "two or more card annotations; requires visual review before binder_page or duel_field assignment",
+    "single_card_archive": "exactly one card annotation; not evidence of handheld capture",
+    "unannotated": "no card annotation"
+  },
+  "schema": "https://tcger.app/reports/canonical-geometry-audit/v1",
+  "summary": {
+    "cardInstances": 8228,
+    "closingPointNormalized": 4296,
+    "geometryQuality:bbox-derived": 3922,
+    "geometryQuality:source-polygon": 4306,
+    "quadFit:accepted": 2882,
+    "quadFit:aspect": 602,
+    "quadFit:residual": 822,
+    "records": 6278,
+    "sceneCandidate:multi_card_unclassified": 304,
+    "sceneCandidate:single_card_archive": 5942,
+    "sceneCandidate:unannotated": 32,
+    "sourcePolygonInstances": 4306
+  }
+}

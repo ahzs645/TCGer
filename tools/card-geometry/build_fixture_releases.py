@@ -56,6 +56,8 @@ FIXTURE_POLICY: dict[str, Any] = {
     "requiredSplits": ["train", "validation", "test"],
     "minimumRecordsPerSplit": {"train": 1, "validation": 1, "test": 1},
     "minimumInstancesPerSplit": {"train": 1, "validation": 1, "test": 1},
+    "minimumMetricEligibleInstances": {"train": 1, "validation": 0, "test": 1},
+    "allowedSourceTiers": ["shippable"],
     "minimumRealEvaluationSessions": 1,
     "realOnlySplits": ["test"],
     "requiredSceneSlices": [
@@ -78,6 +80,8 @@ TRAINING_POLICY: dict[str, Any] = {
     "requiredSplits": ["train", "validation", "test"],
     "minimumRecordsPerSplit": {"train": 500, "validation": 50, "test": 100},
     "minimumInstancesPerSplit": {"train": 1000, "validation": 100, "test": 150},
+    "minimumMetricEligibleInstances": {"train": 1000, "validation": 100, "test": 100},
+    "allowedSourceTiers": ["shippable"],
     "minimumRealEvaluationSessions": 3,
     "realOnlySplits": ["test"],
     "requiredSceneSlices": [
@@ -309,6 +313,7 @@ def materialize(
                 "sha256": sha256_bytes(record_text.encode("utf-8")),
                 "split": item["split"],
                 "sceneSlice": item["sceneSlice"],
+                "sourceTier": item.get("sourceTier", "shippable"),
                 "leakageKeys": leakage_keys_from_record(record),
                 "images": [{"path": image_rel, "sha256": sha256_bytes(intended_image)}],
             }

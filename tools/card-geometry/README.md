@@ -46,6 +46,7 @@ structured `checks` list. Check codes, in report order:
 | `LEAKAGE_DISJOINT` | a source archive, session, physical card, source asset, record hash, or image hash appears in more than one split |
 | `EVAL_DENYLIST` | a frozen evaluation session appears outside the `test` split |
 | `SPLIT_REAL_ONLY` | a synthetic record sits in a real-only split |
+| `SOURCE_TIER` | a policy-gated release has a missing or disallowed source tier; every training policy must activate this gate |
 | `SHARED_FIXTURES` | the contract fixtures above do not reproduce in this environment |
 | `CORNER_COUNTS` | never; it records `eligible / evaluated / skipped` corners per source kind, scene slice, and split, and divides the evaluated corners into `metricEligible` (known coordinate whose per-corner `cornerSource` is in the policy's `metricEligibleCornerSources`) and `metricExcluded` (`maskFit`, `detector`, or absent). `maskFit` and `detector` corners are reported but can never become corner-error ground truth |
 | `READINESS_MINIMUMS` | the release does not meet its policy's minimums |
@@ -132,6 +133,16 @@ specified readiness policy. A non-empty gain/change/loss set requires a new
 release and corpus hash; the pinned release and its existing reports remain
 immutable.
 
+`--multi-instance-labels` accepts the checked-in manual sidecar schema for
+binder and duel-field frames. Every instance requires a physical-card id and
+four human-ordered corners; resulting records are test-only and their sessions
+are denylisted. Canonical external archives are admitted only when provenance
+resolves to one shippable license (`CC BY 4.0`, `MIT`, or `self-captured`).
+`combine_geometry_releases.py` joins separately pinned real, external, and
+synthetic parts without rewriting record bytes, rejects duplicate paths and
+synthetic test records, and binds the exact approved policy as a
+`training`-purpose release.
+
 ## Geometry benchmark
 
 `benchmark_geometry.py` scores one localizer's portable predictions against a
@@ -191,13 +202,15 @@ FastViT head use the existing `permissive` route.
 
 The checked-in `fixtures/experiment-config.evaluation-only.v1.json` is a
 schema and guard fixture only: its training-release hashes and container digest
-are placeholders. A real config cannot be prepared until the human approves
-`training-minimums-v1`; the wrapper requires that exact policy id and its
-committed SHA-256 and never generates a policy from corpus contents.
+are placeholders. The approved `training-minimums-v1` is checked in under
+`policies/`, SHA-256
+`eb530f1e34f1bfede111c7a43ef01a3d71b2db3c5d8d15713ac11b70d7474191`.
+The wrapper requires that exact policy id and hash and never generates a
+training policy from corpus contents.
 
 ```sh
 python3 tools/card-geometry/run_card_geometry_hf_job.py \
-  --config <resolved-candidate-config.json> --action train --dry-run
+  --config <resolved-candidate-config.json> --action train --pipeline-smoke --dry-run
 ```
 
 ## Running the checks
@@ -206,6 +219,7 @@ python3 tools/card-geometry/run_card_geometry_hf_job.py \
 uv pip install -r tools/card-geometry/requirements.txt
 uv pip install -r tools/card-geometry/compositor/requirements.txt
 python3 -m unittest discover -s tools/card-geometry -p 'test_*.py'
+uvx --from ruff==0.15.8 ruff check tools/card-geometry
 ```
 
 `reference_geometry.py` and `build_fixture_releases.py` need only the standard

@@ -158,10 +158,13 @@ The comparison table records, for every candidate:
 - decoder source-code size; and
 - L4 GPU hours.
 
-Gate 0 does not authorize a corpus. Before a training-purpose release is
-built, the human must approve a committed `training-minimums-v1` policy and
-its hash. The builder must bind that approved policy; it must never generate a
-training policy from the corpus it is evaluating.
+Gate 0 does not authorize a corpus. The approved
+`tools/card-geometry/policies/training-minimums-v1.json` is frozen at SHA-256
+`eb530f1e34f1bfede111c7a43ef01a3d71b2db3c5d8d15713ac11b70d7474191`.
+A training-purpose release must bind those exact bytes; a builder must never
+generate a training policy from the corpus it is evaluating. The policy admits
+only `shippable` source tiers and requires 1,000/100/100 complete
+metric-eligible instances in train/validation/test.
 
 ## Runtimes
 
@@ -446,7 +449,8 @@ orientation accuracy.
 The three foundation workstreams were independent of the final licensing
 decision. The contract freeze, benchmark, and compositor tooling are landed.
 Candidate configuration and license-route enforcement are also implemented;
-training now waits on human approval of `training-minimums-v1` and its hash.
+training now waits on a combined shippable release that meets the frozen
+`training-minimums-v1` policy.
 
 1. **Contract freeze**
    - commit JSON schemas for `CardGeometryResult` and the corpus record;
@@ -498,9 +502,9 @@ training now waits on human approval of `training-minimums-v1` and its hash.
 
 ## Execution order
 
-1. Obtain human approval of the committed `training-minimums-v1` coverage
-   policy and its hash. Build the training-purpose release against that policy
-   and require the pinned preflight to report `readyFor: training`.
+1. Build the training-purpose release against the frozen
+   `training-minimums-v1` policy and hash, and require the pinned preflight to
+   report `readyFor: training`.
 2. Run one epoch of YOLO11n-pose on an L4 to prove corpus download, preflight,
    training, private checkpoint persistence, config hashing, private export,
    and evaluation end to end.

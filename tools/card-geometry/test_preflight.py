@@ -217,6 +217,34 @@ class PreflightTests(unittest.TestCase):
             any("metricEligibleCornerSources" in error for error in errors), errors
         )
 
+    def test_source_tier_policy_rejects_missing_or_disallowed_tiers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "source-tier"
+            shutil.copytree(RELEASES_DIR / "valid-fixture", release)
+            manifest_path = release / "manifest.json"
+            manifest = load_json(manifest_path)
+            manifest["records"][0]["sourceTier"] = "research-only"
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(manifest_path, manifest)
+            report = run_preflight(release, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], ["SOURCE_TIER"])
+
+            manifest["records"][0].pop("sourceTier")
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(manifest_path, manifest)
+            report = run_preflight(release, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], ["SOURCE_TIER"])
+
+    def test_readiness_counts_only_complete_metric_eligible_quads(self):
+        report = self.run_release("valid-fixture")
+        readiness = next(
+            check for check in report["checks"] if check["code"] == "READINESS_MINIMUMS"
+        )
+        self.assertEqual(
+            readiness["details"]["metricEligibleInstancesPerSplit"],
+            {"train": 2, "validation": 0, "test": 1},
+        )
+
     def test_source_archive_is_a_cross_split_leakage_key(self):
         report = self.run_release("invalid-source-archive-leakage")
         self.assertEqual(report["failedChecks"], ["LEAKAGE_DISJOINT"])

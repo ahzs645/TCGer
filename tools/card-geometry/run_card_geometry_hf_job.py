@@ -97,9 +97,23 @@ def _merge_defaults(defaults: Any, supplied: Any) -> Any:
     return merged
 
 
-def resolve_config(raw: dict[str, Any]) -> dict[str, Any]:
+def resolve_config(raw: dict[str, Any], *, pipeline_smoke: bool = False) -> dict[str, Any]:
     """Apply defaults, validate Draft 2020-12 schema, and enforce semantics."""
     resolved = _merge_defaults(DEFAULTS, raw)
+    if pipeline_smoke:
+        if resolved.get("candidate") != "yolo11n-pose":
+            raise ConfigurationError(
+                "--pipeline-smoke is restricted to the yolo11n-pose end-to-end proof"
+            )
+        resolved["fairness"]["budget"] = {"kind": "epochs", "value": 1}
+        resolved["fairness"]["seedPolicy"]["repeatCount"] = 1
+        resolved["deviations"].append(
+            {
+                "rule": "budget",
+                "candidateValue": {"kind": "epochs", "value": 1},
+                "reason": "one-epoch pipeline smoke before the full bake-off batch",
+            }
+        )
     validator = make_validator(load_json(SCHEMAS_DIR / CONFIG_SCHEMA_FILE))
     errors = validation_errors(validator, resolved, limit=50)
     if errors:
@@ -430,13 +444,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--workdir", type=Path, default=Path("/tmp/tcger-card-geometry"))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--pipeline-smoke",
+        action="store_true",
+        help="force the one-epoch, one-repeat yolo11n-pose pipeline proof and hash that deviation",
+    )
     args = parser.parse_args(argv)
 
     raw = load_json(args.config)
     if not isinstance(raw, dict):
         raise SystemExit("experiment config must be a JSON object")
     try:
-        resolved = resolve_config(raw)
+        resolved = resolve_config(raw, pipeline_smoke=args.pipeline_smoke)
         if args.action == "export" and not args.export_format:
             raise ConfigurationError("--export-format is required for --action export")
         if args.action == "train" and args.export_format:

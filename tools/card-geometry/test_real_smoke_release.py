@@ -115,6 +115,22 @@ class RealReleaseAdapterTests(unittest.TestCase):
                 4,
             )
 
+    def test_canonical_adapter_rejects_non_shippable_license(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, _ = self._canonical_source(root)
+            row = json.loads(corpus.read_text())
+            row["provenance"][0]["license"] = "research-only"
+            corpus.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "no single shippable license"):
+                build_release(
+                    canonical_corpus=corpus,
+                    raw_dir=raw,
+                    archive_splits={"annotations.v7i.coco-segmentation.zip": "train"},
+                    devmode_sessions=[],
+                    output=root / "release",
+                )
+
     def test_devmode_fixed_quad_provenance_controls_metric_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -306,6 +322,66 @@ class RealReleaseAdapterTests(unittest.TestCase):
                     devmode_sessions=[],
                     output=Path(tmp) / "release",
                 )
+
+    def test_manual_multi_instance_sidecar_ingests_all_cards(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, image = self._canonical_source(root)
+            sessions_root = root / "sessions"
+            session = sessions_root / "scan-session-20260902-binder"
+            session.mkdir(parents=True)
+            (session / "frame.png").write_bytes(image)
+            labels = root / "multi.json"
+            labels.write_text(
+                json.dumps(
+                    {
+                        "schema": "https://tcger.app/schemas/card-geometry-manual-multi-instance-labels/v1",
+                        "frames": [
+                            {
+                                "key": f"{session.name}/frame.png",
+                                "sceneSlice": "binder_page",
+                                "game": "pokemon",
+                                "instances": [
+                                    {
+                                        "instanceId": f"card-{index}",
+                                        "physicalCardId": f"binder-card-{index}",
+                                        "corners": [
+                                            [0.1 + index * 0.4, 0.1],
+                                            [0.4 + index * 0.4, 0.1],
+                                            [0.4 + index * 0.4, 0.9],
+                                            [0.1 + index * 0.4, 0.9],
+                                        ],
+                                    }
+                                    for index in range(2)
+                                ],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = root / "release"
+            summary = build_release(
+                canonical_corpus=corpus,
+                raw_dir=raw,
+                archive_splits={"annotations.v7i.coco-segmentation.zip": "test"},
+                devmode_sessions=[],
+                output=output,
+                devmode_sessions_root=sessions_root,
+                multi_instance_label_files=[labels],
+            )
+            manifest = load_json(output / "manifest.json")
+            entry = next(
+                item for item in manifest["records"] if item["recordId"].startswith("devmode-multi-")
+            )
+            record = load_json(output / entry["path"])
+            self.assertEqual(entry["sceneSlice"], "binder_page")
+            self.assertEqual(len(record["instances"]), 2)
+            self.assertEqual(
+                {corner["cornerSource"] for item in record["instances"] for corner in item["corners"]},
+                {"human"},
+            )
+            self.assertEqual(summary["stats"]["devmodeMultiInstanceCards"], 2)
 
 
 if __name__ == "__main__":

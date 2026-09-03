@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/card-geometry-manual-multi-instance-labels/v1",
+  "title": "TCGer manual multi-instance geometry labels v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "frames"],
+  "properties": {
+    "schema": {
+      "const": "https://tcger.app/schemas/card-geometry-manual-multi-instance-labels/v1"
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "sceneSlice", "instances"],
+        "properties": {
+          "key": { "type": "string", "pattern": "^[^/]+/.+$" },
+          "sceneSlice": { "enum": ["binder_page", "duel_field", "steep_playmat", "single_handheld"] },
+          "game": { "enum": ["pokemon", "magic", "yugioh"] },
+          "instances": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["instanceId", "corners", "physicalCardId"],
+              "properties": {
+                "instanceId": { "type": "string", "minLength": 1 },
+                "physicalCardId": { "type": "string", "minLength": 1 },
+                "orientationKnown": { "type": "boolean", "default": true },
+                "side": { "enum": ["faceUp", "faceDown", "unknown"] },
+                "container": { "enum": ["rawCard", "slab", "unknown"] },
+                "corners": {
+                  "type": "array",
+                  "minItems": 4,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "prefixItems": [
+                      { "type": "number" },
+                      { "type": "number" }
+                    ],
+                    "items": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

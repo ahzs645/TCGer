@@ -90,6 +90,8 @@ class FiftyOneReleaseDiffTests(unittest.TestCase):
                     "sessionId": "session-a",
                     "width": 100,
                     "height": 200,
+                    "captureMode": "binder" if key == keys[4] else "single",
+                    "game": "pokemon",
                     "sceneSlice": "single_handheld",
                 }
                 for key in keys
@@ -110,7 +112,18 @@ class FiftyOneReleaseDiffTests(unittest.TestCase):
             self.assertEqual(report["summary"]["unchangedManualQuad"], 1)
             self.assertEqual(report["summary"]["stillUnlabeled"], 2)
             self.assertEqual(report["summary"]["detectorQuadFrames"], 1)
+            self.assertEqual(
+                report["summary"]["breakdown"]["captureMode"]["binder"][
+                    "stillUnlabeled"
+                ],
+                1,
+            )
             self.assertTrue(report["releaseChangeRequired"])
+            self.assertEqual(report["binderSessionsFirst"][0]["sessionId"], "session-a")
+            self.assertEqual(
+                report["sessions"][0]["breakdown"]["game"]["pokemon"]["frames"],
+                5,
+            )
             changed = report["sessions"][0]["changedManualQuad"][0]
             self.assertEqual(changed["cornerDeltasPixels"][0]["distance"], 10.0)
             self.assertEqual(report["coverage"]["metricEligibleCorners"], 12)

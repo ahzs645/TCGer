@@ -36,6 +36,17 @@
     },
     "minimumRecordsPerSplit": { "$ref": "#/$defs/perSplitCount" },
     "minimumInstancesPerSplit": { "$ref": "#/$defs/perSplitCount" },
+    "minimumMetricEligibleInstances": {
+      "description": "Minimum instances per split whose four corners are coordinate-known and all have a cornerSource admitted by metricEligibleCornerSources. Optional for legacy fixture and smoke policies; required by the approved training policy.",
+      "$ref": "#/$defs/perSplitCount"
+    },
+    "allowedSourceTiers": {
+      "description": "Data-use tiers permitted in the release. Optional only for immutable legacy releases; a training policy must bind this field and SOURCE_TIER enforces it.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sourceTier" }
+    },
     "minimumRealEvaluationSessions": {
       "description": "Distinct real-capture session ids that must appear in the `test` split.",
       "type": "integer",
@@ -85,6 +96,9 @@
   },
   "$defs": {
     "split": { "enum": ["train", "validation", "test"] },
+    "sourceTier": {
+      "enum": ["shippable", "research-only", "evaluation-external"]
+    },
     "perSplitCount": {
       "type": "object",
       "additionalProperties": false,

@@ -8,8 +8,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from corpus_release import load_json, load_schema, make_validator, validation_errors
-from run_card_geometry_hf_job import (
+from corpus_release import (  # noqa: E402
+    load_json,
+    load_schema,
+    make_validator,
+    validation_errors,
+)
+from run_card_geometry_hf_job import (  # noqa: E402
     CONFIG_SCHEMA_FILE,
     ConfigurationError,
     PublicationBlocked,
@@ -37,6 +42,19 @@ class CandidateExperimentConfigTests(unittest.TestCase):
         self.assertFalse(schema["additionalProperties"])
         validator = make_validator(schema)
         self.assertEqual(validation_errors(validator, self.raw), [])
+
+    def test_pipeline_smoke_is_hashed_and_restricted_to_yolo11n(self):
+        raw = copy.deepcopy(self.raw)
+        raw["fairness"]["budget"] = {"kind": "epochs", "value": 50}
+        resolved = resolve_config(raw, pipeline_smoke=True)
+        self.assertEqual(resolved["fairness"]["budget"], {"kind": "epochs", "value": 1})
+        self.assertEqual(resolved["fairness"]["seedPolicy"]["repeatCount"], 1)
+        self.assertEqual(resolved["deviations"][-1]["rule"], "budget")
+        self.assertNotEqual(experiment_hash(resolved), experiment_hash(resolve_config(raw)))
+
+        raw["candidate"] = "yolo11s-pose"
+        with self.assertRaises(ConfigurationError):
+            resolve_config(raw, pipeline_smoke=True)
 
     def test_defaults_are_applied_before_hashing(self):
         explicit = resolve_config(self.raw)

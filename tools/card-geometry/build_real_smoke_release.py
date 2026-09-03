@@ -37,12 +37,16 @@ from corpus_release import (  # noqa: E402
     RECORD_SCHEMA_ID,
     corpus_hash,
     leakage_keys_from_record,
+    load_schema,
+    make_validator,
     pretty_json,
     sha256_bytes,
     sha256_file,
+    validation_errors,
 )
 
 DEFAULT_TCGX_ARCHIVE = "annotations.v7i.coco-segmentation.zip"
+SHIPPABLE_LICENSES = frozenset({"CC BY 4.0", "MIT", "self-captured"})
 KNOWN_FORK_GROUPS = (
     frozenset(
         {
@@ -53,6 +57,10 @@ KNOWN_FORK_GROUPS = (
 )
 UNKNOWN_CORNERS = tuple(
     {"visibility": "unlabeled", "coordinateKnown": False} for _ in range(4)
+)
+MULTI_INSTANCE_SCHEMA = (
+    Path(__file__).resolve().parents[2]
+    / "docs/scanner-system/schemas/card-geometry-manual-multi-instance-labels.v1.schema.json"
 )
 
 
@@ -286,6 +294,7 @@ def _write_record(
     image_suffix: str,
     split: str,
     scene_slice: str,
+    source_tier: str = "shippable",
 ) -> dict[str, Any]:
     record_id = record["recordId"]
     image_rel = f"images/{record_id}{image_suffix.lower()}"
@@ -304,6 +313,7 @@ def _write_record(
         "sha256": sha256_bytes(record_text.encode("utf-8")),
         "split": split,
         "sceneSlice": scene_slice,
+        "sourceTier": source_tier,
         "leakageKeys": leakage_keys_from_record(record),
         "images": [{"path": image_rel, "sha256": image_hash}],
     }
@@ -316,6 +326,15 @@ def _source_license(row: dict[str, Any]) -> str | None:
         if item.get("license")
     }
     return next(iter(values)) if len(values) == 1 else None
+
+
+def _shippable_source_license(row: dict[str, Any]) -> str:
+    license_id = _source_license(row)
+    if license_id not in SHIPPABLE_LICENSES:
+        raise ValueError(
+            f"canonical source {row.get('id')} has no single shippable license: {license_id!r}"
+        )
+    return license_id
 
 
 def add_canonical_archive(
@@ -367,9 +386,9 @@ def add_canonical_archive(
                 "grouping": {"sourceArchiveId": source_archive_id},
                 "instances": instances,
             }
-            license_id = _source_license(row)
-            if license_id:
-                record["source"]["licenseId"] = license_id
+            license_id = _shippable_source_license(row)
+            record["source"]["licenseId"] = license_id
+            stats[f"sourceLicense:{license_id}"] += 1
             suffix = Path(row["imageMember"]).suffix or ".jpg"
             entries.append(
                 _write_record(
@@ -546,6 +565,79 @@ def add_manual_devmode_backup(
     return entries, sorted(session_ids)
 
 
+def add_manual_multi_instance_labels(
+    root: Path, labels_path: Path, sessions_root: Path, stats: Counter
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Ingest human-ordered quads for every card in a labeled frame."""
+    document = json.loads(labels_path.read_text(encoding="utf-8"))
+    errors = validation_errors(make_validator(load_schema(MULTI_INSTANCE_SCHEMA)), document)
+    if errors:
+        raise ValueError("invalid multi-instance labels:\n- " + "\n- ".join(errors))
+    entries = []
+    sessions = set()
+    for frame in sorted(document["frames"], key=lambda item: item["key"]):
+        raw_session, image_file = frame["key"].split("/", 1)
+        session_id = _safe_id(raw_session)
+        image_path = sessions_root / raw_session / image_file
+        if not image_path.is_file():
+            raise FileNotFoundError(image_path)
+        image_bytes = image_path.read_bytes()
+        width, height = _image_dimensions(image_bytes)
+        instances = []
+        for annotation in frame["instances"]:
+            quad = _quad_points(annotation["corners"])
+            if quad is None:
+                raise ValueError(f"invalid quad in {frame['key']}:{annotation['instanceId']}")
+            instances.append(
+                {
+                    "instanceId": _safe_id(annotation["instanceId"]),
+                    "detectionClass": "card",
+                    "corners": [
+                        {
+                            "point": {"x": x, "y": y},
+                            "visibility": (
+                                "visible" if 0 <= x <= 1 and 0 <= y <= 1 else "outsideFrame"
+                            ),
+                            "coordinateKnown": True,
+                            "cornerSource": "human",
+                        }
+                        for x, y in quad
+                    ],
+                    "orientationKnown": annotation.get("orientationKnown", True),
+                    "side": annotation.get("side", "unknown"),
+                    "container": annotation.get("container", "unknown"),
+                    "occlusionOrder": len(instances),
+                    "physicalCardId": _safe_id(annotation["physicalCardId"]),
+                }
+            )
+        record = {
+            "schema": RECORD_SCHEMA_ID,
+            "recordId": _safe_id(
+                f"devmode-multi-{session_id}-{sha256_bytes(frame['key'].encode())[:16]}"
+            ),
+            "source": {"kind": "real", "width": width, "height": height},
+            "grouping": {
+                "sourceArchiveId": _safe_id(f"devmode:{session_id}"),
+                "sessionId": session_id,
+            },
+            "instances": instances,
+        }
+        entries.append(
+            _write_record(
+                root,
+                record,
+                image_bytes,
+                image_path.suffix or ".jpg",
+                "test",
+                frame["sceneSlice"],
+            )
+        )
+        sessions.add(session_id)
+        stats["devmodeMultiInstanceFrames"] += 1
+        stats["devmodeMultiInstanceCards"] += len(instances)
+    return entries, sorted(sessions)
+
+
 def _validate_archive_splits(archive_splits: dict[str, str]) -> None:
     for group in KNOWN_FORK_GROUPS:
         assigned = {archive_splits[name] for name in group if name in archive_splits}
@@ -564,6 +656,8 @@ def _smoke_policy(splits: set[str], has_session: bool) -> dict[str, Any]:
         "requiredSplits": ordered,
         "minimumRecordsPerSplit": {split: 1 for split in ordered},
         "minimumInstancesPerSplit": {split: 1 for split in ordered},
+        "minimumMetricEligibleInstances": {split: 0 for split in ordered},
+        "allowedSourceTiers": ["shippable"],
         "minimumRealEvaluationSessions": 1 if has_session else 0,
         "realOnlySplits": ordered,
         "requiredSceneSlices": [],
@@ -585,6 +679,7 @@ def build_release(
     max_records_per_archive: int | None = None,
     devmode_label_backups: list[Path] | None = None,
     devmode_sessions_root: Path | None = None,
+    multi_instance_label_files: list[Path] | None = None,
     release_id: str = "real-geometry-ingestion-smoke-v1",
 ) -> dict[str, Any]:
     _validate_archive_splits(archive_splits)
@@ -632,6 +727,16 @@ def build_release(
         )
         entries.extend(backup_entries)
         denylist.update(session_ids)
+    multi_paths = sorted(multi_instance_label_files or [])
+    if multi_paths and devmode_sessions_root is None:
+        raise ValueError("devmode_sessions_root is required with multi-instance labels")
+    for labels_path in multi_paths:
+        assert devmode_sessions_root is not None
+        multi_entries, session_ids = add_manual_multi_instance_labels(
+            output, labels_path, devmode_sessions_root, stats
+        )
+        entries.extend(multi_entries)
+        denylist.update(session_ids)
     if not entries:
         raise ValueError("no geometry records were produced")
     splits = {entry["split"] for entry in entries}
@@ -664,6 +769,9 @@ def build_release(
         "maxRecordsPerArchive": max_records_per_archive,
         "devmodeLabelBackups": [
             {"path": str(path), "sha256": sha256_file(path)} for path in backup_paths
+        ],
+        "multiInstanceLabelFiles": [
+            {"path": str(path), "sha256": sha256_file(path)} for path in multi_paths
         ],
         "stats": dict(sorted(stats.items())),
     }
@@ -706,6 +814,13 @@ def main() -> int:
         help="Canonical sessions directory used to resolve backup session/image keys",
     )
     parser.add_argument(
+        "--multi-instance-labels",
+        type=Path,
+        action="append",
+        default=[],
+        help="manual multi-card label sidecar matching the checked-in schema",
+    )
+    parser.add_argument(
         "--max-records-per-archive",
         type=int,
         help="Deterministic smoke sample after sorting by record id; omit for a complete archive",
@@ -725,6 +840,7 @@ def main() -> int:
         max_records_per_archive=args.max_records_per_archive,
         devmode_label_backups=args.devmode_label_backup,
         devmode_sessions_root=args.devmode_sessions_root,
+        multi_instance_label_files=args.multi_instance_labels,
         release_id=args.release_id,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
