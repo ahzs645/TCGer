@@ -116,7 +116,7 @@ def durable_geometry(sample):
 def scene_slice_for(sample, requested=None):
     """Choose an explicit editor slice without rewriting finalized truth."""
     saved = (durable_geometry(sample) or {}).get("sceneSlice")
-    value = saved or requested
+    value = saved or requested or field_value(sample, "geometry_scene_slice")
     if value is None:
         value = (
             "binder_page"
@@ -264,8 +264,20 @@ class EditorStore:
 
     def progress(self):
         samples = self.list_samples()
+        scene_slices = {
+            scene_slice_for(self.dataset[value], self.requested_scene_slice)
+            for value in self.sample_ids
+        }
+        if len(scene_slices) != 1:
+            finalized = sum(1 for item in samples if item["finalized"])
+            return {
+                "sceneSlice": "mixed_review",
+                "minimum": len(samples),
+                "finalizedInstances": finalized,
+                "ready": finalized >= len(samples),
+            }
         finalized = sum(item["cards"] for item in samples if item["finalized"])
-        scene_slice = self.requested_scene_slice or "binder_page"
+        scene_slice = next(iter(scene_slices))
         minimum = SCENE_MINIMUMS[scene_slice]
         return {
             "sceneSlice": scene_slice,

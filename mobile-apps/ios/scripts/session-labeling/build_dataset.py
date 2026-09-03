@@ -288,6 +288,16 @@ def main():
     ap.add_argument("--sessions-dir", required=True)
     ap.add_argument("--dataset-name", default="tcger-sessions")
     ap.add_argument(
+        "--append-session",
+        action="append",
+        default=[],
+        metavar="DIR",
+        help=(
+            "append one scan-session directory to an existing dataset without "
+            "rebuilding it; repeat for multiple sessions"
+        ),
+    )
+    ap.add_argument(
         "--metadata",
         action="append",
         default=None,
@@ -341,7 +351,16 @@ def main():
     import fiftyone as fo
 
     saved_verdicts = {}
-    if fo.dataset_exists(args.dataset_name):
+    append_mode = bool(args.append_session)
+    existing_keys = set()
+    if append_mode:
+        if not fo.dataset_exists(args.dataset_name):
+            raise RuntimeError(
+                f"cannot append: dataset {args.dataset_name!r} does not exist"
+            )
+        dataset = fo.load_dataset(args.dataset_name)
+        existing_keys = set(dataset.values("key"))
+    elif fo.dataset_exists(args.dataset_name):
         existing = fo.load_dataset(args.dataset_name)
         from fiftyone import ViewField as F
         if existing.has_sample_field("verdict"):
@@ -350,15 +369,15 @@ def main():
             has_rescan = existing.has_sample_field("binder_rerun_json")
             has_binder_labels = existing.has_sample_field("binder_labels_json")
             has_manual_instances = existing.has_sample_field("manual_instances_json")
-            keep = F("verdict") != None
+            keep = F("verdict") != None  # noqa: E711 - FiftyOne expression
             if has_rescan:
                 # Binder pages carry re-scans without ever having a verdict.
-                keep = keep | (F("binder_rerun_json") != None)
+                keep = keep | (F("binder_rerun_json") != None)  # noqa: E711
             if has_binder_labels:
                 # Per-pocket judgments are separate from page-level verdicts.
-                keep = keep | (F("binder_labels_json") != None)
+                keep = keep | (F("binder_labels_json") != None)  # noqa: E711
             if has_manual_instances:
-                keep = keep | (F("manual_instances_json") != None)
+                keep = keep | (F("manual_instances_json") != None)  # noqa: E711
             for s in existing.match(keep).iter_samples():
                 saved_verdicts[s["key"]] = (
                     s["verdict"], s["corrected_card_id"],
@@ -372,11 +391,19 @@ def main():
         if saved_verdicts:
             print(f"carrying {len(saved_verdicts)} applied verdicts across the rebuild")
         fo.delete_dataset(args.dataset_name)
-    dataset = fo.Dataset(args.dataset_name, persistent=True)
+    if not append_mode:
+        dataset = fo.Dataset(args.dataset_name, persistent=True)
 
     samples = []
     n_sessions = 0
-    for session_dir in sorted(sessions_dir.glob("scan-session-*")):
+    session_dirs = (
+        [Path(value).expanduser().resolve() for value in args.append_session]
+        if append_mode
+        else sorted(sessions_dir.glob("scan-session-*"))
+    )
+    for session_dir in session_dirs:
+        if not session_dir.is_dir() or not session_dir.name.startswith("scan-session-"):
+            raise ValueError(f"not a scan-session directory: {session_dir}")
         results_path = session_dir / "results.json"
         if not results_path.exists():
             continue
@@ -394,6 +421,8 @@ def main():
                 continue
             record = by_image.get(frame["imageFile"])
             key = f"{session_dir.name}/{frame['imageFile']}"
+            if key in existing_keys:
+                continue
             is_binder = bool(record and str(record.get("outcome", "")).startswith("binderPage"))
 
             attempt = decisive_attempt(record) if record else None
@@ -479,17 +508,22 @@ def main():
                 sample.tags.append("device-accepted" if device_id else "device-abstained")
             samples.append(sample)
 
-    dataset.add_samples(samples)
+    if samples:
+        dataset.add_samples(samples)
     # All-None at build time, so add_samples drops them from the schema;
     # declare them explicitly or the panel/writeback can't read them.
-    dataset.add_sample_field("verdict", fo.StringField)
-    dataset.add_sample_field("corrected_card_id", fo.StringField)
-    dataset.add_sample_field("fixed_quad_json", fo.StringField)
-    dataset.add_sample_field("fixed_quad_source", fo.StringField)
-    dataset.add_sample_field("rerun_top5_json", fo.StringField)
-    dataset.add_sample_field("binder_rerun_json", fo.StringField)
-    dataset.add_sample_field("binder_labels_json", fo.StringField)
-    dataset.add_sample_field("manual_instances_json", fo.StringField)
+    for field in (
+        "verdict",
+        "corrected_card_id",
+        "fixed_quad_json",
+        "fixed_quad_source",
+        "rerun_top5_json",
+        "binder_rerun_json",
+        "binder_labels_json",
+        "manual_instances_json",
+    ):
+        if not dataset.has_sample_field(field):
+            dataset.add_sample_field(field, fo.StringField)
     dataset.info["sessions_dir"] = str(sessions_dir)
     dataset.info["card_cache_dir"] = str(cache_dir)
     dataset.info["labeling_state_dir"] = str(
@@ -498,25 +532,32 @@ def main():
     dataset.info["card_metadata_paths"] = [str(path) for path in metadata_paths]
     dataset.save()
 
-    from fiftyone import ViewField as F
-    dataset.save_view("to-label: accepts", dataset.match_tags("device-accepted"))
-    dataset.save_view("to-label: abstains", dataset.match_tags("device-abstained"))
-    dataset.save_view("already labeled", dataset.match_tags("already-labeled"))
-    dataset.save_view("binder pages", dataset.match_tags("binder"))
-    dataset.save_view(
-        "binder labeled", dataset.match(F("binder_labels_json") != None)
-    )
-    dataset.save_view("verdict applied", dataset.match(F("verdict") != None))
-    game_labels = {
-        "pokemon": "Pokémon",
-        "magic": "Magic",
-        "yugioh": "Yu-Gi-Oh!",
-    }
-    for game in sorted({s.game for s in samples if s.game}):
-        label = game_labels.get(game, game.replace("-", " ").title())
-        dataset.save_view(f"game: {label}", dataset.match(F("game") == game))
+    if not append_mode:
+        from fiftyone import ViewField as F
+        dataset.save_view("to-label: accepts", dataset.match_tags("device-accepted"))
+        dataset.save_view("to-label: abstains", dataset.match_tags("device-abstained"))
+        dataset.save_view("already labeled", dataset.match_tags("already-labeled"))
+        dataset.save_view("binder pages", dataset.match_tags("binder"))
+        dataset.save_view(
+            "binder labeled", dataset.match(F("binder_labels_json") != None)  # noqa: E711
+        )
+        dataset.save_view(
+            "verdict applied", dataset.match(F("verdict") != None)  # noqa: E711
+        )
+        game_labels = {
+            "pokemon": "Pokémon",
+            "magic": "Magic",
+            "yugioh": "Yu-Gi-Oh!",
+        }
+        for game in sorted({s.game for s in samples if s.game}):
+            label = game_labels.get(game, game.replace("-", " ").title())
+            dataset.save_view(f"game: {label}", dataset.match(F("game") == game))
 
-    print(f"\n{len(samples)} frames from {n_sessions} sessions -> dataset '{args.dataset_name}'")
+    action = "appended to" if append_mode else "->"
+    print(
+        f"\n{len(samples)} frames from {n_sessions} sessions {action} "
+        f"dataset '{args.dataset_name}'"
+    )
     for tag in ("device-accepted", "device-abstained", "already-labeled", "binder"):
         print(f"  {tag}: {len(dataset.match_tags(tag))}")
     print("\nLaunch:  ~/.venvs/tcger-label/bin/fiftyone app launch " + args.dataset_name)

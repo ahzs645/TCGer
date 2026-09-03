@@ -87,6 +87,14 @@ class CornerEditorServerTest(unittest.TestCase):
             SERVER.scene_slice_for(sample, "steep_playmat"), "steep_playmat"
         )
 
+    def test_sample_scene_suggestion_is_used_without_an_override(self):
+        sample = _Sample(
+            key="frame-1",
+            frame_type="single",
+            geometry_scene_slice="steep_playmat",
+        )
+        self.assertEqual(SERVER.scene_slice_for(sample), "steep_playmat")
+
     def test_finalized_scene_slice_is_not_silently_rewritten(self):
         sample = _Sample(
             key="frame-1",
