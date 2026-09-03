@@ -1,0 +1,409 @@
+{
+  "coordinateConvention": {
+    "normalizedErrorDenominator": "mean truth-quad side length in source pixels",
+    "origin": "topLeft",
+    "pixelMapping": {
+      "x": "x * width",
+      "y": "y * height"
+    },
+    "space": "normalizedSourceImage",
+    "status": "frozen by crop-parity-2026-09-02"
+  },
+  "cornerError": {
+    "bySceneSlice": {
+      "binder_page": {
+        "normalized": {
+          "count": 84,
+          "mean": 0.044982143277,
+          "p50": 0.038877301829,
+          "p90": 0.071649393576,
+          "p95": 0.088425066414
+        },
+        "normalizedSkippedNoFullTruthQuad": 0,
+        "pixel": {
+          "count": 84,
+          "mean": 12.058290382986,
+          "p50": 9.907084928346,
+          "p90": 20.040198403586,
+          "p95": 26.770358010638
+        },
+        "truthCornerCounts": {
+          "eligible": 108,
+          "evaluated": 108,
+          "metricEligible": 108,
+          "metricExcluded": 0,
+          "skipped": 0
+        }
+      },
+      "single_card_archive": {
+        "normalized": {
+          "count": 0,
+          "mean": null,
+          "p50": null,
+          "p90": null,
+          "p95": null
+        },
+        "normalizedSkippedNoFullTruthQuad": 0,
+        "pixel": {
+          "count": 0,
+          "mean": null,
+          "p50": null,
+          "p90": null,
+          "p95": null
+        },
+        "truthCornerCounts": {
+          "eligible": 16,
+          "evaluated": 12,
+          "metricEligible": 0,
+          "metricExcluded": 12,
+          "skipped": 4
+        }
+      },
+      "single_handheld": {
+        "normalized": {
+          "count": 184,
+          "mean": 0.256711494722,
+          "p50": 0.135320213455,
+          "p90": 0.551983898823,
+          "p95": 0.85348578092
+        },
+        "normalizedSkippedNoFullTruthQuad": 0,
+        "pixel": {
+          "count": 184,
+          "mean": 148.17350494221,
+          "p50": 84.195544424556,
+          "p90": 310.132997346462,
+          "p95": 473.598806718395
+        },
+        "truthCornerCounts": {
+          "eligible": 228,
+          "evaluated": 228,
+          "metricEligible": 228,
+          "metricExcluded": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "bySourceKind": {
+      "real": {
+        "normalized": {
+          "count": 268,
+          "mean": 0.190348563672,
+          "p50": 0.07751176071,
+          "p90": 0.473222509802,
+          "p95": 0.746151745471
+        },
+        "normalizedSkippedNoFullTruthQuad": 0,
+        "pixel": {
+          "count": 268,
+          "mean": 105.510527244543,
+          "p50": 49.526279268059,
+          "p90": 279.083964369035,
+          "p95": 411.687002034281
+        },
+        "truthCornerCounts": {
+          "eligible": 352,
+          "evaluated": 348,
+          "metricEligible": 336,
+          "metricExcluded": 12,
+          "skipped": 4
+        }
+      }
+    },
+    "byTruthVisibility": {
+      "outsideFrame": {
+        "normalized": {
+          "count": 34,
+          "mean": 0.28932284988,
+          "p50": 0.234400951313,
+          "p90": 0.600481151519,
+          "p95": 0.890921657202
+        },
+        "normalizedSkippedNoFullTruthQuad": 0,
+        "pixel": {
+          "count": 34,
+          "mean": 166.612194218611,
+          "p50": 152.876225737218,
+          "p90": 302.738321776399,
+          "p95": 485.122849257799
+        },
+        "truthCornerCounts": {
+          "eligible": 46,
+          "evaluated": 46,
+          "metricEligible": 46,
+          "metricExcluded": 0,
+          "skipped": 0
+        }
+      },
+      "unlabeled": {
+        "normalized": {
+          "count": 0,
+          "mean": null,
+          "p50": null,
+          "p90": null,
+          "p95": null
+        },
+        "normalizedSkippedNoFullTruthQuad": 0,
+        "pixel": {
+          "count": 0,
+          "mean": null,
+          "p50": null,
+          "p90": null,
+          "p95": null
+        },
+        "truthCornerCounts": {
+          "eligible": 4,
+          "evaluated": 0,
+          "metricEligible": 0,
+          "metricExcluded": 0,
+          "skipped": 4
+        }
+      },
+      "visible": {
+        "normalized": {
+          "count": 234,
+          "mean": 0.17596768448,
+          "p50": 0.070204187371,
+          "p90": 0.430212652817,
+          "p95": 0.682636307437
+        },
+        "normalizedSkippedNoFullTruthQuad": 0,
+        "pixel": {
+          "count": 234,
+          "mean": 96.632507256858,
+          "p50": 38.074271955438,
+          "p90": 261.963130185169,
+          "p95": 372.729375646992
+        },
+        "truthCornerCounts": {
+          "eligible": 302,
+          "evaluated": 302,
+          "metricEligible": 290,
+          "metricExcluded": 12,
+          "skipped": 0
+        }
+      }
+    },
+    "overall": {
+      "normalized": {
+        "count": 268,
+        "mean": 0.190348563672,
+        "p50": 0.07751176071,
+        "p90": 0.473222509802,
+        "p95": 0.746151745471
+      },
+      "normalizedSkippedNoFullTruthQuad": 0,
+      "pixel": {
+        "count": 268,
+        "mean": 105.510527244543,
+        "p50": 49.526279268059,
+        "p90": 279.083964369035,
+        "p95": 411.687002034281
+      },
+      "truthCornerCounts": {
+        "eligible": 352,
+        "evaluated": 348,
+        "metricEligible": 336,
+        "metricExcluded": 12,
+        "skipped": 4
+      }
+    }
+  },
+  "corpusHash": "764491d11ea134686687c462fa7bef19cf70ca817ab1d124d3f27b5c6d400a0d",
+  "counts": {
+    "records": 64,
+    "scorableTruthInstances": 88,
+    "truthGeometrySource": {
+      "quad": 87,
+      "visibleMask": 1
+    },
+    "truthInstances": 88,
+    "unscorableTruthInstances": 0
+  },
+  "detection": {
+    "bySceneSlice": {
+      "binder_page": {
+        "duplicate": 0,
+        "duplicatePerImage": 0.0,
+        "extra": 0,
+        "extraPerImage": 0.0,
+        "matches": 21,
+        "meanMatchedIoU": 0.900426834178,
+        "miss": 6,
+        "missPerImage": 2.0,
+        "predictions": 21,
+        "recall@0.5": 0.777777777778,
+        "recall@0.75": 0.777777777778,
+        "recall@0.9": 0.481481481481,
+        "records": 3,
+        "truthInstances": 27
+      },
+      "single_card_archive": {
+        "duplicate": 0,
+        "duplicatePerImage": 0.0,
+        "extra": 1,
+        "extraPerImage": 0.25,
+        "matches": 2,
+        "meanMatchedIoU": 0.813193105439,
+        "miss": 2,
+        "missPerImage": 0.5,
+        "predictions": 3,
+        "recall@0.5": 0.5,
+        "recall@0.75": 0.5,
+        "recall@0.9": 0.0,
+        "records": 4,
+        "truthInstances": 4
+      },
+      "single_handheld": {
+        "duplicate": 0,
+        "duplicatePerImage": 0.0,
+        "extra": 31,
+        "extraPerImage": 0.543859649123,
+        "matches": 46,
+        "meanMatchedIoU": 0.717252250556,
+        "miss": 11,
+        "missPerImage": 0.19298245614,
+        "predictions": 77,
+        "recall@0.5": 0.80701754386,
+        "recall@0.75": 0.333333333333,
+        "recall@0.9": 0.105263157895,
+        "records": 57,
+        "truthInstances": 57
+      }
+    },
+    "bySourceKind": {
+      "real": {
+        "duplicate": 0,
+        "duplicatePerImage": 0.0,
+        "extra": 32,
+        "extraPerImage": 0.5,
+        "matches": 69,
+        "meanMatchedIoU": 0.77578193122,
+        "miss": 19,
+        "missPerImage": 0.296875,
+        "predictions": 101,
+        "recall@0.5": 0.784090909091,
+        "recall@0.75": 0.477272727273,
+        "recall@0.9": 0.215909090909,
+        "records": 64,
+        "truthInstances": 88
+      }
+    },
+    "overall": {
+      "duplicate": 0,
+      "duplicatePerImage": 0.0,
+      "extra": 32,
+      "extraPerImage": 0.5,
+      "matches": 69,
+      "meanMatchedIoU": 0.77578193122,
+      "miss": 19,
+      "missPerImage": 0.296875,
+      "predictions": 101,
+      "recall@0.5": 0.784090909091,
+      "recall@0.75": 0.477272727273,
+      "recall@0.9": 0.215909090909,
+      "records": 64,
+      "truthInstances": 88
+    }
+  },
+  "localizerId": "draw2-ygo-obb",
+  "matching": {
+    "algorithm": "greedy one-to-one descending quad IoU",
+    "higherRecallThresholdsRematch": false,
+    "matchIouThreshold": 0.5,
+    "recallThresholds": [
+      0.5,
+      0.75,
+      0.9
+    ],
+    "tieBreak": [
+      "prediction confidence descending",
+      "prediction index ascending",
+      "truth index ascending"
+    ]
+  },
+  "orientation": {
+    "accuracy": 0.940298507463,
+    "correctPairs": 63,
+    "eligiblePairs": 67,
+    "evaluatedPairs": 67,
+    "excludedUnknownOrientation": 2,
+    "insufficientKnownCorners": 1
+  },
+  "percentileMethod": "linear interpolation at (n - 1) * p",
+  "predictionsSha256": "b9c686af34d797d443c949bd4fbee8648db6fb9c318d18b641e16a79a49cb4bd",
+  "preflight": {
+    "cornerCounts": {
+      "bySceneSlice": {
+        "binder_page": {
+          "cornerSource:human": 108,
+          "eligible": 108,
+          "evaluated": 108,
+          "metricEligible": 108,
+          "metricExcluded": 0,
+          "skipped": 0,
+          "visibility:outsideFrame": 6,
+          "visibility:visible": 102
+        },
+        "single_card_archive": {
+          "cornerSource:maskFit": 12,
+          "eligible": 16,
+          "evaluated": 12,
+          "metricEligible": 0,
+          "metricExcluded": 12,
+          "skipped": 4,
+          "visibility:unlabeled": 4,
+          "visibility:visible": 12
+        },
+        "single_handheld": {
+          "cornerSource:human": 228,
+          "eligible": 228,
+          "evaluated": 228,
+          "metricEligible": 228,
+          "metricExcluded": 0,
+          "skipped": 0,
+          "visibility:outsideFrame": 40,
+          "visibility:visible": 188
+        }
+      },
+      "bySourceKind": {
+        "real": {
+          "cornerSource:human": 336,
+          "cornerSource:maskFit": 12,
+          "eligible": 352,
+          "evaluated": 348,
+          "metricEligible": 336,
+          "metricExcluded": 12,
+          "skipped": 4,
+          "visibility:outsideFrame": 46,
+          "visibility:unlabeled": 4,
+          "visibility:visible": 302
+        }
+      },
+      "bySplit": {
+        "test": {
+          "cornerSource:human": 336,
+          "cornerSource:maskFit": 12,
+          "eligible": 352,
+          "evaluated": 348,
+          "metricEligible": 336,
+          "metricExcluded": 12,
+          "skipped": 4,
+          "visibility:outsideFrame": 46,
+          "visibility:unlabeled": 4,
+          "visibility:visible": 302
+        }
+      },
+      "metricEligibleCornerSources": [
+        "human",
+        "synthetic"
+      ]
+    },
+    "failedChecks": [],
+    "readyFor": "tooling"
+  },
+  "releaseId": "real-geometry-binder-smoke-v4",
+  "releasePurpose": "smoke",
+  "schema": "https://tcger.app/schemas/card-geometry-benchmark-report/v1",
+  "toolingRevision": "d9dad6b1db9bd918e4c28bd8b36e0bde39552d9a"
+}

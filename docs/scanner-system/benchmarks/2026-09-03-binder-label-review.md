@@ -28,6 +28,11 @@ corner accuracy.
   Championships designs appear to be card backs, but are saved as `faceUp`.
   Confirm the side classification during review.
 
+Follow-up: the user saved all three as `faceDown`. The subsequent
+[local v4 export and baselines](2026-09-03-binder-v4/README.md) include those
+corrections and all 27 reviewed binder instances; the original review above
+records the state before that follow-up.
+
 ## Editor changes
 
 Only the active card has corner handles; other cards retain their outlines.

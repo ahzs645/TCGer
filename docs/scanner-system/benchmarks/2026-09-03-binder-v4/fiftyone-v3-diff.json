@@ -1,0 +1,2785 @@
+{
+  "binderSessionsFirst": [
+    {
+      "detectorQuadFrames": 0,
+      "frames": 41,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 3,
+      "sessionId": "scan-session-20260809-223944",
+      "stillUnlabeled": 38
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 17,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260818-144857",
+      "stillUnlabeled": 17
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 9,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260810-220315",
+      "stillUnlabeled": 9
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 8,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260809-175804",
+      "stillUnlabeled": 8
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 8,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260812-220107",
+      "stillUnlabeled": 8
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 7,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260809-184048",
+      "stillUnlabeled": 7
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 7,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260809-211223",
+      "stillUnlabeled": 7
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 5,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260809-190752",
+      "stillUnlabeled": 5
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 4,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260816-165452",
+      "stillUnlabeled": 4
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 4,
+      "games": [
+        "magic",
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260827-223150",
+      "stillUnlabeled": 4
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 3,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260821-211659",
+      "stillUnlabeled": 3
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 2,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260809-215559",
+      "stillUnlabeled": 2
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 2,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260810-112257",
+      "stillUnlabeled": 2
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 2,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260812-224415",
+      "stillUnlabeled": 2
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 2,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260814-081249",
+      "stillUnlabeled": 2
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 2,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260821-231419",
+      "stillUnlabeled": 2
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 1,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260810-173108",
+      "stillUnlabeled": 1
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 1,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260811-114121",
+      "stillUnlabeled": 1
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 1,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260813-183749",
+      "stillUnlabeled": 1
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 1,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260814-124705",
+      "stillUnlabeled": 1
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 1,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260816-204703",
+      "stillUnlabeled": 1
+    },
+    {
+      "detectorQuadFrames": 0,
+      "frames": 1,
+      "games": [
+        "pokemon"
+      ],
+      "manualQuadFrames": 0,
+      "sessionId": "scan-session-20260817-214446",
+      "stillUnlabeled": 1
+    }
+  ],
+  "coordinateConvention": "image-edge: x * width, y * height",
+  "coverage": {
+    "metricEligibleCornerSources": [
+      "human",
+      "synthetic"
+    ],
+    "metricEligibleCorners": 336,
+    "metricEligibleInstances": {
+      "test": {
+        "actual": 84,
+        "minimum": 100,
+        "shortfall": 16
+      },
+      "train": {
+        "actual": 0,
+        "minimum": 1000,
+        "shortfall": 1000
+      },
+      "validation": {
+        "actual": 0,
+        "minimum": 100,
+        "shortfall": 100
+      }
+    },
+    "minimumRealEvaluationSessions": 3,
+    "observedSceneSliceInstances": {
+      "test:binder_page": 27,
+      "test:single_card_archive": 4,
+      "test:single_handheld": 57
+    },
+    "policyId": "training-minimums-v2",
+    "policySha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+    "policyStatus": "approved",
+    "realEvaluationSessionShortfall": 0,
+    "realEvaluationSessions": 8,
+    "requiredSceneSlices": [
+      {
+        "actualInstances": 57,
+        "actualMetricEligibleInstances": 57,
+        "meetsMetricEligibleMinimum": true,
+        "meetsMinimum": true,
+        "metricEligibleShortfall": 0,
+        "minimumInstances": 50,
+        "minimumMetricEligibleInstances": 50,
+        "sceneSlice": "single_handheld",
+        "shortfall": 0,
+        "split": "test"
+      },
+      {
+        "actualInstances": 0,
+        "actualMetricEligibleInstances": 0,
+        "meetsMetricEligibleMinimum": false,
+        "meetsMinimum": false,
+        "metricEligibleShortfall": 20,
+        "minimumInstances": 20,
+        "minimumMetricEligibleInstances": 20,
+        "sceneSlice": "steep_playmat",
+        "shortfall": 20,
+        "split": "test"
+      },
+      {
+        "actualInstances": 0,
+        "actualMetricEligibleInstances": 0,
+        "meetsMetricEligibleMinimum": false,
+        "meetsMinimum": false,
+        "metricEligibleShortfall": 30,
+        "minimumInstances": 30,
+        "minimumMetricEligibleInstances": 30,
+        "sceneSlice": "duel_field",
+        "shortfall": 30,
+        "split": "test"
+      },
+      {
+        "actualInstances": 27,
+        "actualMetricEligibleInstances": 27,
+        "meetsMetricEligibleMinimum": true,
+        "meetsMinimum": true,
+        "metricEligibleShortfall": 0,
+        "minimumInstances": 20,
+        "minimumMetricEligibleInstances": 20,
+        "sceneSlice": "binder_page",
+        "shortfall": 0,
+        "split": "test"
+      }
+    ],
+    "splits": {
+      "test": {
+        "instanceShortfall": 62,
+        "instances": 88,
+        "minimumInstances": 150,
+        "minimumRecords": 100,
+        "recordShortfall": 36,
+        "records": 64
+      },
+      "train": {
+        "instanceShortfall": 1000,
+        "instances": 0,
+        "minimumInstances": 1000,
+        "minimumRecords": 500,
+        "recordShortfall": 500,
+        "records": 0
+      },
+      "validation": {
+        "instanceShortfall": 100,
+        "instances": 0,
+        "minimumInstances": 100,
+        "minimumRecords": 50,
+        "recordShortfall": 50,
+        "records": 0
+      }
+    }
+  },
+  "export": {
+    "exportedAt": "2026-09-03T09:38:57-07:00",
+    "labeledSamples": 163,
+    "path": "TCGer-Labeling/fiftyone-sessions/backups/labels-20260903-093857.json",
+    "sha256": "43719d17a8bceac44f356385bc10cbe96c6d917785d6c88d456675de199418ed"
+  },
+  "pinnedRelease": {
+    "corpusHash": "97780e7e96cbd98da91173a00b37e6304514f758a9046f5bd98adf30c418820e",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "65017ce8da9137fea491739bd06388ab513831a2",
+    "releaseId": "real-geometry-devmode-orientation-smoke-v3"
+  },
+  "provenanceCounts": {
+    "detector": 28,
+    "human": 57,
+    "skippedMissingSource": 0
+  },
+  "provenanceCountsScope": "legacy fixed_quad fields only; finalized multi-card counts are in summary",
+  "provenanceMapping": {
+    "manual": "human",
+    "missingSource": "skipped",
+    "otherNamedSource": "detector"
+  },
+  "releaseChangeRequired": true,
+  "schema": "https://tcger.app/schemas/fiftyone-geometry-release-diff/v1",
+  "sessions": [
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 41,
+            "manualQuadFrames": 3,
+            "stillUnlabeled": 38
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 41,
+            "manualQuadFrames": 3,
+            "stillUnlabeled": 38
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 27,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 27,
+        "gainingManualQuad": 3,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 38,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [
+        "scan-session-20260809-223944/frame-0000.jpg",
+        "scan-session-20260809-223944/frame-0010.jpg",
+        "scan-session-20260809-223944/frame-0018.jpg"
+      ],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-223944",
+      "stillUnlabeled": [
+        "scan-session-20260809-223944/frame-0001.jpg",
+        "scan-session-20260809-223944/frame-0002.jpg",
+        "scan-session-20260809-223944/frame-0003.jpg",
+        "scan-session-20260809-223944/frame-0004.jpg",
+        "scan-session-20260809-223944/frame-0005.jpg",
+        "scan-session-20260809-223944/frame-0006.jpg",
+        "scan-session-20260809-223944/frame-0007.jpg",
+        "scan-session-20260809-223944/frame-0008.jpg",
+        "scan-session-20260809-223944/frame-0009.jpg",
+        "scan-session-20260809-223944/frame-0011.jpg",
+        "scan-session-20260809-223944/frame-0012.jpg",
+        "scan-session-20260809-223944/frame-0013.jpg",
+        "scan-session-20260809-223944/frame-0014.jpg",
+        "scan-session-20260809-223944/frame-0015.jpg",
+        "scan-session-20260809-223944/frame-0016.jpg",
+        "scan-session-20260809-223944/frame-0017.jpg",
+        "scan-session-20260809-223944/frame-0019.jpg",
+        "scan-session-20260809-223944/frame-0020.jpg",
+        "scan-session-20260809-223944/frame-0021.jpg",
+        "scan-session-20260809-223944/frame-0022.jpg",
+        "scan-session-20260809-223944/frame-0023.jpg",
+        "scan-session-20260809-223944/frame-0024.jpg",
+        "scan-session-20260809-223944/frame-0025.jpg",
+        "scan-session-20260809-223944/frame-0026.jpg",
+        "scan-session-20260809-223944/frame-0027.jpg",
+        "scan-session-20260809-223944/frame-0028.jpg",
+        "scan-session-20260809-223944/frame-0029.jpg",
+        "scan-session-20260809-223944/frame-0030.jpg",
+        "scan-session-20260809-223944/frame-0031.jpg",
+        "scan-session-20260809-223944/frame-0032.jpg",
+        "scan-session-20260809-223944/frame-0033.jpg",
+        "scan-session-20260809-223944/frame-0034.jpg",
+        "scan-session-20260809-223944/frame-0035.jpg",
+        "scan-session-20260809-223944/frame-0036.jpg",
+        "scan-session-20260809-223944/frame-0037.jpg",
+        "scan-session-20260809-223944/frame-0038.jpg",
+        "scan-session-20260809-223944/frame-0039.jpg",
+        "scan-session-20260809-223944/frame-0040.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 17,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 17
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 20,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 20
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 37,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 37
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 37,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260818-144857",
+      "stillUnlabeled": [
+        "scan-session-20260818-144857/frame-0000.jpg",
+        "scan-session-20260818-144857/frame-0001.jpg",
+        "scan-session-20260818-144857/frame-0002.jpg",
+        "scan-session-20260818-144857/frame-0003.jpg",
+        "scan-session-20260818-144857/frame-0004.jpg",
+        "scan-session-20260818-144857/frame-0005.jpg",
+        "scan-session-20260818-144857/frame-0006.jpg",
+        "scan-session-20260818-144857/frame-0007.jpg",
+        "scan-session-20260818-144857/frame-0008.jpg",
+        "scan-session-20260818-144857/frame-0009.jpg",
+        "scan-session-20260818-144857/frame-0010.jpg",
+        "scan-session-20260818-144857/frame-0011.jpg",
+        "scan-session-20260818-144857/frame-0012.jpg",
+        "scan-session-20260818-144857/frame-0013.jpg",
+        "scan-session-20260818-144857/frame-0014.jpg",
+        "scan-session-20260818-144857/frame-0015.jpg",
+        "scan-session-20260818-144857/frame-0016.jpg",
+        "scan-session-20260818-144857/frame-0017.jpg",
+        "scan-session-20260818-144857/frame-0018.jpg",
+        "scan-session-20260818-144857/frame-0019.jpg",
+        "scan-session-20260818-144857/frame-0020.jpg",
+        "scan-session-20260818-144857/frame-0021.jpg",
+        "scan-session-20260818-144857/frame-0022.jpg",
+        "scan-session-20260818-144857/frame-0023.jpg",
+        "scan-session-20260818-144857/frame-0024.jpg",
+        "scan-session-20260818-144857/frame-0025.jpg",
+        "scan-session-20260818-144857/frame-0026.jpg",
+        "scan-session-20260818-144857/frame-0027.jpg",
+        "scan-session-20260818-144857/frame-0028.jpg",
+        "scan-session-20260818-144857/frame-0029.jpg",
+        "scan-session-20260818-144857/frame-0030.jpg",
+        "scan-session-20260818-144857/frame-0031.jpg",
+        "scan-session-20260818-144857/frame-0032.jpg",
+        "scan-session-20260818-144857/frame-0033.jpg",
+        "scan-session-20260818-144857/frame-0034.jpg",
+        "scan-session-20260818-144857/frame-0035.jpg",
+        "scan-session-20260818-144857/frame-0036.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 9,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 9
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 14,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 14
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 23,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 23
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 23,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260810-220315",
+      "stillUnlabeled": [
+        "scan-session-20260810-220315/frame-0000.jpg",
+        "scan-session-20260810-220315/frame-0001.jpg",
+        "scan-session-20260810-220315/frame-0002.jpg",
+        "scan-session-20260810-220315/frame-0003.jpg",
+        "scan-session-20260810-220315/frame-0004.jpg",
+        "scan-session-20260810-220315/frame-0005.jpg",
+        "scan-session-20260810-220315/frame-0006.jpg",
+        "scan-session-20260810-220315/frame-0007.jpg",
+        "scan-session-20260810-220315/frame-0008.jpg",
+        "scan-session-20260810-220315/frame-0009.jpg",
+        "scan-session-20260810-220315/frame-0010.jpg",
+        "scan-session-20260810-220315/frame-0011.jpg",
+        "scan-session-20260810-220315/frame-0012.jpg",
+        "scan-session-20260810-220315/frame-0013.jpg",
+        "scan-session-20260810-220315/frame-0014.jpg",
+        "scan-session-20260810-220315/frame-0015.jpg",
+        "scan-session-20260810-220315/frame-0016.jpg",
+        "scan-session-20260810-220315/frame-0017.jpg",
+        "scan-session-20260810-220315/frame-0018.jpg",
+        "scan-session-20260810-220315/frame-0019.jpg",
+        "scan-session-20260810-220315/frame-0020.jpg",
+        "scan-session-20260810-220315/frame-0021.jpg",
+        "scan-session-20260810-220315/frame-0022.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 8,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 8
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 8,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 8
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 8,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-175804",
+      "stillUnlabeled": [
+        "scan-session-20260809-175804/frame-0000.jpg",
+        "scan-session-20260809-175804/frame-0001.jpg",
+        "scan-session-20260809-175804/frame-0002.jpg",
+        "scan-session-20260809-175804/frame-0003.jpg",
+        "scan-session-20260809-175804/frame-0004.jpg",
+        "scan-session-20260809-175804/frame-0005.jpg",
+        "scan-session-20260809-175804/frame-0006.jpg",
+        "scan-session-20260809-175804/frame-0007.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 8,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 8
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 7,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 7
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 15,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 15
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 15,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260812-220107",
+      "stillUnlabeled": [
+        "scan-session-20260812-220107/frame-0000.jpg",
+        "scan-session-20260812-220107/frame-0001.jpg",
+        "scan-session-20260812-220107/frame-0002.jpg",
+        "scan-session-20260812-220107/frame-0003.jpg",
+        "scan-session-20260812-220107/frame-0004.jpg",
+        "scan-session-20260812-220107/frame-0005.jpg",
+        "scan-session-20260812-220107/frame-0006.jpg",
+        "scan-session-20260812-220107/frame-0007.jpg",
+        "scan-session-20260812-220107/frame-0008.jpg",
+        "scan-session-20260812-220107/frame-0009.jpg",
+        "scan-session-20260812-220107/frame-0010.jpg",
+        "scan-session-20260812-220107/frame-0011.jpg",
+        "scan-session-20260812-220107/frame-0012.jpg",
+        "scan-session-20260812-220107/frame-0013.jpg",
+        "scan-session-20260812-220107/frame-0014.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 7,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 7
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 7,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 7
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 7,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-184048",
+      "stillUnlabeled": [
+        "scan-session-20260809-184048/frame-0000.jpg",
+        "scan-session-20260809-184048/frame-0001.jpg",
+        "scan-session-20260809-184048/frame-0002.jpg",
+        "scan-session-20260809-184048/frame-0003.jpg",
+        "scan-session-20260809-184048/frame-0004.jpg",
+        "scan-session-20260809-184048/frame-0005.jpg",
+        "scan-session-20260809-184048/frame-0006.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 7,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 7
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 15,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 15
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 22,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 22
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 22,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-211223",
+      "stillUnlabeled": [
+        "scan-session-20260809-211223/frame-0000.jpg",
+        "scan-session-20260809-211223/frame-0001.jpg",
+        "scan-session-20260809-211223/frame-0002.jpg",
+        "scan-session-20260809-211223/frame-0003.jpg",
+        "scan-session-20260809-211223/frame-0004.jpg",
+        "scan-session-20260809-211223/frame-0005.jpg",
+        "scan-session-20260809-211223/frame-0006.jpg",
+        "scan-session-20260809-211223/frame-0007.jpg",
+        "scan-session-20260809-211223/frame-0008.jpg",
+        "scan-session-20260809-211223/frame-0009.jpg",
+        "scan-session-20260809-211223/frame-0010.jpg",
+        "scan-session-20260809-211223/frame-0011.jpg",
+        "scan-session-20260809-211223/frame-0012.jpg",
+        "scan-session-20260809-211223/frame-0013.jpg",
+        "scan-session-20260809-211223/frame-0014.jpg",
+        "scan-session-20260809-211223/frame-0015.jpg",
+        "scan-session-20260809-211223/frame-0016.jpg",
+        "scan-session-20260809-211223/frame-0017.jpg",
+        "scan-session-20260809-211223/frame-0018.jpg",
+        "scan-session-20260809-211223/frame-0019.jpg",
+        "scan-session-20260809-211223/frame-0020.jpg",
+        "scan-session-20260809-211223/frame-0021.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 5,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 5
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 29,
+            "manualQuadFrames": 6,
+            "stillUnlabeled": 23
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 34,
+            "manualQuadFrames": 6,
+            "stillUnlabeled": 28
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 6,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 28,
+        "unchangedManualQuad": 6
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-190752",
+      "stillUnlabeled": [
+        "scan-session-20260809-190752/frame-0000.jpg",
+        "scan-session-20260809-190752/frame-0001.jpg",
+        "scan-session-20260809-190752/frame-0002.jpg",
+        "scan-session-20260809-190752/frame-0003.jpg",
+        "scan-session-20260809-190752/frame-0006.jpg",
+        "scan-session-20260809-190752/frame-0008.jpg",
+        "scan-session-20260809-190752/frame-0010.jpg",
+        "scan-session-20260809-190752/frame-0011.jpg",
+        "scan-session-20260809-190752/frame-0012.jpg",
+        "scan-session-20260809-190752/frame-0013.jpg",
+        "scan-session-20260809-190752/frame-0016.jpg",
+        "scan-session-20260809-190752/frame-0017.jpg",
+        "scan-session-20260809-190752/frame-0018.jpg",
+        "scan-session-20260809-190752/frame-0019.jpg",
+        "scan-session-20260809-190752/frame-0020.jpg",
+        "scan-session-20260809-190752/frame-0021.jpg",
+        "scan-session-20260809-190752/frame-0022.jpg",
+        "scan-session-20260809-190752/frame-0023.jpg",
+        "scan-session-20260809-190752/frame-0024.jpg",
+        "scan-session-20260809-190752/frame-0025.jpg",
+        "scan-session-20260809-190752/frame-0026.jpg",
+        "scan-session-20260809-190752/frame-0027.jpg",
+        "scan-session-20260809-190752/frame-0028.jpg",
+        "scan-session-20260809-190752/frame-0029.jpg",
+        "scan-session-20260809-190752/frame-0030.jpg",
+        "scan-session-20260809-190752/frame-0031.jpg",
+        "scan-session-20260809-190752/frame-0032.jpg",
+        "scan-session-20260809-190752/frame-0033.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-190752/frame-0004.jpg",
+        "scan-session-20260809-190752/frame-0005.jpg",
+        "scan-session-20260809-190752/frame-0007.jpg",
+        "scan-session-20260809-190752/frame-0009.jpg",
+        "scan-session-20260809-190752/frame-0014.jpg",
+        "scan-session-20260809-190752/frame-0015.jpg"
+      ]
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 4,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 4
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 5,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 5
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 9,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 9
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 9,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260816-165452",
+      "stillUnlabeled": [
+        "scan-session-20260816-165452/frame-0000.jpg",
+        "scan-session-20260816-165452/frame-0001.jpg",
+        "scan-session-20260816-165452/frame-0002.jpg",
+        "scan-session-20260816-165452/frame-0003.jpg",
+        "scan-session-20260816-165452/frame-0004.jpg",
+        "scan-session-20260816-165452/frame-0005.jpg",
+        "scan-session-20260816-165452/frame-0006.jpg",
+        "scan-session-20260816-165452/frame-0007.jpg",
+        "scan-session-20260816-165452/frame-0008.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 4,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 4
+          },
+          "single": {
+            "detectorQuadFrames": 9,
+            "frames": 28,
+            "manualQuadFrames": 7,
+            "stillUnlabeled": 21
+          }
+        },
+        "game": {
+          "magic": {
+            "detectorQuadFrames": 9,
+            "frames": 22,
+            "manualQuadFrames": 7,
+            "stillUnlabeled": 15
+          },
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 10,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 10
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 7,
+        "detectorQuadFrames": 9,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 25,
+        "unchangedManualQuad": 7
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260827-223150/frame-0001.jpg",
+        "scan-session-20260827-223150/frame-0009.jpg",
+        "scan-session-20260827-223150/frame-0012.jpg",
+        "scan-session-20260827-223150/frame-0013.jpg",
+        "scan-session-20260827-223150/frame-0016.jpg",
+        "scan-session-20260827-223150/frame-0017.jpg",
+        "scan-session-20260827-223150/frame-0018.jpg",
+        "scan-session-20260827-223150/frame-0019.jpg",
+        "scan-session-20260827-223150/frame-0020.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260827-223150",
+      "stillUnlabeled": [
+        "scan-session-20260827-223150/frame-0000.jpg",
+        "scan-session-20260827-223150/frame-0001.jpg",
+        "scan-session-20260827-223150/frame-0002.jpg",
+        "scan-session-20260827-223150/frame-0003.jpg",
+        "scan-session-20260827-223150/frame-0008.jpg",
+        "scan-session-20260827-223150/frame-0009.jpg",
+        "scan-session-20260827-223150/frame-0012.jpg",
+        "scan-session-20260827-223150/frame-0013.jpg",
+        "scan-session-20260827-223150/frame-0014.jpg",
+        "scan-session-20260827-223150/frame-0016.jpg",
+        "scan-session-20260827-223150/frame-0017.jpg",
+        "scan-session-20260827-223150/frame-0018.jpg",
+        "scan-session-20260827-223150/frame-0019.jpg",
+        "scan-session-20260827-223150/frame-0020.jpg",
+        "scan-session-20260827-223150/frame-0021.jpg",
+        "scan-session-20260827-223150/frame-0022.jpg",
+        "scan-session-20260827-223150/frame-0023.jpg",
+        "scan-session-20260827-223150/frame-0024.jpg",
+        "scan-session-20260827-223150/frame-0025.jpg",
+        "scan-session-20260827-223150/frame-0026.jpg",
+        "scan-session-20260827-223150/frame-0027.jpg",
+        "scan-session-20260827-223150/frame-0028.jpg",
+        "scan-session-20260827-223150/frame-0029.jpg",
+        "scan-session-20260827-223150/frame-0030.jpg",
+        "scan-session-20260827-223150/frame-0031.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260827-223150/frame-0004.jpg",
+        "scan-session-20260827-223150/frame-0005.jpg",
+        "scan-session-20260827-223150/frame-0006.jpg",
+        "scan-session-20260827-223150/frame-0007.jpg",
+        "scan-session-20260827-223150/frame-0010.jpg",
+        "scan-session-20260827-223150/frame-0011.jpg",
+        "scan-session-20260827-223150/frame-0015.jpg"
+      ]
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 23,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 23
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 26,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 26
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 26,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-211659",
+      "stillUnlabeled": [
+        "scan-session-20260821-211659/frame-0000.jpg",
+        "scan-session-20260821-211659/frame-0001.jpg",
+        "scan-session-20260821-211659/frame-0002.jpg",
+        "scan-session-20260821-211659/frame-0003.jpg",
+        "scan-session-20260821-211659/frame-0004.jpg",
+        "scan-session-20260821-211659/frame-0005.jpg",
+        "scan-session-20260821-211659/frame-0006.jpg",
+        "scan-session-20260821-211659/frame-0007.jpg",
+        "scan-session-20260821-211659/frame-0008.jpg",
+        "scan-session-20260821-211659/frame-0009.jpg",
+        "scan-session-20260821-211659/frame-0010.jpg",
+        "scan-session-20260821-211659/frame-0011.jpg",
+        "scan-session-20260821-211659/frame-0012.jpg",
+        "scan-session-20260821-211659/frame-0013.jpg",
+        "scan-session-20260821-211659/frame-0014.jpg",
+        "scan-session-20260821-211659/frame-0015.jpg",
+        "scan-session-20260821-211659/frame-0016.jpg",
+        "scan-session-20260821-211659/frame-0017.jpg",
+        "scan-session-20260821-211659/frame-0018.jpg",
+        "scan-session-20260821-211659/frame-0019.jpg",
+        "scan-session-20260821-211659/frame-0020.jpg",
+        "scan-session-20260821-211659/frame-0021.jpg",
+        "scan-session-20260821-211659/frame-0022.jpg",
+        "scan-session-20260821-211659/frame-0023.jpg",
+        "scan-session-20260821-211659/frame-0024.jpg",
+        "scan-session-20260821-211659/frame-0025.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-215559",
+      "stillUnlabeled": [
+        "scan-session-20260809-215559/frame-0000.jpg",
+        "scan-session-20260809-215559/frame-0001.jpg",
+        "scan-session-20260809-215559/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 4,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 4
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 6,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 6
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 6,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260810-112257",
+      "stillUnlabeled": [
+        "scan-session-20260810-112257/frame-0000.jpg",
+        "scan-session-20260810-112257/frame-0001.jpg",
+        "scan-session-20260810-112257/frame-0002.jpg",
+        "scan-session-20260810-112257/frame-0003.jpg",
+        "scan-session-20260810-112257/frame-0004.jpg",
+        "scan-session-20260810-112257/frame-0005.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260812-224415",
+      "stillUnlabeled": [
+        "scan-session-20260812-224415/frame-0000.jpg",
+        "scan-session-20260812-224415/frame-0001.jpg",
+        "scan-session-20260812-224415/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 4,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 4
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 6,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 6
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 6,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260814-081249",
+      "stillUnlabeled": [
+        "scan-session-20260814-081249/frame-0000.jpg",
+        "scan-session-20260814-081249/frame-0001.jpg",
+        "scan-session-20260814-081249/frame-0002.jpg",
+        "scan-session-20260814-081249/frame-0003.jpg",
+        "scan-session-20260814-081249/frame-0004.jpg",
+        "scan-session-20260814-081249/frame-0005.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 40,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 40
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 42,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 42
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 42,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-231419",
+      "stillUnlabeled": [
+        "scan-session-20260821-231419/frame-0000.jpg",
+        "scan-session-20260821-231419/frame-0001.jpg",
+        "scan-session-20260821-231419/frame-0002.jpg",
+        "scan-session-20260821-231419/frame-0003.jpg",
+        "scan-session-20260821-231419/frame-0004.jpg",
+        "scan-session-20260821-231419/frame-0005.jpg",
+        "scan-session-20260821-231419/frame-0006.jpg",
+        "scan-session-20260821-231419/frame-0007.jpg",
+        "scan-session-20260821-231419/frame-0008.jpg",
+        "scan-session-20260821-231419/frame-0009.jpg",
+        "scan-session-20260821-231419/frame-0010.jpg",
+        "scan-session-20260821-231419/frame-0011.jpg",
+        "scan-session-20260821-231419/frame-0012.jpg",
+        "scan-session-20260821-231419/frame-0013.jpg",
+        "scan-session-20260821-231419/frame-0014.jpg",
+        "scan-session-20260821-231419/frame-0015.jpg",
+        "scan-session-20260821-231419/frame-0016.jpg",
+        "scan-session-20260821-231419/frame-0017.jpg",
+        "scan-session-20260821-231419/frame-0018.jpg",
+        "scan-session-20260821-231419/frame-0019.jpg",
+        "scan-session-20260821-231419/frame-0020.jpg",
+        "scan-session-20260821-231419/frame-0021.jpg",
+        "scan-session-20260821-231419/frame-0022.jpg",
+        "scan-session-20260821-231419/frame-0023.jpg",
+        "scan-session-20260821-231419/frame-0024.jpg",
+        "scan-session-20260821-231419/frame-0025.jpg",
+        "scan-session-20260821-231419/frame-0026.jpg",
+        "scan-session-20260821-231419/frame-0027.jpg",
+        "scan-session-20260821-231419/frame-0028.jpg",
+        "scan-session-20260821-231419/frame-0029.jpg",
+        "scan-session-20260821-231419/frame-0030.jpg",
+        "scan-session-20260821-231419/frame-0031.jpg",
+        "scan-session-20260821-231419/frame-0032.jpg",
+        "scan-session-20260821-231419/frame-0033.jpg",
+        "scan-session-20260821-231419/frame-0034.jpg",
+        "scan-session-20260821-231419/frame-0035.jpg",
+        "scan-session-20260821-231419/frame-0036.jpg",
+        "scan-session-20260821-231419/frame-0037.jpg",
+        "scan-session-20260821-231419/frame-0038.jpg",
+        "scan-session-20260821-231419/frame-0039.jpg",
+        "scan-session-20260821-231419/frame-0040.jpg",
+        "scan-session-20260821-231419/frame-0041.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260810-173108",
+      "stillUnlabeled": [
+        "scan-session-20260810-173108/frame-0000.jpg",
+        "scan-session-20260810-173108/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 8,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 8
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 9,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 9
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 9,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260811-114121",
+      "stillUnlabeled": [
+        "scan-session-20260811-114121/frame-0000.jpg",
+        "scan-session-20260811-114121/frame-0001.jpg",
+        "scan-session-20260811-114121/frame-0002.jpg",
+        "scan-session-20260811-114121/frame-0003.jpg",
+        "scan-session-20260811-114121/frame-0004.jpg",
+        "scan-session-20260811-114121/frame-0005.jpg",
+        "scan-session-20260811-114121/frame-0006.jpg",
+        "scan-session-20260811-114121/frame-0007.jpg",
+        "scan-session-20260811-114121/frame-0008.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 4,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 4
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 5,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 5
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 5,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260813-183749",
+      "stillUnlabeled": [
+        "scan-session-20260813-183749/frame-0000.jpg",
+        "scan-session-20260813-183749/frame-0001.jpg",
+        "scan-session-20260813-183749/frame-0002.jpg",
+        "scan-session-20260813-183749/frame-0003.jpg",
+        "scan-session-20260813-183749/frame-0004.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260814-124705",
+      "stillUnlabeled": [
+        "scan-session-20260814-124705/frame-0000.jpg",
+        "scan-session-20260814-124705/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260816-204703",
+      "stillUnlabeled": [
+        "scan-session-20260816-204703/frame-0000.jpg",
+        "scan-session-20260816-204703/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "binder": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          },
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 4,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 4
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 5,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 5
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 5,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260817-214446",
+      "stillUnlabeled": [
+        "scan-session-20260817-214446/frame-0000.jpg",
+        "scan-session-20260817-214446/frame-0001.jpg",
+        "scan-session-20260817-214446/frame-0002.jpg",
+        "scan-session-20260817-214446/frame-0003.jpg",
+        "scan-session-20260817-214446/frame-0004.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-145850",
+      "stillUnlabeled": [
+        "scan-session-20260809-145850/frame-0000.jpg",
+        "scan-session-20260809-145850/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 1,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-145947",
+      "stillUnlabeled": [
+        "scan-session-20260809-145947/frame-0000.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 2,
+            "frames": 15,
+            "manualQuadFrames": 5,
+            "stillUnlabeled": 10
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 2,
+            "frames": 15,
+            "manualQuadFrames": 5,
+            "stillUnlabeled": 10
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 5,
+        "detectorQuadFrames": 2,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 10,
+        "unchangedManualQuad": 5
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260809-160556/frame-0012.jpg",
+        "scan-session-20260809-160556/frame-0014.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-160556",
+      "stillUnlabeled": [
+        "scan-session-20260809-160556/frame-0000.jpg",
+        "scan-session-20260809-160556/frame-0002.jpg",
+        "scan-session-20260809-160556/frame-0004.jpg",
+        "scan-session-20260809-160556/frame-0005.jpg",
+        "scan-session-20260809-160556/frame-0006.jpg",
+        "scan-session-20260809-160556/frame-0008.jpg",
+        "scan-session-20260809-160556/frame-0010.jpg",
+        "scan-session-20260809-160556/frame-0012.jpg",
+        "scan-session-20260809-160556/frame-0013.jpg",
+        "scan-session-20260809-160556/frame-0014.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-160556/frame-0001.jpg",
+        "scan-session-20260809-160556/frame-0003.jpg",
+        "scan-session-20260809-160556/frame-0007.jpg",
+        "scan-session-20260809-160556/frame-0009.jpg",
+        "scan-session-20260809-160556/frame-0011.jpg"
+      ]
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 2,
+            "frames": 33,
+            "manualQuadFrames": 18,
+            "stillUnlabeled": 15
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 2,
+            "frames": 33,
+            "manualQuadFrames": 18,
+            "stillUnlabeled": 15
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 18,
+        "detectorQuadFrames": 2,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 15,
+        "unchangedManualQuad": 18
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260809-175313/frame-0005.jpg",
+        "scan-session-20260809-175313/frame-0030.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-175313",
+      "stillUnlabeled": [
+        "scan-session-20260809-175313/frame-0000.jpg",
+        "scan-session-20260809-175313/frame-0003.jpg",
+        "scan-session-20260809-175313/frame-0005.jpg",
+        "scan-session-20260809-175313/frame-0007.jpg",
+        "scan-session-20260809-175313/frame-0010.jpg",
+        "scan-session-20260809-175313/frame-0011.jpg",
+        "scan-session-20260809-175313/frame-0012.jpg",
+        "scan-session-20260809-175313/frame-0020.jpg",
+        "scan-session-20260809-175313/frame-0021.jpg",
+        "scan-session-20260809-175313/frame-0025.jpg",
+        "scan-session-20260809-175313/frame-0026.jpg",
+        "scan-session-20260809-175313/frame-0027.jpg",
+        "scan-session-20260809-175313/frame-0029.jpg",
+        "scan-session-20260809-175313/frame-0030.jpg",
+        "scan-session-20260809-175313/frame-0032.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-175313/frame-0001.jpg",
+        "scan-session-20260809-175313/frame-0002.jpg",
+        "scan-session-20260809-175313/frame-0004.jpg",
+        "scan-session-20260809-175313/frame-0006.jpg",
+        "scan-session-20260809-175313/frame-0008.jpg",
+        "scan-session-20260809-175313/frame-0009.jpg",
+        "scan-session-20260809-175313/frame-0013.jpg",
+        "scan-session-20260809-175313/frame-0014.jpg",
+        "scan-session-20260809-175313/frame-0015.jpg",
+        "scan-session-20260809-175313/frame-0016.jpg",
+        "scan-session-20260809-175313/frame-0017.jpg",
+        "scan-session-20260809-175313/frame-0018.jpg",
+        "scan-session-20260809-175313/frame-0019.jpg",
+        "scan-session-20260809-175313/frame-0022.jpg",
+        "scan-session-20260809-175313/frame-0023.jpg",
+        "scan-session-20260809-175313/frame-0024.jpg",
+        "scan-session-20260809-175313/frame-0028.jpg",
+        "scan-session-20260809-175313/frame-0031.jpg"
+      ]
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 1,
+            "frames": 24,
+            "manualQuadFrames": 12,
+            "stillUnlabeled": 12
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 1,
+            "frames": 24,
+            "manualQuadFrames": 12,
+            "stillUnlabeled": 12
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 12,
+        "detectorQuadFrames": 1,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 12,
+        "unchangedManualQuad": 12
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260809-183843/frame-0000.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-183843",
+      "stillUnlabeled": [
+        "scan-session-20260809-183843/frame-0000.jpg",
+        "scan-session-20260809-183843/frame-0001.jpg",
+        "scan-session-20260809-183843/frame-0002.jpg",
+        "scan-session-20260809-183843/frame-0005.jpg",
+        "scan-session-20260809-183843/frame-0008.jpg",
+        "scan-session-20260809-183843/frame-0009.jpg",
+        "scan-session-20260809-183843/frame-0010.jpg",
+        "scan-session-20260809-183843/frame-0011.jpg",
+        "scan-session-20260809-183843/frame-0012.jpg",
+        "scan-session-20260809-183843/frame-0016.jpg",
+        "scan-session-20260809-183843/frame-0017.jpg",
+        "scan-session-20260809-183843/frame-0023.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260809-183843/frame-0003.jpg",
+        "scan-session-20260809-183843/frame-0004.jpg",
+        "scan-session-20260809-183843/frame-0006.jpg",
+        "scan-session-20260809-183843/frame-0007.jpg",
+        "scan-session-20260809-183843/frame-0013.jpg",
+        "scan-session-20260809-183843/frame-0014.jpg",
+        "scan-session-20260809-183843/frame-0015.jpg",
+        "scan-session-20260809-183843/frame-0018.jpg",
+        "scan-session-20260809-183843/frame-0019.jpg",
+        "scan-session-20260809-183843/frame-0020.jpg",
+        "scan-session-20260809-183843/frame-0021.jpg",
+        "scan-session-20260809-183843/frame-0022.jpg"
+      ]
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 16,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 16
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 16,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 16
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 16,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-210958",
+      "stillUnlabeled": [
+        "scan-session-20260809-210958/frame-0000.jpg",
+        "scan-session-20260809-210958/frame-0001.jpg",
+        "scan-session-20260809-210958/frame-0002.jpg",
+        "scan-session-20260809-210958/frame-0003.jpg",
+        "scan-session-20260809-210958/frame-0004.jpg",
+        "scan-session-20260809-210958/frame-0005.jpg",
+        "scan-session-20260809-210958/frame-0006.jpg",
+        "scan-session-20260809-210958/frame-0007.jpg",
+        "scan-session-20260809-210958/frame-0008.jpg",
+        "scan-session-20260809-210958/frame-0009.jpg",
+        "scan-session-20260809-210958/frame-0010.jpg",
+        "scan-session-20260809-210958/frame-0011.jpg",
+        "scan-session-20260809-210958/frame-0012.jpg",
+        "scan-session-20260809-210958/frame-0013.jpg",
+        "scan-session-20260809-210958/frame-0014.jpg",
+        "scan-session-20260809-210958/frame-0015.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260809-230224",
+      "stillUnlabeled": [
+        "scan-session-20260809-230224/frame-0000.jpg",
+        "scan-session-20260809-230224/frame-0001.jpg",
+        "scan-session-20260809-230224/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260813-062035",
+      "stillUnlabeled": [
+        "scan-session-20260813-062035/frame-0000.jpg",
+        "scan-session-20260813-062035/frame-0001.jpg",
+        "scan-session-20260813-062035/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 2,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 2
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 2,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260813-220015",
+      "stillUnlabeled": [
+        "scan-session-20260813-220015/frame-0000.jpg",
+        "scan-session-20260813-220015/frame-0001.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260815-090217",
+      "stillUnlabeled": [
+        "scan-session-20260815-090217/frame-0000.jpg",
+        "scan-session-20260815-090217/frame-0001.jpg",
+        "scan-session-20260815-090217/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 3,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 3
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 3,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260815-115155",
+      "stillUnlabeled": [
+        "scan-session-20260815-115155/frame-0000.jpg",
+        "scan-session-20260815-115155/frame-0001.jpg",
+        "scan-session-20260815-115155/frame-0002.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 62,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 62
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 62,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 62
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 62,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260818-103659",
+      "stillUnlabeled": [
+        "scan-session-20260818-103659/frame-0000.jpg",
+        "scan-session-20260818-103659/frame-0001.jpg",
+        "scan-session-20260818-103659/frame-0002.jpg",
+        "scan-session-20260818-103659/frame-0003.jpg",
+        "scan-session-20260818-103659/frame-0004.jpg",
+        "scan-session-20260818-103659/frame-0005.jpg",
+        "scan-session-20260818-103659/frame-0006.jpg",
+        "scan-session-20260818-103659/frame-0007.jpg",
+        "scan-session-20260818-103659/frame-0008.jpg",
+        "scan-session-20260818-103659/frame-0009.jpg",
+        "scan-session-20260818-103659/frame-0010.jpg",
+        "scan-session-20260818-103659/frame-0011.jpg",
+        "scan-session-20260818-103659/frame-0012.jpg",
+        "scan-session-20260818-103659/frame-0013.jpg",
+        "scan-session-20260818-103659/frame-0014.jpg",
+        "scan-session-20260818-103659/frame-0015.jpg",
+        "scan-session-20260818-103659/frame-0016.jpg",
+        "scan-session-20260818-103659/frame-0017.jpg",
+        "scan-session-20260818-103659/frame-0018.jpg",
+        "scan-session-20260818-103659/frame-0019.jpg",
+        "scan-session-20260818-103659/frame-0020.jpg",
+        "scan-session-20260818-103659/frame-0021.jpg",
+        "scan-session-20260818-103659/frame-0022.jpg",
+        "scan-session-20260818-103659/frame-0023.jpg",
+        "scan-session-20260818-103659/frame-0024.jpg",
+        "scan-session-20260818-103659/frame-0025.jpg",
+        "scan-session-20260818-103659/frame-0026.jpg",
+        "scan-session-20260818-103659/frame-0027.jpg",
+        "scan-session-20260818-103659/frame-0028.jpg",
+        "scan-session-20260818-103659/frame-0029.jpg",
+        "scan-session-20260818-103659/frame-0030.jpg",
+        "scan-session-20260818-103659/frame-0031.jpg",
+        "scan-session-20260818-103659/frame-0032.jpg",
+        "scan-session-20260818-103659/frame-0033.jpg",
+        "scan-session-20260818-103659/frame-0034.jpg",
+        "scan-session-20260818-103659/frame-0035.jpg",
+        "scan-session-20260818-103659/frame-0036.jpg",
+        "scan-session-20260818-103659/frame-0037.jpg",
+        "scan-session-20260818-103659/frame-0038.jpg",
+        "scan-session-20260818-103659/frame-0039.jpg",
+        "scan-session-20260818-103659/frame-0040.jpg",
+        "scan-session-20260818-103659/frame-0041.jpg",
+        "scan-session-20260818-103659/frame-0042.jpg",
+        "scan-session-20260818-103659/frame-0043.jpg",
+        "scan-session-20260818-103659/frame-0044.jpg",
+        "scan-session-20260818-103659/frame-0045.jpg",
+        "scan-session-20260818-103659/frame-0046.jpg",
+        "scan-session-20260818-103659/frame-0047.jpg",
+        "scan-session-20260818-103659/frame-0048.jpg",
+        "scan-session-20260818-103659/frame-0049.jpg",
+        "scan-session-20260818-103659/frame-0050.jpg",
+        "scan-session-20260818-103659/frame-0051.jpg",
+        "scan-session-20260818-103659/frame-0052.jpg",
+        "scan-session-20260818-103659/frame-0053.jpg",
+        "scan-session-20260818-103659/frame-0054.jpg",
+        "scan-session-20260818-103659/frame-0055.jpg",
+        "scan-session-20260818-103659/frame-0056.jpg",
+        "scan-session-20260818-103659/frame-0057.jpg",
+        "scan-session-20260818-103659/frame-0058.jpg",
+        "scan-session-20260818-103659/frame-0059.jpg",
+        "scan-session-20260818-103659/frame-0060.jpg",
+        "scan-session-20260818-103659/frame-0061.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 1,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260820-135949",
+      "stillUnlabeled": [
+        "scan-session-20260820-135949/frame-0000.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 1,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-121821",
+      "stillUnlabeled": [
+        "scan-session-20260821-121821/frame-0000.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 5,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 5
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 5,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 5
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 5,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260821-215651",
+      "stillUnlabeled": [
+        "scan-session-20260821-215651/frame-0000.jpg",
+        "scan-session-20260821-215651/frame-0001.jpg",
+        "scan-session-20260821-215651/frame-0002.jpg",
+        "scan-session-20260821-215651/frame-0003.jpg",
+        "scan-session-20260821-215651/frame-0004.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 0,
+            "frames": 27,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 27
+          }
+        },
+        "game": {
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 27,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 27
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 0,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 27,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260826-143226",
+      "stillUnlabeled": [
+        "scan-session-20260826-143226/frame-0000.jpg",
+        "scan-session-20260826-143226/frame-0001.jpg",
+        "scan-session-20260826-143226/frame-0002.jpg",
+        "scan-session-20260826-143226/frame-0003.jpg",
+        "scan-session-20260826-143226/frame-0004.jpg",
+        "scan-session-20260826-143226/frame-0005.jpg",
+        "scan-session-20260826-143226/frame-0006.jpg",
+        "scan-session-20260826-143226/frame-0007.jpg",
+        "scan-session-20260826-143226/frame-0008.jpg",
+        "scan-session-20260826-143226/frame-0009.jpg",
+        "scan-session-20260826-143226/frame-0010.jpg",
+        "scan-session-20260826-143226/frame-0011.jpg",
+        "scan-session-20260826-143226/frame-0012.jpg",
+        "scan-session-20260826-143226/frame-0013.jpg",
+        "scan-session-20260826-143226/frame-0014.jpg",
+        "scan-session-20260826-143226/frame-0015.jpg",
+        "scan-session-20260826-143226/frame-0016.jpg",
+        "scan-session-20260826-143226/frame-0017.jpg",
+        "scan-session-20260826-143226/frame-0018.jpg",
+        "scan-session-20260826-143226/frame-0019.jpg",
+        "scan-session-20260826-143226/frame-0020.jpg",
+        "scan-session-20260826-143226/frame-0021.jpg",
+        "scan-session-20260826-143226/frame-0022.jpg",
+        "scan-session-20260826-143226/frame-0023.jpg",
+        "scan-session-20260826-143226/frame-0024.jpg",
+        "scan-session-20260826-143226/frame-0025.jpg",
+        "scan-session-20260826-143226/frame-0026.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 5,
+            "frames": 7,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 7
+          }
+        },
+        "game": {
+          "magic": {
+            "detectorQuadFrames": 5,
+            "frames": 6,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 6
+          },
+          "pokemon": {
+            "detectorQuadFrames": 0,
+            "frames": 1,
+            "manualQuadFrames": 0,
+            "stillUnlabeled": 1
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 0,
+        "detectorQuadFrames": 5,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 7,
+        "unchangedManualQuad": 0
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260829-155957/frame-0001.jpg",
+        "scan-session-20260829-155957/frame-0002.jpg",
+        "scan-session-20260829-155957/frame-0003.jpg",
+        "scan-session-20260829-155957/frame-0005.jpg",
+        "scan-session-20260829-155957/frame-0006.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260829-155957",
+      "stillUnlabeled": [
+        "scan-session-20260829-155957/frame-0000.jpg",
+        "scan-session-20260829-155957/frame-0001.jpg",
+        "scan-session-20260829-155957/frame-0002.jpg",
+        "scan-session-20260829-155957/frame-0003.jpg",
+        "scan-session-20260829-155957/frame-0004.jpg",
+        "scan-session-20260829-155957/frame-0005.jpg",
+        "scan-session-20260829-155957/frame-0006.jpg"
+      ],
+      "unchangedManualQuad": []
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 4,
+            "frames": 27,
+            "manualQuadFrames": 5,
+            "stillUnlabeled": 22
+          }
+        },
+        "game": {
+          "magic": {
+            "detectorQuadFrames": 4,
+            "frames": 27,
+            "manualQuadFrames": 5,
+            "stillUnlabeled": 22
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 5,
+        "detectorQuadFrames": 4,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 22,
+        "unchangedManualQuad": 5
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260829-200235/frame-0003.jpg",
+        "scan-session-20260829-200235/frame-0012.jpg",
+        "scan-session-20260829-200235/frame-0013.jpg",
+        "scan-session-20260829-200235/frame-0014.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260829-200235",
+      "stillUnlabeled": [
+        "scan-session-20260829-200235/frame-0000.jpg",
+        "scan-session-20260829-200235/frame-0001.jpg",
+        "scan-session-20260829-200235/frame-0002.jpg",
+        "scan-session-20260829-200235/frame-0003.jpg",
+        "scan-session-20260829-200235/frame-0004.jpg",
+        "scan-session-20260829-200235/frame-0005.jpg",
+        "scan-session-20260829-200235/frame-0006.jpg",
+        "scan-session-20260829-200235/frame-0007.jpg",
+        "scan-session-20260829-200235/frame-0008.jpg",
+        "scan-session-20260829-200235/frame-0009.jpg",
+        "scan-session-20260829-200235/frame-0010.jpg",
+        "scan-session-20260829-200235/frame-0011.jpg",
+        "scan-session-20260829-200235/frame-0012.jpg",
+        "scan-session-20260829-200235/frame-0013.jpg",
+        "scan-session-20260829-200235/frame-0014.jpg",
+        "scan-session-20260829-200235/frame-0015.jpg",
+        "scan-session-20260829-200235/frame-0016.jpg",
+        "scan-session-20260829-200235/frame-0018.jpg",
+        "scan-session-20260829-200235/frame-0020.jpg",
+        "scan-session-20260829-200235/frame-0021.jpg",
+        "scan-session-20260829-200235/frame-0025.jpg",
+        "scan-session-20260829-200235/frame-0026.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260829-200235/frame-0017.jpg",
+        "scan-session-20260829-200235/frame-0019.jpg",
+        "scan-session-20260829-200235/frame-0022.jpg",
+        "scan-session-20260829-200235/frame-0023.jpg",
+        "scan-session-20260829-200235/frame-0024.jpg"
+      ]
+    },
+    {
+      "breakdown": {
+        "captureMode": {
+          "single": {
+            "detectorQuadFrames": 5,
+            "frames": 30,
+            "manualQuadFrames": 4,
+            "stillUnlabeled": 26
+          }
+        },
+        "game": {
+          "magic": {
+            "detectorQuadFrames": 5,
+            "frames": 30,
+            "manualQuadFrames": 4,
+            "stillUnlabeled": 26
+          }
+        }
+      },
+      "changedManualQuad": [],
+      "counts": {
+        "changedManualQuad": 0,
+        "currentManualInstances": 4,
+        "detectorQuadFrames": 5,
+        "gainingManualInstances": 0,
+        "gainingManualQuad": 0,
+        "losingManualInstances": 0,
+        "losingManualQuad": 0,
+        "stillUnlabeled": 26,
+        "unchangedManualQuad": 4
+      },
+      "detectorQuadFrames": [
+        "scan-session-20260829-233753/frame-0002.jpg",
+        "scan-session-20260829-233753/frame-0004.jpg",
+        "scan-session-20260829-233753/frame-0006.jpg",
+        "scan-session-20260829-233753/frame-0014.jpg",
+        "scan-session-20260829-233753/frame-0015.jpg"
+      ],
+      "gainingManualQuad": [],
+      "losingManualQuad": [],
+      "sessionId": "scan-session-20260829-233753",
+      "stillUnlabeled": [
+        "scan-session-20260829-233753/frame-0000.jpg",
+        "scan-session-20260829-233753/frame-0001.jpg",
+        "scan-session-20260829-233753/frame-0002.jpg",
+        "scan-session-20260829-233753/frame-0004.jpg",
+        "scan-session-20260829-233753/frame-0006.jpg",
+        "scan-session-20260829-233753/frame-0007.jpg",
+        "scan-session-20260829-233753/frame-0008.jpg",
+        "scan-session-20260829-233753/frame-0009.jpg",
+        "scan-session-20260829-233753/frame-0010.jpg",
+        "scan-session-20260829-233753/frame-0011.jpg",
+        "scan-session-20260829-233753/frame-0014.jpg",
+        "scan-session-20260829-233753/frame-0015.jpg",
+        "scan-session-20260829-233753/frame-0016.jpg",
+        "scan-session-20260829-233753/frame-0017.jpg",
+        "scan-session-20260829-233753/frame-0018.jpg",
+        "scan-session-20260829-233753/frame-0019.jpg",
+        "scan-session-20260829-233753/frame-0020.jpg",
+        "scan-session-20260829-233753/frame-0021.jpg",
+        "scan-session-20260829-233753/frame-0022.jpg",
+        "scan-session-20260829-233753/frame-0023.jpg",
+        "scan-session-20260829-233753/frame-0024.jpg",
+        "scan-session-20260829-233753/frame-0025.jpg",
+        "scan-session-20260829-233753/frame-0026.jpg",
+        "scan-session-20260829-233753/frame-0027.jpg",
+        "scan-session-20260829-233753/frame-0028.jpg",
+        "scan-session-20260829-233753/frame-0029.jpg"
+      ],
+      "unchangedManualQuad": [
+        "scan-session-20260829-233753/frame-0003.jpg",
+        "scan-session-20260829-233753/frame-0005.jpg",
+        "scan-session-20260829-233753/frame-0012.jpg",
+        "scan-session-20260829-233753/frame-0013.jpg"
+      ]
+    }
+  ],
+  "summary": {
+    "breakdown": {
+      "captureMode": {
+        "binder": {
+          "detectorQuadFrames": 0,
+          "frames": 129,
+          "manualQuadFrames": 3,
+          "stillUnlabeled": 126
+        },
+        "single": {
+          "detectorQuadFrames": 28,
+          "frames": 475,
+          "manualQuadFrames": 57,
+          "stillUnlabeled": 418
+        }
+      },
+      "game": {
+        "magic": {
+          "detectorQuadFrames": 23,
+          "frames": 85,
+          "manualQuadFrames": 16,
+          "stillUnlabeled": 69
+        },
+        "pokemon": {
+          "detectorQuadFrames": 5,
+          "frames": 519,
+          "manualQuadFrames": 44,
+          "stillUnlabeled": 475
+        }
+      }
+    },
+    "changedManualQuad": 0,
+    "currentManualInstances": 84,
+    "currentManualQuadFrames": 60,
+    "detectorQuadFrames": 28,
+    "gainingManualInstances": 27,
+    "gainingManualQuad": 3,
+    "inventoryFrames": 604,
+    "losingManualInstances": 0,
+    "losingManualQuad": 0,
+    "sessions": 41,
+    "stillUnlabeled": 544,
+    "unchangedManualQuad": 57
+  },
+  "supersedes": {
+    "exportedAt": "2026-09-02T19:49:20-07:00",
+    "path": "TCGer-Labeling/fiftyone-sessions/backups/labels-20260902-194920.json",
+    "sha256": "308faca4d2e7ca1d2b4e60cd36e7ee70708f1b935c5b1552292f1243e5041f5c"
+  }
+}
