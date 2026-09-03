@@ -394,7 +394,7 @@ function renderControls() {
   });
 }
 
-document.querySelector("#add").onclick = () => {
+function addCard() {
   if (!state.sample) return;
   const index = state.sample.quads.length;
   const inset = 0.08 + (index % 4) * 0.015;
@@ -411,7 +411,9 @@ document.querySelector("#add").onclick = () => {
   renderControls();
   draw();
   status("New card added. Drag its four corners into place.");
-};
+}
+document.querySelector("#add").onclick = addCard;
+document.querySelector("#add-card-top").onclick = addCard;
 document.querySelector("#scene-slice").onchange = (event) => {
   if (!state.sample) return;
   state.sample.sceneSlice = event.target.value;
