@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import importlib.util
 import json
 import os
@@ -23,6 +24,7 @@ import urllib.request
 from pathlib import Path
 
 from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub.errors import HfHubHTTPError
 
 
 def safe_extract(archive: Path, destination: Path) -> None:
@@ -132,15 +134,26 @@ def main() -> None:
     }
     report_file = root / "report.json"
     report_file.write_bytes(module.canonical_json(report))
+    print("CROP_PARITY_REPORT_BASE64_BEGIN")
+    print(base64.b64encode(report_file.read_bytes()).decode("ascii"))
+    print("CROP_PARITY_REPORT_BASE64_END")
     api = HfApi(token=token)
-    commit = api.upload_file(
-        path_or_fileobj=report_file,
-        path_in_repo=args.report_path,
-        repo_id=args.model_repo,
-        commit_message="Add crop parity encoder-grid report",
-        create_pr=True,
-    )
-    print(json.dumps({"reportPath": args.report_path, "commitOid": commit.oid}, sort_keys=True))
+    try:
+        commit = api.upload_file(
+            path_or_fileobj=report_file,
+            path_in_repo=args.report_path,
+            repo_id=args.model_repo,
+            commit_message="Add crop parity encoder-grid report",
+            create_pr=True,
+        )
+        persistence = {"reportPath": args.report_path, "commitOid": commit.oid}
+    except HfHubHTTPError as error:
+        persistence = {
+            "reportPath": args.report_path,
+            "commitOid": None,
+            "uploadError": f"{error.response.status_code} {error.response.reason}",
+        }
+    print(json.dumps(persistence, sort_keys=True))
 
 
 if __name__ == "__main__":
