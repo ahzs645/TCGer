@@ -23,6 +23,11 @@ candidates and are also captured by the append-only journal.
 The `save_manual_card_geometry` operator converts every drawn `manual_quad`
 polyline into a durable multi-instance record with per-card visibility,
 occlusion order, orientation, and face state for geometry-corpus ingestion.
+
+The `Card Geometry` modal panel is the preferred editor for multi-card frames.
+It keeps card-relative TL/TR/BR/BL ordering visible, provides a 20% canvas
+margin for amodal corners, and writes both `manual_quad` and the durable
+multi-instance payload without requiring the generic annotation editor.
 """
 
 import base64
@@ -32,6 +37,16 @@ from pathlib import Path
 
 import fiftyone.operators as foo
 import fiftyone.operators.types as types
+
+from .geometry_editor import (
+    CORNER_NAMES,
+    CORNER_VISIBILITIES,
+    default_geometry_metadata as _default_geometry_metadata,
+    geometry_record as _geometry_record,
+    manual_quads as _manual_quads,
+    nearest_corner as _nearest_corner,
+    quad_validation_error as _quad_validation_error,
+)
 
 VERDICTS = [
     ("true", "✓ Correct"),
@@ -171,6 +186,13 @@ def _data_uri(pil_image, quality=82):
     buf = io.BytesIO()
     pil_image.convert("RGB").save(buf, format="JPEG", quality=quality)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def _png_data_uri(pil_image):
+    """Lossless image URI for the corner magnifier."""
+    buf = io.BytesIO()
+    pil_image.convert("RGB").save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
 def _scaled(img, height):
@@ -933,7 +955,6 @@ class CardVerdictPanel(foo.Panel):
     def _show_binder_rescan(self, ctx, sample, entries):
         """Render persisted page re-scan entries: each detection's warped
         crop captioned with its top pick; green border = would-accept."""
-        import json
         import sys
 
         sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -1245,8 +1266,6 @@ class CardVerdictPanel(foo.Panel):
         """Record which alt boundary fixes this frame's crop. Clicking the
         chosen one again clears it. Stored as fixed_quad_json/-source and
         written to results.json by writeback.py as fixedQuad/fixedQuadSource."""
-        import json
-
         quads = ctx.panel.get_state("alt_quads") or []
         if index >= len(quads) or not ctx.current_sample:
             return
@@ -1520,7 +1539,9 @@ class CardVerdictPanel(foo.Panel):
         if quad is None:
             try:
                 lines = sample["detection_quads"].polylines
-                decisive = next((l for l in lines if l.label == "decisive"), None)
+                decisive = next(
+                    (line for line in lines if line.label == "decisive"), None
+                )
                 if decisive and decisive.points:
                     quad = [list(p) for p in decisive.points[0]]
             except Exception:
@@ -2587,6 +2608,752 @@ class CardVerdictPanel(foo.Panel):
         )
 
 
+class CardGeometryPanel(foo.Panel):
+    """Purpose-built ordered-corner editor for multi-card source frames."""
+
+    MARGIN = 0.2
+    GRID_STEPS = 90
+
+    @property
+    def config(self):
+        return foo.PanelConfig(
+            name="tcger_card_geometry",
+            label="Card Geometry",
+            surfaces="modal",
+            icon="crop_free",
+        )
+
+    def on_load(self, ctx):
+        self._load_sample(ctx)
+
+    def on_change_current_sample(self, ctx):
+        self._load_sample(ctx)
+
+    def _load_sample(self, ctx):
+        import json
+
+        from PIL import Image
+
+        ctx.panel.state.geometry_quads = []
+        ctx.panel.state.geometry_metadata = []
+        ctx.panel.state.geometry_active = 0
+        ctx.panel.state.geometry_mode = "idle"
+        ctx.panel.state.geometry_draft = []
+        ctx.panel.state.geometry_corner = 0
+        ctx.panel.state.geometry_status = ""
+        ctx.panel.state.geometry_bg = None
+        ctx.panel.state.geometry_w = 560
+        ctx.panel.state.geometry_h = 520
+        ctx.panel.state.geometry_zoom_bg = None
+        ctx.panel.state.geometry_zoom_bounds = [0, 0, 1, 1]
+        ctx.panel.state.geometry_zoom_label = ""
+        sample_id = ctx.current_sample
+        if not sample_id:
+            return
+        try:
+            sample = ctx.dataset[sample_id]
+        except Exception:
+            return
+
+        quads = _manual_quads(sample)
+        key = sample.get_field("key") or sample_id
+        metadata = _default_geometry_metadata(key, quads)
+        try:
+            saved = json.loads(sample["manual_instances_json"] or "null")
+        except Exception:
+            saved = None
+        if saved and len(saved.get("instances") or []) == len(quads):
+            for index, item in enumerate(saved["instances"]):
+                metadata[index] = {
+                    "physicalCardId": item.get("physicalCardId")
+                    or f"{key}:card-{index}",
+                    "occlusionOrder": int(item.get("occlusionOrder", index)),
+                    "orientationKnown": bool(item.get("orientationKnown", True)),
+                    "side": item.get("side", "faceUp"),
+                    "cornerVisibility": list(
+                        item.get("cornerVisibility")
+                        or metadata[index]["cornerVisibility"]
+                    ),
+                }
+        ctx.panel.state.geometry_quads = quads
+        ctx.panel.state.geometry_metadata = metadata
+        ctx.panel.state.geometry_active = max(0, len(quads) - 1)
+
+        try:
+            image = Image.open(sample.filepath)
+            width, height = image.size
+            display_h = 620
+            display_w = max(320, round(display_h * width / height))
+            ctx.panel.state.geometry_bg = _data_uri(
+                image.resize((display_w, display_h)), quality=82
+            )
+        except Exception:
+            ctx.panel.state.geometry_status = "Could not load the source frame."
+        self._update_plot(ctx)
+
+    def _write_quads(self, ctx):
+        import fiftyone as fo
+
+        sample = ctx.dataset[ctx.current_sample]
+        quads = ctx.panel.get_state("geometry_quads") or []
+        sample["manual_quad"] = fo.Polylines(
+            polylines=[
+                fo.Polyline(
+                    label="card",
+                    points=[[tuple(map(float, point)) for point in quad]],
+                    closed=True,
+                    filled=False,
+                )
+                for quad in quads
+            ]
+        )
+        sample.save()
+        _journal(sample)
+
+    def _update_plot(self, ctx):
+        self._update_zoom(ctx)
+        margin = self.MARGIN
+        steps = self.GRID_STEPS
+        grid = [-margin + i * (1 + 2 * margin) / (steps - 1) for i in range(steps)]
+        traces = [
+            {
+                "type": "heatmap",
+                "z": [[0] * steps for _ in range(steps)],
+                "x": grid,
+                "y": grid,
+                "opacity": 0.03,
+                "showscale": False,
+                "hoverinfo": "none",
+                "colorscale": [[0, "#000000"], [1, "#000000"]],
+            }
+        ]
+        quads = ctx.panel.get_state("geometry_quads") or []
+        active = int(ctx.panel.get_state("geometry_active") or 0)
+        for index, quad in enumerate(quads):
+            points = quad + [quad[0]]
+            selected = index == active
+            traces.append(
+                {
+                    "type": "scatter",
+                    "x": [point[0] for point in points],
+                    "y": [point[1] for point in points],
+                    "mode": "lines+markers+text" if selected else "lines+markers",
+                    "marker": {
+                        "size": 12 if selected else 7,
+                        "color": "#34c759" if selected else "#4da3ff",
+                    },
+                    "line": {
+                        "width": 3 if selected else 1.5,
+                        "color": "#34c759" if selected else "#4da3ff",
+                    },
+                    "text": list(CORNER_NAMES) + [""],
+                    "textposition": "top center",
+                    "hoverinfo": "none",
+                    "name": f"Card {index + 1}",
+                }
+            )
+        mode = ctx.panel.get_state("geometry_mode") or "idle"
+        if quads and mode == "move":
+            active = int(ctx.panel.get_state("geometry_active") or 0)
+            corner = int(ctx.panel.get_state("geometry_corner") or 0)
+            x, y = quads[active][corner]
+            traces.append(
+                {
+                    "type": "scatter",
+                    "x": [x],
+                    "y": [y],
+                    "mode": "markers+text",
+                    "marker": {
+                        "size": 18,
+                        "color": "#ff9f0a",
+                        "line": {"color": "#ffffff", "width": 2},
+                    },
+                    "text": [f"EDIT {CORNER_NAMES[corner]}"],
+                    "textposition": "bottom center",
+                    "hoverinfo": "none",
+                    "showlegend": False,
+                }
+            )
+        draft = ctx.panel.get_state("geometry_draft") or []
+        if draft:
+            traces.append(
+                {
+                    "type": "scatter",
+                    "x": [point[0] for point in draft],
+                    "y": [point[1] for point in draft],
+                    "mode": "lines+markers+text",
+                    "marker": {"size": 12, "color": "#ff9f0a"},
+                    "line": {"width": 2, "color": "#ff9f0a", "dash": "dot"},
+                    "text": list(CORNER_NAMES[: len(draft)]),
+                    "textposition": "top center",
+                    "hoverinfo": "none",
+                    "name": "New card",
+                }
+            )
+        bounds = ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1]
+        left, top, right, bottom = [float(value) for value in bounds]
+        quads = ctx.panel.get_state("geometry_quads") or []
+        if quads:
+            active = int(ctx.panel.get_state("geometry_active") or 0)
+            corner = int(ctx.panel.get_state("geometry_corner") or 0)
+            x, y = quads[active][corner]
+            x_span = right - left
+            y_span = bottom - top
+            traces.extend(
+                [
+                    {
+                        "type": "heatmap",
+                        "z": [[0, 0], [0, 0]],
+                        "x": [left, right],
+                        "y": [top, bottom],
+                        "opacity": 0.01,
+                        "showscale": False,
+                        "hoverinfo": "none",
+                        "colorscale": [[0, "#000000"], [1, "#000000"]],
+                        "xaxis": "x2",
+                        "yaxis": "y2",
+                    },
+                    {
+                        "type": "scatter",
+                        "x": [x - 0.08 * x_span, x + 0.08 * x_span, None, x, x],
+                        "y": [y, y, None, y - 0.08 * y_span, y + 0.08 * y_span],
+                        "mode": "lines",
+                        "line": {"color": "#ff453a", "width": 2},
+                        "hoverinfo": "none",
+                        "showlegend": False,
+                        "xaxis": "x2",
+                        "yaxis": "y2",
+                    },
+                    {
+                        "type": "scatter",
+                        "x": [x],
+                        "y": [y],
+                        "mode": "markers",
+                        "marker": {
+                            "size": 12,
+                            "color": "rgba(0,0,0,0)",
+                            "line": {"color": "#ff453a", "width": 2},
+                        },
+                        "hoverinfo": "none",
+                        "showlegend": False,
+                        "xaxis": "x2",
+                        "yaxis": "y2",
+                    },
+                ]
+            )
+        ctx.panel.set_state("geometry_plot", traces)
+
+    def _update_zoom(self, ctx):
+        """Render a lossless source-pixel patch around the selected corner."""
+        from PIL import Image
+
+        quads = ctx.panel.get_state("geometry_quads") or []
+        if not quads or not ctx.current_sample:
+            ctx.panel.state.geometry_zoom_bg = None
+            return
+        active = int(ctx.panel.get_state("geometry_active") or 0)
+        corner = int(ctx.panel.get_state("geometry_corner") or 0)
+        x, y = quads[active][corner]
+        try:
+            sample = ctx.dataset[ctx.current_sample]
+            image = Image.open(sample.filepath).convert("RGB")
+            width, height = image.size
+            center_x = float(x) * width
+            center_y = float(y) * height
+            radius = max(48, round(min(width, height) * 0.045))
+            crop_box = (
+                round(center_x - radius),
+                round(center_y - radius),
+                round(center_x + radius),
+                round(center_y + radius),
+            )
+            patch = image.crop(crop_box).resize((300, 300), Image.Resampling.NEAREST)
+            ctx.panel.state.geometry_zoom_bg = _png_data_uri(patch)
+            ctx.panel.state.geometry_zoom_bounds = [
+                crop_box[0] / width,
+                crop_box[1] / height,
+                crop_box[2] / width,
+                crop_box[3] / height,
+            ]
+            ctx.panel.state.geometry_zoom_label = (
+                f"Magnifier · Card {active + 1} {CORNER_NAMES[corner]} · "
+                f"({center_x:.1f}, {center_y:.1f}) px"
+            )
+        except Exception:
+            ctx.panel.state.geometry_zoom_bg = None
+            ctx.panel.state.geometry_zoom_label = "Magnifier unavailable"
+
+    def on_select_card(self, ctx):
+        ctx.panel.state.geometry_active = int(ctx.params["card_index"])
+        ctx.panel.state.geometry_mode = "idle"
+        ctx.panel.state.geometry_draft = []
+        ctx.panel.state.geometry_status = ""
+        self._update_plot(ctx)
+
+    def on_add_card(self, ctx):
+        ctx.panel.state.geometry_mode = "add"
+        ctx.panel.state.geometry_draft = []
+        ctx.panel.state.geometry_status = (
+            "Click TL → TR → BR → BL. The pale margin accepts outside-frame corners."
+        )
+        self._update_plot(ctx)
+
+    def on_cancel_edit(self, ctx):
+        ctx.panel.state.geometry_mode = "idle"
+        ctx.panel.state.geometry_draft = []
+        ctx.panel.state.geometry_status = "Edit cancelled."
+        self._update_plot(ctx)
+
+    def on_choose_corner(self, ctx):
+        ctx.panel.state.geometry_corner = int(ctx.params["corner_index"])
+        ctx.panel.state.geometry_mode = "move"
+        name = CORNER_NAMES[int(ctx.params["corner_index"])]
+        ctx.panel.state.geometry_status = (
+            f"{name} selected. Click the full image for a rough move or the "
+            "magnifier for pixel-level placement; repeat until exact."
+        )
+        self._update_plot(ctx)
+
+    def on_plot_click(self, ctx):
+        x = ctx.params.get("x")
+        y = ctx.params.get("y")
+        if x is None or y is None:
+            return
+        point = [float(x), float(y)]
+        mode = ctx.panel.get_state("geometry_mode") or "idle"
+        quads = ctx.panel.get_state("geometry_quads") or []
+        handle = _nearest_corner(quads, point[0], point[1])
+        if mode == "idle":
+            if handle is None:
+                ctx.panel.state.geometry_status = (
+                    "Click close to a named corner dot on this right-hand canvas."
+                )
+                return
+            active, corner = handle
+            ctx.panel.state.geometry_active = active
+            ctx.panel.state.geometry_corner = corner
+            ctx.panel.state.geometry_mode = "move"
+            ctx.panel.state.geometry_status = (
+                f"Card {active + 1} {CORNER_NAMES[corner]} selected. Now click "
+                "the magnifier to place it precisely."
+            )
+            self._update_plot(ctx)
+            return
+        if mode == "add":
+            draft = [list(item) for item in ctx.panel.get_state("geometry_draft") or []]
+            draft.append(point)
+            if len(draft) < 4:
+                ctx.panel.state.geometry_draft = draft
+                ctx.panel.state.geometry_status = (
+                    f"{len(draft)}/4 placed — next: {CORNER_NAMES[len(draft)]}"
+                )
+                self._update_plot(ctx)
+                return
+            error = _quad_validation_error(draft)
+            if error:
+                ctx.panel.state.geometry_draft = []
+                ctx.panel.state.geometry_status = f"Not saved: {error}. Try that card again."
+                self._update_plot(ctx)
+                return
+            quads = [list(item) for item in ctx.panel.get_state("geometry_quads") or []]
+            quads.append(draft)
+            sample = ctx.dataset[ctx.current_sample]
+            metadata = list(ctx.panel.get_state("geometry_metadata") or [])
+            metadata.extend(
+                _default_geometry_metadata(sample.get_field("key"), [draft])
+            )
+            metadata[-1]["physicalCardId"] = (
+                f"{sample.get_field('key')}:card-{len(quads) - 1}"
+            )
+            metadata[-1]["occlusionOrder"] = len(quads) - 1
+            ctx.panel.state.geometry_quads = quads
+            ctx.panel.state.geometry_metadata = metadata
+            ctx.panel.state.geometry_active = len(quads) - 1
+            ctx.panel.state.geometry_mode = "idle"
+            ctx.panel.state.geometry_draft = []
+            ctx.panel.state.geometry_status = f"Card {len(quads)} saved."
+            self._write_quads(ctx)
+            self._update_plot(ctx)
+            return
+        if mode == "move":
+            active = int(ctx.panel.get_state("geometry_active") or 0)
+            corner = int(ctx.panel.get_state("geometry_corner") or 0)
+            if handle is not None and handle != (active, corner):
+                active, corner = handle
+                ctx.panel.state.geometry_active = active
+                ctx.panel.state.geometry_corner = corner
+                ctx.panel.state.geometry_status = (
+                    f"Card {active + 1} {CORNER_NAMES[corner]} selected. Now "
+                    "click the magnifier to place it precisely."
+                )
+                self._update_plot(ctx)
+                return
+            quads = [
+                [list(point) for point in quad]
+                for quad in ctx.panel.get_state("geometry_quads") or []
+            ]
+            if not quads:
+                return
+            old = quads[active][corner]
+            quads[active][corner] = point
+            error = _quad_validation_error(quads[active])
+            if error:
+                quads[active][corner] = old
+                ctx.panel.state.geometry_status = f"Move rejected: {error}."
+            else:
+                ctx.panel.state.geometry_quads = quads
+                metadata = list(ctx.panel.get_state("geometry_metadata") or [])
+                metadata[active]["cornerVisibility"][corner] = (
+                    "visible"
+                    if 0 <= point[0] <= 1 and 0 <= point[1] <= 1
+                    else "outsideFrame"
+                )
+                ctx.panel.state.geometry_metadata = metadata
+                ctx.panel.state.geometry_status = (
+                    f"Card {active + 1} {CORNER_NAMES[corner]} moved and saved."
+                )
+                self._write_quads(ctx)
+            # Keep the same corner active so repeated clicks in the magnifier
+            # can refine placement without re-selecting the handle.
+            ctx.panel.state.geometry_mode = "move"
+            self._update_plot(ctx)
+
+    def on_delete_card(self, ctx):
+        quads = list(ctx.panel.get_state("geometry_quads") or [])
+        if not quads:
+            return
+        active = int(ctx.panel.get_state("geometry_active") or 0)
+        del quads[active]
+        metadata = list(ctx.panel.get_state("geometry_metadata") or [])
+        del metadata[active]
+        for index, item in enumerate(metadata):
+            item["occlusionOrder"] = index
+        ctx.panel.state.geometry_quads = quads
+        ctx.panel.state.geometry_metadata = metadata
+        ctx.panel.state.geometry_active = max(0, min(active, len(quads) - 1))
+        ctx.panel.state.geometry_status = "Card deleted."
+        self._write_quads(ctx)
+        self._update_plot(ctx)
+
+    def on_set_side(self, ctx):
+        metadata = list(ctx.panel.get_state("geometry_metadata") or [])
+        if not metadata:
+            return
+        active = int(ctx.panel.get_state("geometry_active") or 0)
+        metadata[active]["side"] = ctx.params["side"]
+        ctx.panel.state.geometry_metadata = metadata
+
+    def on_toggle_orientation(self, ctx):
+        metadata = list(ctx.panel.get_state("geometry_metadata") or [])
+        if not metadata:
+            return
+        active = int(ctx.panel.get_state("geometry_active") or 0)
+        metadata[active]["orientationKnown"] = not bool(
+            metadata[active]["orientationKnown"]
+        )
+        ctx.panel.state.geometry_metadata = metadata
+
+    def on_cycle_visibility(self, ctx):
+        metadata = list(ctx.panel.get_state("geometry_metadata") or [])
+        if not metadata:
+            return
+        active = int(ctx.panel.get_state("geometry_active") or 0)
+        corner = int(ctx.params["corner_index"])
+        current = metadata[active]["cornerVisibility"][corner]
+        next_index = (CORNER_VISIBILITIES.index(current) + 1) % len(
+            CORNER_VISIBILITIES
+        )
+        metadata[active]["cornerVisibility"][corner] = CORNER_VISIBILITIES[next_index]
+        ctx.panel.state.geometry_metadata = metadata
+
+    def on_save_page(self, ctx):
+        import json
+
+        import fiftyone as fo
+
+        quads = ctx.panel.get_state("geometry_quads") or []
+        if not quads:
+            ctx.panel.state.geometry_status = "Add at least one card before saving."
+            return
+        sample = ctx.dataset[ctx.current_sample]
+        metadata = ctx.panel.get_state("geometry_metadata") or []
+        scene_slice = (
+            "binder_page"
+            if sample.get_field("frame_type") == "binder"
+            else "single_handheld"
+        )
+        record = _geometry_record(
+            sample.get_field("key"),
+            sample.get_field("game"),
+            scene_slice,
+            quads,
+            metadata,
+        )
+        # Re-persist through the panel writer so any reverse-winding polygons
+        # created by FiftyOne's generic canvas become canonical TL/TR/BR/BL.
+        self._write_quads(ctx)
+        if not ctx.dataset.has_sample_field("manual_instances_json"):
+            ctx.dataset.add_sample_field("manual_instances_json", fo.StringField)
+        sample["manual_instances_json"] = json.dumps(record, sort_keys=True)
+        sample.save()
+        _journal(sample)
+        ctx.panel.state.geometry_status = (
+            f"Saved {len(quads)} cards to manual_instances_json."
+        )
+
+    def render(self, ctx):
+        panel = types.Object()
+        quads = ctx.panel.get_state("geometry_quads") or []
+        active = int(ctx.panel.get_state("geometry_active") or 0)
+        mode = ctx.panel.get_state("geometry_mode") or "idle"
+        panel.md(
+            "### Ordered card corners\n"
+            "**Edit on this right-hand canvas, not the left Sample pane.** "
+            "Click a named corner dot once to select it, then click in the "
+            "magnifier to place it. New cards use **TL → TR → BR → BL** order. "
+            "The pale border is a 20% "
+            "amodal margin; corners placed there are saved as `outsideFrame`.",
+            name="geometry_help",
+        )
+        panel.plot(
+            "geometry_plot",
+            layout={
+                "images": [
+                    {
+                        "source": ctx.panel.get_state("geometry_bg"),
+                        "xref": "x",
+                        "yref": "y",
+                        "x": 0,
+                        "y": 0,
+                        "sizex": 1,
+                        "sizey": 1,
+                        "xanchor": "left",
+                        "yanchor": "top",
+                        "sizing": "stretch",
+                        "layer": "below",
+                    },
+                    {
+                        "source": ctx.panel.get_state("geometry_zoom_bg"),
+                        "xref": "x2",
+                        "yref": "y2",
+                        "x": (
+                            ctx.panel.get_state("geometry_zoom_bounds")
+                            or [0, 0, 1, 1]
+                        )[0],
+                        "y": (
+                            ctx.panel.get_state("geometry_zoom_bounds")
+                            or [0, 0, 1, 1]
+                        )[1],
+                        "sizex": (
+                            (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[2]
+                            - (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[0]
+                        ),
+                        "sizey": (
+                            (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[3]
+                            - (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[1]
+                        ),
+                        "xanchor": "left",
+                        "yanchor": "top",
+                        "sizing": "stretch",
+                        "layer": "below",
+                    },
+                ],
+                "xaxis": {
+                    "range": [-self.MARGIN, 1 + self.MARGIN],
+                    "domain": [0, 0.64],
+                    "visible": False,
+                    "fixedrange": True,
+                },
+                "yaxis": {
+                    "range": [1 + self.MARGIN, -self.MARGIN],
+                    "domain": [0, 1],
+                    "visible": False,
+                    "fixedrange": True,
+                },
+                "xaxis2": {
+                    "range": [
+                        (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[0],
+                        (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[2],
+                    ],
+                    "domain": [0.70, 0.99],
+                    "visible": False,
+                    "fixedrange": True,
+                },
+                "yaxis2": {
+                    "range": [
+                        (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[3],
+                        (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[1],
+                    ],
+                    "domain": [0.64, 0.95],
+                    "visible": False,
+                    "fixedrange": True,
+                },
+                "shapes": [
+                    {
+                        "type": "rect",
+                        "x0": 0,
+                        "y0": 0,
+                        "x1": 1,
+                        "y1": 1,
+                        "line": {"color": "#888888", "width": 1, "dash": "dot"},
+                    },
+                    {
+                        "type": "rect",
+                        "xref": "x2",
+                        "yref": "y2",
+                        "x0": (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[0],
+                        "y0": (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[1],
+                        "x1": (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[2],
+                        "y1": (ctx.panel.get_state("geometry_zoom_bounds") or [0, 0, 1, 1])[3],
+                        "line": {"color": "#ff9f0a", "width": 2},
+                    },
+                ],
+                "annotations": [
+                    {
+                        "xref": "paper",
+                        "yref": "paper",
+                        "x": 0.32,
+                        "y": 1.0,
+                        "text": "EDIT HERE · click a corner dot",
+                        "showarrow": False,
+                        "font": {"size": 12, "color": "#ff9f0a"},
+                        "xanchor": "center",
+                    },
+                    {
+                        "xref": "paper",
+                        "yref": "paper",
+                        "x": 0.845,
+                        "y": 0.99,
+                        "text": ctx.panel.get_state("geometry_zoom_label") or "Magnifier",
+                        "showarrow": False,
+                        "font": {"size": 11, "color": "#ffffff"},
+                        "xanchor": "center",
+                    }
+                ],
+                "width": ctx.panel.get_state("geometry_w") or 520,
+                "height": ctx.panel.get_state("geometry_h") or 620,
+                "margin": {"l": 0, "r": 0, "t": 0, "b": 0},
+                "showlegend": False,
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+            },
+            config={"displayModeBar": False, "scrollZoom": False},
+            on_click=self.on_plot_click,
+        )
+
+        if quads:
+            cards = types.Object()
+            for index in range(len(quads)):
+                cards.btn(
+                    f"card_{index}",
+                    label=("● " if index == active else "") + str(index + 1),
+                    on_click=self.on_select_card,
+                    params={"card_index": index},
+                    variant="contained" if index == active else "outlined",
+                )
+            panel.define_property(
+                "geometry_cards",
+                cards,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+
+        actions = types.Object()
+        actions.btn(
+            "add",
+            label="Cancel new card" if mode == "add" else "+ Add card",
+            on_click=self.on_cancel_edit if mode == "add" else self.on_add_card,
+            variant="contained" if mode == "add" else "outlined",
+        )
+        actions.btn(
+            "delete",
+            label="Delete active card",
+            on_click=self.on_delete_card,
+            disabled=not bool(quads),
+            variant="outlined",
+        )
+        actions.btn(
+            "save",
+            label=f"Save page ({len(quads)} cards)",
+            on_click=self.on_save_page,
+            disabled=not bool(quads),
+            variant="contained",
+        )
+        panel.define_property(
+            "geometry_actions",
+            actions,
+            view=types.GridView(orientation="horizontal", gap=1),
+        )
+
+        if quads:
+            panel.md(
+                f"**Card {active + 1}** — move one ordered corner:",
+                name="active_card_label",
+            )
+            corners = types.Object()
+            for index, name in enumerate(CORNER_NAMES):
+                selected = mode == "move" and (
+                    int(ctx.panel.get_state("geometry_corner") or 0) == index
+                )
+                corners.btn(
+                    f"corner_{index}",
+                    label=("● " if selected else "") + name,
+                    on_click=self.on_choose_corner,
+                    params={"corner_index": index},
+                    variant="contained" if selected else "outlined",
+                )
+            panel.define_property(
+                "geometry_corners",
+                corners,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+
+            metadata = (ctx.panel.get_state("geometry_metadata") or [])[active]
+            sides = types.Object()
+            for side in ("faceUp", "faceDown", "unknown"):
+                sides.btn(
+                    side,
+                    label=("● " if metadata["side"] == side else "") + side,
+                    on_click=self.on_set_side,
+                    params={"side": side},
+                    variant="contained" if metadata["side"] == side else "outlined",
+                )
+            sides.btn(
+                "orientation",
+                label=("● " if metadata["orientationKnown"] else "○ ")
+                + "orientation known",
+                on_click=self.on_toggle_orientation,
+                variant="contained" if metadata["orientationKnown"] else "outlined",
+            )
+            panel.define_property(
+                "geometry_side",
+                sides,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+            visibility = types.Object()
+            for index, name in enumerate(CORNER_NAMES):
+                value = metadata["cornerVisibility"][index]
+                visibility.btn(
+                    f"visibility_{index}",
+                    label=f"{name}: {value}",
+                    on_click=self.on_cycle_visibility,
+                    params={"corner_index": index},
+                    variant="outlined",
+                )
+            panel.define_property(
+                "geometry_visibility",
+                visibility,
+                view=types.GridView(orientation="horizontal", gap=1),
+            )
+
+        status = ctx.panel.get_state("geometry_status") or ""
+        if status:
+            panel.md(status, name="geometry_status")
+        return types.Property(
+            panel,
+            view=types.GridView(gap=2, align_x="left", orientation="vertical"),
+        )
+
+
 class ApplyCardVerdict(foo.Operator):
     """Grid-selection fallback if the modal panel misbehaves."""
 
@@ -2641,18 +3408,7 @@ class SaveManualCardGeometry(foo.Operator):
 
     @staticmethod
     def _quads(sample):
-        try:
-            lines = sample["manual_quad"].polylines
-        except Exception:
-            return []
-        result = []
-        for line in lines:
-            points = line.points[0] if line.points else []
-            if len(points) == 5 and points[0] == points[-1]:
-                points = points[:-1]
-            if len(points) == 4:
-                result.append([[float(x), float(y)] for x, y in points])
-        return result
+        return _manual_quads(sample)
 
     def resolve_input(self, ctx):
         inputs = types.Object()
@@ -2782,5 +3538,6 @@ class SaveManualCardGeometry(foo.Operator):
 
 def register(p):
     p.register(CardVerdictPanel)
+    p.register(CardGeometryPanel)
     p.register(ApplyCardVerdict)
     p.register(SaveManualCardGeometry)

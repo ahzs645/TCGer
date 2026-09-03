@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TCGer Corner Editor</title>
+    <link rel="stylesheet" href="/editor.css" />
+  </head>
+  <body>
+    <header>
+      <div><h1>Card corner editor</h1><p>Drag a named corner. The magnifier follows it live.</p></div>
+      <div class="sample-nav"><button id="previous">←</button><select id="sample"></select><button id="next">→</button></div>
+    </header>
+    <main>
+      <section class="workspace">
+        <div class="canvas-shell"><canvas id="editor" aria-label="Draggable card corner editor"></canvas><div id="drag-hint">Grab a corner dot and drag</div></div>
+        <aside>
+          <div class="magnifier-title"><strong id="selection">Select a corner</strong><span id="coordinates"></span></div>
+          <canvas id="magnifier" width="360" height="360"></canvas>
+          <label class="zoom-control">Zoom window <input id="zoom" type="range" min="24" max="160" value="64" /></label>
+          <p class="tip">Press and hold a dot, then move your pointer. Release to save that corner.</p>
+        </aside>
+      </section>
+      <section class="controls">
+        <div id="cards" class="button-row"></div>
+        <div class="button-row"><button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="save" class="primary">Save page</button></div>
+        <div id="metadata" class="metadata"></div>
+      </section>
+    </main>
+    <footer><span id="status">Loading…</span><span id="minimum-progress"></span><span id="page-count"></span></footer>
+    <script src="/editor.js"></script>
+  </body>
+</html>

@@ -143,13 +143,30 @@ synthetic parts without rewriting record bytes, rejects duplicate paths and
 synthetic test records, and binds the exact approved policy as a
 `training`-purpose release.
 
-For a binder frame in FiftyOne, draw one four-point `manual_quad` polyline per
-card, then run **Save multi-card geometry** from the operator menu. Its form
-collects each card's physical id, occlusion order, side (including
-`faceDown`), orientation status, and four visibility states. It persists the
-validated payload in `manual_instances_json`; `backup_labels.py` captures that
-field and the real-release adapter consumes it directly. A nine-card page does
-not require hand-editing JSON.
+For a binder frame in FiftyOne, open the **Card Geometry** modal panel. Add
+cards in TL/TR/BR/BL order or select an existing card and move one named
+corner. A lossless source-pixel magnifier beside the page provides a crosshair
+and exact pixel coordinates for repeated fine adjustment. The panel includes a
+20% margin around the capture for amodal corners,
+repairs the reverse winding produced by FiftyOne's generic polyline canvas,
+and exposes side, orientation, and per-corner visibility before **Save page**.
+It writes the canonical `manual_quad` field and the validated
+`manual_instances_json` payload; `backup_labels.py` captures both and the
+real-release adapter consumes the durable payload directly. The generic
+polyline editor plus **Save multi-card geometry** remains a fallback.
+
+FiftyOne's Python panel exposes discrete click events but not continuous
+pointer movement. For press-drag-release editing with a magnifier that follows
+the corner live, start the browser-side companion editor:
+
+```bash
+/Users/ahmadjalil/.venvs/tcger-label/bin/python \
+  tools/card-geometry/corner_editor_server.py
+```
+
+Open `http://127.0.0.1:5152`. It loads the `geometry: binder first batch`
+saved view by default, writes to the same `manual_quad` field and append-only
+journal on every release, and updates `manual_instances_json` on **Save page**.
 
 ## Geometry benchmark
 
