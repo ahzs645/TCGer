@@ -245,6 +245,39 @@ class PreflightTests(unittest.TestCase):
             {"train": 2, "validation": 0, "test": 1},
         )
 
+    def test_scene_slice_minimum_cannot_be_filled_by_maskfit_only_truth(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "slice-metric"
+            shutil.copytree(RELEASES_DIR / "valid-fixture", release)
+            policy_path = release / "policy.json"
+            policy = load_json(policy_path)
+            policy["requiredSceneSlices"] = [
+                {
+                    "sceneSlice": "single_handheld",
+                    "split": "validation",
+                    "minimumInstances": 1,
+                    "minimumMetricEligibleInstances": 1,
+                }
+            ]
+            write_json(policy_path, policy)
+            manifest_path = release / "manifest.json"
+            manifest = load_json(manifest_path)
+            manifest["readiness"]["readinessPolicySha256"] = sha256_file(policy_path)
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(manifest_path, manifest)
+
+            report = run_preflight(release, tooling_revision="test")
+            readiness = next(
+                check
+                for check in report["checks"]
+                if check["code"] == "READINESS_MINIMUMS"
+            )
+            self.assertEqual(report["failedChecks"], ["READINESS_MINIMUMS"])
+            self.assertIn(
+                "validation/single_handheld: 0 metric-eligible instances < 1",
+                readiness["details"]["shortfalls"],
+            )
+
     def test_source_archive_is_a_cross_split_leakage_key(self):
         report = self.run_release("invalid-source-archive-leakage")
         self.assertEqual(report["failedChecks"], ["LEAKAGE_DISJOINT"])

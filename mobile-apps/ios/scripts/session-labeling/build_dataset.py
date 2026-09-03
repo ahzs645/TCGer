@@ -349,6 +349,7 @@ def main():
             has_rerun = existing.has_sample_field("rerun_top5_json")
             has_rescan = existing.has_sample_field("binder_rerun_json")
             has_binder_labels = existing.has_sample_field("binder_labels_json")
+            has_manual_instances = existing.has_sample_field("manual_instances_json")
             keep = F("verdict") != None
             if has_rescan:
                 # Binder pages carry re-scans without ever having a verdict.
@@ -356,6 +357,8 @@ def main():
             if has_binder_labels:
                 # Per-pocket judgments are separate from page-level verdicts.
                 keep = keep | (F("binder_labels_json") != None)
+            if has_manual_instances:
+                keep = keep | (F("manual_instances_json") != None)
             for s in existing.match(keep).iter_samples():
                 saved_verdicts[s["key"]] = (
                     s["verdict"], s["corrected_card_id"],
@@ -364,6 +367,7 @@ def main():
                     s["rerun_top5_json"] if has_rerun else None,
                     s["binder_rerun_json"] if has_rescan else None,
                     s["binder_labels_json"] if has_binder_labels else None,
+                    s["manual_instances_json"] if has_manual_instances else None,
                 )
         if saved_verdicts:
             print(f"carrying {len(saved_verdicts)} applied verdicts across the rebuild")
@@ -452,13 +456,14 @@ def main():
                 ),
                 binder_pockets_json=json.dumps(pockets) if pockets else None,
                 n_pockets=len(pockets) if pockets else None,
-                verdict=saved_verdicts.get(key, (None,) * 7)[0],
-                corrected_card_id=saved_verdicts.get(key, (None,) * 7)[1],
-                fixed_quad_json=saved_verdicts.get(key, (None,) * 7)[2],
-                fixed_quad_source=saved_verdicts.get(key, (None,) * 7)[3],
-                rerun_top5_json=saved_verdicts.get(key, (None,) * 7)[4],
-                binder_rerun_json=saved_verdicts.get(key, (None,) * 7)[5],
-                binder_labels_json=saved_verdicts.get(key, (None,) * 7)[6],
+                verdict=saved_verdicts.get(key, (None,) * 8)[0],
+                corrected_card_id=saved_verdicts.get(key, (None,) * 8)[1],
+                fixed_quad_json=saved_verdicts.get(key, (None,) * 8)[2],
+                fixed_quad_source=saved_verdicts.get(key, (None,) * 8)[3],
+                rerun_top5_json=saved_verdicts.get(key, (None,) * 8)[4],
+                binder_rerun_json=saved_verdicts.get(key, (None,) * 8)[5],
+                binder_labels_json=saved_verdicts.get(key, (None,) * 8)[6],
+                manual_instances_json=saved_verdicts.get(key, (None,) * 8)[7],
             )
             if key in saved_verdicts and saved_verdicts[key][0] is not None:
                 sample.tags.append("verdict-applied")
@@ -484,6 +489,7 @@ def main():
     dataset.add_sample_field("rerun_top5_json", fo.StringField)
     dataset.add_sample_field("binder_rerun_json", fo.StringField)
     dataset.add_sample_field("binder_labels_json", fo.StringField)
+    dataset.add_sample_field("manual_instances_json", fo.StringField)
     dataset.info["sessions_dir"] = str(sessions_dir)
     dataset.info["card_cache_dir"] = str(cache_dir)
     dataset.info["labeling_state_dir"] = str(

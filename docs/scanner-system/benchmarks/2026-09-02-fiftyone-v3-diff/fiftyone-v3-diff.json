@@ -251,39 +251,55 @@
       "test:single_card_archive": 4,
       "test:single_handheld": 57
     },
-    "policyId": "training-minimums-v1",
+    "policyId": "training-minimums-v2",
     "policyStatus": "approved",
     "realEvaluationSessionShortfall": 0,
     "realEvaluationSessions": 7,
     "requiredSceneSlices": [
       {
         "actualInstances": 57,
+        "actualMetricEligibleInstances": 57,
+        "meetsMetricEligibleMinimum": true,
         "meetsMinimum": true,
+        "metricEligibleShortfall": 0,
         "minimumInstances": 50,
+        "minimumMetricEligibleInstances": 50,
         "sceneSlice": "single_handheld",
         "shortfall": 0,
         "split": "test"
       },
       {
         "actualInstances": 0,
+        "actualMetricEligibleInstances": 0,
+        "meetsMetricEligibleMinimum": false,
         "meetsMinimum": false,
+        "metricEligibleShortfall": 20,
         "minimumInstances": 20,
+        "minimumMetricEligibleInstances": 20,
         "sceneSlice": "steep_playmat",
         "shortfall": 20,
         "split": "test"
       },
       {
         "actualInstances": 0,
+        "actualMetricEligibleInstances": 0,
+        "meetsMetricEligibleMinimum": false,
         "meetsMinimum": false,
+        "metricEligibleShortfall": 30,
         "minimumInstances": 30,
+        "minimumMetricEligibleInstances": 30,
         "sceneSlice": "duel_field",
         "shortfall": 30,
         "split": "test"
       },
       {
         "actualInstances": 0,
+        "actualMetricEligibleInstances": 0,
+        "meetsMetricEligibleMinimum": false,
         "meetsMinimum": false,
+        "metricEligibleShortfall": 20,
         "minimumInstances": 20,
+        "minimumMetricEligibleInstances": 20,
         "sceneSlice": "binder_page",
         "shortfall": 20,
         "split": "test"

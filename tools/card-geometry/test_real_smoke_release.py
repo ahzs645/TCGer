@@ -346,13 +346,22 @@ class RealReleaseAdapterTests(unittest.TestCase):
                                         "instanceId": f"card-{index}",
                                         "physicalCardId": f"binder-card-{index}",
                                         "corners": [
-                                            [0.1 + index * 0.4, 0.1],
-                                            [0.4 + index * 0.4, 0.1],
-                                            [0.4 + index * 0.4, 0.9],
-                                            [0.1 + index * 0.4, 0.9],
+                                            [0.05 + (index % 3) * 0.31, 0.05 + (index // 3) * 0.31],
+                                            [0.30 + (index % 3) * 0.31, 0.05 + (index // 3) * 0.31],
+                                            [0.30 + (index % 3) * 0.31, 0.30 + (index // 3) * 0.31],
+                                            [0.05 + (index % 3) * 0.31, 0.30 + (index // 3) * 0.31],
                                         ],
+                                        "cornerVisibility": [
+                                            "occluded" if index == 8 else "visible",
+                                            "visible",
+                                            "visible",
+                                            "visible",
+                                        ],
+                                        "occlusionOrder": index,
+                                        "orientationKnown": True,
+                                        "side": "faceDown" if index == 8 else "faceUp",
                                     }
-                                    for index in range(2)
+                                    for index in range(9)
                                 ],
                             }
                         ],
@@ -376,12 +385,79 @@ class RealReleaseAdapterTests(unittest.TestCase):
             )
             record = load_json(output / entry["path"])
             self.assertEqual(entry["sceneSlice"], "binder_page")
-            self.assertEqual(len(record["instances"]), 2)
+            self.assertEqual(len(record["instances"]), 9)
             self.assertEqual(
                 {corner["cornerSource"] for item in record["instances"] for corner in item["corners"]},
                 {"human"},
             )
-            self.assertEqual(summary["stats"]["devmodeMultiInstanceCards"], 2)
+            self.assertEqual(record["instances"][-1]["side"], "faceDown")
+            self.assertEqual(
+                record["instances"][-1]["corners"][0]["visibility"], "occluded"
+            )
+            self.assertEqual(record["instances"][-1]["occlusionOrder"], 8)
+            self.assertEqual(summary["stats"]["devmodeMultiInstanceCards"], 9)
+            self.assertEqual(summary["stats"]["devmodeMultiInstanceFaceDown"], 1)
+            self.assertEqual(
+                summary["stats"]["devmodeMultiInstanceOccludedCorners"], 1
+            )
+
+    def test_fiftyone_backup_carries_saved_multi_card_geometry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, image = self._canonical_source(root)
+            sessions_root = root / "sessions"
+            session = sessions_root / "scan-session-20260902-binder-backup"
+            session.mkdir(parents=True)
+            (session / "frame.png").write_bytes(image)
+            frame = {
+                "key": f"{session.name}/frame.png",
+                "sceneSlice": "binder_page",
+                "game": "pokemon",
+                "instances": [
+                    {
+                        "instanceId": "card-0",
+                        "physicalCardId": "binder-card-0",
+                        "corners": [[0.1, 0.1], [0.4, 0.1], [0.4, 0.8], [0.1, 0.8]],
+                        "cornerVisibility": ["visible"] * 4,
+                        "occlusionOrder": 0,
+                        "orientationKnown": True,
+                        "side": "faceDown",
+                    }
+                ],
+            }
+            backup = root / "labels.json"
+            backup.write_text(
+                json.dumps(
+                    [
+                        {
+                            "key": frame["key"],
+                            "manual_instances_json": json.dumps(frame),
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = root / "release"
+            summary = build_release(
+                canonical_corpus=corpus,
+                raw_dir=raw,
+                archive_splits={"annotations.v7i.coco-segmentation.zip": "test"},
+                devmode_sessions=[],
+                output=output,
+                devmode_label_backups=[backup],
+                devmode_sessions_root=sessions_root,
+            )
+            self.assertEqual(summary["stats"]["devmodeBackupMultiInstanceRecords"], 1)
+            manifest = load_json(output / "manifest.json")
+            record = load_json(
+                output
+                / next(
+                    entry["path"]
+                    for entry in manifest["records"]
+                    if entry["recordId"].startswith("devmode-multi-")
+                )
+            )
+            self.assertEqual(record["instances"][0]["side"], "faceDown")
 
 
 if __name__ == "__main__":

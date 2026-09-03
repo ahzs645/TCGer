@@ -747,6 +747,7 @@ def check_readiness(ctx: Context) -> None:
     instances_per_split: Counter = Counter()
     metric_eligible_instances_per_split: Counter = Counter()
     slice_instances: Counter = Counter()
+    slice_metric_eligible_instances: Counter = Counter()
     test_real_sessions: set[str] = set()
     for entry, record in _entries_with_records(ctx):
         split = entry["split"]
@@ -755,7 +756,7 @@ def check_readiness(ctx: Context) -> None:
         instances_per_split[split] += count
         eligible_sources = set(policy["metricEligibleCornerSources"])
         if isinstance(record, dict):
-            metric_eligible_instances_per_split[split] += sum(
+            eligible_count = sum(
                 len(instance.get("corners", [])) == 4
                 and all(
                     corner.get("coordinateKnown")
@@ -764,6 +765,8 @@ def check_readiness(ctx: Context) -> None:
                 )
                 for instance in record.get("instances", [])
             )
+            metric_eligible_instances_per_split[split] += eligible_count
+            slice_metric_eligible_instances[(entry["sceneSlice"], split)] += eligible_count
         slice_instances[(entry["sceneSlice"], split)] += count
         if (
             split == "test"
@@ -806,7 +809,28 @@ def check_readiness(ctx: Context) -> None:
             shortfalls.append(
                 f"{requirement['split']}/{requirement['sceneSlice']}: {slice_instances[key]} instances < {requirement['minimumInstances']}"
             )
+        metric_minimum = requirement.get("minimumMetricEligibleInstances")
+        if metric_minimum is None and ctx.manifest["releasePurpose"] == "training":
+            shortfalls.append(
+                f"{requirement['split']}/{requirement['sceneSlice']}: policy omits minimumMetricEligibleInstances"
+            )
+        elif (
+            metric_minimum is not None
+            and slice_metric_eligible_instances[key] < metric_minimum
+        ):
+            shortfalls.append(
+                f"{requirement['split']}/{requirement['sceneSlice']}: "
+                f"{slice_metric_eligible_instances[key]} metric-eligible instances < {metric_minimum}"
+            )
 
+    reported_slice_keys = sorted(
+        set(slice_instances)
+        | set(slice_metric_eligible_instances)
+        | {
+            (requirement["sceneSlice"], requirement["split"])
+            for requirement in policy["requiredSceneSlices"]
+        }
+    )
     details = {
         "policyId": policy["policyId"],
         "recordsPerSplit": {split: records_per_split[split] for split in SPLITS},
@@ -816,8 +840,12 @@ def check_readiness(ctx: Context) -> None:
         },
         "testRealSessions": sorted(test_real_sessions),
         "sceneSliceInstances": {
-            f"{split}/{scene}": count
-            for (scene, split), count in sorted(slice_instances.items())
+            f"{split}/{scene}": slice_instances[(scene, split)]
+            for scene, split in reported_slice_keys
+        },
+        "sceneSliceMetricEligibleInstances": {
+            f"{split}/{scene}": slice_metric_eligible_instances[(scene, split)]
+            for scene, split in reported_slice_keys
         },
     }
     if shortfalls:

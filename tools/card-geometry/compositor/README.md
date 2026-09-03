@@ -106,7 +106,7 @@ slices before changing either distractor density or transformation ranges.
 
 This is a smoke release. Its generated minimums are tooling-only and cannot
 authorize training. A future `training` release must bind the separately
-approved `training-minimums-v1` policy by hash.
+approved `training-minimums-v2` policy by hash.
 
 The first published run is pinned at dataset revision
 `b4ef746b06c725cbe196e709d518dc53eea0ad13`, release path

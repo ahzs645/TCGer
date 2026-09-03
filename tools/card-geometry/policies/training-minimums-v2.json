@@ -1,0 +1,69 @@
+{
+  "allowedSourceTiers": [
+    "shippable"
+  ],
+  "description": "Approved minimum coverage for the first shared card-geometry training bake-off. Supersedes v1 before any release bound it by requiring metric-eligible geometry within every required test scene slice.",
+  "metricEligibleCornerSources": [
+    "human",
+    "synthetic"
+  ],
+  "minimumInstancesPerSplit": {
+    "test": 150,
+    "train": 1000,
+    "validation": 100
+  },
+  "minimumMetricEligibleInstances": {
+    "test": 100,
+    "train": 1000,
+    "validation": 100
+  },
+  "minimumRealEvaluationSessions": 3,
+  "minimumRecordsPerSplit": {
+    "test": 100,
+    "train": 500,
+    "validation": 50
+  },
+  "policyId": "training-minimums-v2",
+  "realOnlySplits": [
+    "test"
+  ],
+  "requiredLeakageKeys": {
+    "real": [],
+    "synthetic": [
+      "physicalCardIds",
+      "sourceAssetIds"
+    ]
+  },
+  "requiredSceneSlices": [
+    {
+      "minimumInstances": 50,
+      "minimumMetricEligibleInstances": 50,
+      "sceneSlice": "single_handheld",
+      "split": "test"
+    },
+    {
+      "minimumInstances": 20,
+      "minimumMetricEligibleInstances": 20,
+      "sceneSlice": "steep_playmat",
+      "split": "test"
+    },
+    {
+      "minimumInstances": 30,
+      "minimumMetricEligibleInstances": 30,
+      "sceneSlice": "duel_field",
+      "split": "test"
+    },
+    {
+      "minimumInstances": 20,
+      "minimumMetricEligibleInstances": 20,
+      "sceneSlice": "binder_page",
+      "split": "test"
+    }
+  ],
+  "requiredSplits": [
+    "train",
+    "validation",
+    "test"
+  ],
+  "schema": "https://tcger.app/schemas/card-geometry-readiness-policy/v1"
+}

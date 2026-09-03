@@ -17,7 +17,7 @@ from pathlib import Path
 
 FIELDS = ("verdict", "corrected_card_id", "fixed_quad_json",
           "fixed_quad_source", "rerun_top5_json", "binder_rerun_json",
-          "binder_labels_json")
+          "binder_labels_json", "manual_instances_json")
 
 
 def main():

@@ -143,6 +143,14 @@ synthetic parts without rewriting record bytes, rejects duplicate paths and
 synthetic test records, and binds the exact approved policy as a
 `training`-purpose release.
 
+For a binder frame in FiftyOne, draw one four-point `manual_quad` polyline per
+card, then run **Save multi-card geometry** from the operator menu. Its form
+collects each card's physical id, occlusion order, side (including
+`faceDown`), orientation status, and four visibility states. It persists the
+validated payload in `manual_instances_json`; `backup_labels.py` captures that
+field and the real-release adapter consumes it directly. A nine-card page does
+not require hand-editing JSON.
+
 ## Geometry benchmark
 
 `benchmark_geometry.py` scores one localizer's portable predictions against a
@@ -202,9 +210,9 @@ FastViT head use the existing `permissive` route.
 
 The checked-in `fixtures/experiment-config.evaluation-only.v1.json` is a
 schema and guard fixture only: its training-release hashes and container digest
-are placeholders. The approved `training-minimums-v1` is checked in under
+are placeholders. The approved `training-minimums-v2` is checked in under
 `policies/`, SHA-256
-`eb530f1e34f1bfede111c7a43ef01a3d71b2db3c5d8d15713ac11b70d7474191`.
+`b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d`.
 The wrapper requires that exact policy id and hash and never generates a
 training policy from corpus contents.
 

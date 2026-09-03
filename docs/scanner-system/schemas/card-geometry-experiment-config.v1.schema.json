@@ -53,7 +53,7 @@
         "datasetRevision": { "$ref": "#/$defs/gitRevision" },
         "releasePath": { "$ref": "#/$defs/relativePath" },
         "corpusHash": { "$ref": "#/$defs/sha256" },
-        "policyId": { "const": "training-minimums-v1" },
+        "policyId": { "const": "training-minimums-v2" },
         "policySha256": { "$ref": "#/$defs/sha256" }
       }
     },

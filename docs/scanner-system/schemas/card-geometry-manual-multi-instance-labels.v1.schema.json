@@ -25,13 +25,20 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["instanceId", "corners", "physicalCardId"],
+              "required": ["instanceId", "corners", "cornerVisibility", "physicalCardId", "occlusionOrder", "orientationKnown", "side"],
               "properties": {
                 "instanceId": { "type": "string", "minLength": 1 },
                 "physicalCardId": { "type": "string", "minLength": 1 },
                 "orientationKnown": { "type": "boolean", "default": true },
                 "side": { "enum": ["faceUp", "faceDown", "unknown"] },
                 "container": { "enum": ["rawCard", "slab", "unknown"] },
+                "occlusionOrder": { "type": "integer", "minimum": 0 },
+                "cornerVisibility": {
+                  "type": "array",
+                  "minItems": 4,
+                  "maxItems": 4,
+                  "items": { "enum": ["visible", "occluded", "outsideFrame"] }
+                },
                 "corners": {
                   "type": "array",
                   "minItems": 4,

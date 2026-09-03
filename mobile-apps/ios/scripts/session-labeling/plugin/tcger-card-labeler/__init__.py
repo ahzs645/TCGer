@@ -19,6 +19,10 @@ Fallback: the `apply_card_verdict` operator (backtick key) on grid selections.
 Binder pages keep independent human judgments in `binder_labels_json`, keyed
 by recorded pocket number. These labels never replace recorded device crops or
 candidates and are also captured by the append-only journal.
+
+The `save_manual_card_geometry` operator converts every drawn `manual_quad`
+polyline into a durable multi-instance record with per-card visibility,
+occlusion order, orientation, and face state for geometry-corpus ingestion.
 """
 
 import base64
@@ -232,7 +236,8 @@ def _journal(sample):
                "key": sample["key"]}
         for f in ("verdict", "corrected_card_id",
                   "fixed_quad_json", "fixed_quad_source", "rerun_top5_json",
-                  "binder_rerun_json", "binder_labels_json"):
+                  "binder_rerun_json", "binder_labels_json",
+                  "manual_instances_json"):
             rec[f] = sample[f] if sample.has_field(f) else None
         try:
             mq = sample["manual_quad"]
@@ -2616,6 +2621,166 @@ class ApplyCardVerdict(foo.Operator):
         return {"applied": len(keys), "verdict": verdict}
 
 
+class SaveManualCardGeometry(foo.Operator):
+    """Persist every drawn `manual_quad` polyline with per-card metadata."""
+
+    @property
+    def config(self):
+        return foo.OperatorConfig(
+            name="save_manual_card_geometry",
+            label="Save multi-card geometry",
+            dynamic=True,
+        )
+
+    @staticmethod
+    def _sample(ctx):
+        sample_id = ctx.current_sample or (
+            ctx.selected[0] if len(ctx.selected) == 1 else None
+        )
+        return ctx.dataset[sample_id] if sample_id else None
+
+    @staticmethod
+    def _quads(sample):
+        try:
+            lines = sample["manual_quad"].polylines
+        except Exception:
+            return []
+        result = []
+        for line in lines:
+            points = line.points[0] if line.points else []
+            if len(points) == 5 and points[0] == points[-1]:
+                points = points[:-1]
+            if len(points) == 4:
+                result.append([[float(x), float(y)] for x, y in points])
+        return result
+
+    def resolve_input(self, ctx):
+        inputs = types.Object()
+        sample = self._sample(ctx)
+        if sample is None:
+            inputs.md("Open one frame, or select exactly one frame.", name="missing")
+            return types.Property(inputs)
+        quads = self._quads(sample)
+        inputs.md(
+            f"Found **{len(quads)}** four-corner polylines in `manual_quad`. "
+            "For a 3×3 binder page, draw all nine cards in the Annotate tab "
+            "before saving.",
+            name="count",
+        )
+        scene_choices = types.Choices()
+        for value in ("binder_page", "duel_field", "steep_playmat", "single_handheld"):
+            scene_choices.add_choice(value, label=value)
+        default_scene = (
+            "binder_page"
+            if sample.get_field("frame_type") == "binder"
+            else "single_handheld"
+        )
+        inputs.enum(
+            "scene_slice",
+            scene_choices.values(),
+            view=scene_choices,
+            default=default_scene,
+            required=True,
+            label="Scene slice",
+        )
+        side_choices = types.Choices()
+        for value in ("faceUp", "faceDown", "unknown"):
+            side_choices.add_choice(value, label=value)
+        visibility_choices = types.Choices()
+        for value in ("visible", "occluded", "outsideFrame"):
+            visibility_choices.add_choice(value, label=value)
+        key = sample.get_field("key")
+        for index, quad in enumerate(quads):
+            inputs.md(f"Card {index + 1}", name=f"heading_{index}")
+            inputs.str(
+                f"physical_card_id_{index}",
+                default=f"{key}:card-{index}",
+                required=True,
+                label="Physical card ID",
+            )
+            inputs.int(
+                f"occlusion_order_{index}",
+                default=index,
+                required=True,
+                label="Occlusion order (higher is on top)",
+            )
+            inputs.enum(
+                f"side_{index}",
+                side_choices.values(),
+                view=side_choices,
+                default="faceUp",
+                required=True,
+                label="Side",
+            )
+            inputs.bool(
+                f"orientation_known_{index}",
+                default=True,
+                label="Corners are card-relative TL/TR/BR/BL",
+            )
+            for corner_index, point in enumerate(quad):
+                default_visibility = (
+                    "visible"
+                    if 0 <= point[0] <= 1 and 0 <= point[1] <= 1
+                    else "outsideFrame"
+                )
+                inputs.enum(
+                    f"visibility_{index}_{corner_index}",
+                    visibility_choices.values(),
+                    view=visibility_choices,
+                    default=default_visibility,
+                    required=True,
+                    label=f"Corner {corner_index + 1} visibility",
+                )
+        return types.Property(inputs)
+
+    def execute(self, ctx):
+        import json
+
+        import fiftyone as fo
+
+        sample = self._sample(ctx)
+        if sample is None:
+            raise ValueError("open or select exactly one frame")
+        quads = self._quads(sample)
+        if not quads:
+            raise ValueError("manual_quad has no four-corner polylines")
+        instances = []
+        for index, quad in enumerate(quads):
+            instances.append(
+                {
+                    "instanceId": f"card-{index}",
+                    "physicalCardId": ctx.params[f"physical_card_id_{index}"].strip(),
+                    "corners": quad,
+                    "cornerVisibility": [
+                        ctx.params[f"visibility_{index}_{corner_index}"]
+                        for corner_index in range(4)
+                    ],
+                    "occlusionOrder": int(ctx.params[f"occlusion_order_{index}"]),
+                    "orientationKnown": bool(
+                        ctx.params.get(f"orientation_known_{index}", True)
+                    ),
+                    "side": ctx.params[f"side_{index}"],
+                    "container": "rawCard",
+                }
+            )
+        orders = [item["occlusionOrder"] for item in instances]
+        if len(orders) != len(set(orders)):
+            raise ValueError("occlusion orders must be unique within a frame")
+        record = {
+            "key": sample.get_field("key"),
+            "sceneSlice": ctx.params["scene_slice"],
+            "game": _normalized_game(sample.get_field("game")),
+            "instances": instances,
+        }
+        if not ctx.dataset.has_sample_field("manual_instances_json"):
+            ctx.dataset.add_sample_field("manual_instances_json", fo.StringField)
+        sample["manual_instances_json"] = json.dumps(record, sort_keys=True)
+        sample.save()
+        _journal(sample)
+        return {"saved": len(instances), "key": record["key"]}
+
+
 def register(p):
     p.register(CardVerdictPanel)
     p.register(ApplyCardVerdict)
+    p.register(SaveManualCardGeometry)

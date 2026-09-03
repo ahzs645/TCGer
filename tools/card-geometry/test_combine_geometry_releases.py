@@ -12,7 +12,7 @@ from corpus_release import RELEASES_DIR, load_json, sha256_file  # noqa: E402
 
 class CombineGeometryReleasesTests(unittest.TestCase):
     def test_combines_shippable_parts_under_exact_training_policy(self):
-        policy = ROOT / "policies" / "training-minimums-v1.json"
+        policy = ROOT / "policies" / "training-minimums-v2.json"
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "combined"
             manifest = combine(
@@ -29,7 +29,7 @@ class CombineGeometryReleasesTests(unittest.TestCase):
             for entry in manifest["records"]:
                 self.assertEqual(entry["sourceTier"], "shippable")
                 self.assertTrue((output / entry["path"]).is_file())
-            self.assertEqual(load_json(output / "policy.json")["policyId"], "training-minimums-v1")
+            self.assertEqual(load_json(output / "policy.json")["policyId"], "training-minimums-v2")
 
 
 if __name__ == "__main__":

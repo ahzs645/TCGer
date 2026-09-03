@@ -25,6 +25,9 @@ from corpus_release import (  # noqa: E402
     validation_errors,
 )
 
+APPROVED_POLICY_ID = "training-minimums-v2"
+APPROVED_POLICY_SHA256 = "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d"
+
 
 def combine(
     *, inputs: list[Path], output: Path, release_id: str, policy_path: Path
@@ -38,8 +41,10 @@ def combine(
     errors = validation_errors(make_validator(load_schema(POLICY_SCHEMA_FILE)), policy)
     if errors:
         raise ValueError("invalid readiness policy:\n- " + "\n- ".join(errors))
-    if policy.get("policyId") != "training-minimums-v1":
-        raise ValueError("combined training release requires training-minimums-v1")
+    if policy.get("policyId") != APPROVED_POLICY_ID:
+        raise ValueError("combined training release requires training-minimums-v2")
+    if sha256_bytes(policy_bytes) != APPROVED_POLICY_SHA256:
+        raise ValueError("training-minimums-v2 bytes do not match the approved hash")
     if policy.get("allowedSourceTiers") != ["shippable"]:
         raise ValueError("combined training release requires shippable-only policy")
 

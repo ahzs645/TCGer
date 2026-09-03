@@ -5,7 +5,7 @@
     "corpusHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "datasetRepo": "ahzs645/tcger-scanner-images",
     "datasetRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "policyId": "training-minimums-v1",
+    "policyId": "training-minimums-v2",
     "policySha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "releasePath": "geometry/releases/training-v1"
   },

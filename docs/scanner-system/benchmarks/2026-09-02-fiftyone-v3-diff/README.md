@@ -49,11 +49,14 @@ binder sessions are listed first in the JSON report:
 Labeling one or more of these multi-card frames is cheaper than a new binder
 capture. New captures are still required for `steep_playmat`, `duel_field`,
 and all Yu-Gi-Oh coverage: singles, a duel field, and a binder page.
+The first labeling batch is three nine-pocket pages from
+`scan-session-20260809-223944`: 27 human instances clear the v2
+`binder_page` minimum of 20 with seven instances of headroom.
 
 ## Coverage against the frozen training policy
 
-Coverage is measured against the frozen `training-minimums-v1` policy, SHA-256
-`eb530f1e34f1bfede111c7a43ef01a3d71b2db3c5d8d15713ac11b70d7474191`.
+Coverage is measured against the frozen `training-minimums-v2` policy, SHA-256
+`b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d`.
 
 | Test requirement | Current | Minimum | Remaining |
 |---|---:|---:|---:|
@@ -61,10 +64,10 @@ Coverage is measured against the frozen `training-minimums-v1` policy, SHA-256
 | card instances | 61 | 150 | 89 |
 | metric-eligible card instances | 57 | 100 | 43 |
 | real sessions | 7 | 3 | 0 |
-| `single_handheld` instances | 57 | 50 | 0 |
-| `steep_playmat` instances | 0 | 20 | 20 |
-| `duel_field` instances | 0 | 30 | 30 |
-| `binder_page` instances | 0 | 20 | 20 |
+| `single_handheld` metric-eligible instances | 57 | 50 | 0 |
+| `steep_playmat` metric-eligible instances | 0 | 20 | 20 |
+| `duel_field` metric-eligible instances | 0 | 30 | 30 |
+| `binder_page` metric-eligible instances | 0 | 20 | 20 |
 
 The human capture list can therefore drop ordinary single-handheld coverage.
 It still needs at least 39 new test records and 89 card instances overall,

@@ -159,12 +159,17 @@ The comparison table records, for every candidate:
 - L4 GPU hours.
 
 Gate 0 does not authorize a corpus. The approved
-`tools/card-geometry/policies/training-minimums-v1.json` is frozen at SHA-256
-`eb530f1e34f1bfede111c7a43ef01a3d71b2db3c5d8d15713ac11b70d7474191`.
+`tools/card-geometry/policies/training-minimums-v2.json` is frozen at SHA-256
+`b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d`.
 A training-purpose release must bind those exact bytes; a builder must never
 generate a training policy from the corpus it is evaluating. The policy admits
 only `shippable` source tiers and requires 1,000/100/100 complete
 metric-eligible instances in train/validation/test.
+Each required test scene slice also requires the same number of fully
+metric-eligible instances as its total-instance minimum. This prevents a slice
+filled only with `maskFit` geometry from satisfying readiness while remaining
+unmeasurable. `training-minimums-v1` was superseded before any corpus release
+bound it; its bytes remain checked in only as history.
 
 ## Runtimes
 
@@ -368,6 +373,14 @@ every relevant card in a selected duel-field and binder subset must be
 annotated with the full corpus schema. This changes labels only, not the
 frozen images, and can start immediately.
 
+The canonical-corpus audit found 304 existing multi-card records. The
+reviewable `grid-size-overlap-rotation-v1` pass provisionally assigns 99 to
+`binder_page`, 125 to `duel_field`, and 80 to `other`, with its measured
+features and a deterministic 24-frame human spot-check recorded in
+`benchmarks/2026-09-02-canonical-multi-card-scenes.json`. These assignments
+are candidate labels, not frozen truth; human corrections are stored as
+overrides rather than used to retune the heuristic after model results exist.
+
 Extend the benchmark with:
 
 - one-to-one matching between predictions and ground truth;
@@ -411,7 +424,7 @@ tune these values after a candidate is evaluated.
 - zero duplicates and at most three extras on the 61-frame frozen release;
 - no increase in wrong accepts through the full recognition replay.
 
-These are candidate regression budgets, not `training-minimums-v1`; corpus
+These are candidate regression budgets, not `training-minimums-v2`; corpus
 coverage targets remain a separate human decision.
 
 ## Orientation rule
@@ -450,7 +463,7 @@ The three foundation workstreams were independent of the final licensing
 decision. The contract freeze, benchmark, and compositor tooling are landed.
 Candidate configuration and license-route enforcement are also implemented;
 training now waits on a combined shippable release that meets the frozen
-`training-minimums-v1` policy.
+`training-minimums-v2` policy.
 
 1. **Contract freeze**
    - commit JSON schemas for `CardGeometryResult` and the corpus record;
@@ -503,7 +516,7 @@ training now waits on a combined shippable release that meets the frozen
 ## Execution order
 
 1. Build the training-purpose release against the frozen
-   `training-minimums-v1` policy and hash, and require the pinned preflight to
+   `training-minimums-v2` policy and hash, and require the pinned preflight to
    report `readyFor: training`.
 2. Run one epoch of YOLO11n-pose on an L4 to prove corpus download, preflight,
    training, private checkpoint persistence, config hashing, private export,

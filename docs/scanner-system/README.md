@@ -68,6 +68,7 @@ the required encoders separately and merging calibrated candidates.
 | [Card-geometry orientation baselines](benchmarks/2026-09-02-shared-card-geometry-orientation-v3/README.md) | Orientation-known rerun of the same predictions, including fixed-order tail errors, orientation accuracy, and the pinned fail-first Hub smoke |
 | [FiftyOne versus geometry v3](benchmarks/2026-09-02-fiftyone-v3-diff/README.md) | Per-session re-export audit, immutable-release decision, provenance counts, and remaining test-slice capture gaps |
 | [Canonical geometry audit](benchmarks/2026-09-02-canonical-geometry-audit.md) | Closing-point normalization, conservative mask-fit yield, and multi-card scene candidates in the 6,278-record canonical corpus |
+| [Canonical multi-card heuristic](benchmarks/2026-09-02-canonical-multi-card-scenes.md) | Reviewable binder/duel/other assignments and a stratified human spot-check list for all 304 multi-card records |
 | [Synthetic card-geometry smoke](benchmarks/2026-09-02-synthetic-card-geometry-smoke/README.md) | Deterministic 2,000-frame compositor release, pinned Hub smoke, and the first single-handheld and multi-card baseline results |
 | [Crop parity experiment](crop-parity-2026-09-02.md) | Frozen 67-frame warp input, 36-cell reference grid, current bench/web pixel results, native export harnesses, and downstream encoder agreement Job |
 | [Game-package hardening roadmap](game-package-hardening-roadmap.md) | Validator parity, atomic/streamed installs, publisher authority, identity, lifecycle, and future capabilities |

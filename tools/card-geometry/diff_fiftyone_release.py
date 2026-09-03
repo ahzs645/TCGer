@@ -219,6 +219,7 @@ def coverage_report(
     record_counts: Counter[str] = Counter()
     instance_counts: Counter[str] = Counter()
     slice_instances: Counter[tuple[str, str]] = Counter()
+    slice_metric_eligible: Counter[tuple[str, str]] = Counter()
     metric_eligible_instances: Counter[str] = Counter()
     eligible_sources = set(policy["metricEligibleCornerSources"])
     for item in release["nonDevmode"]:
@@ -228,7 +229,7 @@ def coverage_report(
         slice_instances[(entry["split"], entry["sceneSlice"])] += len(
             record["instances"]
         )
-        metric_eligible_instances[entry["split"]] += sum(
+        eligible_count = sum(
             len(instance.get("corners", [])) == 4
             and all(
                 corner.get("coordinateKnown")
@@ -237,6 +238,8 @@ def coverage_report(
             )
             for instance in record["instances"]
         )
+        metric_eligible_instances[entry["split"]] += eligible_count
+        slice_metric_eligible[(entry["split"], entry["sceneSlice"])] += eligible_count
     for key in current_manual:
         inventory = inventory_by_key.get(key)
         if inventory is None:
@@ -245,6 +248,7 @@ def coverage_report(
         instance_counts["test"] += 1
         slice_instances[("test", inventory["sceneSlice"])] += 1
         metric_eligible_instances["test"] += 1
+        slice_metric_eligible[("test", inventory["sceneSlice"])] += 1
 
     required_slices = []
     for requirement in policy["requiredSceneSlices"]:
@@ -252,6 +256,8 @@ def coverage_report(
         scene_slice = requirement["sceneSlice"]
         actual = slice_instances[(split, scene_slice)]
         minimum = requirement["minimumInstances"]
+        metric_minimum = requirement.get("minimumMetricEligibleInstances", 0)
+        metric_actual = slice_metric_eligible[(split, scene_slice)]
         required_slices.append(
             {
                 "split": split,
@@ -260,6 +266,10 @@ def coverage_report(
                 "minimumInstances": minimum,
                 "shortfall": max(0, minimum - actual),
                 "meetsMinimum": actual >= minimum,
+                "actualMetricEligibleInstances": metric_actual,
+                "minimumMetricEligibleInstances": metric_minimum,
+                "metricEligibleShortfall": max(0, metric_minimum - metric_actual),
+                "meetsMetricEligibleMinimum": metric_actual >= metric_minimum,
             }
         )
 

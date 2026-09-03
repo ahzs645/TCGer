@@ -532,6 +532,20 @@ def add_manual_devmode_backup(
     entries = []
     session_ids = set()
     for item in sorted(records, key=lambda value: str(value.get("key", ""))):
+        raw_multi = item.get("manual_instances_json")
+        if isinstance(raw_multi, str) and raw_multi.strip():
+            try:
+                frame = json.loads(raw_multi)
+            except json.JSONDecodeError:
+                stats["devmodeBackupInvalidMultiInstance"] += 1
+            else:
+                entry, session_id = _manual_multi_frame_entry(
+                    root, frame, sessions_root, stats
+                )
+                entries.append(entry)
+                session_ids.add(session_id)
+                stats["devmodeBackupMultiInstanceRecords"] += 1
+                continue
         if item.get("fixed_quad_source") != "manual":
             continue
         raw_quad = item.get("fixed_quad_json")
@@ -565,76 +579,109 @@ def add_manual_devmode_backup(
     return entries, sorted(session_ids)
 
 
+def _manual_multi_frame_entry(
+    root: Path,
+    frame: dict[str, Any],
+    sessions_root: Path,
+    stats: Counter,
+) -> tuple[dict[str, Any], str]:
+    errors = validation_errors(
+        make_validator(load_schema(MULTI_INSTANCE_SCHEMA)),
+        {
+            "schema": "https://tcger.app/schemas/card-geometry-manual-multi-instance-labels/v1",
+            "frames": [frame],
+        },
+    )
+    if errors:
+        raise ValueError("invalid multi-instance frame:\n- " + "\n- ".join(errors))
+    orders = [item["occlusionOrder"] for item in frame["instances"]]
+    if len(orders) != len(set(orders)):
+        raise ValueError(f"duplicate occlusionOrder in {frame['key']}")
+    raw_session, image_file = frame["key"].split("/", 1)
+    session_id = _safe_id(raw_session)
+    image_path = sessions_root / raw_session / image_file
+    if not image_path.is_file():
+        raise FileNotFoundError(image_path)
+    image_bytes = image_path.read_bytes()
+    width, height = _image_dimensions(image_bytes)
+    instances = []
+    for annotation in frame["instances"]:
+        quad = _quad_points(annotation["corners"])
+        if quad is None:
+            raise ValueError(f"invalid quad in {frame['key']}:{annotation['instanceId']}")
+        instances.append(
+            {
+                "instanceId": _safe_id(annotation["instanceId"]),
+                "detectionClass": "card",
+                "corners": [
+                    {
+                        "point": {"x": x, "y": y},
+                        "visibility": visibility,
+                        "coordinateKnown": True,
+                        "cornerSource": "human",
+                    }
+                    for (x, y), visibility in zip(
+                        quad, annotation["cornerVisibility"], strict=True
+                    )
+                ],
+                "orientationKnown": annotation["orientationKnown"],
+                "side": annotation["side"],
+                "container": annotation.get("container", "unknown"),
+                "occlusionOrder": annotation["occlusionOrder"],
+                "physicalCardId": _safe_id(annotation["physicalCardId"]),
+            }
+        )
+    record = {
+        "schema": RECORD_SCHEMA_ID,
+        "recordId": _safe_id(
+            f"devmode-multi-{session_id}-{sha256_bytes(frame['key'].encode())[:16]}"
+        ),
+        "source": {"kind": "real", "width": width, "height": height},
+        "grouping": {
+            "sourceArchiveId": _safe_id(f"devmode:{session_id}"),
+            "sessionId": session_id,
+        },
+        "instances": instances,
+    }
+    entry = _write_record(
+        root,
+        record,
+        image_bytes,
+        image_path.suffix or ".jpg",
+        "test",
+        frame["sceneSlice"],
+    )
+    stats["devmodeMultiInstanceFrames"] += 1
+    stats["devmodeMultiInstanceCards"] += len(instances)
+    stats["devmodeMultiInstanceFaceDown"] += sum(
+        instance["side"] == "faceDown" for instance in instances
+    )
+    stats["devmodeMultiInstanceOccludedCorners"] += sum(
+        corner["visibility"] == "occluded"
+        for instance in instances
+        for corner in instance["corners"]
+    )
+    return entry, session_id
+
+
 def add_manual_multi_instance_labels(
     root: Path, labels_path: Path, sessions_root: Path, stats: Counter
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Ingest human-ordered quads for every card in a labeled frame."""
     document = json.loads(labels_path.read_text(encoding="utf-8"))
-    errors = validation_errors(make_validator(load_schema(MULTI_INSTANCE_SCHEMA)), document)
+    errors = validation_errors(
+        make_validator(load_schema(MULTI_INSTANCE_SCHEMA)), document
+    )
     if errors:
         raise ValueError("invalid multi-instance labels:\n- " + "\n- ".join(errors))
     entries = []
     sessions = set()
     for frame in sorted(document["frames"], key=lambda item: item["key"]):
-        raw_session, image_file = frame["key"].split("/", 1)
-        session_id = _safe_id(raw_session)
-        image_path = sessions_root / raw_session / image_file
-        if not image_path.is_file():
-            raise FileNotFoundError(image_path)
-        image_bytes = image_path.read_bytes()
-        width, height = _image_dimensions(image_bytes)
-        instances = []
-        for annotation in frame["instances"]:
-            quad = _quad_points(annotation["corners"])
-            if quad is None:
-                raise ValueError(f"invalid quad in {frame['key']}:{annotation['instanceId']}")
-            instances.append(
-                {
-                    "instanceId": _safe_id(annotation["instanceId"]),
-                    "detectionClass": "card",
-                    "corners": [
-                        {
-                            "point": {"x": x, "y": y},
-                            "visibility": (
-                                "visible" if 0 <= x <= 1 and 0 <= y <= 1 else "outsideFrame"
-                            ),
-                            "coordinateKnown": True,
-                            "cornerSource": "human",
-                        }
-                        for x, y in quad
-                    ],
-                    "orientationKnown": annotation.get("orientationKnown", True),
-                    "side": annotation.get("side", "unknown"),
-                    "container": annotation.get("container", "unknown"),
-                    "occlusionOrder": len(instances),
-                    "physicalCardId": _safe_id(annotation["physicalCardId"]),
-                }
-            )
-        record = {
-            "schema": RECORD_SCHEMA_ID,
-            "recordId": _safe_id(
-                f"devmode-multi-{session_id}-{sha256_bytes(frame['key'].encode())[:16]}"
-            ),
-            "source": {"kind": "real", "width": width, "height": height},
-            "grouping": {
-                "sourceArchiveId": _safe_id(f"devmode:{session_id}"),
-                "sessionId": session_id,
-            },
-            "instances": instances,
-        }
-        entries.append(
-            _write_record(
-                root,
-                record,
-                image_bytes,
-                image_path.suffix or ".jpg",
-                "test",
-                frame["sceneSlice"],
-            )
+        entry, session_id = _manual_multi_frame_entry(
+            root, frame, sessions_root, stats
         )
+        entries.append(entry)
         sessions.add(session_id)
-        stats["devmodeMultiInstanceFrames"] += 1
-        stats["devmodeMultiInstanceCards"] += len(instances)
     return entries, sorted(sessions)
 
 

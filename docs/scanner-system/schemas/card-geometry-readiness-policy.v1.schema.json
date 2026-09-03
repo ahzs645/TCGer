@@ -72,7 +72,12 @@
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
           },
           "split": { "$ref": "#/$defs/split" },
-          "minimumInstances": { "type": "integer", "minimum": 1 }
+          "minimumInstances": { "type": "integer", "minimum": 1 },
+          "minimumMetricEligibleInstances": {
+            "description": "Minimum instances in this exact split and scene slice whose four corners are coordinate-known and metric-eligible. Required semantically for every slice in a training-purpose release; optional here for immutable legacy policies.",
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     },
