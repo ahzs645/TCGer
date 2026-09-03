@@ -811,7 +811,8 @@ def build_release(
         "policySha256": manifest["readiness"]["readinessPolicySha256"],
         "records": len(entries),
         "instances": sum(stats[key] for key in stats if key.startswith("maskFit:"))
-        + stats["devmodeQuadRecords"],
+        + stats["devmodeQuadRecords"]
+        + stats["devmodeMultiInstanceCards"],
         "archiveSplits": dict(sorted(archive_splits.items())),
         "maxRecordsPerArchive": max_records_per_archive,
         "devmodeLabelBackups": [

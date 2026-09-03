@@ -18,6 +18,81 @@ def write_json(path: Path, value):
 
 
 class FiftyOneReleaseDiffTests(unittest.TestCase):
+    def test_finalized_binder_replaces_legacy_quad_and_counts_nine_instances(self):
+        key = "session-b/page.jpg"
+        quad = [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]
+        frame = {
+            "key": key, "sceneSlice": "binder_page",
+            "instances": [{"instanceId": f"card-{i}", "corners": quad} for i in range(9)],
+        }
+        records = {key: {
+            "fixed_quad_source": "manual", "fixed_quad_json": json.dumps(quad),
+            "manual_instances_json": json.dumps(frame),
+        }}
+        current = MODULE.manual_instances(records)
+        self.assertEqual(len(current[key]["quads"]), 9)
+        policy = {
+            "policyId": "training-minimums-v2", "metricEligibleCornerSources": ["human"],
+            "minimumRealEvaluationSessions": 1, "requiredSplits": ["test"],
+            "minimumRecordsPerSplit": {"test": 1}, "minimumInstancesPerSplit": {"test": 9},
+            "minimumMetricEligibleInstances": {"test": 9},
+            "requiredSceneSlices": [{"split": "test", "sceneSlice": "binder_page",
+                                     "minimumInstances": 9, "minimumMetricEligibleInstances": 9}],
+        }
+        inventory = {key: {"key": key, "sessionId": "session-b", "sceneSlice": "other"}}
+        coverage = MODULE.coverage_report({"nonDevmode": []}, current, inventory, policy)
+        self.assertEqual(coverage["metricEligibleCorners"], 36)
+        self.assertEqual(coverage["splits"]["test"]["records"], 1)
+        self.assertEqual(coverage["requiredSceneSlices"][0]["actualMetricEligibleInstances"], 9)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            before, after = root / "labels-20260101-010101.json", root / "labels-20260102-010101.json"
+            write_json(before, [dict(records[key], key=key)])
+            record_id = MODULE.release_record_id(key).replace("devmode-", "devmode-multi-", 1)
+            write_json(root / "records/page.json", {
+                "recordId": record_id, "grouping": {"sessionId": "session-b"},
+                "source": {"width": 100, "height": 200},
+                "instances": [{"instanceId": i["instanceId"], "corners": [
+                    {"point": {"x": x, "y": y}} for x, y in quad
+                ]} for i in frame["instances"]],
+            })
+            write_json(root / "manifest.json", {
+                "releaseId": "test", "corpusHash": "abc", "records": [{
+                    "recordId": record_id, "path": "records/page.json", "split": "test", "sceneSlice": "binder_page",
+                }],
+            })
+            # Edit only card 9; a single-card-only diff used to miss this.
+            frame["instances"][-1]["corners"] = [[0.2, 0.1], *quad[1:]]
+            write_json(after, [{"key": key, "manual_instances_json": json.dumps(frame)}])
+            write_json(root / "policy.json", policy)
+            report = MODULE.build_report(
+                current_backup=after, prior_backup=before, release_root=root,
+                inventory=inventory.values(), policy_path=root / "policy.json",
+                dataset_repo="owner/data", dataset_revision="a" * 40,
+            )
+            self.assertEqual(report["summary"]["changedManualQuad"], 1)
+            self.assertEqual(report["summary"]["currentManualInstances"], 9)
+            self.assertTrue(report["releaseChangeRequired"])
+            change = report["sessions"][0]["changedManualQuad"][0]
+            self.assertEqual(change["changedInstances"][0]["instanceId"], "card-8")
+            self.assertEqual(change["maximumCornerDeltaPixels"], 10)
+            # An entirely new binder page gains nine instances, not one.
+            write_json(root / "manifest.json", {"releaseId": "empty", "corpusHash": "abc", "records": []})
+            report = MODULE.build_report(
+                current_backup=after, prior_backup=before, release_root=root,
+                inventory=inventory.values(), policy_path=root / "policy.json",
+                dataset_repo="owner/data", dataset_revision="a" * 40,
+            )
+            self.assertEqual(report["summary"]["gainingManualQuad"], 1)
+            self.assertEqual(report["summary"]["gainingManualInstances"], 9)
+            self.assertEqual(report["sessions"][0]["counts"]["gainingManualInstances"], 9)
+
+    def test_drafts_ignored_and_invalid_durable_payload_fails_closed(self):
+        self.assertEqual(MODULE.manual_instances({"s/f": {"manual_quad_points": [[0, 0]]}}), {})
+        for raw in ("{", '{"key":"other"}', '{"key":"s/f","instances":[]}'):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                MODULE.manual_instances({"s/f": {"manual_instances_json": raw}})
+
     def test_classifies_changes_and_pixel_deltas(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

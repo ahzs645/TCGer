@@ -63,6 +63,7 @@ def parse_quad(value: Any) -> list[list[float]] | None:
             or isinstance(point[1], bool)
             or not isinstance(point[0], (int, float))
             or not isinstance(point[1], (int, float))
+            or not all(math.isfinite(axis) for axis in point)
         ):
             return None
         quad.append([float(point[0]), float(point[1])])
@@ -92,6 +93,36 @@ def manual_quads(records: dict[str, dict[str, Any]]) -> dict[str, list[list[floa
     return result
 
 
+def manual_instances(records: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Prefer finalized multi-card payloads; never count their legacy quad twice.
+
+    Unfinalized canvas drafts are intentionally ignored. Invalid durable
+    payloads fail closed instead of falling back to an unrelated single quad.
+    The release builder subsequently validates the complete sidecar schema.
+    """
+    result = {}
+    singles = manual_quads(records)
+    for key, item in records.items():
+        raw = item.get("manual_instances_json")
+        if isinstance(raw, str) and raw.strip():
+            frame = json.loads(raw)
+            if not isinstance(frame, dict) or frame.get("key") != key:
+                raise ValueError(f"multi-card payload key mismatch: {key}")
+            instances = {}
+            for instance in frame.get("instances", []):
+                identifier = instance.get("instanceId")
+                quad = parse_quad(instance.get("corners"))
+                if not identifier or identifier in instances or quad is None:
+                    raise ValueError(f"invalid/duplicate manual instance: {key}")
+                instances[identifier] = quad
+            if not instances:
+                raise ValueError(f"empty finalized multi-card payload: {key}")
+            result[key] = {"quads": instances, "sceneSlice": frame["sceneSlice"]}
+        elif key in singles:
+            result[key] = {"quads": {"card-0": singles[key]}}
+    return result
+
+
 def provenance_counts(records: dict[str, dict[str, Any]]) -> dict[str, int]:
     counts: Counter[str] = Counter()
     for item in records.values():
@@ -114,8 +145,12 @@ def provenance_counts(records: dict[str, dict[str, Any]]) -> dict[str, int]:
 
 def load_release(release_root: Path, prior_backup: Path) -> dict[str, Any]:
     manifest = json.loads((release_root / "manifest.json").read_text(encoding="utf-8"))
-    prior_manual = manual_quads(load_backup(prior_backup))
-    key_by_record = {release_record_id(key): key for key in prior_manual}
+    prior_manual = manual_instances(load_backup(prior_backup))
+    key_by_record = {}
+    for key in prior_manual:
+        record_id = release_record_id(key)
+        key_by_record[record_id] = key
+        key_by_record[record_id.replace("devmode-", "devmode-multi-", 1)] = key
     devmode: dict[str, dict[str, Any]] = {}
     non_devmode_entries: list[dict[str, Any]] = []
     for entry in manifest["records"]:
@@ -129,10 +164,15 @@ def load_release(release_root: Path, prior_backup: Path) -> dict[str, Any]:
             raise ValueError(
                 f"cannot map pinned Dev Mode record to prior backup: {record['recordId']}"
             )
-        corners = record["instances"][0]["corners"]
-        quad = [[corner["point"][axis] for axis in ("x", "y")] for corner in corners]
+        quads = {
+            instance.get("instanceId", "card-0"): [
+                [corner["point"][axis] for axis in ("x", "y")]
+                for corner in instance["corners"]
+            ]
+            for instance in record["instances"]
+        }
         devmode[key] = {
-            "quad": quad,
+            "quads": quads,
             "width": int(record["source"]["width"]),
             "height": int(record["source"]["height"]),
             "sceneSlice": entry["sceneSlice"],
@@ -212,7 +252,7 @@ def changed_quad(before: list[list[float]], after: list[list[float]]) -> bool:
 
 def coverage_report(
     release: dict[str, Any],
-    current_manual: dict[str, list[list[float]]],
+    current_manual: dict[str, dict[str, Any]],
     inventory_by_key: dict[str, dict[str, Any]],
     policy: dict[str, Any],
 ) -> dict[str, Any]:
@@ -245,10 +285,13 @@ def coverage_report(
         if inventory is None:
             continue
         record_counts["test"] += 1
-        instance_counts["test"] += 1
-        slice_instances[("test", inventory["sceneSlice"])] += 1
-        metric_eligible_instances["test"] += 1
-        slice_metric_eligible[("test", inventory["sceneSlice"])] += 1
+        count = len(current_manual[key]["quads"])
+        scene_slice = current_manual[key].get("sceneSlice", inventory["sceneSlice"])
+        eligible_count = count if "human" in eligible_sources else 0
+        instance_counts["test"] += count
+        slice_instances[("test", scene_slice)] += count
+        metric_eligible_instances["test"] += eligible_count
+        slice_metric_eligible[("test", scene_slice)] += eligible_count
 
     required_slices = []
     for requirement in policy["requiredSceneSlices"]:
@@ -294,7 +337,7 @@ def coverage_report(
         "policyStatus": (
             "draft-unapproved" if "draft" in policy["policyId"] else "approved"
         ),
-        "metricEligibleCorners": len(current_manual) * 4,
+        "metricEligibleCorners": sum(metric_eligible_instances.values()) * 4,
         "metricEligibleInstances": {
             split: {
                 "actual": metric_eligible_instances[split],
@@ -331,7 +374,7 @@ def build_report(
     dataset_revision: str,
 ) -> dict[str, Any]:
     current_records = load_backup(current_backup)
-    current_manual = manual_quads(current_records)
+    current_manual = manual_instances(current_records)
     release = load_release(release_root, prior_backup)
     baseline = release["devmode"]
     inventory_by_key = {item["key"]: item for item in inventory}
@@ -369,16 +412,29 @@ def build_report(
         elif before is not None and after is None:
             sessions[session_id]["losingManualQuad"].append(key)
         elif before is not None and after is not None:
-            if changed_quad(before["quad"], after):
-                deltas = corner_deltas(
-                    before["quad"], after, before["width"], before["height"]
-                )
+            old_quads, new_quads = before["quads"], after["quads"]
+            added = sorted(new_quads.keys() - old_quads.keys())
+            removed = sorted(old_quads.keys() - new_quads.keys())
+            changes = []
+            for identifier in sorted(old_quads.keys() & new_quads.keys()):
+                if changed_quad(old_quads[identifier], new_quads[identifier]):
+                    deltas = corner_deltas(
+                        old_quads[identifier], new_quads[identifier],
+                        before["width"], before["height"],
+                    )
+                    changes.append({"instanceId": identifier, "cornerDeltasPixels": deltas})
+            if added or removed or changes:
+                # Keep the original single-card delta field for consumers.
+                deltas = [delta for change in changes for delta in change["cornerDeltasPixels"]]
                 sessions[session_id]["changedManualQuad"].append(
                     {
                         "key": key,
                         "cornerDeltasPixels": deltas,
+                        "changedInstances": changes,
+                        "gainingInstanceIds": added,
+                        "losingInstanceIds": removed,
                         "maximumCornerDeltaPixels": max(
-                            delta["distance"] for delta in deltas
+                            (delta["distance"] for delta in deltas), default=0.0
                         ),
                     }
                 )
@@ -422,6 +478,20 @@ def build_report(
     for session_id in ordered_sessions:
         values = sessions[session_id]
         counts = {name: len(items) for name, items in values.items()}
+        session_keys = [item["key"] for item in inventory_by_session[session_id]]
+        counts["currentManualInstances"] = sum(
+            len(current_manual.get(key, {}).get("quads", {})) for key in session_keys
+        )
+        counts["gainingManualInstances"] = sum(
+            len(current_manual.get(key, {}).get("quads", {}).keys()
+                - baseline.get(key, {}).get("quads", {}).keys())
+            for key in session_keys
+        )
+        counts["losingManualInstances"] = sum(
+            len(baseline.get(key, {}).get("quads", {}).keys()
+                - current_manual.get(key, {}).get("quads", {}).keys())
+            for key in session_keys
+        )
         frames = inventory_by_session[session_id]
         session_rows.append(
             {
@@ -450,6 +520,15 @@ def build_report(
         "sessions": len(session_rows),
         "inventoryFrames": len(all_keys),
         "currentManualQuadFrames": len(current_manual),
+        "currentManualInstances": sum(len(frame["quads"]) for frame in current_manual.values()),
+        "gainingManualInstances": sum(
+            len(frame["quads"].keys() - baseline.get(key, {}).get("quads", {}).keys())
+            for key, frame in current_manual.items()
+        ),
+        "losingManualInstances": sum(
+            len(frame["quads"].keys() - current_manual.get(key, {}).get("quads", {}).keys())
+            for key, frame in baseline.items()
+        ),
         "gainingManualQuad": sum(row["counts"]["gainingManualQuad"] for row in session_rows),
         "changedManualQuad": sum(row["counts"]["changedManualQuad"] for row in session_rows),
         "losingManualQuad": sum(row["counts"]["losingManualQuad"] for row in session_rows),
@@ -492,13 +571,15 @@ def build_report(
             "missingSource": "skipped",
         },
         "provenanceCounts": provenance_counts(current_records),
+        "provenanceCountsScope": "legacy fixed_quad fields only; finalized multi-card counts are in summary",
         "summary": summary,
         "releaseChangeRequired": release_change_required,
         "binderSessionsFirst": binder_sessions,
         "sessions": session_rows,
-        "coverage": coverage_report(
-            release, current_manual, inventory_by_key, policy
-        ),
+        "coverage": {
+            **coverage_report(release, current_manual, inventory_by_key, policy),
+            "policySha256": sha256_file(policy_path),
+        },
     }
 
 

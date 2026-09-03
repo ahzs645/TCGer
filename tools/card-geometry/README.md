@@ -133,6 +133,12 @@ specified readiness policy. A non-empty gain/change/loss set requires a new
 release and corpus hash; the pinned release and its existing reports remain
 immutable.
 
+The diff prefers finalized `manual_instances_json` over a frame's legacy
+single quad, counts every card once, and reports changes by instance id with
+pixel deltas. Draft canvas polylines alone do not enter coverage. Readiness
+counts cards separately from frames: a nine-card binder page contributes nine
+metric-eligible instances but only one test record.
+
 `--multi-instance-labels` accepts the checked-in manual sidecar schema for
 binder and duel-field frames. Every instance requires a physical-card id and
 four human-ordered corners; resulting records are test-only and their sessions

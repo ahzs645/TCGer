@@ -396,6 +396,10 @@ class RealReleaseAdapterTests(unittest.TestCase):
             )
             self.assertEqual(record["instances"][-1]["occlusionOrder"], 8)
             self.assertEqual(summary["stats"]["devmodeMultiInstanceCards"], 9)
+            self.assertEqual(summary["instances"], sum(
+                len(load_json(output / item["path"])["instances"])
+                for item in manifest["records"]
+            ))
             self.assertEqual(summary["stats"]["devmodeMultiInstanceFaceDown"], 1)
             self.assertEqual(
                 summary["stats"]["devmodeMultiInstanceOccludedCorners"], 1
