@@ -101,36 +101,67 @@ Prior art for the formulation, none of it card-specific:
 OBB, segmentation, and pose can share one corpus release and one experiment
 batch. They remain separate training jobs.
 
-## Gate 0: licensing and provenance
+## Gate 0: train freely, ship gated
 
-This gate is already open. The web detector's `metadata.yaml` declares
-AGPL-3.0, the iOS training notebook installs Ultralytics and starts from
-`yolo11s.pt`, and the repository has no root license file. Ultralytics offers
-AGPL-3.0 and Enterprise licensing. No further Ultralytics model is trained or
-shipped until one of these is chosen:
+The licensing gate applies to publication, not to this internal bake-off.
+Any candidate may be trained, exported privately for evaluation, and
+benchmarked. No Ultralytics-derived export may be published to the shared
+asset store while its run has `licenseRoute: evaluation-only`. Publication is
+unlocked only after the human records either an Ultralytics Enterprise route
+or an AGPL-compatible route. Apache/permissive candidates use
+`licenseRoute: permissive` and keep the existing publication path.
 
-1. make the applicable product and source AGPL-compatible;
-2. purchase an Ultralytics Enterprise license; or
-3. replace the Ultralytics detector and training dependency.
+This is an operating rule for the experiment, not a conclusion inferred from
+model quality. Checkpoint, pretrained-backbone, framework, and dataset
+licenses still receive provenance records. FastViT's license is Apple's custom
+redistributable license and its acknowledgements must be audited before a
+FastViT-derived model ships.
 
-If option 3 is chosen, the permissive path becomes the main line: an
-RTMDet/RTMPose prototype (MMDetection and MMPose are Apache-2.0) as the faster
-baseline, and a custom four-corner head on the FastViT backbone the encoder
-trainer already uses as the architecture under full control. Checkpoint,
-pretrained-backbone, and dataset licenses need their own provenance records;
-FastViT's license is Apple's custom redistributable license and its
-acknowledgements must be audited.
+The licensing bake-off contains four runs across three architecture families:
 
-Recommendation: for a long-lived shared scanner, take option 3 and replace
-the Ultralytics dependency, unless an Enterprise license is deliberately
-purchased. AGPL must not become the product license by accident. Enterprise
-is the fastest route if its cost and terms are acceptable. Replacement costs
-more engineering but leaves the detector, its exports, and the release process
-under clearer control.
+| Candidate | Framework | License family | Purpose in the bake-off |
+|---|---|---|---|
+| YOLO11n-pose, four card corners | Ultralytics | AGPL-3.0 or Enterprise for publication | smallest pose baseline and one-epoch wrapper smoke |
+| YOLO11s-pose, four card corners | Ultralytics | AGPL-3.0 or Enterprise for publication | higher-capacity pose candidate |
+| YOLOX-Pose, four card corners | MMYOLO | Apache-2.0 | permissive one-stage pose candidate |
+| FastViT-T8 custom four-corner head | TCGer/PyTorch | custom head; audit the FastViT backbone terms | architecture under project control |
+
+RTMPose is not shortlisted: it is top-down and requires a detector in front,
+which would confound the comparison of one-stage card localizers. The bake-off
+produces a recommendation; the human makes the licensing decision after seeing
+the results.
 
 Every shipped geometry model records the same provenance the encoder releases
 already do: corpus release hash, code revision, checkpoint hash, export hash,
 input contract, and evaluation artifact.
+
+### Bake-off fairness and measurements
+
+Every run uses a fully resolved, hashed experiment configuration. The shared
+rules are the same training-purpose corpus release, 640-pixel input, the same
+epoch or wall-clock budget, the same augmentation where the framework allows,
+the same seed policy, and the same evaluation script. A framework limitation
+or other exception is an explicit `deviations` entry in that resolved config;
+it is never an unrecorded change. Private checkpoints live at
+`geometry/<candidate>/<corpus-hash>/<experiment-hash>/`.
+
+The comparison table records, for every candidate:
+
+- the geometry benchmark on the frozen real v3 release and the synthetic
+  duel-field slice;
+- full recognition replay (`correct`, `wrong`, and `abstain`) on the labeled
+  sessions;
+- exported bytes for every platform;
+- model, decoder, and end-to-end latency on one physical iPhone and one
+  physical Android phone;
+- Core ML versus ONNX parity on the golden fixtures;
+- decoder source-code size; and
+- L4 GPU hours.
+
+Gate 0 does not authorize a corpus. Before a training-purpose release is
+built, the human must approve a committed `training-minimums-v1` policy and
+its hash. The builder must bind that approved policy; it must never generate a
+training policy from the corpus it is evaluating.
 
 ## Runtimes
 
@@ -412,9 +443,10 @@ orientation accuracy.
 
 ## Work that starts now
 
-Three workstreams were unblocked and independent of the licensing decision.
-The contract-freeze workstream is complete; benchmark and compositor tooling
-are also landed, while candidate training still waits on the human gates.
+The three foundation workstreams were independent of the final licensing
+decision. The contract freeze, benchmark, and compositor tooling are landed.
+Candidate configuration and license-route enforcement are also implemented;
+training now waits on human approval of `training-minimums-v1` and its hash.
 
 1. **Contract freeze**
    - commit JSON schemas for `CardGeometryResult` and the corpus record;
@@ -430,7 +462,7 @@ are also landed, while candidate training still waits on the human gates.
      round-trips before any model exists;
    - commit crop fixtures (tolerance). Raw-tensor-to-candidate fixtures are
      model-specific and are added per trained model in export step 3, so this
-     workstream stays independent of the licensing decision.
+     workstream stays independent of the final licensing decision.
 
    The first implementation commit is therefore: the two JSON schemas, the
    validation/NMS fixtures, and the context-padding and inverse-coordinate
@@ -466,23 +498,27 @@ are also landed, while candidate training still waits on the human gates.
 
 ## Execution order
 
-1. In parallel, none blocking the others:
-   - resolve licensing and create the model/data provenance manifest;
-   - the three workstreams above.
-2. After the licensing decision:
-   - select the allowed training family;
-   - train the candidate batch (pose primary with OBB and segmentation
-     challengers, or RTMDet/RTMPose plus the custom FastViT corner head).
-3. Export raw heads to Core ML and ONNX; implement each model's
+1. Obtain human approval of the committed `training-minimums-v1` coverage
+   policy and its hash. Build the training-purpose release against that policy
+   and require the pinned preflight to report `readyFor: training`.
+2. Run one epoch of YOLO11n-pose on an L4 to prove corpus download, preflight,
+   training, private checkpoint persistence, config hashing, private export,
+   and evaluation end to end.
+3. Run the full four-candidate batch (the three architecture families in the
+   Gate 0 table) under the shared fairness configuration.
+4. Export raw heads privately to Core ML and ONNX; implement each model's
    raw-tensor-to-candidate decoder in Swift, Kotlin, and TypeScript and add
    its model-specific golden fixtures beside the shared validation/NMS
    fixtures.
-4. Run offline geometry evaluation, full recognition replay on the labeled
+5. Run offline geometry evaluation, full recognition replay on the labeled
    Magic, Pokémon, and Yu-Gi-Oh sessions, and physical-device latency and
    thermal tests.
-5. Ship the winner through the shared asset store as a content-addressed
-   release with a mutable manifest published last.
-6. Retire the bundled iOS `CardDetector.mlpackage`, the web TensorFlow.js
+6. Produce the comparison table and a recommendation. The human then chooses
+   the license route. An `evaluation-only` Ultralytics run cannot proceed to
+   the asset-store publication step.
+7. Ship the licensed winner through the shared asset store as a
+   content-addressed release with a mutable manifest published last.
+8. Retire the bundled iOS `CardDetector.mlpackage`, the web TensorFlow.js
    detector and its runtime dependency, and, under the orientation rule
    above, the unconditional 0°/180° double inference.
 

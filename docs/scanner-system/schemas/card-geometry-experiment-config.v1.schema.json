@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tcger.app/schemas/card-geometry-experiment-config/v1",
+  "title": "TCGer card-geometry experiment config v1",
+  "description": "A fully resolved, hashable training and evaluation configuration for one candidate in the shared geometry licensing bake-off.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "bakeoffId",
+    "candidate",
+    "framework",
+    "licenseRoute",
+    "toolingRevision",
+    "corpus",
+    "execution",
+    "fairness",
+    "evaluations",
+    "measurements",
+    "deviations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "https://tcger.app/schemas/card-geometry-experiment-config/v1"
+    },
+    "bakeoffId": { "$ref": "#/$defs/id" },
+    "candidate": {
+      "enum": [
+        "yolo11n-pose",
+        "yolo11s-pose",
+        "yolox-pose",
+        "fastvit-t8-four-corner"
+      ]
+    },
+    "framework": { "enum": ["ultralytics", "mmyolo", "tcger-pytorch"] },
+    "licenseRoute": {
+      "enum": ["evaluation-only", "enterprise", "agpl", "permissive"]
+    },
+    "toolingRevision": { "$ref": "#/$defs/gitRevision" },
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "datasetRepo",
+        "datasetRevision",
+        "releasePath",
+        "corpusHash",
+        "policyId",
+        "policySha256"
+      ],
+      "properties": {
+        "datasetRepo": { "$ref": "#/$defs/hubRepo" },
+        "datasetRevision": { "$ref": "#/$defs/gitRevision" },
+        "releasePath": { "$ref": "#/$defs/relativePath" },
+        "corpusHash": { "$ref": "#/$defs/sha256" },
+        "policyId": { "const": "training-minimums-v1" },
+        "policySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpointRepo",
+        "checkpointRepoPrivate",
+        "containerImage",
+        "gpuFlavor",
+        "trainCommand",
+        "privateExportCommands"
+      ],
+      "properties": {
+        "checkpointRepo": { "$ref": "#/$defs/hubRepo" },
+        "checkpointRepoPrivate": { "const": true },
+        "containerImage": {
+          "type": "string",
+          "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$"
+        },
+        "gpuFlavor": { "const": "l4x1" },
+        "trainCommand": { "$ref": "#/$defs/command" },
+        "privateExportCommands": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["coreml", "onnx"],
+          "properties": {
+            "coreml": { "$ref": "#/$defs/command" },
+            "onnx": { "$ref": "#/$defs/command" }
+          }
+        },
+        "assetStorePublishCommand": { "$ref": "#/$defs/command" }
+      }
+    },
+    "fairness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputResolution",
+        "budget",
+        "augmentationProfile",
+        "seedPolicy",
+        "evaluationScript"
+      ],
+      "properties": {
+        "inputResolution": { "const": 640 },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "enum": ["epochs", "wall-clock-seconds"] },
+            "value": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "augmentationProfile": { "$ref": "#/$defs/id" },
+        "seedPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseSeed", "repeatCount", "derivation"],
+          "properties": {
+            "baseSeed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+            "repeatCount": { "type": "integer", "minimum": 1 },
+            "derivation": { "const": "base-plus-repeat-index" }
+          }
+        },
+        "evaluationScript": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "$ref": "#/$defs/relativePath" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "evaluations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frozenRealV3",
+        "syntheticDuelField",
+        "recognitionReplay",
+        "goldenFixtures"
+      ],
+      "properties": {
+        "frozenRealV3": { "$ref": "#/$defs/pinnedRelease" },
+        "syntheticDuelField": { "$ref": "#/$defs/pinnedRelease" },
+        "recognitionReplay": { "$ref": "#/$defs/hashedArtifact" },
+        "goldenFixtures": { "$ref": "#/$defs/hashedArtifact" }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "geometryRealV3",
+        "geometrySyntheticDuelField",
+        "recognitionReplay",
+        "exportedBytesPlatforms",
+        "physicalLatencyPlatforms",
+        "coremlOnnxParity",
+        "decoderCodeSize",
+        "l4GpuHours"
+      ],
+      "properties": {
+        "geometryRealV3": { "const": true },
+        "geometrySyntheticDuelField": { "const": true },
+        "recognitionReplay": { "const": true },
+        "exportedBytesPlatforms": {
+          "const": ["ios", "android", "web"]
+        },
+        "physicalLatencyPlatforms": { "const": ["ios", "android"] },
+        "coremlOnnxParity": { "const": true },
+        "decoderCodeSize": { "const": true },
+        "l4GpuHours": { "const": true }
+      }
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule", "candidateValue", "reason"],
+        "properties": {
+          "rule": {
+            "enum": [
+              "budget",
+              "augmentation",
+              "seed-policy",
+              "evaluation-script",
+              "input-resolution",
+              "corpus-release"
+            ]
+          },
+          "candidateValue": {},
+          "reason": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitRevision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "hubRepo": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\s]+$"
+    },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "pinnedRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["datasetRepo", "datasetRevision", "releasePath", "corpusHash"],
+      "properties": {
+        "datasetRepo": { "$ref": "#/$defs/hubRepo" },
+        "datasetRevision": { "$ref": "#/$defs/gitRevision" },
+        "releasePath": { "$ref": "#/$defs/relativePath" },
+        "corpusHash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "hashedArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

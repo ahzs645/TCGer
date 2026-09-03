@@ -158,6 +158,40 @@ images by content hash; those quads remain predictions, never ground truth.
 The [deterministic compositor](compositor/README.md) emits synthetic scenes as
 ordinary smoke-purpose releases through these same contracts and checks.
 
+## Candidate licensing bake-off
+
+`run_card_geometry_hf_job.py` is the backend-neutral Hugging Face Job wrapper
+for the four-candidate licensing bake-off. It validates a
+`card-geometry-experiment-config.v1` document, applies defaults before hashing,
+and scopes all private artifacts to:
+
+```text
+geometry/<candidate>/<corpus-hash>/<experiment-hash>/
+```
+
+The resolved config pins the training corpus and approved policy by hash,
+freezes the 640-pixel fairness rules and evaluation inputs, records deviations,
+and carries the complete measurement checklist. The wrapper re-runs preflight
+with `releasePurpose: training` before a backend command executes and verifies
+that the checkpoint repository is private.
+
+`licenseRoute: evaluation-only` permits YOLO11n-pose and YOLO11s-pose training
+and private Core ML/ONNX exports. An asset-store destination is rejected before
+Hub access, workdir creation, or exporter execution. `enterprise` or `agpl`
+unlocks that destination for Ultralytics candidates; YOLOX-Pose and the custom
+FastViT head use the existing `permissive` route.
+
+The checked-in `fixtures/experiment-config.evaluation-only.v1.json` is a
+schema and guard fixture only: its training-release hashes and container digest
+are placeholders. A real config cannot be prepared until the human approves
+`training-minimums-v1`; the wrapper requires that exact policy id and its
+committed SHA-256 and never generates a policy from corpus contents.
+
+```sh
+python3 tools/card-geometry/run_card_geometry_hf_job.py \
+  --config <resolved-candidate-config.json> --action train --dry-run
+```
+
 ## Running the checks
 
 ```sh

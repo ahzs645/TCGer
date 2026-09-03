@@ -1,0 +1,97 @@
+{
+  "bakeoffId": "shared-card-geometry-licensing-v1",
+  "candidate": "yolo11n-pose",
+  "corpus": {
+    "corpusHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "policyId": "training-minimums-v1",
+    "policySha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "releasePath": "geometry/releases/training-v1"
+  },
+  "deviations": [],
+  "evaluations": {
+    "frozenRealV3": {
+      "corpusHash": "97780e7e96cbd98da91173a00b37e6304514f758a9046f5bd98adf30c418820e",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "65017ce8da9137fea491739bd06388ab513831a2",
+      "releasePath": "geometry/releases/real-geometry-devmode-orientation-smoke-v3"
+    },
+    "goldenFixtures": {
+      "path": "tools/card-geometry/fixtures/validation-nms.v1.json",
+      "sha256": "ec0f877af9d0f2afe4f6a76c7a4590c033fa0d35027815330adb24c540532168"
+    },
+    "recognitionReplay": {
+      "path": "docs/scanner-system/benchmarks/2026-09-02-shared-card-geometry/reports/device-geometry-outcomes.json",
+      "sha256": "05b56efb2ece661100fab8c935485174e5d59aae562704002e86349e008a5997"
+    },
+    "syntheticDuelField": {
+      "corpusHash": "544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "b4ef746b06c725cbe196e709d518dc53eea0ad13",
+      "releasePath": "geometry/releases/synthetic-geometry-smoke-v1"
+    }
+  },
+  "execution": {
+    "checkpointRepo": "ahzs645/tcger-universal-arcface",
+    "checkpointRepoPrivate": true,
+    "containerImage": "registry.example/tcger-geometry@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "gpuFlavor": "l4x1",
+    "privateExportCommands": {
+      "coreml": [
+        "python",
+        "trainers/export_geometry.py",
+        "--format",
+        "coreml"
+      ],
+      "onnx": [
+        "python",
+        "trainers/export_geometry.py",
+        "--format",
+        "onnx"
+      ]
+    },
+    "trainCommand": [
+      "python",
+      "trainers/train_yolo_pose.py"
+    ]
+  },
+  "fairness": {
+    "augmentationProfile": "shared-card-geometry-v1",
+    "budget": {
+      "kind": "epochs",
+      "value": 1
+    },
+    "evaluationScript": {
+      "path": "tools/card-geometry/benchmark_geometry.py",
+      "sha256": "f9736ffca879854f605ad2ac008cd236b595402d4666ad7908e97e86d7361afa"
+    },
+    "inputResolution": 640,
+    "seedPolicy": {
+      "baseSeed": 20260902,
+      "derivation": "base-plus-repeat-index",
+      "repeatCount": 1
+    }
+  },
+  "framework": "ultralytics",
+  "licenseRoute": "evaluation-only",
+  "measurements": {
+    "coremlOnnxParity": true,
+    "decoderCodeSize": true,
+    "exportedBytesPlatforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "geometryRealV3": true,
+    "geometrySyntheticDuelField": true,
+    "l4GpuHours": true,
+    "physicalLatencyPlatforms": [
+      "ios",
+      "android"
+    ],
+    "recognitionReplay": true
+  },
+  "schema": "https://tcger.app/schemas/card-geometry-experiment-config/v1",
+  "toolingRevision": "9dc0c1cac5c08cfe98739f6fb6814121760795d4"
+}
