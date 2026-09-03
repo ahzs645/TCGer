@@ -184,6 +184,8 @@ coordinates, and bilinear sampling. Preview proportions default to 63×88 for
 standard cards or 59×86 for Yu-Gi-Oh; a 720×1000 scanner-ratio preset is also
 available. These are display presets, not measurements or automatic corner
 inference. Transparent checkerboard identifies pixels outside the capture.
+The browser editor displays 40% exterior workspace and accepts known amodal
+coordinates within a 50% safety bound for steep, partly cropped cards.
 This preview is not the release rectifier, does not change the frozen crop
 contract, and never changes saved annotations when its proportions change.
 Test its math and active-card selection with

@@ -1,7 +1,9 @@
 "use strict";
 
 const CORNERS = ["TL", "TR", "BR", "BL"];
-const MARGIN = 0.2;
+// Show enough exterior canvas for amodal corners under strong perspective.
+// Validation permits a slightly larger 50% safety bound.
+const MARGIN = 0.4;
 const geometry = window.CardEditorGeometry;
 const state = {
   samples: [], index: 0, sample: null, image: null, activeCard: 0,

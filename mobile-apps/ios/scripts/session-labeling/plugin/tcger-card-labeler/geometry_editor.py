@@ -25,8 +25,8 @@ def quad_validation_error(points):
         quad = [[float(x), float(y)] for x, y in points]
     except (TypeError, ValueError):
         return "corner coordinates must be numeric"
-    if any(not (-0.25 <= value <= 1.25) for point in quad for value in point):
-        return "corners must stay within the editor's 20% context margin"
+    if any(not (-0.5 <= value <= 1.5) for point in quad for value in point):
+        return "corners must stay within the editor's 50% exterior safety bound"
     crosses = []
     for index in range(4):
         a = quad[index]

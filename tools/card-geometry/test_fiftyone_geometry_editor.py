@@ -38,14 +38,14 @@ class GeometryEditorHelpersTest(unittest.TestCase):
         self.assertIsNone(HELPERS.nearest_corner(quads, 0.5, 0.5))
 
     def test_accepts_ordered_quad_with_outside_frame_corner(self):
-        quad = [[0.1, 0.1], [0.9, 0.1], [0.9, 1.08], [0.1, 1.08]]
+        quad = [[0.1, 0.1], [0.9, 0.1], [0.9, 1.4], [0.1, 1.4]]
         self.assertIsNone(HELPERS.quad_validation_error(quad))
 
     def test_rejects_crossed_and_out_of_margin_quads(self):
         crossed = [[0.1, 0.1], [0.9, 0.9], [0.9, 0.1], [0.1, 0.9]]
         self.assertIn("cross", HELPERS.quad_validation_error(crossed))
-        outside_margin = [[0.1, 0.1], [1.3, 0.1], [0.9, 0.9], [0.1, 0.9]]
-        self.assertIn("20%", HELPERS.quad_validation_error(outside_margin))
+        outside_margin = [[0.1, 0.1], [1.6, 0.1], [0.9, 0.9], [0.1, 0.9]]
+        self.assertIn("50%", HELPERS.quad_validation_error(outside_margin))
 
     def test_manual_quads_strips_only_duplicate_closing_point(self):
         closed = [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]
