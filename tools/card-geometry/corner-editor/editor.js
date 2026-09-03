@@ -110,9 +110,11 @@ function draw() {
     quad.forEach((point, cornerIndex) => {
       const [x, y] = toCanvas(point, frame);
       const selected = active && cornerIndex === state.activeCorner;
+      const reviewed = state.sample.draftSource !== "detector"
+        || state.reviewedCorners.has(`${cardIndex}:${cornerIndex}`);
       ctx.beginPath();
       ctx.arc(x, y, selected ? 13 * frame.ratio : active ? 9 * frame.ratio : 6 * frame.ratio, 0, Math.PI * 2);
-      ctx.fillStyle = selected ? "#ff9f0a" : active ? "#34c759" : "#4da3ff";
+      ctx.fillStyle = selected ? "#ff9f0a" : reviewed ? "#34c759" : "#ff453a";
       ctx.fill();
       if (selected) {
         ctx.strokeStyle = "white";
@@ -121,8 +123,9 @@ function draw() {
       }
       if (active) {
         ctx.font = `${Math.round(13 * frame.ratio)}px sans-serif`;
-        ctx.fillStyle = selected ? "#ffb340" : "white";
-        ctx.fillText(CORNERS[cornerIndex], x + 12 * frame.ratio, y - 10 * frame.ratio);
+        ctx.fillStyle = selected ? "#ffb340" : reviewed ? "white" : "#ff827a";
+        const reviewMark = reviewed ? "✓" : "•";
+        ctx.fillText(`${CORNERS[cornerIndex]} ${reviewMark}`, x + 12 * frame.ratio, y - 10 * frame.ratio);
       }
     });
   });
@@ -244,6 +247,19 @@ function validQuad(quad) {
   return geometry.validQuad(quad);
 }
 
+function unreviewedCorners() {
+  if (state.sample?.draftSource !== "detector") return [];
+  const missing = [];
+  state.sample.quads.forEach((_, cardIndex) => {
+    CORNERS.forEach((corner, cornerIndex) => {
+      if (!state.reviewedCorners.has(`${cardIndex}:${cornerIndex}`)) {
+        missing.push({key: `${cardIndex}:${cornerIndex}`, label: `Card ${cardIndex + 1} ${corner}`});
+      }
+    });
+  });
+  return missing;
+}
+
 editor.addEventListener("pointerdown", (event) => {
   if (!state.sample || event.button !== 0) return;
   editor.focus({preventScroll: true});
@@ -289,9 +305,11 @@ async function endDrag(event) {
   if (!unchanged) renderControls();
   if (state.sample.draftSource === "detector") {
     state.reviewedCorners.add(`${state.activeCard}:${state.activeCorner}`);
-    const required = state.sample.quads.length * 4;
-    if (state.reviewedCorners.size < required) {
-      status(`Detector draft: ${state.reviewedCorners.size}/${required} corners reviewed. Click or drag every corner before saving.`);
+    renderControls();
+    draw();
+    const missing = unreviewedCorners();
+    if (missing.length) {
+      status(`Still unreviewed: ${missing.map((item) => item.label).join(", ")}. Click, drag, or use Save frame to confirm them.`);
       return;
     }
     await persist(false, "All detector-draft corners reviewed. Ready to save frame.");
@@ -356,7 +374,14 @@ function renderControls() {
   cards.replaceChildren();
   state.sample.quads.forEach((_, index) => {
     const button = document.createElement("button");
-    button.textContent = `Card ${index + 1}`;
+    if (state.sample.draftSource === "detector") {
+      const reviewed = CORNERS.filter((_, cornerIndex) =>
+        state.reviewedCorners.has(`${index}:${cornerIndex}`)
+      ).length;
+      button.textContent = `Card ${index + 1} · ${reviewed}/4`;
+    } else {
+      button.textContent = `Card ${index + 1}`;
+    }
     button.className = index === state.activeCard ? "active" : "";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(index === state.activeCard));
@@ -444,12 +469,20 @@ document.querySelector("#delete").onclick = async () => {
   await persist(false, "Card deleted and remaining draft saved");
 };
 document.querySelector("#save").onclick = () => {
-  const required = state.sample.quads.length * 4;
-  if (state.sample.draftSource === "detector" && state.reviewedCorners.size < required) {
-    status(`Review all four detector-draft corners first (${state.reviewedCorners.size}/${required} done). Click a correct corner; drag one that needs correction.`, "error");
-    return;
+  const missing = unreviewedCorners();
+  if (missing.length) {
+    const labels = missing.map((item) => item.label).join(", ");
+    const confirmed = window.confirm(
+      `Unreviewed detector corners: ${labels}.\n\nSaving confirms that these positions are already correct. Save frame?`,
+    );
+    if (!confirmed) {
+      status(`Not saved. Unreviewed: ${labels}.`, "error");
+      return;
+    }
+    missing.forEach((item) => state.reviewedCorners.add(item.key));
   }
-  persist(true, `Frame saved (${state.sample.quads.length} cards)`);
+  const suffix = missing.length ? `; confirmed ${missing.length} unchanged corners` : "";
+  persist(true, `Frame saved (${state.sample.quads.length} cards${suffix})`);
 };
 document.querySelector("#zoom").oninput = drawMagnifier;
 window.addEventListener("resize", draw);
