@@ -23,7 +23,12 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = ROOT / "mobile-apps/ios/scripts/session-labeling/plugin/tcger-card-labeler"
 STATIC_DIR = Path(__file__).with_name("corner-editor")
-BINDER_MINIMUM = 20
+SCENE_MINIMUMS = {
+    "single_handheld": 50,
+    "binder_page": 20,
+    "steep_playmat": 20,
+    "duel_field": 30,
+}
 
 import sys  # noqa: E402
 
@@ -75,12 +80,52 @@ def load_editor_metadata(sample, quads):
     return metadata
 
 
+def polyline_quads(sample, field):
+    """Read four-point quads from a FiftyOne polyline field."""
+    try:
+        lines = sample[field].polylines
+    except Exception:
+        return []
+    result = []
+    for line in lines:
+        points = line.points[0] if line.points else []
+        if len(points) == 5 and points[0] == points[-1]:
+            points = points[:-1]
+        if len(points) != 4:
+            continue
+        quad = [[float(x), float(y)] for x, y in points]
+        signed_area = sum(
+            quad[index][0] * quad[(index + 1) % 4][1]
+            - quad[(index + 1) % 4][0] * quad[index][1]
+            for index in range(4)
+        ) / 2
+        if signed_area < 0:
+            quad.reverse()
+        result.append(quad)
+    return result
+
+
 def durable_geometry(sample):
     try:
         value = json.loads(field_value(sample, "manual_instances_json") or "null")
     except (TypeError, json.JSONDecodeError):
         return None
     return value if isinstance(value, dict) else None
+
+
+def scene_slice_for(sample, requested=None):
+    """Choose an explicit editor slice without rewriting finalized truth."""
+    saved = (durable_geometry(sample) or {}).get("sceneSlice")
+    value = saved or requested
+    if value is None:
+        value = (
+            "binder_page"
+            if field_value(sample, "frame_type") == "binder"
+            else "single_handheld"
+        )
+    if value not in SCENE_MINIMUMS:
+        raise ValueError(f"invalid scene slice: {value}")
+    return value
 
 
 def geometry_is_finalized(sample, quads):
@@ -185,12 +230,15 @@ def append_journal(sample):
 
 
 class EditorStore:
-    def __init__(self, dataset_name, view_name):
+    def __init__(self, dataset_name, view_name, scene_slice=None):
         import fiftyone as fo
 
         self.fo = fo
         self.dataset = fo.load_dataset(dataset_name)
         self.view_name = view_name
+        if scene_slice is not None and scene_slice not in SCENE_MINIMUMS:
+            raise ValueError(f"invalid scene slice: {scene_slice}")
+        self.requested_scene_slice = scene_slice
         view = self.dataset.load_saved_view(view_name)
         self.sample_ids = [str(value) for value in view.values("id")]
 
@@ -199,12 +247,17 @@ class EditorStore:
         for value in self.sample_ids:
             sample = self.dataset[value]
             quads = manual_quads(sample)
+            draft_source = None
+            if not quads:
+                quads = polyline_quads(sample, "detection_quads")
+                draft_source = "detector"
             result.append(
                 {
                     "id": value,
                     "key": sample_key(sample),
                     "cards": len(quads),
                     "finalized": geometry_is_finalized(sample, quads),
+                    "draftSource": draft_source,
                 }
             )
         return result
@@ -212,10 +265,13 @@ class EditorStore:
     def progress(self):
         samples = self.list_samples()
         finalized = sum(item["cards"] for item in samples if item["finalized"])
+        scene_slice = self.requested_scene_slice or "binder_page"
+        minimum = SCENE_MINIMUMS[scene_slice]
         return {
-            "minimum": BINDER_MINIMUM,
+            "sceneSlice": scene_slice,
+            "minimum": minimum,
             "finalizedInstances": finalized,
-            "ready": finalized >= BINDER_MINIMUM,
+            "ready": finalized >= minimum,
         }
 
     def sample_payload(self, value):
@@ -223,6 +279,10 @@ class EditorStore:
             raise KeyError(value)
         sample = self.dataset[value]
         quads = manual_quads(sample)
+        draft_source = None
+        if not quads:
+            quads = polyline_quads(sample, "detection_quads")
+            draft_source = "detector"
         with Image.open(sample.filepath) as image:
             width, height = image.size
         return {
@@ -230,12 +290,14 @@ class EditorStore:
             "key": sample_key(sample),
             "game": field_value(sample, "game", "pokemon"),
             "frameType": field_value(sample, "frame_type", "binder"),
+            "sceneSlice": scene_slice_for(sample, self.requested_scene_slice),
             "width": width,
             "height": height,
             "imageUrl": f"/api/image/{value}",
             "quads": quads,
             "metadata": load_editor_metadata(sample, quads),
             "finalized": geometry_is_finalized(sample, quads),
+            "draftSource": draft_source,
         }
 
     def image_path(self, value):
@@ -260,7 +322,7 @@ class EditorStore:
             ]
         )
         if bool(payload.get("finalize")):
-            scene_slice = "binder_page" if field_value(sample, "frame_type") == "binder" else "single_handheld"
+            scene_slice = scene_slice_for(sample, payload.get("sceneSlice"))
             record = geometry_record(
                 sample_key(sample), field_value(sample, "game"), scene_slice, quads, metadata
             )
@@ -348,10 +410,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="tcger-sessions")
     parser.add_argument("--view", default="geometry: binder first batch")
+    parser.add_argument("--scene-slice", choices=sorted(SCENE_MINIMUMS))
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5152)
     args = parser.parse_args()
-    store = EditorStore(args.dataset, args.view)
+    store = EditorStore(args.dataset, args.view, args.scene_slice)
     server = ThreadingHTTPServer((args.host, args.port), EditorHandler)
     server.store = store
     print(f"TCGer corner editor: http://{args.host}:{args.port} ({len(store.sample_ids)} samples from {args.view!r})")

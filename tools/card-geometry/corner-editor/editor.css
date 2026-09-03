@@ -19,6 +19,7 @@ aside { background:var(--surface); padding:10px; border-radius:12px; border:1px 
 .tip { color:var(--muted); font-size:12px; line-height:1.4; margin-bottom:0; }
 .controls { margin-top:12px; padding:12px; background:var(--surface); border:1px solid #30323a; border-radius:12px; }
 .button-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; } .metadata { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); }
+.scene-label { display:flex; align-items:center; gap:8px; margin-left:auto; color:var(--muted); }
 .metadata label { display:flex; align-items:center; gap:6px; padding:6px 8px; background:var(--surface-2); border-radius:8px; } .metadata select { padding:4px 7px; }
 footer { position:fixed; bottom:0; left:0; right:0; border-top:1px solid #30323a; border-bottom:0; font-size:13px; z-index:5; } #status.ok { color:var(--green); } #status.error { color:#ff827a; }
 #minimum-progress { color:var(--orange); font-variant-numeric:tabular-nums; } #minimum-progress.ready { color:var(--green); }

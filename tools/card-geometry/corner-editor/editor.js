@@ -7,7 +7,7 @@ const state = {
   samples: [], index: 0, sample: null, image: null, activeCard: 0,
   activeCorner: 0, dragging: false, dragSnapshot: null, dragMetadataSnapshot: null,
   progress: {minimum: 20, finalizedInstances: 0, ready: false},
-  sourcePixels: null, previewFrame: null,
+  sourcePixels: null, previewFrame: null, reviewedCorners: new Set(),
 };
 const editor = document.querySelector("#editor");
 const ctx = editor.getContext("2d");
@@ -283,6 +283,14 @@ async function endDrag(event) {
   }
   if (JSON.stringify(state.sample.quads[state.activeCard]) === JSON.stringify(state.dragSnapshot)) return;
   renderControls();
+  if (state.sample.draftSource === "detector") {
+    state.reviewedCorners.add(`${state.activeCard}:${state.activeCorner}`);
+    const required = state.sample.quads.length * 4;
+    if (state.reviewedCorners.size < required) {
+      status(`Detector draft: ${state.reviewedCorners.size}/${required} corners adjusted. Adjust every corner before saving.`);
+      return;
+    }
+  }
   await persist(false, `Saved Card ${state.activeCard + 1} ${CORNERS[state.activeCorner]}`);
 }
 editor.addEventListener("pointerup", endDrag);
@@ -303,7 +311,12 @@ async function persist(finalize, message) {
     await jsonRequest(`/api/sample/${state.sample.id}`, {
       method: "PUT",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({quads: state.sample.quads, metadata: state.sample.metadata, finalize}),
+      body: JSON.stringify({
+        quads: state.sample.quads,
+        metadata: state.sample.metadata,
+        sceneSlice: state.sample.sceneSlice,
+        finalize,
+      }),
     });
     state.sample.finalized = finalize;
     await refreshProgress();
@@ -315,7 +328,8 @@ async function persist(finalize, message) {
 
 function renderProgress() {
   const element = document.querySelector("#minimum-progress");
-  element.textContent = `Binder minimum: ${state.progress.finalizedInstances}/${state.progress.minimum}`;
+  const label = (state.progress.sceneSlice || "binder_page").replaceAll("_", " ");
+  element.textContent = `${label}: ${state.progress.finalizedInstances}/${state.progress.minimum}`;
   element.className = state.progress.ready ? "ready" : "";
 }
 
@@ -395,6 +409,11 @@ document.querySelector("#add").onclick = () => {
   draw();
   status("New card added. Drag its four corners into place.");
 };
+document.querySelector("#scene-slice").onchange = (event) => {
+  if (!state.sample) return;
+  state.sample.sceneSlice = event.target.value;
+  status(`This frame will save as ${event.target.selectedOptions[0].text}.`);
+};
 document.querySelector("#delete").onclick = async () => {
   if (!state.sample?.quads.length) return;
   state.sample.quads.splice(state.activeCard, 1);
@@ -406,7 +425,14 @@ document.querySelector("#delete").onclick = async () => {
   if (state.sample.quads.length) await persist(false, "Card deleted and saved");
   else status("A page must keep at least one card", "error");
 };
-document.querySelector("#save").onclick = () => persist(true, `Page saved (${state.sample.quads.length} cards)`);
+document.querySelector("#save").onclick = () => {
+  const required = state.sample.quads.length * 4;
+  if (state.sample.draftSource === "detector" && state.reviewedCorners.size < required) {
+    status(`Adjust all four detector-draft corners first (${state.reviewedCorners.size}/${required} done).`, "error");
+    return;
+  }
+  persist(true, `Frame saved (${state.sample.quads.length} cards)`);
+};
 document.querySelector("#zoom").oninput = drawMagnifier;
 window.addEventListener("resize", draw);
 
@@ -415,6 +441,8 @@ async function loadSample(index) {
   const summary = state.samples[state.index];
   status("Loading page…");
   state.sample = await jsonRequest(`/api/sample/${summary.id}`);
+  state.reviewedCorners = new Set();
+  document.querySelector("#scene-slice").value = state.sample.sceneSlice;
   state.sourcePixels = null;
   state.activeCard = 0;
   state.activeCorner = 0;
@@ -430,7 +458,10 @@ async function loadSample(index) {
     document.querySelector("#preview-profile").value = geometry.defaultProfile(state.sample.game);
     renderControls();
     draw();
-    status("Ready — choose a card; Tab / Shift+Tab switches cards while editing.", "ok");
+    const draft = state.sample.draftSource === "detector"
+      ? " Detector corners are a starting draft—review all four before saving."
+      : "";
+    status(`Ready — choose a card; Tab / Shift+Tab switches cards while editing.${draft}`, "ok");
   };
   state.image.onerror = () => status("Could not load source image", "error");
   state.image.src = `${state.sample.imageUrl}?v=${Date.now()}`;

@@ -45,7 +45,17 @@
         </aside>
       </section>
       <section class="controls">
-        <div class="button-row"><button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="save" class="primary">Save page</button></div>
+        <div class="button-row">
+          <button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="save" class="primary">Save frame</button>
+          <label class="scene-label">Evaluation slice
+            <select id="scene-slice">
+              <option value="single_handheld">Single handheld</option>
+              <option value="binder_page">Binder page</option>
+              <option value="steep_playmat">Steep playmat</option>
+              <option value="duel_field">Duel field</option>
+            </select>
+          </label>
+        </div>
         <div id="metadata" class="metadata"></div>
       </section>
     </main>

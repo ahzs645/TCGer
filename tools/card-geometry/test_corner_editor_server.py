@@ -81,6 +81,31 @@ class CornerEditorServerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cross"):
             SERVER.validate_payload(crossed)
 
+    def test_requested_scene_slice_is_used_for_unfinalized_frame(self):
+        sample = _Sample(key="frame-1", frame_type="single")
+        self.assertEqual(
+            SERVER.scene_slice_for(sample, "steep_playmat"), "steep_playmat"
+        )
+
+    def test_finalized_scene_slice_is_not_silently_rewritten(self):
+        sample = _Sample(
+            key="frame-1",
+            manual_instances_json='{"sceneSlice":"duel_field","instances":[]}',
+        )
+        self.assertEqual(
+            SERVER.scene_slice_for(sample, "steep_playmat"), "duel_field"
+        )
+
+    def test_detection_quads_can_seed_an_unfinalized_draft(self):
+        class _Polyline:
+            points = [[[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]]
+
+        class _Polylines:
+            polylines = [_Polyline()]
+
+        sample = _Sample(detection_quads=_Polylines())
+        self.assertEqual(len(SERVER.polyline_quads(sample, "detection_quads")), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
