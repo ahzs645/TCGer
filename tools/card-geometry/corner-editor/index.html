@@ -8,26 +8,49 @@
   </head>
   <body>
     <header>
-      <div><h1>Card corner editor</h1><p>Drag a named corner. The magnifier follows it live.</p></div>
+      <div><h1>Card corner editor</h1><p>One card at a time · live corner zoom and perspective correction</p></div>
       <div class="sample-nav"><button id="previous">←</button><select id="sample"></select><button id="next">→</button></div>
     </header>
     <main>
       <section class="workspace">
-        <div class="canvas-shell"><canvas id="editor" aria-label="Draggable card corner editor"></canvas><div id="drag-hint">Grab a corner dot and drag</div></div>
-        <aside>
+        <div class="canvas-shell">
+          <div class="card-navigation">
+            <button id="previous-card" aria-label="Previous card">← Card</button>
+            <div id="cards" class="button-row" role="tablist" aria-label="Active card"></div>
+            <button id="next-card" aria-label="Next card">Card →</button>
+          </div>
+          <canvas id="editor" tabindex="0" aria-label="Card editor. Tab next card, Shift Tab previous card, Escape exit editing, 1 to 4 select corner."></canvas>
+          <div id="drag-hint">Only active corners are editable · Tab / Shift+Tab switches cards · Esc exits</div>
+        </div>
+        <aside class="inspection-panels">
+          <section class="inspection">
           <div class="magnifier-title"><strong id="selection">Select a corner</strong><span id="coordinates"></span></div>
           <canvas id="magnifier" width="360" height="360"></canvas>
           <label class="zoom-control">Zoom window <input id="zoom" type="range" min="24" max="160" value="64" /></label>
           <p class="tip">Press and hold a dot, then move your pointer. Release to save that corner.</p>
+          </section>
+          <section class="inspection">
+            <div class="magnifier-title"><strong>Rectified card</strong><span id="preview-card"></span></div>
+            <label class="profile-label">Preview proportions
+              <select id="preview-profile">
+                <option value="standard">Standard · 63 × 88 mm</option>
+                <option value="small">Small · 59 × 86 mm</option>
+                <option value="pipeline">Scanner crop · 720 × 1000 px</option>
+              </select>
+            </label>
+            <canvas id="rectified" width="252" height="352" aria-label="Live perspective-corrected active card preview"></canvas>
+            <p id="preview-status" class="tip" aria-live="polite"></p>
+            <p class="tip">Checkerboard = outside the captured image. Proportions are a viewing aid, not a prediction of hidden corners. Preview only; saved quads are unchanged.</p>
+          </section>
         </aside>
       </section>
       <section class="controls">
-        <div id="cards" class="button-row"></div>
         <div class="button-row"><button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="save" class="primary">Save page</button></div>
         <div id="metadata" class="metadata"></div>
       </section>
     </main>
     <footer><span id="status">Loading…</span><span id="minimum-progress"></span><span id="page-count"></span></footer>
+    <script src="/geometry.js"></script>
     <script src="/editor.js"></script>
   </body>
 </html>

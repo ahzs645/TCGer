@@ -168,6 +168,21 @@ Open `http://127.0.0.1:5152`. It loads the `geometry: binder first batch`
 saved view by default, writes to the same `manual_quad` field and append-only
 journal on every release, and updates `manual_instances_json` on **Save page**.
 
+Only the active card displays draggable corner handles; other cards retain
+their outlines. Card tabs and the previous/next-card buttons switch the active
+card. With the canvas or a card tab focused, Tab/Shift+Tab cycle cards (wrapping),
+1–4 select TL/TR/BR/BL, and Escape returns to normal form navigation.
+
+The live rectified preview uses an inverse homography, image-edge source
+coordinates, and bilinear sampling. Preview proportions default to 63×88 for
+standard cards or 59×86 for Yu-Gi-Oh; a 720×1000 scanner-ratio preset is also
+available. These are display presets, not measurements or automatic corner
+inference. Transparent checkerboard identifies pixels outside the capture.
+This preview is not the release rectifier, does not change the frozen crop
+contract, and never changes saved annotations when its proportions change.
+Test its math and active-card selection with
+`node --test tools/card-geometry/corner-editor/geometry.test.cjs`.
+
 ## Geometry benchmark
 
 `benchmark_geometry.py` scores one localizer's portable predictions against a

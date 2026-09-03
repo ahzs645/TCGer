@@ -2,16 +2,20 @@
 
 const CORNERS = ["TL", "TR", "BR", "BL"];
 const MARGIN = 0.2;
+const geometry = window.CardEditorGeometry;
 const state = {
   samples: [], index: 0, sample: null, image: null, activeCard: 0,
-  activeCorner: 0, dragging: false, dragSnapshot: null,
+  activeCorner: 0, dragging: false, dragSnapshot: null, dragMetadataSnapshot: null,
   progress: {minimum: 20, finalizedInstances: 0, ready: false},
+  sourcePixels: null, previewFrame: null,
 };
 const editor = document.querySelector("#editor");
 const ctx = editor.getContext("2d");
 const magnifier = document.querySelector("#magnifier");
 const zoomCtx = magnifier.getContext("2d", {alpha: false});
 const statusEl = document.querySelector("#status");
+const rectified = document.querySelector("#rectified");
+const rectifiedCtx = rectified.getContext("2d");
 
 function status(message, kind = "") {
   statusEl.textContent = message;
@@ -86,7 +90,10 @@ function draw() {
   ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
   ctx.setLineDash([]);
 
-  state.sample.quads.forEach((quad, cardIndex) => {
+  const paintOrder = state.sample.quads.map((_, i) => i).filter(i => i !== state.activeCard);
+  if (state.sample.quads.length) paintOrder.push(state.activeCard);
+  paintOrder.forEach((cardIndex) => {
+    const quad = state.sample.quads[cardIndex];
     const active = cardIndex === state.activeCard;
     ctx.strokeStyle = active ? "#34c759" : "#4da3ff";
     ctx.lineWidth = active ? 4 : 2;
@@ -97,6 +104,7 @@ function draw() {
     });
     ctx.closePath();
     ctx.stroke();
+    if (!active) return; // outlines remain; hidden handles cannot obscure the active card
     quad.forEach((point, cornerIndex) => {
       const [x, y] = toCanvas(point, frame);
       const selected = active && cornerIndex === state.activeCorner;
@@ -117,7 +125,68 @@ function draw() {
     });
   });
   drawMagnifier();
+  schedulePreview();
 }
+
+function schedulePreview() {
+  if (state.previewFrame !== null) return;
+  state.previewFrame = requestAnimationFrame(() => {
+    state.previewFrame = null;
+    rectifiedCtx.clearRect(0, 0, rectified.width, rectified.height);
+    const previewStatus = document.querySelector("#preview-status");
+    if (!state.sourcePixels || !state.sample?.quads.length) {
+      previewStatus.textContent = "Select a card to preview.";
+      document.querySelector("#preview-card").textContent = "";
+      return;
+    }
+    document.querySelector("#preview-card").textContent = `Card ${state.activeCard + 1}`;
+    const profile = geometry.PROFILES[document.querySelector("#preview-profile").value];
+    rectified.width = profile.width;
+    rectified.height = profile.height;
+    try {
+      const preview = geometry.rectify(state.sourcePixels, state.sample.quads[state.activeCard], profile.width, profile.height);
+      rectifiedCtx.putImageData(new ImageData(preview.data, preview.width, preview.height), 0, 0);
+      previewStatus.textContent = `${(preview.outsideFraction * 100).toFixed(1)}% outside capture · TL → TR → BR → BL`;
+    } catch (error) {
+      previewStatus.textContent = `Adjust corners: ${error.message}`;
+    }
+  });
+}
+
+function selectCard(index) {
+  if (!state.sample?.quads.length || state.dragging) return;
+  state.activeCard = geometry.cycleCard(index, state.sample.quads.length, 0);
+  state.activeCorner = 0;
+  renderControls();
+  draw();
+}
+
+function cycleCard(direction) {
+  if (!state.sample?.quads.length) return;
+  selectCard(geometry.cycleCard(state.activeCard, state.sample.quads.length, direction));
+}
+
+// Tab switches cards only in the editing surface, not in forms elsewhere.
+// Escape exits this keyboard mode so ordinary focus navigation is available.
+function editingKey(event) {
+  if (event.altKey || event.ctrlKey || event.metaKey || state.dragging) return;
+  if (event.key === "Tab") {
+    event.preventDefault();
+    cycleCard(event.shiftKey ? -1 : 1);
+    editor.focus({preventScroll: true});
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    document.querySelector("#zoom").focus();
+  } else if (/^[1-4]$/.test(event.key) && state.sample?.quads.length) {
+    state.activeCorner = Number(event.key) - 1;
+    draw();
+  }
+}
+editor.addEventListener("keydown", editingKey);
+document.querySelector("#cards").addEventListener("keydown", editingKey);
+document.querySelector("#previous-card").onclick = () => cycleCard(-1);
+document.querySelector("#next-card").onclick = () => cycleCard(1);
+document.querySelector("#preview-profile").onchange = schedulePreview;
 
 function drawMagnifier() {
   zoomCtx.fillStyle = "#050505";
@@ -165,47 +234,29 @@ function nearestHandle(event) {
   const px = (event.clientX - rect.left) * scale;
   const py = (event.clientY - rect.top) * scale;
   const frame = fit();
-  let best = null;
-  let bestDistance = (24 * frame.ratio) ** 2;
-  state.sample.quads.forEach((quad, cardIndex) => {
-    quad.forEach((point, cornerIndex) => {
-      const [x, y] = toCanvas(point, frame);
-      const distance = (x - px) ** 2 + (y - py) ** 2;
-      if (distance <= bestDistance) {
-        bestDistance = distance;
-        best = [cardIndex, cornerIndex];
-      }
-    });
-  });
-  return best;
+  const quads = state.sample.quads.map(quad => quad.map(point => toCanvas(point, frame)));
+  return geometry.nearestActiveHandle(quads, state.activeCard, [px, py], 20 * frame.ratio);
 }
 
 function validQuad(quad) {
-  if (quad.length !== 4) return "A card needs four corners";
-  const crosses = quad.map((a, index) => {
-    const b = quad[(index + 1) % 4];
-    const c = quad[(index + 2) % 4];
-    return (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
-  });
-  if (crosses.some((value) => Math.abs(value) < 1e-5)) return "Corners are too close to a line";
-  if (!(crosses.every((value) => value > 0) || crosses.every((value) => value < 0))) return "Corners cross";
-  return null;
+  return geometry.validQuad(quad);
 }
 
 editor.addEventListener("pointerdown", (event) => {
-  if (!state.sample) return;
+  if (!state.sample || event.button !== 0) return;
+  editor.focus({preventScroll: true});
   const handle = nearestHandle(event);
   if (!handle) {
-    status("Grab one of the named corner dots", "error");
+    status("Choose a card tab first, then drag one of its four corners.");
     return;
   }
   [state.activeCard, state.activeCorner] = handle;
   state.dragging = true;
   state.dragSnapshot = clone(state.sample.quads[state.activeCard]);
+  state.dragMetadataSnapshot = clone(state.sample.metadata[state.activeCard]);
   editor.setPointerCapture(event.pointerId);
   editor.classList.add("dragging");
-  state.sample.quads[state.activeCard][state.activeCorner] = fromPointer(event);
-  updateVisibility();
+  // Selecting a handle must not snap it to the cursor's edge.
   renderControls();
   draw();
   status(`Dragging Card ${state.activeCard + 1} ${CORNERS[state.activeCorner]}…`);
@@ -221,13 +272,17 @@ async function endDrag(event) {
   state.dragging = false;
   editor.classList.remove("dragging");
   if (editor.hasPointerCapture(event.pointerId)) editor.releasePointerCapture(event.pointerId);
-  const error = validQuad(state.sample.quads[state.activeCard]);
+  const error = event.type === "pointercancel" ? "Drag cancelled" : validQuad(state.sample.quads[state.activeCard]);
   if (error) {
     state.sample.quads[state.activeCard] = state.dragSnapshot;
+    state.sample.metadata[state.activeCard] = state.dragMetadataSnapshot;
+    renderControls();
     status(`Move rejected: ${error}`, "error");
     draw();
     return;
   }
+  if (JSON.stringify(state.sample.quads[state.activeCard]) === JSON.stringify(state.dragSnapshot)) return;
+  renderControls();
   await persist(false, `Saved Card ${state.activeCard + 1} ${CORNERS[state.activeCorner]}`);
 }
 editor.addEventListener("pointerup", endDrag);
@@ -236,8 +291,11 @@ editor.addEventListener("pointercancel", endDrag);
 function updateVisibility() {
   if (!state.sample?.metadata[state.activeCard]) return;
   const point = state.sample.quads[state.activeCard][state.activeCorner];
-  state.sample.metadata[state.activeCard].cornerVisibility[state.activeCorner] =
-    point[0] >= 0 && point[0] <= 1 && point[1] >= 0 && point[1] <= 1 ? "visible" : "outsideFrame";
+  const labels = state.sample.metadata[state.activeCard].cornerVisibility;
+  const inside = point[0] >= 0 && point[0] <= 1 && point[1] >= 0 && point[1] <= 1;
+  // Preserve a user's occluded label while moving within the capture.
+  labels[state.activeCorner] = !inside ? "outsideFrame"
+    : labels[state.activeCorner] === "outsideFrame" ? "visible" : labels[state.activeCorner];
 }
 
 async function persist(finalize, message) {
@@ -247,10 +305,8 @@ async function persist(finalize, message) {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({quads: state.sample.quads, metadata: state.sample.metadata, finalize}),
     });
-    if (finalize) {
-      state.sample.finalized = true;
-      await refreshProgress();
-    }
+    state.sample.finalized = finalize;
+    await refreshProgress();
     status(message, "ok");
   } catch (error) {
     status(`Save failed: ${error.message}`, "error");
@@ -268,6 +324,10 @@ async function refreshProgress() {
   state.samples = payload.samples;
   state.progress = payload.progress;
   renderProgress();
+  for (const sample of state.samples) {
+    const option = Array.from(document.querySelector("#sample").options).find(o => o.value === sample.id);
+    if (option) option.textContent = `${sample.key} · ${sample.cards} cards · ${sample.finalized ? "finalized" : "draft"}`;
+  }
 }
 
 function renderControls() {
@@ -277,11 +337,12 @@ function renderControls() {
     const button = document.createElement("button");
     button.textContent = `Card ${index + 1}`;
     button.className = index === state.activeCard ? "active" : "";
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(index === state.activeCard));
+    button.tabIndex = index === state.activeCard ? 0 : -1;
     button.onclick = () => {
-      state.activeCard = index;
-      state.activeCorner = 0;
-      renderControls();
-      draw();
+      selectCard(index);
+      editor.focus({preventScroll: true});
     };
     cards.append(button);
   });
@@ -354,14 +415,22 @@ async function loadSample(index) {
   const summary = state.samples[state.index];
   status("Loading page…");
   state.sample = await jsonRequest(`/api/sample/${summary.id}`);
+  state.sourcePixels = null;
   state.activeCard = 0;
   state.activeCorner = 0;
   state.image = new Image();
   state.image.decoding = "sync";
   state.image.onload = () => {
+    const source = document.createElement("canvas");
+    source.width = state.image.naturalWidth;
+    source.height = state.image.naturalHeight;
+    const sourceCtx = source.getContext("2d", {willReadFrequently: true});
+    sourceCtx.drawImage(state.image, 0, 0);
+    state.sourcePixels = sourceCtx.getImageData(0, 0, source.width, source.height);
+    document.querySelector("#preview-profile").value = geometry.defaultProfile(state.sample.game);
     renderControls();
     draw();
-    status("Ready — drag any named corner", "ok");
+    status("Ready — choose a card; Tab / Shift+Tab switches cards while editing.", "ok");
   };
   state.image.onerror = () => status("Could not load source image", "error");
   state.image.src = `${state.sample.imageUrl}?v=${Date.now()}`;
