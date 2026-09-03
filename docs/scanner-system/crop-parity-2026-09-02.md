@@ -59,13 +59,22 @@ hypothesis until the native rows and downstream agreement are present.
 
 ## Downstream grid
 
-Hugging Face Job `6a98b5ae21c5aa7c8364f04a` runs the full 36-cell grid with
+Hugging Face Job `6a98b5ae21c5aa7c8364f04a` is invalid evidence. It completed
+the grid with raw Magic crops, omitting Magic's declared
+`grey-world-autocontrast` query normalization, and then failed to persist its
+report because the Job OAuth token could only create a Hub pull request.
+
+Corrected Job `6a98bcc20718b0f6d8912afb` reruns the full 36-cell grid with
 the released Pokémon `physical-v2-107fe33b` and Magic
-`visual-style-v2-5c27e506-r2` encoders. It compares embedding cosine, top-1
-family, and accept/abstain decisions for every platform crop and reference
-cell. The worker is pinned to tooling commit
-`2e42f19837065c5931be0fef53c9506cba5b692a` and uploads its timestamp-free
-JSON report under `geometry/crop-parity-reports/` in the private model repo.
+`visual-style-v2-5c27e506-r2` encoders. Pokémon applies `none`; Magic applies
+Pillow-equivalent grey-world balance followed by 1% per-channel autocontrast
+before the encoder resize. It compares embedding cosine, top-1 family, and
+accept/abstain decisions for every platform crop and reference cell, with
+`outsideFrame` and `fullyInside` cohorts kept separate. The corrected worker
+is pinned to tooling commit
+`9cf3377fdbde3e7475d9e8e5c825043d69d221d8` and persists its timestamp-free
+JSON report through an immutable Hub pull-request commit under
+`geometry/crop-parity-reports/` in the private model repo.
 
 ## Native exporters
 
