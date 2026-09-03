@@ -111,10 +111,17 @@ def main() -> None:
             "grey-world-autocontrast",
         ),
     ]
+    platforms = sorted(
+        (path.name, path)
+        for path in Path("platform").iterdir()
+        if path.is_dir()
+    )
+    if not platforms:
+        raise RuntimeError("input bundle contains no platform crop directories")
     report = module.analyze(
         Path("cases.json"),
         references,
-        [("bench", Path("platform/bench-current")), ("web", Path("platform/web-current"))],
+        platforms,
         encoders,
     )
     report["toolingRevision"] = args.tooling_revision

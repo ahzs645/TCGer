@@ -13,6 +13,7 @@ sys.path.insert(0, str(HERE))
 from crop_parity import (  # noqa: E402
     HEIGHT,
     WIDTH,
+    comparable_pixel_metrics,
     inset_quad,
     normalized_quad_to_pixels,
     normalize_query_colors,
@@ -56,6 +57,11 @@ class CropParityTests(unittest.TestCase):
         metrics = pixel_metrics(actual, reference)
         self.assertAlmostEqual(metrics["mae"], 0.2)
         self.assertAlmostEqual(metrics["psnrDb"], 20 * math.log10(5))
+
+    def test_pixel_metrics_skip_size_mismatch(self):
+        reference = np.zeros((2, 2, 3), dtype=np.uint8)
+        actual = np.zeros((2, 1, 3), dtype=np.uint8)
+        self.assertIsNone(comparable_pixel_metrics(actual, reference))
 
     def test_magic_query_normalization_matches_grey_world_autocontrast_contract(self):
         from PIL import Image

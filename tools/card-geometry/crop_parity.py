@@ -177,6 +177,15 @@ def pixel_metrics(actual: np.ndarray, reference: np.ndarray) -> dict[str, float]
     return {"mae": mae, "psnrDb": psnr}
 
 
+def comparable_pixel_metrics(
+    actual: np.ndarray, reference: np.ndarray
+) -> dict[str, float] | None:
+    """Return pixel metrics only when both crops honor the same dimensions."""
+    if actual.shape != reference.shape:
+        return None
+    return pixel_metrics(actual, reference)
+
+
 def normalize_query_colors(image: Image.Image, mode: str) -> Image.Image:
     """Apply the released per-game query policy before encoder preprocessing."""
     if mode == "none":
@@ -461,6 +470,7 @@ def analyze(
     for platform_name, platform_root in platforms:
         rows = []
         missing = []
+        pixel_size_mismatches = []
         for configuration in grid():
             pixel_values: dict[str, dict[str, list[float]]] = {
                 cohort: {"maes": [], "psnrs": []}
@@ -485,12 +495,17 @@ def analyze(
                     continue
                 actual_image = Image.open(actual_path).convert("RGB")
                 reference_image = Image.open(reference_path).convert("RGB")
-                metrics = pixel_metrics(np.asarray(actual_image), np.asarray(reference_image))
                 case_cohort = _case_cohort(case)
-                for cohort_name in ("all", case_cohort):
-                    pixel_values[cohort_name]["maes"].append(metrics["mae"])
-                    if math.isfinite(metrics["psnrDb"]):
-                        pixel_values[cohort_name]["psnrs"].append(metrics["psnrDb"])
+                metrics = comparable_pixel_metrics(
+                    np.asarray(actual_image), np.asarray(reference_image)
+                )
+                if metrics is None:
+                    pixel_size_mismatches.append(case["caseId"])
+                else:
+                    for cohort_name in ("all", case_cohort):
+                        pixel_values[cohort_name]["maes"].append(metrics["mae"])
+                        if math.isfinite(metrics["psnrDb"]):
+                            pixel_values[cohort_name]["psnrs"].append(metrics["psnrDb"])
                 for runtime in encoders:
                     actual_key = (platform_name, runtime.name, case["caseId"])
                     reference_key = (
@@ -546,6 +561,7 @@ def analyze(
         report_platforms[platform_name] = {
             "cropRoot": str(platform_root),
             "missingCaseIds": sorted(set(missing)),
+            "pixelSizeMismatchCaseIds": sorted(set(pixel_size_mismatches)),
             "comparisons": rows,
         }
     return {

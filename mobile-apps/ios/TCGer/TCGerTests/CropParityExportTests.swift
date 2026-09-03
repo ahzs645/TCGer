@@ -21,11 +21,15 @@ final class CropParityExportTests: XCTestCase {
     }
 
     func testExportCurrentCoreImageCrops() throws {
-        guard let casesURL = Bundle(for: Self.self).url(
+        let bundledCasesURL = Bundle(for: Self.self).url(
             forResource: "cases",
             withExtension: "json",
             subdirectory: "CropParityInputs.generated"
-        ) else {
+        )
+        let stagedCasesURL = ProcessInfo.processInfo.environment["CROP_PARITY_INPUT_ROOT"]
+            .map { URL(fileURLWithPath: $0, isDirectory: true).appendingPathComponent("cases.json") }
+        guard let casesURL = bundledCasesURL ?? stagedCasesURL,
+              FileManager.default.fileExists(atPath: casesURL.path) else {
             throw XCTSkip("stage crop-parity inputs into CropParityInputs.generated")
         }
         let document = try JSONDecoder().decode(
@@ -40,7 +44,10 @@ final class CropParityExportTests: XCTestCase {
                 XCTFail("could not decode \(fixture.caseId)")
                 continue
             }
-            XCTAssertEqual(Self.sha256(Data(contentsOf: sourceURL)), fixture.sourceSha256)
+            XCTAssertEqual(
+                Self.sha256(try Data(contentsOf: sourceURL)),
+                fixture.sourceSha256
+            )
             let points = try fixture.quad.map { pair -> CGPoint in
                 guard pair.count == 2 else {
                     throw NSError(domain: "CropParity", code: 1)
