@@ -330,14 +330,127 @@ def build(spec: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _number(value: float | int | None, digits: int = 3) -> str:
+    if value is None:
+        return "—"
+    return f"{value:.{digits}f}"
+
+
+def _megabytes(value: int | None) -> str:
+    return "—" if value is None else f"{value / 1_000_000:.1f}"
+
+
+def render_markdown(report: dict[str, Any]) -> str:
+    """Render the deterministic human review alongside the canonical JSON."""
+    outcome = report["outcome"]
+    recommendation = outcome["recommendation"]
+    lines = [
+        "# Shared card-geometry bake-off — 2026-09-04",
+        "",
+        "**Recommendation:** "
+        + (
+            "promote the best production-ready candidate."
+            if recommendation == "promote-best-production-ready-candidate"
+            else "ship none of the candidates; retain the current detector and the 0°/180° recognition safety net."
+        ),
+        "",
+        "The comparison is bound to one production training corpus, one real evaluation corpus, "
+        "one synthetic duel-field corpus, and one effective fairness identity:",
+        "",
+        f"- Training corpus: `{report['trainingCorpusHash']}`",
+        f"- Real evaluation: `{report['realEvaluationCorpusHash']}`",
+        f"- Synthetic evaluation: `{report['syntheticEvaluationCorpusHash']}`",
+        f"- Effective fairness: `{report['effectiveFairnessHash']}`",
+        "",
+        "## Results",
+        "",
+        "| Candidate | License route | Real R@.5 | Real R@.75 | Corner p50 | p90 | p95 | Outside p50 | Synthetic R@.75 | Correct / wrong / abstain | ONNX MB | Core ML MB | Min parity cosine | L4 h | Production ready |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for row in report["candidates"]:
+        export = row["export"]
+        recognition = row["recognition"]
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    row["candidate"],
+                    row["licenseRoute"],
+                    _number(row["real"]["recallAt05"]),
+                    _number(row["real"]["recallAt075"]),
+                    _number(row["real"]["normalizedCorner"]["p50"]),
+                    _number(row["real"]["normalizedCorner"]["p90"]),
+                    _number(row["real"]["normalizedCorner"]["p95"]),
+                    _number(row["real"]["outsideFrameNormalizedP50"]),
+                    _number(row["synthetic"]["recallAt075"]),
+                    f"{recognition['correct']} / {recognition['wrong']} / {recognition['abstain']}",
+                    _megabytes(None if export is None else export["onnxBytes"]),
+                    _megabytes(None if export is None else export["coremlBytes"]),
+                    _number(None if export is None else export["minimumCosine"], 6),
+                    _number(row["training"]["l4GpuHours"], 2),
+                    "yes" if row["productionReady"] else "no",
+                )
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "Corner errors are normalized by the mean truth-quad side length. Recognition counts "
+            "exclude outcomes whose catalog identity is unavailable and preserve those as `unknown` in the JSON report.",
+            "",
+            "## Gates",
+            "",
+        ]
+    )
+    for row in report["candidates"]:
+        failed = [name for name, passed in row["checks"].items() if not passed]
+        lines.append(
+            f"- **{row['candidate']}:** "
+            + ("all gates passed" if not failed else "failed " + ", ".join(f"`{name}`" for name in failed))
+            + "."
+        )
+    lines.extend(
+        [
+            "",
+            "Physical iPhone and Android latency are production gates. An unavailable device is "
+            "reported as unmeasured, never treated as a pass. Reference decoders and golden raw-tensor "
+            "fixtures do not count as completed Swift, Kotlin, and TypeScript production integrations.",
+            "",
+            "## Human decisions remaining",
+            "",
+        ]
+    )
+    decisions = outcome.get("humanDecisionRemaining", [])
+    lines.extend(f"- {decision}" for decision in decisions)
+    if not decisions:
+        lines.append("- None.")
+    lines.extend(
+        [
+            "",
+            "## Reproduction",
+            "",
+            "`comparison.json` is the canonical deterministic report. `comparison-spec.json` binds "
+            "its inputs, candidate jobs, decoder sources, and human-only gates; all referenced input "
+            "files carry SHA-256 identities inside the report.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--spec", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--markdown", type=Path)
     args = parser.parse_args()
     report = build(load_json(args.spec))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(canonical_json(report))
+    if args.markdown is not None:
+        args.markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown.write_text(render_markdown(report), encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 

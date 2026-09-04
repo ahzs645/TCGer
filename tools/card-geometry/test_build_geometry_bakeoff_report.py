@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from build_geometry_bakeoff_report import build  # noqa: E402
+from build_geometry_bakeoff_report import build, render_markdown  # noqa: E402
 
 
 class BuildGeometryBakeoffReportTests(unittest.TestCase):
@@ -154,6 +154,11 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
                 "ship-none-retain-current-detector-and-safety-net",
             )
             self.assertFalse(report["candidates"][0]["checks"]["realRecallAt05"])
+            markdown = render_markdown(report)
+            self.assertIn("# Shared card-geometry bake-off", markdown)
+            self.assertIn("ship none of the candidates", markdown)
+            self.assertIn("| loser | permissive | 0.500", markdown)
+            self.assertIn("`realRecallAt05`", markdown)
 
     def test_evaluation_only_candidate_cannot_be_production_ready(self):
         with tempfile.TemporaryDirectory() as temporary:
