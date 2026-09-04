@@ -4,10 +4,12 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 from PIL import Image
 
 from evaluate_geometry_candidate import (
     AttributeDict,
+    as_numpy,
     candidate_result,
     classify_replay_outcome,
     configure_yolox_test,
@@ -17,6 +19,25 @@ from evaluate_geometry_candidate import (
 
 
 class EvaluateGeometryCandidateTests(unittest.TestCase):
+    def test_as_numpy_accepts_arrays_and_tensor_protocol(self):
+        array = np.asarray([[1.0, 2.0]], dtype=np.float32)
+        self.assertIs(as_numpy(array), array)
+
+        class TensorLike:
+            def __init__(self, value):
+                self.value = value
+
+            def detach(self):
+                return self
+
+            def cpu(self):
+                return self
+
+            def numpy(self):
+                return self.value
+
+        np.testing.assert_array_equal(as_numpy(TensorLike(array)), array)
+
     def test_padding_inverse_maps_original_corners(self):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "frame.jpg"

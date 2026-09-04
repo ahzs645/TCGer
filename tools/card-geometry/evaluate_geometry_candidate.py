@@ -101,6 +101,18 @@ def source_point(x: float, y: float, width: int, height: int) -> dict[str, float
     }
 
 
+def as_numpy(value: Any) -> np.ndarray:
+    """Normalize either a torch-style tensor or an existing array."""
+
+    if hasattr(value, "detach"):
+        value = value.detach()
+    if hasattr(value, "cpu"):
+        value = value.cpu()
+    if hasattr(value, "numpy"):
+        value = value.numpy()
+    return np.asarray(value)
+
+
 def candidate_result(
     points: list[tuple[float, float]], confidence: float, corner_confidences: list[float]
 ) -> dict[str, Any]:
@@ -224,11 +236,11 @@ class Predictor:
         predictions = result.pred_instances
         if not hasattr(predictions, "keypoints"):
             return []
-        keypoints = predictions.keypoints.detach().cpu().numpy()
-        scores = predictions.scores.detach().cpu().numpy()
+        keypoints = as_numpy(predictions.keypoints)
+        scores = as_numpy(predictions.scores)
         keypoint_scores = getattr(predictions, "keypoint_scores", None)
         if keypoint_scores is not None:
-            keypoint_scores = keypoint_scores.detach().cpu().numpy()
+            keypoint_scores = as_numpy(keypoint_scores)
         rows = []
         for index, points in enumerate(keypoints):
             if len(points) != 4:
