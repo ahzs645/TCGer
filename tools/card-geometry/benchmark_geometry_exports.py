@@ -268,6 +268,17 @@ def benchmark(
                     "artifactSha256": onnx_identity["sha256"],
                 },
             )
+        elif candidate == "yolox-pose":
+            from decode_geometry_exports import decode_yolox_pose
+
+            golden["expectedResults"] = decode_yolox_pose(
+                onnx_values,
+                resolution=size,
+                model_id={
+                    "releaseVersion": 1,
+                    "artifactSha256": onnx_identity["sha256"],
+                },
+            )
         golden_manifest.append(golden)
         if spec["id"] == "gradient":
             latency_coreml_input, latency_tensor = coreml_value_input, tensor
