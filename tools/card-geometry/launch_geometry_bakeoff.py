@@ -376,6 +376,10 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
         )
         for candidate in candidates
     }
+    resolved_configs = {
+        candidate: resolve_config(config, pipeline_smoke=args.pipeline_smoke)
+        for candidate, config in configs.items()
+    }
     token = get_token()
     if not token:
         raise RuntimeError("a local Hugging Face token is required")
@@ -459,7 +463,8 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
         "corpusHash": args.corpus_hash,
         "configHashes": {candidate: sha256_bytes(canonical_json(config)) for candidate, config in configs.items()},
         "experiments": {
-            candidate: descriptor(config) for candidate, config in configs.items()
+            candidate: descriptor(config)
+            for candidate, config in resolved_configs.items()
         },
         "jobs": jobs,
     }

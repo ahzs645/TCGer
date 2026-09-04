@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/card-geometry"))
 
 from launch_geometry_bakeoff import base_config, bootstrap_command  # noqa: E402
-from run_card_geometry_hf_job import descriptor  # noqa: E402
+from run_card_geometry_hf_job import descriptor, resolve_config  # noqa: E402
 
 
 CORPUS = {
@@ -39,10 +39,28 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
                 tooling_revision="c" * 40,
                 epochs=50,
             )
-            hashes.add(descriptor(config)["fairnessHash"])
+            resolved = resolve_config(config)
+            hashes.add(descriptor(resolved)["fairnessHash"])
             self.assertEqual(config["fairness"]["budget"], {"kind": "epochs", "value": 50})
-            self.assertTrue(descriptor(config)["checkpointPrefix"].startswith(f"geometry/{candidate}/"))
+            self.assertTrue(
+                descriptor(resolved)["checkpointPrefix"].startswith(
+                    f"geometry/{candidate}/"
+                )
+            )
         self.assertEqual(len(hashes), 1)
+
+    def test_pipeline_smoke_descriptor_uses_worker_resolved_config(self):
+        config = base_config(
+            candidate="yolo11n-pose",
+            corpus=CORPUS,
+            tooling_revision="c" * 40,
+            epochs=50,
+        )
+        resolved = resolve_config(config, pipeline_smoke=True)
+        report = descriptor(resolved)
+        self.assertEqual(resolved["fairness"]["budget"], {"kind": "epochs", "value": 1})
+        self.assertEqual(report["resolvedConfigSha256"], report["experimentHash"])
+        self.assertNotEqual(report["experimentHash"], descriptor(resolve_config(config))["experimentHash"])
 
     def test_bootstrap_never_embeds_token_value(self):
         command = bootstrap_command(
