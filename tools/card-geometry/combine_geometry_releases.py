@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -27,6 +28,16 @@ from corpus_release import (  # noqa: E402
 
 APPROVED_POLICY_ID = "training-minimums-v2"
 APPROVED_POLICY_SHA256 = "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d"
+
+
+def link_or_copy(source: Path, destination: Path) -> str:
+    """Preserve immutable release bytes without duplicating them when possible."""
+    try:
+        os.link(source, destination)
+        return "hardlink"
+    except OSError:
+        shutil.copyfile(source, destination)
+        return "copy"
 
 
 def combine(
@@ -77,7 +88,7 @@ def combine(
                 seen_paths.add(relative)
                 destination = output / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(root / relative, destination)
+                link_or_copy(root / relative, destination)
             entries.append(entry)
 
     manifest = {

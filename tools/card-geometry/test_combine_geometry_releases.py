@@ -6,11 +6,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from combine_geometry_releases import combine  # noqa: E402
+from combine_geometry_releases import combine, link_or_copy  # noqa: E402
 from corpus_release import RELEASES_DIR, load_json, sha256_file  # noqa: E402
 
 
 class CombineGeometryReleasesTests(unittest.TestCase):
+    def test_link_or_copy_preserves_exact_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.bin"
+            destination = root / "destination.bin"
+            source.write_bytes(b"immutable release bytes")
+            method = link_or_copy(source, destination)
+            self.assertIn(method, {"hardlink", "copy"})
+            self.assertEqual(destination.read_bytes(), source.read_bytes())
+
     def test_combines_shippable_parts_under_exact_training_policy(self):
         policy = ROOT / "policies" / "training-minimums-v2.json"
         with tempfile.TemporaryDirectory() as temporary:
