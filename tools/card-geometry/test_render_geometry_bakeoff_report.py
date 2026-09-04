@@ -30,7 +30,7 @@ def candidate() -> dict:
             "onnxBytes": 12,
             "coremlBytes": 13,
             "minimumCosine": 0.999,
-            "latency": {"onnxCpu": {"meanMilliseconds": 3.5}},
+            "latency": {"onnxMacCpu": {"meanMs": 3.5}},
             "physicalDeviceLatency": {
                 "ios": {"status": "unavailable"},
                 "android": {"status": "unavailable"},
@@ -73,6 +73,7 @@ class RenderGeometryBakeoffReportTests(unittest.TestCase):
         self.assertIn("| candidate-a | evaluation-only | 1.000 | 0.900", output)
         self.assertIn("Failed gates: shippingLicense, physicalIosLatency.", output)
         self.assertIn("iOS unavailable; Android unavailable", output)
+        self.assertIn("onnxMacCpu 3.50 ms", output)
         self.assertIn("Choose a license route", output)
 
     def test_rejects_wrong_schema(self):

@@ -30,10 +30,10 @@ def latency_summary(candidate: dict[str, Any]) -> str:
         return "not exported"
     rows = []
     latency = export.get("latency", {})
-    for key in ("onnxCpu", "coremlCpu", "coremlAll"):
+    for key in ("onnxMacCpu", "coremlMacCpu", "coremlMacAll"):
         row = latency.get(key)
-        if row and row.get("meanMilliseconds") is not None:
-            rows.append(f"{key} {row['meanMilliseconds']:.2f} ms")
+        if row and row.get("meanMs") is not None:
+            rows.append(f"{key} {row['meanMs']:.2f} ms")
     return "; ".join(rows) if rows else "not measured"
 
 
