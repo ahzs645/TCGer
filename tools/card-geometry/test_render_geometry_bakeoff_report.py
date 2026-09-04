@@ -57,6 +57,13 @@ class RenderGeometryBakeoffReportTests(unittest.TestCase):
             "schema": EXPECTED_SCHEMA,
             "bakeoffId": "bakeoff-a",
             "trainingCorpusHash": "a" * 64,
+            "trainingCorpus": {
+                "releaseId": "training-v1",
+                "policyId": "training-minimums-v2",
+                "allowedSourceTiers": ["shippable"],
+                "recordsPerSplit": {"train": 1},
+                "instancesPerSplit": {"train": 1},
+            },
             "realEvaluationCorpusHash": "b" * 64,
             "syntheticEvaluationCorpusHash": "c" * 64,
             "effectiveFairnessHash": "d" * 64,

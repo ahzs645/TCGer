@@ -72,6 +72,49 @@ def code_sources(paths: list[str]) -> dict[str, Any]:
     }
 
 
+def check_details(report: dict[str, Any], code: str) -> dict[str, Any]:
+    matches = [row for row in report["checks"] if row["code"] == code]
+    if len(matches) != 1 or matches[0]["status"] != "pass":
+        raise ValueError(f"training corpus preflight lacks one passing {code} check")
+    return matches[0]["details"]
+
+
+def training_corpus_summary(spec: dict[str, Any]) -> dict[str, Any]:
+    path = Path(spec["trainingCorpusPreflight"])
+    report = load_json(path)
+    expected_hash = spec["trainingCorpusHash"]
+    if report.get("readyFor") != "training" or report.get("failedChecks"):
+        raise ValueError("training corpus preflight is not ready for training")
+    if {
+        report.get("declaredCorpusHash"),
+        report.get("recomputedCorpusHash"),
+    } != {expected_hash}:
+        raise ValueError("training corpus preflight hash does not match bake-off corpus")
+    readiness = check_details(report, "READINESS_MINIMUMS")
+    source_tier = check_details(report, "SOURCE_TIER")
+    check_details(report, "LEAKAGE_DISJOINT")
+    check_details(report, "SPLIT_REAL_ONLY")
+    return {
+        "releaseId": report["releaseId"],
+        "releasePurpose": report["releasePurpose"],
+        "readyFor": report["readyFor"],
+        "corpusHash": expected_hash,
+        "policyId": report["readinessPolicyId"],
+        "policySha256": report["readinessPolicySha256"],
+        "allowedSourceTiers": source_tier["allowedSourceTiers"],
+        "recordsPerSplit": readiness["recordsPerSplit"],
+        "instancesPerSplit": readiness["instancesPerSplit"],
+        "metricEligibleInstancesPerSplit": readiness[
+            "metricEligibleInstancesPerSplit"
+        ],
+        "sceneSliceInstances": readiness["sceneSliceInstances"],
+        "sceneSliceMetricEligibleInstances": readiness[
+            "sceneSliceMetricEligibleInstances"
+        ],
+        "preflight": source(path),
+    }
+
+
 def outside_frame_p50(report: dict[str, Any]) -> float | None:
     row = report["cornerError"]["byTruthVisibility"].get("outsideFrame")
     return None if row is None else row["normalized"]["p50"]
@@ -240,6 +283,7 @@ def candidate_row(
 
 def build(spec: dict[str, Any]) -> dict[str, Any]:
     budgets = {**DEFAULT_BUDGETS, **spec.get("budgets", {})}
+    training_corpus = training_corpus_summary(spec)
     candidates = [candidate_row(item, budgets) for item in spec["candidates"]]
     corpus_hashes = {row["real"]["corpusHash"] for row in candidates}
     synthetic_hashes = {row["synthetic"]["corpusHash"] for row in candidates}
@@ -259,6 +303,7 @@ def build(spec: dict[str, Any]) -> dict[str, Any]:
         "schema": SCHEMA_ID,
         "bakeoffId": spec["bakeoffId"],
         "trainingCorpusHash": spec["trainingCorpusHash"],
+        "trainingCorpus": training_corpus,
         "realEvaluationCorpusHash": next(iter(corpus_hashes)),
         "syntheticEvaluationCorpusHash": next(iter(synthetic_hashes)),
         "effectiveFairnessHash": next(iter(fairness_hashes)),

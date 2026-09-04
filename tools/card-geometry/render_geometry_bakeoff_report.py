@@ -53,6 +53,11 @@ def render(report: dict[str, Any]) -> str:
         f"- Real evaluation corpus: `{report['realEvaluationCorpusHash']}`",
         f"- Synthetic evaluation corpus: `{report['syntheticEvaluationCorpusHash']}`",
         f"- Effective fairness identity: `{report['effectiveFairnessHash']}`",
+        f"- Training release: `{report['trainingCorpus']['releaseId']}`; policy "
+        f"`{report['trainingCorpus']['policyId']}`; source tiers "
+        f"`{', '.join(report['trainingCorpus']['allowedSourceTiers'])}`",
+        f"- Training records: {report['trainingCorpus']['recordsPerSplit']}; instances "
+        f"{report['trainingCorpus']['instancesPerSplit']}",
         "",
         "## Result",
         "",

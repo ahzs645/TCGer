@@ -11,6 +11,54 @@ from build_geometry_bakeoff_report import build  # noqa: E402
 
 
 class BuildGeometryBakeoffReportTests(unittest.TestCase):
+    def write_preflight(self, root: Path) -> Path:
+        path = root / "preflight.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "releaseId": "training-v1",
+                    "releasePurpose": "training",
+                    "readyFor": "training",
+                    "declaredCorpusHash": "d" * 64,
+                    "recomputedCorpusHash": "d" * 64,
+                    "readinessPolicyId": "training-minimums-v2",
+                    "readinessPolicySha256": "e" * 64,
+                    "failedChecks": [],
+                    "checks": [
+                        {
+                            "code": "READINESS_MINIMUMS",
+                            "status": "pass",
+                            "details": {
+                                "recordsPerSplit": {"train": 1},
+                                "instancesPerSplit": {"train": 1},
+                                "metricEligibleInstancesPerSplit": {"train": 1},
+                                "sceneSliceInstances": {"train/single_handheld": 1},
+                                "sceneSliceMetricEligibleInstances": {
+                                    "train/single_handheld": 1
+                                },
+                            },
+                        },
+                        {
+                            "code": "SOURCE_TIER",
+                            "status": "pass",
+                            "details": {"allowedSourceTiers": ["shippable"]},
+                        },
+                        {"code": "LEAKAGE_DISJOINT", "status": "pass", "details": {}},
+                        {"code": "SPLIT_REAL_ONLY", "status": "pass", "details": {}},
+                    ],
+                }
+            )
+        )
+        return path
+
+    def spec(self, root: Path, candidates: list[dict]) -> dict:
+        return {
+            "bakeoffId": "test",
+            "trainingCorpusHash": "d" * 64,
+            "trainingCorpusPreflight": str(self.write_preflight(root)),
+            "candidates": candidates,
+        }
+
     def write_candidate(self, root: Path, candidate: str, recall: float) -> dict:
         root.mkdir()
         common = {
@@ -92,13 +140,7 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
     def test_recommends_promoting_a_complete_passing_candidate(self):
         with tempfile.TemporaryDirectory() as temporary:
             candidate = self.write_candidate(Path(temporary) / "winner", "winner", 1)
-            report = build(
-                {
-                    "bakeoffId": "test",
-                    "trainingCorpusHash": "d" * 64,
-                    "candidates": [candidate],
-                }
-            )
+            report = build(self.spec(Path(temporary), [candidate]))
             self.assertEqual(report["outcome"]["productionReadyCandidates"], ["winner"])
             self.assertTrue(report["candidates"][0]["productionReady"])
             self.assertEqual(report["candidates"][0]["decoder"]["production"]["lines"], 2)
@@ -106,13 +148,7 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
     def test_recommends_shipping_none_when_real_recall_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             candidate = self.write_candidate(Path(temporary) / "loser", "loser", 0.5)
-            report = build(
-                {
-                    "bakeoffId": "test",
-                    "trainingCorpusHash": "d" * 64,
-                    "candidates": [candidate],
-                }
-            )
+            report = build(self.spec(Path(temporary), [candidate]))
             self.assertEqual(
                 report["outcome"]["recommendation"],
                 "ship-none-retain-current-detector-and-safety-net",
@@ -126,13 +162,7 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             run = json.loads(run_path.read_text())
             run["licenseRoute"] = "evaluation-only"
             run_path.write_text(json.dumps(run))
-            report = build(
-                {
-                    "bakeoffId": "test",
-                    "trainingCorpusHash": "d" * 64,
-                    "candidates": [candidate],
-                }
-            )
+            report = build(self.spec(Path(temporary), [candidate]))
             self.assertTrue(report["candidates"][0]["passesMeasuredMetricBudgets"])
             self.assertFalse(report["candidates"][0]["checks"]["shippingLicense"])
             self.assertFalse(report["candidates"][0]["productionReady"])
@@ -146,13 +176,7 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             report["corpusHash"] = "e" * 64
             path.write_text(json.dumps(report))
             with self.assertRaisesRegex(ValueError, "same frozen evaluation"):
-                build(
-                    {
-                        "bakeoffId": "test",
-                        "trainingCorpusHash": "d" * 64,
-                        "candidates": [first, second],
-                    }
-                )
+                build(self.spec(Path(temporary), [first, second]))
 
     def test_missing_corner_percentiles_fail_without_crashing(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -164,13 +188,7 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             )
             real["cornerError"]["byTruthVisibility"] = {}
             path.write_text(json.dumps(real))
-            report = build(
-                {
-                    "bakeoffId": "test",
-                    "trainingCorpusHash": "d" * 64,
-                    "candidates": [candidate],
-                }
-            )
+            report = build(self.spec(Path(temporary), [candidate]))
             checks = report["candidates"][0]["checks"]
             self.assertFalse(checks["normalizedCornerP50"])
             self.assertFalse(checks["normalizedCornerP90"])
