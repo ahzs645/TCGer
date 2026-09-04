@@ -222,13 +222,12 @@ def write_config(
                 # argument after its parent has replaced None only internally.
                 # That upstream bug makes the framework validation loop crash.
                 # MMEngine always runs validation at max_epochs regardless of
-                # val_interval, so remove the loop itself. The shared frozen
-                # evaluator still runs immediately after training.
-                "val_dataloader = None",
-                "val_evaluator = None",
-                "val_cfg = None",
-                f"train_cfg = dict(max_epochs={epochs}, val_interval={epochs + 1}, "
-                "dynamic_intervals=None)",
+                # val_interval, but still honors val_begin. Keep MMYOLO's
+                # validation objects structurally valid and place the entire
+                # redundant loop beyond this run. The shared frozen evaluator
+                # still runs immediately after training.
+                f"train_cfg = dict(max_epochs={epochs}, val_begin={epochs + 1}, "
+                f"val_interval={epochs + 1}, dynamic_intervals=None)",
                 "param_scheduler = [dict(type='CosineAnnealingLR', eta_min=0.00001, "
                 f"begin=0, end={epochs}, T_max={epochs}, by_epoch=True)]",
                 "custom_hooks = [dict(type='EMAHook', ema_type='ExpMomentumEMA', "
