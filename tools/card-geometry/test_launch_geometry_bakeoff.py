@@ -121,6 +121,7 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         self.assertIn("opencv-python-headless==4.10.0.84", command[-1])
         self.assertIn("6a1f2e65b0746353e94cf87d172503e00e98cc9b2529bb38718d278e6be63d9c", command[-1])
         self.assertIn("mmyolo/archive/8c4d9dc503dc8e327bec8147e8dc97124052f693.tar.gz", command[-1])
+        self.assertIn("archive.parent.mkdir(parents=True, exist_ok=True)", command[-1])
         self.assertNotIn("git clone", command[-1])
         self.assertNotIn("mim install", command[-1])
 

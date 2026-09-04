@@ -88,6 +88,7 @@ import urllib.request
 from pathlib import Path
 
 archive = Path('/work/mmyolo-source.tar.gz')
+archive.parent.mkdir(parents=True, exist_ok=True)
 urllib.request.urlretrieve({archive_url!r}, archive)
 actual = hashlib.sha256(archive.read_bytes()).hexdigest()
 if actual != {MMYOLO_ARCHIVE_SHA256!r}:
