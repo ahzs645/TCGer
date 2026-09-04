@@ -10,7 +10,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from decode_geometry_exports import decode_yolo_pose  # noqa: E402
+from decode_geometry_exports import decode_fastvit_four_corner, decode_yolo_pose  # noqa: E402
 
 
 class ModelRawFixturesTests(unittest.TestCase):
@@ -26,16 +26,38 @@ class ModelRawFixturesTests(unittest.TestCase):
             )
             with np.load(manifest_path.parent / "raw-tensors.npz") as tensors:
                 for fixture in manifest["fixtures"]:
-                    value = tensors[fixture["rawTensorKey"]]
-                    self.assertEqual(list(value.shape), fixture["shape"])
-                    self.assertEqual(value.dtype, np.float32)
-                    self.assertEqual(
-                        hashlib.sha256(value.tobytes()).hexdigest(),
-                        fixture["rawTensorSha256"],
-                    )
+                    keys = fixture.get("rawTensorKeys", [fixture.get("rawTensorKey")])
+                    shapes = fixture.get("shapes", [fixture.get("shape")])
+                    hashes = fixture.get("rawTensorSha256")
+                    if isinstance(hashes, str):
+                        hashes = [hashes]
+                    self.assertNotIn(None, keys)
+                    self.assertEqual(len(keys), len(shapes))
+                    self.assertEqual(len(keys), len(hashes))
+                    values = []
+                    for key, shape, expected_hash in zip(keys, shapes, hashes):
+                        value = tensors[key]
+                        values.append(value)
+                        self.assertEqual(list(value.shape), shape)
+                        self.assertEqual(value.dtype, np.float32)
+                        self.assertEqual(
+                            hashlib.sha256(value.tobytes()).hexdigest(),
+                            expected_hash,
+                        )
                     if manifest["candidate"].startswith("yolo11"):
                         actual = decode_yolo_pose(
-                            value,
+                            values[0],
+                            model_id={
+                                "releaseVersion": 1,
+                                "artifactSha256": manifest["modelArtifact"]["sha256"],
+                            },
+                        )
+                        self.assertEqual(actual, fixture["expectedResults"])
+                    elif manifest["candidate"] == "fastvit-t8-four-corner":
+                        self.assertEqual(len(values), 2)
+                        actual = decode_fastvit_four_corner(
+                            values[0],
+                            values[1],
                             model_id={
                                 "releaseVersion": 1,
                                 "artifactSha256": manifest["modelArtifact"]["sha256"],
