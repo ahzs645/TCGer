@@ -137,11 +137,18 @@ def candidate_row(
             and export["physicalDeviceLatency"]["android"]["status"] == "measured"
         ),
         "productionDecoders": bool(candidate.get("productionDecodersComplete", False)),
+        "shippingLicense": run["licenseRoute"] in {"enterprise", "agpl", "permissive"},
     }
     metric_checks = {
         key: value
         for key, value in checks.items()
-        if key not in {"physicalIosLatency", "physicalAndroidLatency", "productionDecoders"}
+        if key
+        not in {
+            "physicalIosLatency",
+            "physicalAndroidLatency",
+            "productionDecoders",
+            "shippingLicense",
+        }
     }
     return {
         "candidate": run["candidate"],

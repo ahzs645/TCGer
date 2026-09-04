@@ -114,6 +114,24 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             )
             self.assertFalse(report["candidates"][0]["checks"]["realRecallAt05"])
 
+    def test_evaluation_only_candidate_cannot_be_production_ready(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = self.write_candidate(Path(temporary) / "candidate", "candidate", 1)
+            run_path = Path(candidate["reportsRoot"]) / "run-train.json"
+            run = json.loads(run_path.read_text())
+            run["licenseRoute"] = "evaluation-only"
+            run_path.write_text(json.dumps(run))
+            report = build(
+                {
+                    "bakeoffId": "test",
+                    "trainingCorpusHash": "d" * 64,
+                    "candidates": [candidate],
+                }
+            )
+            self.assertTrue(report["candidates"][0]["passesMeasuredMetricBudgets"])
+            self.assertFalse(report["candidates"][0]["checks"]["shippingLicense"])
+            self.assertFalse(report["candidates"][0]["productionReady"])
+
     def test_rejects_mixed_frozen_evaluation_corpora(self):
         with tempfile.TemporaryDirectory() as temporary:
             first = self.write_candidate(Path(temporary) / "one", "one", 1)
