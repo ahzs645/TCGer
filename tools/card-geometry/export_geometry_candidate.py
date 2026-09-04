@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -38,7 +39,13 @@ def find_one(root: Path, patterns: tuple[str, ...]) -> Path:
     matches = []
     for pattern in patterns:
         matches.extend(root.glob(pattern))
-    unique = sorted(set(matches))
+    def natural_key(path: Path) -> tuple[Any, ...]:
+        return tuple(
+            int(part) if part.isdigit() else part
+            for part in re.split(r"(\d+)", path.as_posix())
+        )
+
+    unique = sorted(set(matches), key=natural_key)
     if not unique:
         raise RuntimeError(f"no checkpoint matches {patterns} under {root}")
     preferred = [path for path in unique if path.name.startswith("best")]

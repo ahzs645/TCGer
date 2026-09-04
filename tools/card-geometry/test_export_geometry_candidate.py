@@ -27,6 +27,13 @@ class ExportGeometryCandidateTests(unittest.TestCase):
             (root / "best.pt").touch()
             self.assertEqual(find_one(root, ("*.pt",)).name, "best.pt")
 
+    def test_find_one_uses_numeric_epoch_order_without_best(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ("epoch_1.pth", "epoch_9.pth", "epoch_50.pth"):
+                (root / name).touch()
+            self.assertEqual(find_one(root, ("*.pth",)).name, "epoch_50.pth")
+
     def test_yolo_coreml_omits_onnx_only_options(self):
         coreml = yolo_export_options("coreml", 640)
         onnx = yolo_export_options("onnx", 640)
