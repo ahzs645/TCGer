@@ -17,8 +17,8 @@ from run_card_geometry_hf_job import resolve_config
 PYTORCH_26_IMAGE = (
     "pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee"
 )
-PYTORCH_21_IMAGE = (
-    "pytorch/pytorch@sha256:3387e598cb94fc248d82e712a65b10931a990cea3a2e76362ca30d135f565de4"
+PYTORCH_MMYOLO_IMAGE = (
+    "pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806"
 )
 MMYOLO_REVISION = "8c4d9dc503dc8e327bec8147e8dc97124052f693"
 RECOGNITION_MODEL_REVISION = "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
@@ -144,7 +144,7 @@ def base_config(
             "345af83ed1a7eee2ed322eb327895efd2a2a06c604272dbac92432adc61af889",
         ],
     }
-    container = PYTORCH_21_IMAGE if candidate == "yolox-pose" else PYTORCH_26_IMAGE
+    container = PYTORCH_MMYOLO_IMAGE if candidate == "yolox-pose" else PYTORCH_26_IMAGE
     real_evaluation = real_evaluation or {
         "datasetRepo": "ahzs645/tcger-scanner-images",
         "datasetRevision": "65017ce8da9137fea491739bd06388ab513831a2",
@@ -246,8 +246,10 @@ def bootstrap_command(
         ]
     elif candidate == "yolox-pose":
         setup += [
-            "python -m pip install --no-cache-dir openmim==0.3.9",
-            "mim install 'mmengine==0.10.7' 'mmcv==2.0.1' 'mmdet==3.3.0' 'mmpose==1.3.2'",
+            "python -m pip install --no-cache-dir 'mmcv==2.0.1' "
+            "-f https://download.openmmlab.com/mmcv/dist/cu117/torch2.0/index.html",
+            "python -m pip install --no-cache-dir 'mmengine==0.10.7' "
+            "'mmdet==3.3.0' 'mmpose==1.3.2'",
             "git clone --filter=blob:none https://github.com/open-mmlab/mmyolo.git /work/mmyolo",
             f"git -C /work/mmyolo checkout --detach {MMYOLO_REVISION}",
             "python -m pip install --no-cache-dir -e /work/mmyolo",
