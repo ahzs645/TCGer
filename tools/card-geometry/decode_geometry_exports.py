@@ -98,3 +98,85 @@ def decode_yolo_pose(
         config,
         model_id or {"releaseVersion": 1, "artifactSha256": "0" * 64},
     )
+
+
+def fastvit_candidates(
+    heatmap_logits,
+    corner_logits,
+    *,
+    resolution: int,
+    minimum_confidence: float = 0.05,
+    transform: dict[str, Any] | None = None,
+    maximum_detections: int = 100,
+) -> list[dict[str, Any]]:
+    """Decode raw FastViT CenterNet-style heatmap and corner tensors."""
+    import numpy as np
+
+    heatmap_raw = np.asarray(heatmap_logits, dtype=np.float32)
+    corners_raw = np.asarray(corner_logits, dtype=np.float32)
+    if heatmap_raw.ndim != 4 or heatmap_raw.shape[:2] != (1, 1):
+        raise ValueError(f"expected heatmap shape (1, 1, H, W), got {heatmap_raw.shape}")
+    if corners_raw.ndim != 4 or corners_raw.shape[:2] != (1, 8):
+        raise ValueError(f"expected corner shape (1, 8, H, W), got {corners_raw.shape}")
+    if heatmap_raw.shape[2:] != corners_raw.shape[2:]:
+        raise ValueError("FastViT heatmap and corner spatial dimensions disagree")
+    heatmap = 1.0 / (1.0 + np.exp(-heatmap_raw[0, 0]))
+    padded = np.pad(heatmap, 1, mode="constant", constant_values=-np.inf)
+    windows = np.lib.stride_tricks.sliding_window_view(padded, (3, 3))
+    peaks = np.where(heatmap == windows.max(axis=(-1, -2)), heatmap, 0.0)
+    order = np.argsort(-peaks, axis=None, kind="stable")[:maximum_detections]
+    rows = []
+    corner_values = 1.0 / (1.0 + np.exp(-corners_raw[0]))
+    output_width = peaks.shape[1]
+    for flat_index in order:
+        confidence = float(peaks.flat[flat_index])
+        if confidence < minimum_confidence:
+            break
+        y, x = divmod(int(flat_index), output_width)
+        points = corner_values[:, y, x].reshape(4, 2)
+        corners = []
+        for normalized_x, normalized_y in points:
+            point = (
+                model_point_to_source(
+                    float(normalized_x) * resolution,
+                    float(normalized_y) * resolution,
+                    transform,
+                )
+                if transform is not None
+                else {"x": float(normalized_x), "y": float(normalized_y)}
+            )
+            corners.append({"point": point, "confidence": confidence})
+        rows.append(
+            {
+                "corners": corners,
+                "confidence": confidence,
+                "cornerOrderConfidence": None,
+                "side": "unknown",
+                "container": "rawCard",
+            }
+        )
+    return rows
+
+
+def decode_fastvit_four_corner(
+    heatmap_logits,
+    corner_logits,
+    *,
+    resolution: int = 640,
+    transform: dict[str, Any] | None = None,
+    decoder_config: dict[str, Any] | None = None,
+    model_id: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    config = deepcopy(decoder_config or DEFAULT_DECODER_CONFIG)
+    candidates = fastvit_candidates(
+        heatmap_logits,
+        corner_logits,
+        resolution=resolution,
+        minimum_confidence=float(config["minimumConfidence"]),
+        transform=transform,
+    )
+    return process_candidates(
+        candidates,
+        config,
+        model_id or {"releaseVersion": 1, "artifactSha256": "0" * 64},
+    )

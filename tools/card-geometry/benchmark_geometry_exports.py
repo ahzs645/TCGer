@@ -147,45 +147,109 @@ def benchmark(
     coreml_cpu = ct.models.MLModel(str(coreml_path), compute_units=ct.ComputeUnit.CPU_ONLY)
     coreml_all = ct.models.MLModel(str(coreml_path), compute_units=ct.ComputeUnit.ALL)
     onnx_input = onnx.get_inputs()[0].name
-    onnx_output = onnx.get_outputs()[0].name
+    onnx_outputs = [item.name for item in onnx.get_outputs()]
     coreml_input = coreml_cpu.get_spec().description.input[0].name
-    coreml_output = coreml_cpu.get_spec().description.output[0].name
+    coreml_outputs = [item.name for item in coreml_cpu.get_spec().description.output]
+    coreml_input_kind = coreml_cpu.get_spec().description.input[0].type.WhichOneof("Type")
+    if len(onnx_outputs) != len(coreml_outputs):
+        raise ValueError(
+            f"runtime output-count mismatch: ONNX={onnx_outputs}, Core ML={coreml_outputs}"
+        )
     rows = []
     golden_manifest = []
     golden_arrays: dict[str, Any] = {}
     onnx_identity = artifact_identity(onnx_path)
-    latency_image = None
+    latency_coreml_input = None
     latency_tensor = None
     for spec in FIXTURE_SPECS:
         pixels = fixture_pixels(spec, size)
         tensor = np.transpose(pixels.astype(np.float32) / 255.0, (2, 0, 1))[None]
+        if candidate == "fastvit-t8-four-corner":
+            mean = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)[None, :, None, None]
+            std = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)[None, :, None, None]
+            tensor = (tensor - mean) / std
         image = Image.fromarray(pixels)
-        onnx_value = np.asarray(onnx.run([onnx_output], {onnx_input: tensor})[0], dtype=np.float32)
-        coreml_value = np.asarray(
-            coreml_cpu.predict({coreml_input: image})[coreml_output], dtype=np.float32
-        )
-        rows.append(
-            {
-                "fixture": spec,
-                "inputSha256": hashlib.sha256(pixels.tobytes()).hexdigest(),
-                "onnxOutputSha256": hashlib.sha256(onnx_value.tobytes()).hexdigest(),
-                "coremlOutputSha256": hashlib.sha256(coreml_value.tobytes()).hexdigest(),
-                **output_metrics(onnx_value, coreml_value),
-            }
-        )
-        golden_arrays[spec["id"]] = onnx_value
+        onnx_values = [
+            np.asarray(value, dtype=np.float32)
+            for value in onnx.run(onnx_outputs, {onnx_input: tensor})
+        ]
+        coreml_value_input = image if coreml_input_kind == "imageType" else tensor
+        coreml_prediction = coreml_cpu.predict({coreml_input: coreml_value_input})
+        coreml_values = [
+            np.asarray(coreml_prediction[name], dtype=np.float32) for name in coreml_outputs
+        ]
+        output_rows = []
+        for index, (onnx_value, coreml_value) in enumerate(zip(onnx_values, coreml_values)):
+            output_rows.append(
+                {
+                    "index": index,
+                    "onnxName": onnx_outputs[index],
+                    "coremlName": coreml_outputs[index],
+                    "onnxOutputSha256": hashlib.sha256(onnx_value.tobytes()).hexdigest(),
+                    "coremlOutputSha256": hashlib.sha256(coreml_value.tobytes()).hexdigest(),
+                    **output_metrics(onnx_value, coreml_value),
+                }
+            )
+        parity_row = {
+            "fixture": spec,
+            "inputSha256": hashlib.sha256(pixels.tobytes()).hexdigest(),
+            "outputs": output_rows,
+            "minimumCosine": min(row["cosine"] for row in output_rows),
+            "maximumAbsoluteDifference": max(row["maxAbs"] for row in output_rows),
+        }
+        if len(output_rows) == 1:
+            parity_row.update(
+                {
+                    key: value
+                    for key, value in output_rows[0].items()
+                    if key not in {"index", "onnxName", "coremlName"}
+                }
+            )
+        rows.append(parity_row)
+        tensor_keys = []
+        for index, onnx_value in enumerate(onnx_values):
+            key = spec["id"] if len(onnx_values) == 1 else f"{spec['id']}__output{index}"
+            golden_arrays[key] = onnx_value
+            tensor_keys.append(key)
         golden = {
             "fixture": spec,
-            "rawTensorKey": spec["id"],
-            "rawTensorSha256": hashlib.sha256(onnx_value.tobytes()).hexdigest(),
-            "shape": list(onnx_value.shape),
             "dtype": "float32-little-endian",
         }
+        if len(onnx_values) == 1:
+            golden.update(
+                {
+                    "rawTensorKey": tensor_keys[0],
+                    "rawTensorSha256": hashlib.sha256(onnx_values[0].tobytes()).hexdigest(),
+                    "shape": list(onnx_values[0].shape),
+                }
+            )
+        else:
+            golden.update(
+                {
+                    "rawTensorKeys": tensor_keys,
+                    "rawTensorSha256": [
+                        hashlib.sha256(value.tobytes()).hexdigest() for value in onnx_values
+                    ],
+                    "shapes": [list(value.shape) for value in onnx_values],
+                }
+            )
         if candidate.startswith("yolo11"):
             from decode_geometry_exports import decode_yolo_pose
 
             golden["expectedResults"] = decode_yolo_pose(
-                onnx_value,
+                onnx_values[0],
+                resolution=size,
+                model_id={
+                    "releaseVersion": 1,
+                    "artifactSha256": onnx_identity["sha256"],
+                },
+            )
+        elif candidate == "fastvit-t8-four-corner":
+            from decode_geometry_exports import decode_fastvit_four_corner
+
+            golden["expectedResults"] = decode_fastvit_four_corner(
+                onnx_values[0],
+                onnx_values[1],
                 resolution=size,
                 model_id={
                     "releaseVersion": 1,
@@ -194,18 +258,18 @@ def benchmark(
             )
         golden_manifest.append(golden)
         if spec["id"] == "gradient":
-            latency_image, latency_tensor = image, tensor
-    if latency_image is None or latency_tensor is None:
+            latency_coreml_input, latency_tensor = coreml_value_input, tensor
+    if latency_coreml_input is None or latency_tensor is None:
         raise RuntimeError("gradient latency fixture is missing")
     latency = {
         "onnxMacCpu": time_runtime(
-            lambda: onnx.run([onnx_output], {onnx_input: latency_tensor}), warmup, iterations
+            lambda: onnx.run(onnx_outputs, {onnx_input: latency_tensor}), warmup, iterations
         ),
         "coremlMacCpu": time_runtime(
-            lambda: coreml_cpu.predict({coreml_input: latency_image}), warmup, iterations
+            lambda: coreml_cpu.predict({coreml_input: latency_coreml_input}), warmup, iterations
         ),
         "coremlMacAll": time_runtime(
-            lambda: coreml_all.predict({coreml_input: latency_image}), warmup, iterations
+            lambda: coreml_all.predict({coreml_input: latency_coreml_input}), warmup, iterations
         ),
     }
     if golden_output is not None:
@@ -238,8 +302,12 @@ def benchmark(
         },
         "io": {
             "inputSize": [size, size],
-            "onnx": {"input": onnx_input, "output": onnx_output},
-            "coreml": {"input": coreml_input, "output": coreml_output},
+            "onnx": {"input": onnx_input, "outputs": onnx_outputs},
+            "coreml": {
+                "input": coreml_input,
+                "inputKind": coreml_input_kind,
+                "outputs": coreml_outputs,
+            },
         },
         "parity": rows,
         "latency": latency,

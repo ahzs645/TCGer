@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from decode_geometry_exports import (  # noqa: E402
+    decode_fastvit_four_corner,
+    fastvit_candidates,
     decode_yolo_pose,
     model_point_to_source,
     yolo_pose_candidates,
@@ -25,6 +27,19 @@ def output_with_duplicate_quads():
 
 
 class DecodeGeometryExportsTests(unittest.TestCase):
+    def test_fastvit_decodes_peak_and_ordered_corners(self):
+        heatmap = np.full((1, 1, 2, 2), -20, dtype=np.float32)
+        heatmap[0, 0, 0, 1] = 4
+        corner_values = np.asarray([0.1, 0.2, 0.8, 0.2, 0.8, 0.9, 0.1, 0.9])
+        logits = np.log(corner_values / (1 - corner_values)).astype(np.float32)
+        corners = np.zeros((1, 8, 2, 2), dtype=np.float32)
+        corners[0, :, 0, 1] = logits
+        rows = fastvit_candidates(heatmap, corners, resolution=640)
+        self.assertEqual(len(rows), 1)
+        self.assertAlmostEqual(rows[0]["corners"][0]["point"]["x"], 0.1, places=6)
+        self.assertAlmostEqual(rows[0]["corners"][2]["point"]["y"], 0.9, places=6)
+        self.assertEqual(len(decode_fastvit_four_corner(heatmap, corners)), 1)
+
     def test_yolo_pose_decodes_ordered_normalized_corners(self):
         rows = yolo_pose_candidates(output_with_duplicate_quads(), resolution=640)
         self.assertEqual(len(rows), 2)
