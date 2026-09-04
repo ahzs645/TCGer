@@ -355,6 +355,8 @@ Path('/work/preflight-report.json').write_bytes(preflight.read_bytes())
 """.strip()
     shell = [
         "set -euo pipefail",
+        "export HF_HUB_DOWNLOAD_TIMEOUT=120",
+        "export HF_HUB_ETAG_TIMEOUT=30",
         *setup,
         "python - <<'PY'",
         program,

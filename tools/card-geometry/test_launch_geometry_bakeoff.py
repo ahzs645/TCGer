@@ -81,6 +81,7 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         self.assertIn("Pillow==11.1.0", command[-1])
         self.assertIn("numpy==1.26.4", command[-1])
         self.assertIn("opencv-python-headless==4.10.0.84", command[-1])
+        self.assertIn("HF_HUB_DOWNLOAD_TIMEOUT=120", command[-1])
 
     def test_export_bootstrap_is_private_and_installs_converter(self):
         command = bootstrap_command(

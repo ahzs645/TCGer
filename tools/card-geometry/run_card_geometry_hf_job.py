@@ -404,6 +404,21 @@ def _download_recognition_models(resolved: dict[str, Any], token: str, work: Pat
     return root
 
 
+def export_checkpoint_patterns(candidate: str, prefix: str) -> list[str]:
+    """Download only the release checkpoint needed by a private exporter."""
+    root = f"{prefix}/training-output"
+    if candidate.startswith("yolo11"):
+        return [f"{root}/training/repeat-0/weights/best.pt"]
+    if candidate == "fastvit-t8-four-corner":
+        return [f"{root}/training/repeat-0/best.pt"]
+    if candidate == "yolox-pose":
+        return [
+            f"{root}/training/repeat-0/*.pth",
+            f"{root}/yolox-pose-card.py",
+        ]
+    raise ConfigurationError(f"unsupported export candidate: {candidate}")
+
+
 def _upload_json(api: Any, repo_id: str, path: str, value: Any, message: str) -> str:
     commit = api.upload_file(
         path_or_fileobj=(pretty_json(value)).encode("utf-8"),
@@ -511,7 +526,9 @@ def execute(
                 repo_id=checkpoint_repo,
                 repo_type="model",
                 revision=config_oid,
-                allow_patterns=f"{prefix}/**",
+                allow_patterns=export_checkpoint_patterns(
+                    resolved["candidate"], prefix
+                ),
                 token=token,
             )
         )

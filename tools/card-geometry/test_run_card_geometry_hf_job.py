@@ -23,6 +23,7 @@ from run_card_geometry_hf_job import (  # noqa: E402
     descriptor,
     execute,
     experiment_hash,
+    export_checkpoint_patterns,
     fairness_hash,
     materialize_downloaded_release,
     resolve_config,
@@ -203,6 +204,21 @@ class CandidateExperimentConfigTests(unittest.TestCase):
     def test_fixture_round_trips_as_json(self):
         resolved = resolve_config(self.raw)
         self.assertEqual(json.loads(json.dumps(resolved)), resolved)
+
+    def test_export_downloads_only_the_release_checkpoint(self):
+        prefix = "geometry/candidate/corpus/experiment"
+        self.assertEqual(
+            export_checkpoint_patterns("yolo11n-pose", prefix),
+            [f"{prefix}/training-output/training/repeat-0/weights/best.pt"],
+        )
+        self.assertEqual(
+            export_checkpoint_patterns("fastvit-t8-four-corner", prefix),
+            [f"{prefix}/training-output/training/repeat-0/best.pt"],
+        )
+        yolox = export_checkpoint_patterns("yolox-pose", prefix)
+        self.assertEqual(len(yolox), 2)
+        self.assertTrue(yolox[0].endswith("/*.pth"))
+        self.assertTrue(yolox[1].endswith("/yolox-pose-card.py"))
 
     def test_materializes_transport_shards_to_canonical_layout(self):
         import hashlib
