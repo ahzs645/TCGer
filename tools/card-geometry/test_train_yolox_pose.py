@@ -61,6 +61,15 @@ class TrainYoloxPoseTests(unittest.TestCase):
         self.assertEqual(resumed[-2:], ["--resume", "/cache/epoch_8.pth"])
         self.assertNotIn("--cfg-options", resumed)
 
+    def test_stage_resume_checkpoint_makes_epoch_available_to_evaluator(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "downloaded.pth"
+            source.write_bytes(b"checkpoint")
+            staged = MODULE.stage_resume_checkpoint(source, 50, root / "work")
+            self.assertEqual(staged.name, "epoch_50.pth")
+            self.assertEqual(staged.read_bytes(), b"checkpoint")
+
     def test_pinned_metainfo_defines_four_ordered_corners(self):
         metadata = runpy.run_path(ROOT / MODULE.METAINFO_FILE)["dataset_info"]
         self.assertEqual(metadata["dataset_name"], "tcger-card-corners")
@@ -155,6 +164,9 @@ class TrainYoloxPoseTests(unittest.TestCase):
                 seed=20260903,
             ).read_text()
             self.assertIn("pipeline=shared_pipeline", config)
+            self.assertIn("inference_pipeline = [", config)
+            self.assertIn("pipeline=inference_pipeline", config)
+            self.assertIn("test_dataloader = dict", config)
             self.assertIn("loss_pose=dict(_delete_=True", config)
             self.assertIn("metainfo=metainfo_file", config)
             self.assertIn("metainfo = dict(from_file=metainfo_file)", config)

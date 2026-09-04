@@ -140,6 +140,7 @@ def base_config(
     epochs: int,
     real_evaluation: dict[str, str] | None = None,
     synthetic_evaluation: dict[str, str] | None = None,
+    resume_from: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     framework = {
         "yolo11n-pose": "ultralytics",
@@ -203,6 +204,65 @@ def base_config(
         "releasePath": "geometry/releases/synthetic-geometry-smoke-v1",
         "corpusHash": "544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393",
     }
+    execution = {
+        "checkpointRepo": "ahzs645/tcger-universal-arcface",
+        "checkpointRepoPrivate": True,
+        "containerImage": container,
+        "gpuFlavor": "l4x1",
+        "trainCommand": commands[candidate],
+        "evaluationCommand": [
+            "python",
+            "tools/card-geometry/evaluate_geometry_candidate.py",
+            "--candidate",
+            candidate,
+        ],
+        "privateExportCommands": {
+            "onnx": [
+                "python",
+                "tools/card-geometry/export_geometry_candidate.py",
+                "--candidate",
+                candidate,
+                "--format",
+                "onnx",
+            ],
+            "coreml": [
+                "python",
+                "tools/card-geometry/export_geometry_candidate.py",
+                "--candidate",
+                candidate,
+                "--format",
+                "coreml",
+            ],
+        },
+    }
+    if resume_from is not None:
+        execution["resumeFrom"] = resume_from
+    deviations = (
+        [
+            {
+                "rule": "framework-internal-validation",
+                "candidateValue": "disabled; shared frozen evaluation runs after epoch 50",
+                "reason": (
+                    "Pinned MMYOLO YOLOXPoseHead dereferences a None cfg after parent "
+                    "postprocessing; this avoids a framework-only crash without changing "
+                    "training pixels, budget, seed, or the shared evaluation."
+                ),
+            }
+        ]
+        if candidate == "yolox-pose"
+        else []
+    )
+    if resume_from is not None:
+        deviations.append(
+            {
+                "rule": "training-resume-lineage",
+                "candidateValue": resume_from,
+                "reason": (
+                    "Reuse the verified completed checkpoint after a post-training evaluator "
+                    "failure; do not repeat the fixed 50-epoch optimization budget."
+                ),
+            }
+        )
     raw = {
         "schema": "https://tcger.app/schemas/card-geometry-experiment-config/v1",
         "bakeoffId": "shared-card-geometry-licensing-v1",
@@ -211,37 +271,7 @@ def base_config(
         "licenseRoute": license_route,
         "toolingRevision": tooling_revision,
         "corpus": corpus,
-        "execution": {
-            "checkpointRepo": "ahzs645/tcger-universal-arcface",
-            "checkpointRepoPrivate": True,
-            "containerImage": container,
-            "gpuFlavor": "l4x1",
-            "trainCommand": commands[candidate],
-            "evaluationCommand": [
-                "python",
-                "tools/card-geometry/evaluate_geometry_candidate.py",
-                "--candidate",
-                candidate,
-            ],
-            "privateExportCommands": {
-                "onnx": [
-                    "python",
-                    "tools/card-geometry/export_geometry_candidate.py",
-                    "--candidate",
-                    candidate,
-                    "--format",
-                    "onnx",
-                ],
-                "coreml": [
-                    "python",
-                    "tools/card-geometry/export_geometry_candidate.py",
-                    "--candidate",
-                    candidate,
-                    "--format",
-                    "coreml",
-                ],
-            },
-        },
+        "execution": execution,
         "fairness": {
             "inputResolution": 640,
             "budget": {"kind": "epochs", "value": epochs},
@@ -264,21 +294,7 @@ def base_config(
             ),
             "recognitionModels": recognition_models(),
         },
-        "deviations": (
-            [
-                {
-                    "rule": "framework-internal-validation",
-                    "candidateValue": "disabled; shared frozen evaluation runs after epoch 50",
-                    "reason": (
-                        "Pinned MMYOLO YOLOXPoseHead dereferences a None cfg after parent "
-                        "postprocessing; this avoids a framework-only crash without changing "
-                        "training pixels, budget, seed, or the shared evaluation."
-                    ),
-                }
-            ]
-            if candidate == "yolox-pose"
-            else []
-        ),
+        "deviations": deviations,
     }
     return resolve_config(raw)
 
@@ -433,6 +449,16 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
                 "releasePath": args.synthetic_evaluation_path,
                 "corpusHash": args.synthetic_evaluation_hash,
             },
+            resume_from=(
+                {
+                    "checkpointPrefix": args.resume_from_prefix,
+                    "checkpointSha256": args.resume_from_checkpoint_sha256,
+                    "epoch": args.resume_from_epoch,
+                    "jobId": args.resume_from_job_id,
+                }
+                if args.resume_from_prefix and candidate == "yolox-pose"
+                else None
+            ),
         )
         for candidate in candidates
     }
@@ -559,6 +585,10 @@ def main() -> int:
     )
     parser.add_argument("--pipeline-smoke", action="store_true")
     parser.add_argument("--publish-only", action="store_true")
+    parser.add_argument("--resume-from-prefix")
+    parser.add_argument("--resume-from-checkpoint-sha256")
+    parser.add_argument("--resume-from-job-id")
+    parser.add_argument("--resume-from-epoch", type=int)
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
     if args.action == "export" and not args.export_format:
@@ -574,6 +604,17 @@ def main() -> int:
             "yolox-pose",
             "fastvit-t8-four-corner",
         ]
+    resume_values = (
+        args.resume_from_prefix,
+        args.resume_from_checkpoint_sha256,
+        args.resume_from_job_id,
+        args.resume_from_epoch,
+    )
+    if any(value is not None for value in resume_values):
+        if not all(value is not None for value in resume_values):
+            parser.error("all --resume-from-* arguments are required together")
+        if args.candidate != ["yolox-pose"] or args.action != "train":
+            parser.error("checkpoint resume is restricted to one YOLOX-Pose training job")
     result = publish_and_launch(args)
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.report:

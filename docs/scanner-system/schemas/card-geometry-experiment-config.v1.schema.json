@@ -96,6 +96,17 @@
             "onnx": { "$ref": "#/$defs/command" }
           }
         },
+        "resumeFrom": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["checkpointPrefix", "checkpointSha256", "epoch", "jobId"],
+          "properties": {
+            "checkpointPrefix": { "type": "string", "minLength": 1 },
+            "checkpointSha256": { "$ref": "#/$defs/sha256" },
+            "epoch": { "type": "integer", "minimum": 1 },
+            "jobId": { "type": "string", "minLength": 1 }
+          }
+        },
         "assetStorePublishCommand": { "$ref": "#/$defs/command" }
       }
     },
@@ -200,6 +211,7 @@
               "seed-policy",
           "evaluation-script",
           "framework-internal-validation",
+              "training-resume-lineage",
               "input-resolution",
               "corpus-release"
             ]

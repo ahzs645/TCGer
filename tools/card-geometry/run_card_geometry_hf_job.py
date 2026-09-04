@@ -139,6 +139,20 @@ def resolve_config(raw: dict[str, Any], *, pipeline_smoke: bool = False) -> dict
             f"{resolved['candidate']} uses the permissive publication route"
         )
 
+    resume_from = resolved["execution"].get("resumeFrom")
+    if resume_from is not None:
+        if resolved["candidate"] != "yolox-pose":
+            raise ConfigurationError("checkpoint resume is restricted to yolox-pose")
+        expected_prefix = (
+            f"geometry/yolox-pose/{resolved['corpus']['corpusHash']}/"
+        )
+        if not resume_from["checkpointPrefix"].startswith(expected_prefix):
+            raise ConfigurationError(
+                "resume checkpoint must belong to the same candidate and corpus"
+            )
+        if resume_from["epoch"] > resolved["fairness"]["budget"]["value"]:
+            raise ConfigurationError("resume epoch exceeds the experiment budget")
+
     if resolved["execution"].get("evaluationCommand") and not resolved[
         "evaluations"
     ].get("recognitionModels"):
@@ -506,6 +520,16 @@ def execute(
             ),
         }
     )
+    resume_from = resolved["execution"].get("resumeFrom")
+    if resume_from is not None:
+        env.update(
+            {
+                "TCGER_GEOMETRY_RESUME_PREFIX": resume_from["checkpointPrefix"],
+                "TCGER_GEOMETRY_RESUME_SHA256": resume_from["checkpointSha256"],
+                "TCGER_GEOMETRY_RESUME_EPOCH": str(resume_from["epoch"]),
+                "TCGER_GEOMETRY_RESUME_JOB_ID": resume_from["jobId"],
+            }
+        )
 
     started = time.monotonic()
     if action == "train":

@@ -117,18 +117,22 @@ class CheckpointPersistence:
             self.scan()
 
 
-def remote_resume_checkpoint() -> tuple[Path | None, int | None]:
+def remote_resume_checkpoint() -> tuple[Path | None, int | None, str | None]:
     from huggingface_hub import HfApi, hf_hub_download
 
     repo = os.environ["TCGER_GEOMETRY_CHECKPOINT_REPO"]
     prefix = os.environ["TCGER_GEOMETRY_CHECKPOINT_PREFIX"]
     token = os.environ.get("HF_TOKEN")
     api = HfApi(token=token)
-    path = latest_checkpoint_path(
-        api.list_repo_files(repo_id=repo, repo_type="model"), prefix
-    )
+    paths = api.list_repo_files(repo_id=repo, repo_type="model")
+    source_prefix = prefix
+    path = latest_checkpoint_path(paths, source_prefix)
+    fallback_prefix = os.environ.get("TCGER_GEOMETRY_RESUME_PREFIX")
+    if path is None and fallback_prefix:
+        source_prefix = fallback_prefix
+        path = latest_checkpoint_path(paths, source_prefix)
     if path is None:
-        return None, None
+        return None, None, None
     downloaded = Path(
         hf_hub_download(
             repo_id=repo,
@@ -137,7 +141,18 @@ def remote_resume_checkpoint() -> tuple[Path | None, int | None]:
             token=token,
         )
     )
-    return downloaded, checkpoint_epoch(path)
+    epoch = checkpoint_epoch(path)
+    expected_epoch = os.environ.get("TCGER_GEOMETRY_RESUME_EPOCH")
+    if fallback_prefix and expected_epoch is not None and epoch != int(expected_epoch):
+        raise ValueError(f"resume epoch mismatch: {epoch} != {expected_epoch}")
+    expected_sha256 = os.environ.get("TCGER_GEOMETRY_RESUME_SHA256")
+    if expected_sha256 is not None:
+        actual_sha256 = sha256_file(downloaded)
+        if actual_sha256 != expected_sha256:
+            raise ValueError(
+                f"resume checkpoint SHA-256 mismatch: {actual_sha256} != {expected_sha256}"
+            )
+    return downloaded, epoch, source_prefix
 
 
 def training_command(
@@ -161,6 +176,13 @@ def training_command(
     else:
         command.extend(("--cfg-options", f"load_from={base_checkpoint}"))
     return command
+
+
+def stage_resume_checkpoint(checkpoint: Path, epoch: int, work_dir: Path) -> Path:
+    work_dir.mkdir(parents=True, exist_ok=True)
+    staged = work_dir / f"epoch_{epoch}.pth"
+    shutil.copy2(checkpoint, staged)
+    return staged
 
 
 def coco_annotation(
@@ -321,6 +343,15 @@ def write_config(
          meta_keys=('id', 'img_id', 'img_path', 'ori_shape', 'img_shape',
                     'scale_factor', 'flip_indices')),
 ]"""
+    inference_pipeline = """[
+    dict(type='LoadImageFromFile'),
+    dict(type='Resize', scale=(640, 640), keep_ratio=True),
+    dict(type='mmdet.Pad', pad_to_square=True,
+         pad_val=dict(img=(114.0, 114.0, 114.0))),
+    dict(type='PackDetInputs',
+         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
+                    'scale_factor')),
+]"""
     config.write_text(
         "\n".join(
             [
@@ -332,6 +363,7 @@ def write_config(
                 "num_keypoints = 4",
                 "img_scale = (640, 640)",
                 f"shared_pipeline = {shared_pipeline}",
+                f"inference_pipeline = {inference_pipeline}",
                 "model = dict(bbox_head=dict(head_module=dict(num_keypoints=4), "
                 "loss_pose=dict(_delete_=True, type='OksLoss', metainfo=metainfo_file, "
                 "loss_weight=30.0)), train_cfg=dict(assigner=dict("
@@ -349,7 +381,11 @@ def write_config(
                 "data_root=data_root, ann_file='annotations/validation.json', "
                 "data_prefix=dict(img='images/validation/'), metainfo=metainfo, "
                 "pipeline=shared_pipeline))",
-                "test_dataloader = val_dataloader",
+                f"test_dataloader = dict(batch_size={batch}, num_workers={workers}, "
+                "dataset=dict(_delete_=True, type='PoseCocoDataset', data_mode='bottomup', "
+                "data_root=data_root, ann_file='annotations/validation.json', "
+                "data_prefix=dict(img='images/validation/'), metainfo=metainfo, "
+                "pipeline=inference_pipeline))",
                 "val_evaluator = dict(_delete_=True, type='mmpose.CocoMetric', "
                 "ann_file=data_root + 'annotations/validation.json', score_mode='bbox')",
                 "test_evaluator = val_evaluator",
@@ -389,7 +425,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     seed = int(os.environ["TCGER_GEOMETRY_BASE_SEED"])
     if int(os.environ["TCGER_GEOMETRY_REPEAT_COUNT"]) != 1:
         raise ValueError("one Job invocation trains exactly one resolved repeat")
-    resume_checkpoint, resume_epoch = remote_resume_checkpoint()
+    resume_checkpoint, resume_epoch, resume_prefix = remote_resume_checkpoint()
     base_checkpoint = output / "base-yolox-pose.pth"
     if resume_checkpoint is None:
         download_verified(args.base_url, args.base_sha256, base_checkpoint)
@@ -405,6 +441,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         seed=seed,
     )
     work_dir = output / "training" / "repeat-0"
+    if resume_checkpoint is not None:
+        assert resume_epoch is not None
+        resume_checkpoint = stage_resume_checkpoint(
+            resume_checkpoint, resume_epoch, work_dir
+        )
     command = training_command(
         mmyolo_root=args.mmyolo_root,
         config=config,
@@ -435,7 +476,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "resume": (
             None
             if resume_checkpoint is None
-            else {"checkpoint": str(resume_checkpoint), "epoch": resume_epoch}
+            else {
+                "checkpoint": str(resume_checkpoint),
+                "epoch": resume_epoch,
+                "sourcePrefix": resume_prefix,
+                "sourceJobId": os.environ.get("TCGER_GEOMETRY_RESUME_JOB_ID"),
+            }
         ),
         "checkpointPersistence": {
             "pathPrefix": os.environ["TCGER_GEOMETRY_CHECKPOINT_PREFIX"],

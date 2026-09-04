@@ -163,6 +163,31 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             train_command,
         )
 
+    def test_yolox_resume_lineage_is_hashed_and_corpus_scoped(self):
+        resume = {
+            "checkpointPrefix": f"geometry/yolox-pose/{CORPUS['corpusHash']}/parent",
+            "checkpointSha256": "e" * 64,
+            "epoch": 50,
+            "jobId": "job-parent",
+        }
+        baseline = base_config(
+            candidate="yolox-pose",
+            corpus=CORPUS,
+            tooling_revision="c" * 40,
+            epochs=50,
+        )
+        resumed = base_config(
+            candidate="yolox-pose",
+            corpus=CORPUS,
+            tooling_revision="c" * 40,
+            epochs=50,
+            resume_from=resume,
+        )
+        self.assertEqual(resumed["execution"]["resumeFrom"], resume)
+        self.assertEqual(resumed["deviations"][-1]["rule"], "training-resume-lineage")
+        self.assertNotEqual(descriptor(baseline)["experimentHash"], descriptor(resumed)["experimentHash"])
+        self.assertEqual(descriptor(baseline)["fairnessHash"], descriptor(resumed)["fairnessHash"])
+
 
 if __name__ == "__main__":
     unittest.main()
