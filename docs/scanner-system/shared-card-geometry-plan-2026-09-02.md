@@ -165,6 +165,12 @@ The comparison table records, for every candidate:
 - decoder source-code size; and
 - L4 GPU hours.
 
+The synthetic duel-field benchmark is a split-only, immutable compositor
+release whose source assets and backgrounds are disjoint from the production
+training split. It is diagnostic rather than a promotion gate, but it must not
+reuse exact training frames; the frozen real release remains the deciding
+geometry evaluation.
+
 Gate 0 does not authorize a corpus. The approved
 `tools/card-geometry/policies/training-minimums-v2.json` is frozen at SHA-256
 `b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d`.

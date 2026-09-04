@@ -98,6 +98,7 @@ def base_config(
     tooling_revision: str,
     epochs: int,
     real_evaluation: dict[str, str] | None = None,
+    synthetic_evaluation: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     framework = {
         "yolo11n-pose": "ultralytics",
@@ -151,6 +152,12 @@ def base_config(
         "releasePath": "geometry/releases/real-geometry-devmode-orientation-smoke-v3",
         "corpusHash": "97780e7e96cbd98da91173a00b37e6304514f758a9046f5bd98adf30c418820e",
     }
+    synthetic_evaluation = synthetic_evaluation or {
+        "datasetRepo": "ahzs645/tcger-scanner-images",
+        "datasetRevision": "b4ef746b06c725cbe196e709d518dc53eea0ad13",
+        "releasePath": "geometry/releases/synthetic-geometry-smoke-v1",
+        "corpusHash": "544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393",
+    }
     raw = {
         "schema": "https://tcger.app/schemas/card-geometry-experiment-config/v1",
         "bakeoffId": "shared-card-geometry-licensing-v1",
@@ -203,12 +210,7 @@ def base_config(
         },
         "evaluations": {
             "frozenRealV3": real_evaluation,
-            "syntheticDuelField": {
-                "datasetRepo": "ahzs645/tcger-scanner-images",
-                "datasetRevision": "b4ef746b06c725cbe196e709d518dc53eea0ad13",
-                "releasePath": "geometry/releases/synthetic-geometry-smoke-v1",
-                "corpusHash": "544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393",
-            },
+            "syntheticDuelField": synthetic_evaluation,
             "recognitionReplay": hashed_artifact(
                 "docs/scanner-system/benchmarks/2026-09-02-shared-card-geometry/reports/device-geometry-outcomes.json"
             ),
@@ -320,6 +322,12 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
                 "releasePath": args.real_evaluation_path,
                 "corpusHash": args.real_evaluation_hash,
             },
+            synthetic_evaluation={
+                "datasetRepo": args.dataset_repo,
+                "datasetRevision": args.synthetic_evaluation_revision,
+                "releasePath": args.synthetic_evaluation_path,
+                "corpusHash": args.synthetic_evaluation_hash,
+            },
         )
         for candidate in candidates
     }
@@ -410,6 +418,9 @@ def main() -> int:
     parser.add_argument("--real-evaluation-revision", required=True)
     parser.add_argument("--real-evaluation-path", required=True)
     parser.add_argument("--real-evaluation-hash", required=True)
+    parser.add_argument("--synthetic-evaluation-revision", required=True)
+    parser.add_argument("--synthetic-evaluation-path", required=True)
+    parser.add_argument("--synthetic-evaluation-hash", required=True)
     parser.add_argument(
         "--policy-sha256",
         default="b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
