@@ -224,6 +224,8 @@ def write_config(
                 # MMEngine always runs validation at max_epochs regardless of
                 # val_interval, so remove the loop itself. The shared frozen
                 # evaluator still runs immediately after training.
+                "val_dataloader = None",
+                "val_evaluator = None",
                 "val_cfg = None",
                 f"train_cfg = dict(max_epochs={epochs}, val_interval={epochs + 1}, "
                 "dynamic_intervals=None)",

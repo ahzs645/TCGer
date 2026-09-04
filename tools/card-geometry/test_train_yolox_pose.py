@@ -118,6 +118,8 @@ class TrainYoloxPoseTests(unittest.TestCase):
             self.assertIn("test_cfg=dict(yolox_style=True", config)
             self.assertIn("max_per_img=300", config)
             self.assertIn("val_interval=51", config)
+            self.assertIn("val_dataloader = None", config)
+            self.assertIn("val_evaluator = None", config)
             self.assertIn("val_cfg = None", config)
             self.assertIn("save_best=None", config)
             self.assertIn("dataset=dict(_delete_=True, type='PoseCocoDataset'", config)
