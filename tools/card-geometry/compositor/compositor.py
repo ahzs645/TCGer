@@ -11,6 +11,7 @@ import math
 import shutil
 import sys
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -70,6 +71,35 @@ class SceneCard:
     quad: tuple[tuple[float, float], ...]
     side: str
     sleeve_tint: tuple[int, int, int, int] | None
+
+
+_WORKER_CONFIG: dict[str, Any] | None = None
+_WORKER_CARD_ASSETS: list[Asset] | None = None
+_WORKER_BACKGROUND_ASSETS: list[Asset] | None = None
+
+
+def _initialize_worker(
+    config: dict[str, Any], card_manifest_path: str, background_manifest_path: str
+) -> None:
+    global _WORKER_CONFIG, _WORKER_CARD_ASSETS, _WORKER_BACKGROUND_ASSETS
+    _WORKER_CONFIG = config
+    _WORKER_CARD_ASSETS = load_assets(Path(card_manifest_path), "card")
+    _WORKER_BACKGROUND_ASSETS = load_assets(Path(background_manifest_path), "background")
+
+
+def _render_worker(task: tuple[str, str, int, str]) -> tuple[dict[str, Any], bytes]:
+    if _WORKER_CONFIG is None or _WORKER_CARD_ASSETS is None or _WORKER_BACKGROUND_ASSETS is None:
+        raise RuntimeError("compositor worker was not initialized")
+    split, scene_slice, ordinal, revision = task
+    return render_record(
+        split=split,
+        scene_slice=scene_slice,
+        ordinal=ordinal,
+        revision=revision,
+        config=_WORKER_CONFIG,
+        card_assets=_WORKER_CARD_ASSETS,
+        background_assets=_WORKER_BACKGROUND_ASSETS,
+    )
 
 
 def _deep_merge(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
@@ -740,6 +770,7 @@ def build_release(
     card_manifest_path: Path,
     background_manifest_path: Path,
     compositor_git_sha: str,
+    workers: int = 1,
 ) -> dict[str, Any]:
     if output.exists() and any(output.iterdir()):
         raise CompositorError(f"refusing to replace non-empty output: {output}")
@@ -769,53 +800,73 @@ def build_release(
     distractors_by_scene: dict[str, Counter[str]] = {
         scene: Counter() for scene in SCENE_SLICES
     }
-    for split in SPLITS:
-        for scene_slice in SCENE_SLICES:
-            count = int(records_per_split_scene.get(split, {}).get(scene_slice, 0))
-            for ordinal in range(count):
-                record, image_bytes = render_record(
-                    split=split,
-                    scene_slice=scene_slice,
-                    ordinal=ordinal,
-                    revision=revision,
-                    config=config,
-                    card_assets=card_assets,
-                    background_assets=background_assets,
-                )
-                record_id = record["recordId"]
-                image_rel = record["source"]["path"]
-                record_rel = f"records/{record_id}.json"
-                image_path = output / image_rel
-                record_path = output / record_rel
-                image_path.parent.mkdir(parents=True, exist_ok=True)
-                record_path.parent.mkdir(parents=True, exist_ok=True)
-                image_path.write_bytes(image_bytes)
-                record_text = pretty_json(record)
-                record_path.write_text(record_text, encoding="utf-8")
-                entries.append(
-                    {
-                        "recordId": record_id,
-                        "path": record_rel,
-                        "sha256": sha256_bytes(record_text.encode("utf-8")),
-                        "split": split,
-                        "sceneSlice": scene_slice,
-                        "sourceTier": "shippable",
-                        "leakageKeys": leakage_keys_from_record(record),
-                        "images": [{"path": image_rel, "sha256": sha256_bytes(image_bytes)}],
-                    }
-                )
-                counts["records"] += 1
-                counts["instances"] += len(record["instances"])
-                counts[f"split:{split}"] += 1
-                counts[f"scene:{scene_slice}"] += 1
-                distractor_count = int(record["synthetic"]["distractorCount"])
-                distractors_by_scene[scene_slice]["records"] += 1
-                distractors_by_scene[scene_slice]["distractors"] += distractor_count
-                if distractor_count:
-                    distractors_by_scene[scene_slice]["recordsWithDistractors"] += 1
-                for instance in record["instances"]:
-                    for corner in instance["corners"]:
-                        counts[f"visibility:{corner['visibility']}"] += 1
+    tasks = [
+        (split, scene_slice, ordinal, revision)
+        for split in SPLITS
+        for scene_slice in SCENE_SLICES
+        for ordinal in range(int(records_per_split_scene.get(split, {}).get(scene_slice, 0)))
+    ]
+    if workers < 1:
+        raise CompositorError("--workers must be at least 1")
+    if workers == 1:
+        rendered = (
+            render_record(
+                split=split,
+                scene_slice=scene_slice,
+                ordinal=ordinal,
+                revision=task_revision,
+                config=config,
+                card_assets=card_assets,
+                background_assets=background_assets,
+            )
+            for split, scene_slice, ordinal, task_revision in tasks
+        )
+    else:
+        executor = ProcessPoolExecutor(
+            max_workers=workers,
+            initializer=_initialize_worker,
+            initargs=(config, str(card_manifest_path), str(background_manifest_path)),
+        )
+        rendered = executor.map(_render_worker, tasks, chunksize=1)
+    try:
+        for (split, scene_slice, _, _), (record, image_bytes) in zip(tasks, rendered):
+            record_id = record["recordId"]
+            image_rel = record["source"]["path"]
+            record_rel = f"records/{record_id}.json"
+            image_path = output / image_rel
+            record_path = output / record_rel
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            record_path.parent.mkdir(parents=True, exist_ok=True)
+            image_path.write_bytes(image_bytes)
+            record_text = pretty_json(record)
+            record_path.write_text(record_text, encoding="utf-8")
+            entries.append(
+                {
+                    "recordId": record_id,
+                    "path": record_rel,
+                    "sha256": sha256_bytes(record_text.encode("utf-8")),
+                    "split": split,
+                    "sceneSlice": scene_slice,
+                    "sourceTier": "shippable",
+                    "leakageKeys": leakage_keys_from_record(record),
+                    "images": [{"path": image_rel, "sha256": sha256_bytes(image_bytes)}],
+                }
+            )
+            counts["records"] += 1
+            counts["instances"] += len(record["instances"])
+            counts[f"split:{split}"] += 1
+            counts[f"scene:{scene_slice}"] += 1
+            distractor_count = int(record["synthetic"]["distractorCount"])
+            distractors_by_scene[scene_slice]["records"] += 1
+            distractors_by_scene[scene_slice]["distractors"] += distractor_count
+            if distractor_count:
+                distractors_by_scene[scene_slice]["recordsWithDistractors"] += 1
+            for instance in record["instances"]:
+                for corner in instance["corners"]:
+                    counts[f"visibility:{corner['visibility']}"] += 1
+    finally:
+        if workers != 1:
+            executor.shutdown()
     manifest = {
         "schema": MANIFEST_SCHEMA_ID,
         "releaseId": release_id,
@@ -873,6 +924,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--card-assets", type=Path, required=True)
     parser.add_argument("--background-assets", type=Path, required=True)
     parser.add_argument("--compositor-git-sha", required=True)
+    parser.add_argument("--workers", type=int, default=1)
     args = parser.parse_args(argv)
     try:
         summary = build_release(
@@ -882,6 +934,7 @@ def main(argv: list[str] | None = None) -> int:
             card_manifest_path=args.card_assets,
             background_manifest_path=args.background_assets,
             compositor_git_sha=args.compositor_git_sha,
+            workers=args.workers,
         )
     except (CompositorError, OSError, json.JSONDecodeError) as error:
         print(f"compositor failed: {error}", file=sys.stderr)

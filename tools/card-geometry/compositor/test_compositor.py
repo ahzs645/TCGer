@@ -149,7 +149,7 @@ class CompositorTests(unittest.TestCase):
             first = root / "release-a"
             second = root / "release-b"
             summaries = []
-            for output in (first, second):
+            for index, output in enumerate((first, second)):
                 summaries.append(
                     build_release(
                         output=output,
@@ -158,6 +158,7 @@ class CompositorTests(unittest.TestCase):
                         card_manifest_path=cards,
                         background_manifest_path=backgrounds,
                         compositor_git_sha=GIT_SHA,
+                        workers=index + 1,
                     )
                 )
             first_files = sorted(path.relative_to(first) for path in first.rglob("*") if path.is_file())

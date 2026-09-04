@@ -38,7 +38,7 @@
     "binder_page": {"instances": 9, "longSidePixels": [300, 390], "tiltDegrees": [0, 18]},
     "duel_field": {
       "faceDownProbabilityTrain": 0.18,
-      "faceDownProbabilityValidation": 0.08,
+      "faceDownProbabilityValidation": 0.0,
       "instances": [3, 7],
       "longSidePixels": [80, 430],
       "tiltDegrees": [0, 30]
