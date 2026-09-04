@@ -62,7 +62,7 @@ def render(report: dict[str, Any]) -> str:
         "Outside p50 | Duplicates | Extras | Correct | Wrong | Abstain | Parity cosine | "
         "Measured budgets | Production ready |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
-        "---: | ---: | ---: | ---: | --- | --- |",
+        "---: | ---: | ---: | --- | --- |",
     ]
     for candidate in report["candidates"]:
         real = candidate["real"]

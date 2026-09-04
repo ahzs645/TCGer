@@ -75,6 +75,8 @@ class RenderGeometryBakeoffReportTests(unittest.TestCase):
         self.assertIn("iOS unavailable; Android unavailable", output)
         self.assertIn("onnxMacCpu 3.50 ms", output)
         self.assertIn("Choose a license route", output)
+        table = [line for line in output.splitlines() if line.startswith("|")]
+        self.assertEqual({len([cell for cell in line.split("|") if cell.strip()]) for line in table}, {16})
 
     def test_rejects_wrong_schema(self):
         report = self.report()
