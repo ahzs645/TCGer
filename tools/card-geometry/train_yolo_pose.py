@@ -208,6 +208,25 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         save_period=1,
         plots=False,
         verbose=True,
+        # The canonical synthetic corpus already carries the shared geometry
+        # and photometric augmentation.  Disable framework-local randomness so
+        # every bake-off candidate sees the same pixels.
+        hsv_h=0.0,
+        hsv_s=0.0,
+        hsv_v=0.0,
+        degrees=0.0,
+        translate=0.0,
+        scale=0.0,
+        shear=0.0,
+        perspective=0.0,
+        flipud=0.0,
+        fliplr=0.0,
+        bgr=0.0,
+        mosaic=0.0,
+        mixup=0.0,
+        cutmix=0.0,
+        copy_paste=0.0,
+        close_mosaic=0,
     )
     weights = project / "repeat-0" / "weights"
     artifacts = {
@@ -232,6 +251,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "batch": args.batch,
             "seed": seed,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
+            "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
             "ultralyticsVersion": ultralytics_version,
             "pythonVersion": platform.python_version(),
         },

@@ -8,12 +8,11 @@ import json
 import math
 import os
 import platform
-import random
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image
 
 from train_yolo_pose import load_json, sha256_file
 
@@ -155,12 +154,8 @@ def make_dataset(release: Path, split: str, resolution: int, seed: int):
                 (int(geometry["resizedWidth"]), int(geometry["resizedHeight"])),
                 Image.Resampling.BILINEAR,
             )
-            canvas = Image.new("RGB", (resolution, resolution), (0, 0, 0))
+            canvas = Image.new("RGB", (resolution, resolution), (114, 114, 114))
             canvas.paste(resized, (int(geometry["padLeft"]), int(geometry["padTop"])))
-            local = random.Random(f"{seed}:{split}:{entry['recordId']}")
-            if split == "train":
-                canvas = ImageEnhance.Brightness(canvas).enhance(local.uniform(0.85, 1.15))
-                canvas = ImageEnhance.Contrast(canvas).enhance(local.uniform(0.85, 1.15))
             target = build_targets(
                 record["instances"],
                 width=width,
@@ -343,6 +338,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "seed": seed,
             "learningRate": args.learning_rate,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
+            "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
             "pythonVersion": platform.python_version(),
             "torchVersion": torch.__version__,
         },

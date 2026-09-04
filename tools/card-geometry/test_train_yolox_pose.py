@@ -80,6 +80,30 @@ class TrainYoloxPoseTests(unittest.TestCase):
             self.assertEqual(document["images"][0]["height"], 28)
             self.assertEqual(document["categories"][0]["keypoints"][0], "top_left")
 
+    def test_config_replaces_framework_random_augmentation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkout = root / "mmyolo"
+            base = checkout / "configs/yolox/pose/yolox-pose_s_8xb32-300e-rtmdet-hyp_coco.py"
+            base.parent.mkdir(parents=True)
+            base.write_text("# pinned base\n")
+            dataset = root / "dataset"
+            dataset.mkdir()
+            output = root / "output"
+            output.mkdir()
+            config = MODULE.write_config(
+                mmyolo_root=checkout,
+                dataset=dataset,
+                output=output,
+                epochs=50,
+                batch=16,
+                workers=8,
+                seed=20260903,
+            ).read_text()
+            self.assertIn("pipeline=shared_pipeline", config)
+            self.assertNotIn("Mosaic", config)
+            self.assertNotIn("RandomFlip", config)
+
 
 if __name__ == "__main__":
     unittest.main()

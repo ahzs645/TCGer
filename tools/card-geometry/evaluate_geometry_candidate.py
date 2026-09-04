@@ -142,7 +142,7 @@ class Predictor:
             (int(geometry["resizedWidth"]), int(geometry["resizedHeight"])),
             Image.Resampling.BILINEAR,
         )
-        canvas = Image.new("RGB", (self.resolution, self.resolution), (0, 0, 0))
+        canvas = Image.new("RGB", (self.resolution, self.resolution), (114, 114, 114))
         canvas.paste(resized, (int(geometry["padLeft"]), int(geometry["padTop"])))
         pixels = np.asarray(canvas, dtype=np.float32).transpose(2, 0, 1) / 255.0
         pixels = (pixels - np.asarray([0.485, 0.456, 0.406])[:, None, None]) / np.asarray(

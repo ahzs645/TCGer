@@ -191,6 +191,17 @@ def write_config(
         raise ValueError(f"pinned MMYOLO checkout lacks YOLOX-Pose config: {base}")
     config = output / "yolox-pose-card.py"
     metainfo = repr(CARD_METAINFO)
+    shared_pipeline = """[
+    dict(type='LoadImageFromFile'),
+    dict(type='LoadAnnotations', with_keypoints=True),
+    dict(type='Resize', scale=(640, 640), keep_ratio=True),
+    dict(type='mmdet.Pad', pad_to_square=True,
+         pad_val=dict(img=(114.0, 114.0, 114.0))),
+    dict(type='FilterAnnotations', by_keypoints=True, keep_empty=False),
+    dict(type='PackDetInputs',
+         meta_keys=('id', 'img_id', 'img_path', 'ori_shape', 'img_shape',
+                    'scale_factor', 'flip_indices')),
+]"""
     config.write_text(
         "\n".join(
             [
@@ -199,15 +210,18 @@ def write_config(
                 f"metainfo = {metainfo}",
                 "num_keypoints = 4",
                 "img_scale = (640, 640)",
+                f"shared_pipeline = {shared_pipeline}",
                 "model = dict(bbox_head=dict(head_module=dict(num_keypoints=4), "
                 "loss_pose=dict(metainfo=metainfo)), train_cfg=dict(assigner=dict("
                 "oks_calculator=dict(metainfo=metainfo))))",
                 f"train_dataloader = dict(batch_size={batch}, num_workers={workers}, "
                 "dataset=dict(data_root=data_root, ann_file='annotations/train.json', "
-                "data_prefix=dict(img='images/train/'), metainfo=metainfo))",
+                "data_prefix=dict(img='images/train/'), metainfo=metainfo, "
+                "pipeline=shared_pipeline))",
                 f"val_dataloader = dict(batch_size={batch}, num_workers={workers}, "
                 "dataset=dict(data_root=data_root, ann_file='annotations/validation.json', "
-                "data_prefix=dict(img='images/validation/'), metainfo=metainfo))",
+                "data_prefix=dict(img='images/validation/'), metainfo=metainfo, "
+                "pipeline=shared_pipeline))",
                 "test_dataloader = val_dataloader",
                 "val_evaluator = dict(_delete_=True, type='mmpose.CocoMetric', "
                 "ann_file=data_root + 'annotations/validation.json', score_mode='bbox')",
@@ -277,6 +291,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "batch": args.batch,
             "seed": seed,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
+            "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
             "pythonVersion": platform.python_version(),
         },
         "artifacts": {

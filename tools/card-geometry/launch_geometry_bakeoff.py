@@ -193,7 +193,7 @@ def base_config(
         "fairness": {
             "inputResolution": 640,
             "budget": {"kind": "epochs", "value": epochs},
-            "augmentationProfile": "shared-card-geometry-v1",
+            "augmentationProfile": "canonical-corpus-baked-v1:no-runtime-augmentation",
             "seedPolicy": {
                 "baseSeed": 20260903,
                 "repeatCount": 1,

@@ -145,6 +145,13 @@ or other exception is an explicit `deviations` entry in that resolved config;
 it is never an unrecorded change. Private checkpoints live at
 `geometry/<candidate>/<corpus-hash>/<experiment-hash>/`.
 
+For the first bake-off the resolved augmentation profile is
+`canonical-corpus-baked-v1:no-runtime-augmentation`: all shared photometric and
+geometric variation is rendered into the canonical synthetic records before
+the split is published, and framework-local random augmentation is disabled.
+That makes the pixels and labels comparable across all four trainers instead
+of silently inheriting different Ultralytics, MMYOLO, and PyTorch defaults.
+
 The comparison table records, for every candidate:
 
 - the geometry benchmark on the frozen real v3 release and the synthetic
