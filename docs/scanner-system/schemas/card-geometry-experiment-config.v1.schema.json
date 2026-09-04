@@ -198,7 +198,8 @@
               "budget",
               "augmentation",
               "seed-policy",
-              "evaluation-script",
+          "evaluation-script",
+          "framework-internal-validation",
               "input-resolution",
               "corpus-release"
             ]

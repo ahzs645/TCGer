@@ -218,13 +218,19 @@ def write_config(
                 "val_evaluator = dict(_delete_=True, type='mmpose.CocoMetric', "
                 "ann_file=data_root + 'annotations/validation.json', score_mode='bbox')",
                 "test_evaluator = val_evaluator",
-                f"train_cfg = dict(max_epochs={epochs}, val_interval=1, dynamic_intervals=None)",
+                # Pinned MMYOLO's YOLOXPoseHead dereferences the local cfg
+                # argument after its parent has replaced None only internally.
+                # That upstream bug makes the framework validation loop crash.
+                # The shared frozen evaluator still runs immediately after
+                # training, so suppress only this redundant internal loop.
+                f"train_cfg = dict(max_epochs={epochs}, val_interval={epochs + 1}, "
+                "dynamic_intervals=None)",
                 "param_scheduler = [dict(type='CosineAnnealingLR', eta_min=0.00001, "
                 f"begin=0, end={epochs}, T_max={epochs}, by_epoch=True)]",
                 "custom_hooks = [dict(type='EMAHook', ema_type='ExpMomentumEMA', "
                 "momentum=0.0002, update_buffers=True, strict_load=False, priority=49)]",
                 f"randomness = dict(seed={seed}, deterministic=True)",
-                "default_hooks = dict(checkpoint=dict(interval=1, save_best='coco/AP', rule='greater'))",
+                "default_hooks = dict(checkpoint=dict(interval=1, save_best=None))",
                 "visualizer = dict(type='mmpose.PoseLocalVisualizer')",
                 "work_dir = None",
                 "",

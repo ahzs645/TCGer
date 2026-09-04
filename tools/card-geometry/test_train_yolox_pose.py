@@ -117,6 +117,8 @@ class TrainYoloxPoseTests(unittest.TestCase):
             self.assertIn("load_from = None", config)
             self.assertIn("test_cfg=dict(yolox_style=True", config)
             self.assertIn("max_per_img=300", config)
+            self.assertIn("val_interval=51", config)
+            self.assertIn("save_best=None", config)
             self.assertIn("dataset=dict(_delete_=True, type='PoseCocoDataset'", config)
             self.assertNotIn("Mosaic", config)
             self.assertNotIn("RandomFlip", config)

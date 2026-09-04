@@ -264,7 +264,21 @@ def base_config(
             ),
             "recognitionModels": recognition_models(),
         },
-        "deviations": [],
+        "deviations": (
+            [
+                {
+                    "rule": "framework-internal-validation",
+                    "candidateValue": "disabled; shared frozen evaluation runs after epoch 50",
+                    "reason": (
+                        "Pinned MMYOLO YOLOXPoseHead dereferences a None cfg after parent "
+                        "postprocessing; this avoids a framework-only crash without changing "
+                        "training pixels, budget, seed, or the shared evaluation."
+                    ),
+                }
+            ]
+            if candidate == "yolox-pose"
+            else []
+        ),
     }
     return resolve_config(raw)
 

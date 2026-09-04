@@ -157,6 +157,7 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             epochs=50,
         )
         train_command = config["execution"]["trainCommand"]
+        self.assertEqual(config["deviations"][0]["rule"], "framework-internal-validation")
         self.assertIn(
             "3a8dfbd76b4493580449925f6cd01d1ae3b2b7425c6d1ed168dbe5282920c9b3",
             train_command,
