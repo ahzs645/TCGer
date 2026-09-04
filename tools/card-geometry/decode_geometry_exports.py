@@ -180,3 +180,112 @@ def decode_fastvit_four_corner(
         config,
         model_id or {"releaseVersion": 1, "artifactSha256": "0" * 64},
     )
+
+
+def _sigmoid(values):
+    import numpy as np
+
+    array = np.asarray(values, dtype=np.float32)
+    return 1.0 / (1.0 + np.exp(-array))
+
+
+def yolox_pose_candidates(
+    raw_outputs,
+    *,
+    resolution: int,
+    strides: tuple[int, ...] = (8, 16, 32),
+    minimum_confidence: float = 0.05,
+    transform: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Decode flattened MMYOLO YOLOX-Pose feature-level tensors.
+
+    The export order is three levels each of class, bbox, objectness,
+    keypoint-offset, and keypoint-visibility tensors. Bboxes are retained in
+    the raw export for parity but geometry candidates are formed from the four
+    decoded keypoints.
+    """
+    import numpy as np
+
+    outputs = [np.asarray(value, dtype=np.float32) for value in raw_outputs]
+    expected = len(strides) * 5
+    if len(outputs) != expected:
+        raise ValueError(f"expected {expected} YOLOX-Pose outputs, got {len(outputs)}")
+    levels = len(strides)
+    class_outputs = outputs[:levels]
+    objectness_outputs = outputs[levels * 2 : levels * 3]
+    keypoint_outputs = outputs[levels * 3 : levels * 4]
+    visibility_outputs = outputs[levels * 4 :]
+    rows = []
+    for level, stride in enumerate(strides):
+        class_logits = class_outputs[level]
+        objectness_logits = objectness_outputs[level]
+        keypoint_offsets = keypoint_outputs[level]
+        visibility_logits = visibility_outputs[level]
+        expected_size = resolution // stride
+        expected_shapes = {
+            "class": (1, 1, expected_size, expected_size),
+            "objectness": (1, 1, expected_size, expected_size),
+            "keypoint": (1, 8, expected_size, expected_size),
+            "visibility": (1, 4, expected_size, expected_size),
+        }
+        actual_shapes = {
+            "class": class_logits.shape,
+            "objectness": objectness_logits.shape,
+            "keypoint": keypoint_offsets.shape,
+            "visibility": visibility_logits.shape,
+        }
+        for name, shape in expected_shapes.items():
+            if actual_shapes[name] != shape:
+                raise ValueError(
+                    f"unexpected YOLOX-Pose {name} shape at stride {stride}: "
+                    f"{actual_shapes[name]} != {shape}"
+                )
+        scores = np.sqrt(
+            _sigmoid(class_logits[0, 0]) * _sigmoid(objectness_logits[0, 0])
+        )
+        for y, x in np.argwhere(scores >= minimum_confidence):
+            confidence = float(scores[y, x])
+            offsets = keypoint_offsets[0, :, y, x].reshape(4, 2)
+            visibilities = _sigmoid(visibility_logits[0, :, y, x])
+            corners = []
+            for offset, visibility in zip(offsets, visibilities):
+                model_x = (float(x) + float(offset[0])) * stride
+                model_y = (float(y) + float(offset[1])) * stride
+                point = (
+                    model_point_to_source(model_x, model_y, transform)
+                    if transform is not None
+                    else {"x": model_x / resolution, "y": model_y / resolution}
+                )
+                corners.append({"point": point, "confidence": float(visibility)})
+            rows.append(
+                {
+                    "corners": corners,
+                    "confidence": confidence,
+                    "cornerOrderConfidence": None,
+                    "side": "unknown",
+                    "container": "rawCard",
+                }
+            )
+    rows.sort(key=lambda row: row["confidence"], reverse=True)
+    return rows
+
+
+def decode_yolox_pose(
+    *raw_outputs,
+    resolution: int = 640,
+    transform: dict[str, Any] | None = None,
+    decoder_config: dict[str, Any] | None = None,
+    model_id: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    config = deepcopy(decoder_config or DEFAULT_DECODER_CONFIG)
+    candidates = yolox_pose_candidates(
+        raw_outputs,
+        resolution=resolution,
+        minimum_confidence=float(config["minimumConfidence"]),
+        transform=transform,
+    )
+    return process_candidates(
+        candidates,
+        config,
+        model_id or {"releaseVersion": 1, "artifactSha256": "0" * 64},
+    )

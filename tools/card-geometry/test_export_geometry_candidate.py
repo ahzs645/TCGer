@@ -6,6 +6,7 @@ from pathlib import Path
 from export_geometry_candidate import (
     artifact,
     find_one,
+    flatten_tensor_outputs,
     input_contract,
     tree_sha256,
     yolo_export_options,
@@ -46,6 +47,12 @@ class ExportGeometryCandidateTests(unittest.TestCase):
         self.assertNotIn("simplify", coreml)
         self.assertNotIn("opset", coreml)
         self.assertEqual(onnx["opset"], 17)
+
+    def test_flattens_mmyolo_grouped_outputs_in_order(self):
+        self.assertEqual(
+            flatten_tensor_outputs((("cls8", "cls16"), ("box8", "box16"))),
+            ("cls8", "cls16", "box8", "box16"),
+        )
 
     def test_input_contracts_distinguish_candidate_preprocessing(self):
         self.assertIn("ImageNet", input_contract("fastvit-t8-four-corner", "onnx")["value"])

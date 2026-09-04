@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from decode_geometry_exports import (  # noqa: E402
+    DEFAULT_DECODER_CONFIG,
     decode_fastvit_four_corner,
+    decode_yolox_pose,
     fastvit_candidates,
     decode_yolo_pose,
     model_point_to_source,
@@ -66,6 +68,42 @@ class DecodeGeometryExportsTests(unittest.TestCase):
     def test_invalid_channel_count_fails(self):
         with self.assertRaisesRegex(ValueError, "17 channels"):
             yolo_pose_candidates(np.zeros((1, 16, 10)), resolution=640)
+
+    def test_decodes_flattened_yolox_pose_outputs(self):
+        resolution = 32
+        shapes = [resolution // stride for stride in (8, 16, 32)]
+        classes = [
+            np.full((1, 1, size, size), -20, dtype=np.float32) for size in shapes
+        ]
+        boxes = [np.zeros((1, 4, size, size), dtype=np.float32) for size in shapes]
+        objects = [
+            np.full((1, 1, size, size), -20, dtype=np.float32) for size in shapes
+        ]
+        keypoints = [np.zeros((1, 8, size, size), dtype=np.float32) for size in shapes]
+        visibility = [
+            np.zeros((1, 4, size, size), dtype=np.float32) for size in shapes
+        ]
+        classes[0][0, 0, 1, 2] = 20
+        objects[0][0, 0, 1, 2] = 20
+        keypoints[0][0, :, 1, 2] = np.array([0, 0, 1, 0, 1, 1, 0, 1])
+        decoded = decode_yolox_pose(
+            *(classes + boxes + objects + keypoints + visibility),
+            resolution=resolution,
+            decoder_config={
+                **DEFAULT_DECODER_CONFIG,
+                "minimumConfidence": 0.5,
+                "minimumQuadArea": 0.001,
+            },
+        )
+        self.assertEqual(len(decoded), 1)
+        self.assertEqual(
+            decoded[0]["corners"][0]["point"],
+            {"x": 0.5, "y": 0.25},
+        )
+        self.assertEqual(
+            decoded[0]["corners"][2]["point"],
+            {"x": 0.75, "y": 0.5},
+        )
 
 
 if __name__ == "__main__":

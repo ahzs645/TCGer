@@ -120,6 +120,17 @@ def load_yolox(checkpoint_root: Path, checkpoint: Path):
     return init_detector(str(config), str(checkpoint), device="cpu").eval()
 
 
+def flatten_tensor_outputs(outputs):
+    """Flatten MMYOLO's grouped feature-level outputs in a stable order."""
+    flattened = []
+    for group in outputs:
+        if isinstance(group, (list, tuple)):
+            flattened.extend(group)
+        else:
+            flattened.append(group)
+    return tuple(flattened)
+
+
 def tensor_model(candidate: str, checkpoint_root: Path, checkpoint: Path):
     if candidate == "fastvit-t8-four-corner":
         return load_fastvit(checkpoint)
@@ -134,7 +145,9 @@ def tensor_model(candidate: str, checkpoint_root: Path, checkpoint: Path):
                 self.model = model
 
             def forward(self, images):
-                return self.model(images, None, mode="tensor")
+                return flatten_tensor_outputs(
+                    self.model(images, None, mode="tensor")
+                )
 
         return TensorForward(detector).eval()
     raise ValueError(f"no tensor exporter for {candidate}")
