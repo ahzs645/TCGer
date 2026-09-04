@@ -62,7 +62,19 @@ def configure_yolox_test(model: Any) -> AttributeDict:
         nms=AttributeDict(type="nms", iou_threshold=0.65),
     )
     model.test_cfg = config
-    model.bbox_head.test_cfg = config
+    head = model.bbox_head
+    head.test_cfg = config
+    original_predict_by_feat = head.predict_by_feat
+
+    def predict_by_feat_with_config(*args: Any, **kwargs: Any) -> Any:
+        # Pinned MMYOLO's YOLOXPoseHead passes ``cfg`` to its parent, where
+        # None is replaced with self.test_cfg, but then dereferences the
+        # original local ``cfg`` again.  Bind it explicitly at this boundary.
+        if kwargs.get("cfg") is None:
+            kwargs["cfg"] = config
+        return original_predict_by_feat(*args, **kwargs)
+
+    head.predict_by_feat = predict_by_feat_with_config
     return config
 
 

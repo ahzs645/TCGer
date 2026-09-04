@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from PIL import Image
 
 from evaluate_geometry_candidate import (
+    AttributeDict,
     candidate_result,
     classify_replay_outcome,
     configure_yolox_test,
@@ -35,7 +36,14 @@ class EvaluateGeometryCandidateTests(unittest.TestCase):
         self.assertEqual(row["corners"][3]["confidence"], 0.4)
 
     def test_yolox_test_config_is_bound_to_detector_and_head(self):
-        model = SimpleNamespace(bbox_head=SimpleNamespace())
+        observed = []
+
+        def predict_by_feat(*args, **kwargs):
+            observed.append((args, kwargs))
+            return kwargs["cfg"]
+
+        head = SimpleNamespace(predict_by_feat=predict_by_feat)
+        model = SimpleNamespace(bbox_head=head)
         config = configure_yolox_test(model)
         self.assertIs(model.test_cfg, config)
         self.assertIs(model.bbox_head.test_cfg, config)
@@ -44,6 +52,10 @@ class EvaluateGeometryCandidateTests(unittest.TestCase):
         cloned = copy.deepcopy(config)
         self.assertEqual(cloned.max_per_img, 300)
         self.assertEqual(cloned.nms.iou_threshold, 0.65)
+        self.assertIs(head.predict_by_feat("scores"), config)
+        explicit = AttributeDict(max_per_img=7)
+        self.assertIs(head.predict_by_feat("scores", cfg=explicit), explicit)
+        self.assertEqual(observed[0][0], ("scores",))
 
     def test_replay_does_not_invent_truth_for_a_different_accept(self):
         self.assertEqual(
