@@ -221,8 +221,10 @@ def write_config(
                 # Pinned MMYOLO's YOLOXPoseHead dereferences the local cfg
                 # argument after its parent has replaced None only internally.
                 # That upstream bug makes the framework validation loop crash.
-                # The shared frozen evaluator still runs immediately after
-                # training, so suppress only this redundant internal loop.
+                # MMEngine always runs validation at max_epochs regardless of
+                # val_interval, so remove the loop itself. The shared frozen
+                # evaluator still runs immediately after training.
+                "val_cfg = None",
                 f"train_cfg = dict(max_epochs={epochs}, val_interval={epochs + 1}, "
                 "dynamic_intervals=None)",
                 "param_scheduler = [dict(type='CosineAnnealingLR', eta_min=0.00001, "
