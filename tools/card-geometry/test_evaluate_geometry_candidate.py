@@ -1,12 +1,14 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from PIL import Image
 
 from evaluate_geometry_candidate import (
     candidate_result,
     classify_replay_outcome,
+    configure_yolox_test,
     padded_image,
     source_point,
 )
@@ -30,6 +32,14 @@ class EvaluateGeometryCandidateTests(unittest.TestCase):
         )
         self.assertEqual(row["corners"][0]["point"], {"x": 0.1, "y": 0.1})
         self.assertEqual(row["corners"][3]["confidence"], 0.4)
+
+    def test_yolox_test_config_is_bound_to_detector_and_head(self):
+        model = SimpleNamespace(bbox_head=SimpleNamespace())
+        config = configure_yolox_test(model)
+        self.assertIs(model.test_cfg, config)
+        self.assertIs(model.bbox_head.test_cfg, config)
+        self.assertEqual(config.max_per_img, 300)
+        self.assertEqual(config.nms.iou_threshold, 0.65)
 
     def test_replay_does_not_invent_truth_for_a_different_accept(self):
         self.assertEqual(

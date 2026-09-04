@@ -35,6 +35,33 @@ DECODER_CONFIG = {
 }
 
 
+class AttributeDict(dict):
+    """Dictionary with the attribute access expected by MMYOLO heads."""
+
+    __getattr__ = dict.__getitem__
+
+
+def configure_yolox_test(model: Any) -> AttributeDict:
+    """Bind deterministic post-processing directly to the YOLOX-Pose head.
+
+    MMDetection's generic inference path calls the head without an explicit
+    ``cfg`` argument.  Pinned MMYOLO then dereferences the head's ``test_cfg``
+    locally, so keep the evaluated thresholds explicit instead of depending
+    on detector-to-head config propagation.
+    """
+
+    config = AttributeDict(
+        yolox_style=True,
+        multi_label=True,
+        score_thr=0.01,
+        max_per_img=300,
+        nms=AttributeDict(type="nms", iou_threshold=0.65),
+    )
+    model.test_cfg = config
+    model.bbox_head.test_cfg = config
+    return config
+
+
 def padded_image(source: Path) -> tuple[Image.Image, int, int]:
     with Image.open(source) as opened:
         image = opened.convert("RGB")
@@ -99,6 +126,7 @@ class Predictor:
             checkpoint = find_one(output, ("training/repeat-0/*.pth", "**/*.pth"))
             config = find_one(output, ("yolox-pose-card.py", "**/yolox-pose-card.py"))
             self.model = init_detector(str(config), str(checkpoint), device="cuda:0")
+            configure_yolox_test(self.model)
 
     def predict_yolo(self, image: Image.Image, width: int, height: int) -> list[dict[str, Any]]:
         result = self.model.predict(
