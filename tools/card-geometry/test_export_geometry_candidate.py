@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from export_geometry_candidate import artifact, find_one, tree_sha256
+from export_geometry_candidate import artifact, find_one, tree_sha256, yolo_export_options
 
 
 class ExportGeometryCandidateTests(unittest.TestCase):
@@ -26,6 +26,13 @@ class ExportGeometryCandidateTests(unittest.TestCase):
             (root / "last.pt").touch()
             (root / "best.pt").touch()
             self.assertEqual(find_one(root, ("*.pt",)).name, "best.pt")
+
+    def test_yolo_coreml_omits_onnx_only_options(self):
+        coreml = yolo_export_options("coreml", 640)
+        onnx = yolo_export_options("onnx", 640)
+        self.assertNotIn("simplify", coreml)
+        self.assertNotIn("opset", coreml)
+        self.assertEqual(onnx["opset"], 17)
 
 
 if __name__ == "__main__":

@@ -45,21 +45,25 @@ def find_one(root: Path, patterns: tuple[str, ...]) -> Path:
     return preferred[0] if preferred else unique[-1]
 
 
+def yolo_export_options(format_name: str, resolution: int) -> dict[str, Any]:
+    options: dict[str, Any] = {
+        "format": format_name,
+        "imgsz": resolution,
+        "nms": False,
+        "dynamic": False,
+        "batch": 1,
+    }
+    if format_name == "onnx":
+        options.update({"simplify": False, "opset": 17})
+    return options
+
+
 def export_yolo(checkpoint: Path, format_name: str, output: Path, resolution: int) -> Path:
     from ultralytics import YOLO
 
     model = YOLO(str(checkpoint))
-    result = Path(
-        model.export(
-            format=format_name,
-            imgsz=resolution,
-            nms=False,
-            dynamic=False,
-            simplify=False,
-            opset=17 if format_name == "onnx" else None,
-            batch=1,
-        )
-    )
+    options = yolo_export_options(format_name, resolution)
+    result = Path(model.export(**options))
     suffix = ".onnx" if format_name == "onnx" else ".mlpackage"
     destination = output / f"card-geometry{suffix}"
     if result.is_dir():

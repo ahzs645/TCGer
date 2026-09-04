@@ -247,14 +247,14 @@ def bootstrap_command(
     export_format: str | None = None,
 ) -> list[str]:
     setup = [
-        "python -m pip install --no-cache-dir huggingface_hub==1.28.0 jsonschema==4.23.0",
+        "python -m pip install --no-cache-dir huggingface_hub==1.28.0 "
+        "jsonschema==4.23.0 Pillow==11.1.0 numpy==1.26.4",
     ]
     if candidate.startswith("yolo11"):
         setup += [
             "python -m pip install --no-cache-dir torchvision==0.21.0",
             "python -m pip install --no-cache-dir ultralytics==8.4.138",
             "python -m pip uninstall -y opencv-python",
-            "python -m pip install --no-cache-dir opencv-python-headless==4.12.0.88",
         ]
     elif candidate == "yolox-pose":
         setup += [
@@ -280,7 +280,7 @@ def bootstrap_command(
     else:
         setup += [
             "python -m pip install --no-cache-dir onnxruntime==1.29.0 "
-            "opencv-python-headless==4.12.0.88"
+            "opencv-python-headless==4.10.0.84"
         ]
     if action == "export":
         setup += ["python -m pip install --no-cache-dir onnx==1.22.0"]

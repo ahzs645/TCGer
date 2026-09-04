@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import math
 import os
@@ -150,6 +151,17 @@ def make_dataset(release: Path, split: str, resolution: int, seed: int):
                 (0, 0, 0),
             )
             padded.paste(image, (margins["left"], margins["top"]))
+            encoded = io.BytesIO()
+            padded.save(
+                encoded,
+                format="JPEG",
+                quality=95,
+                optimize=False,
+                progressive=False,
+            )
+            encoded.seek(0)
+            with Image.open(encoded) as reopened:
+                padded = reopened.convert("RGB")
             resized = padded.resize(
                 (int(geometry["resizedWidth"]), int(geometry["resizedHeight"])),
                 Image.Resampling.BILINEAR,
@@ -339,6 +351,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "learningRate": args.learning_rate,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
             "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+            "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
             "pythonVersion": platform.python_version(),
             "torchVersion": torch.__version__,
         },

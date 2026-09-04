@@ -252,6 +252,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "seed": seed,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
             "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+            "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
             "ultralyticsVersion": ultralytics_version,
             "pythonVersion": platform.python_version(),
         },
