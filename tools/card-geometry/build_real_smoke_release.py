@@ -539,6 +539,16 @@ def add_manual_devmode_backup(
             except json.JSONDecodeError:
                 stats["devmodeBackupInvalidMultiInstance"] += 1
             else:
+                if frame.get("noLabelableCard") is True:
+                    if frame.get("instances") != []:
+                        raise ValueError(
+                            "noLabelableCard frame must contain an empty instances list"
+                        )
+                    key = frame.get("key")
+                    if not isinstance(key, str) or "/" not in key:
+                        raise ValueError("noLabelableCard frame must contain a session/image key")
+                    stats["devmodeBackupNoLabelableCardRecords"] += 1
+                    continue
                 entry, session_id = _manual_multi_frame_entry(
                     root, frame, sessions_root, stats
                 )

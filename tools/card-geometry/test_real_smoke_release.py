@@ -463,6 +463,45 @@ class RealReleaseAdapterTests(unittest.TestCase):
             )
             self.assertEqual(record["instances"][0]["side"], "faceDown")
 
+    def test_fiftyone_backup_skips_explicit_no_labelable_card_frame(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, _image = self._canonical_source(root)
+            frame = {
+                "key": "scan-session-negative/frame.png",
+                "sceneSlice": "steep_playmat",
+                "game": "magic",
+                "instances": [],
+                "noLabelableCard": True,
+            }
+            backup = root / "labels.json"
+            backup.write_text(
+                json.dumps(
+                    [{"key": frame["key"], "manual_instances_json": json.dumps(frame)}]
+                ),
+                encoding="utf-8",
+            )
+            output = root / "release"
+            summary = build_release(
+                canonical_corpus=corpus,
+                raw_dir=raw,
+                archive_splits={"annotations.v7i.coco-segmentation.zip": "test"},
+                devmode_sessions=[],
+                output=output,
+                devmode_label_backups=[backup],
+                devmode_sessions_root=root / "sessions",
+            )
+            self.assertEqual(
+                summary["stats"]["devmodeBackupNoLabelableCardRecords"], 1
+            )
+            manifest = load_json(output / "manifest.json")
+            self.assertFalse(
+                any(
+                    item["recordId"].startswith("devmode-multi-")
+                    for item in manifest["records"]
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
