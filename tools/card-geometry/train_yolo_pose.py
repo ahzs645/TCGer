@@ -166,6 +166,9 @@ def download_verified(url: str, expected_sha256: str, destination: Path) -> None
         )
 
 
+SUPPORTED_CANDIDATES = {"yolo11n-pose", "yolo11s-pose"}
+
+
 def train(args: argparse.Namespace) -> dict[str, Any]:
     release = Path(os.environ["TCGER_GEOMETRY_RELEASE_ROOT"])
     output = Path(os.environ["TCGER_GEOMETRY_OUTPUT_DIR"])
@@ -216,7 +219,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError("training produced no checkpoint")
     summary = {
         "schema": "https://tcger.app/reports/yolo-pose-training-smoke/v1",
-        "candidate": "yolo11n-pose",
+        "candidate": args.candidate,
         "experimentHash": os.environ["TCGER_GEOMETRY_EXPERIMENT_HASH"],
         "materialization": materialization,
         "baseCheckpoint": {
@@ -246,6 +249,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--base-sha256", required=True)
+    parser.add_argument("--candidate", choices=sorted(SUPPORTED_CANDIDATES), required=True)
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--materialize-only", action="store_true")

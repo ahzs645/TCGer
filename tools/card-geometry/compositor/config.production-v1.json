@@ -1,0 +1,61 @@
+{
+  "canvas": {
+    "contextMarginPixels": {"bottom": 192, "left": 192, "right": 192, "top": 192},
+    "height": 1280,
+    "jpegQuality": 90,
+    "width": 896
+  },
+  "generation": {
+    "recordsPerSplitScene": {
+      "train": {
+        "binder_page": 1500,
+        "duel_field": 3000,
+        "single_handheld": 1500,
+        "single_handheld_distractor_free": 250,
+        "steep_playmat": 2750
+      },
+      "validation": {
+        "binder_page": 150,
+        "duel_field": 350,
+        "single_handheld": 200,
+        "single_handheld_distractor_free": 100,
+        "steep_playmat": 200
+      }
+    },
+    "seedBase": 20260903
+  },
+  "photometrics": {
+    "brightness": {"maximum": 1.08, "minimum": 0.72, "mode": 0.89},
+    "colorGainMaximum": 1.25,
+    "contrast": {"maximum": 1.28, "minimum": 0.71, "mode": 0.97},
+    "gamma": {"maximum": 1.2, "minimum": 0.8},
+    "intermediateJpegQuality": {"maximum": 96, "minimum": 72},
+    "noiseSigma": {"maximum": 7.6, "minimum": 0.0, "mode": 1.5},
+    "saturation": {"maximum": 1.24, "minimum": 0.56, "mode": 0.9},
+    "sharpness": {"maximum": 1.67, "minimum": 0.06, "mode": 0.64}
+  },
+  "scenes": {
+    "binder_page": {"instances": 9, "longSidePixels": [300, 390], "tiltDegrees": [0, 18]},
+    "duel_field": {
+      "faceDownProbabilityTrain": 0.18,
+      "faceDownProbabilityValidation": 0.08,
+      "instances": [3, 7],
+      "longSidePixels": [80, 430],
+      "tiltDegrees": [0, 30]
+    },
+    "single_handheld": {
+      "handOccluderProbability": 0.35,
+      "instances": 1,
+      "longSidePixels": [500, 900],
+      "outsideFrameProbability": 0.35,
+      "tiltDegrees": [0, 35]
+    },
+    "steep_playmat": {
+      "instances": 1,
+      "longSidePixels": [420, 900],
+      "outsideFrameProbability": 0.2,
+      "tiltDegrees": [40, 60]
+    }
+  },
+  "schema": "https://tcger.app/config/card-geometry-compositor/v1"
+}

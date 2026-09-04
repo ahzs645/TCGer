@@ -47,6 +47,14 @@ Card backs are private training assets. The first smoke uses the checked-in
 Pokémon back only in `train`; validation disables face-down cards so the same
 back bytes never cross the split boundary.
 
+`build_catalog_card_asset_manifest.py` creates an equivalent bounded pack from
+a pinned local catalog whose image rows carry explicit provenance.
+`merge_asset_manifests.py` combines per-game packs while enforcing unique ids,
+paths, and byte-level split isolation. `build_session_background_manifest.py`
+extracts detector-cleared crops from non-evaluation capture sessions; it keeps
+whole sessions in one split and refuses every session on the release's frozen
+evaluation denylist.
+
 The checked-in assets are intentionally a smoke pool, not a training pool. A
 training-purpose synthetic release must first contain several thousand renders
 across Pokémon, Magic, and Yu-Gi-Oh (including the 59:86 Yu-Gi-Oh aspect), all
@@ -103,6 +111,13 @@ the same geometry and photometric distributions as `single_handheld`, but an
 exact distractor count of zero. The build summary reports record prevalence and
 mean distractor count for every scene slice. Compare the two single-handheld
 slices before changing either distractor density or transformation ranges.
+
+`config.production-v1.json` emits 9,000 training and 1,000 diagnostic
+validation frames. It is intended for the leakage-clean multigame asset pack
+(Pokémon, Magic, and Yu-Gi-Oh) plus 100 self-captured, card-cleared background
+crops. The compositor output remains a `smoke` release by construction. The
+approved combiner binds it to real evaluation records and
+`training-minimums-v2`; the compositor never generates its own training policy.
 
 This is a smoke release. Its generated minimums are tooling-only and cannot
 authorize training. A future `training` release must bind the separately

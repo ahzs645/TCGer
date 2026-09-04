@@ -56,17 +56,30 @@ def build_manifest(
     selected = []
     requested = {"train": train_count, "validation": validation_count}
     candidates: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in _rows(manifest_path):
+    rows = _rows(manifest_path)
+    blob_splits: dict[str, set[str]] = defaultdict(set)
+    for row in rows:
+        split = row.get("partition")
+        digest = row.get("blobSha256")
+        if split in requested and isinstance(digest, str):
+            blob_splits[digest].add(split)
+    seen_blobs: set[str] = set()
+    for row in rows:
         split = row.get("partition")
         shard = row.get("shard")
+        digest = row.get("blobSha256")
         if (
             row.get("game") == game
             and row.get("status") == "valid"
             and split in requested
             and isinstance(shard, str)
+            and isinstance(digest, str)
             and (library_root / shard).is_file()
+            and len(blob_splits[digest]) == 1
+            and digest not in seen_blobs
         ):
             candidates[split].append(row)
+            seen_blobs.add(digest)
     for split, count in requested.items():
         choices = sorted(
             candidates[split],
