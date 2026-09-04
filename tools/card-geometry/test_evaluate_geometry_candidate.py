@@ -1,3 +1,4 @@
+import copy
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,6 +41,9 @@ class EvaluateGeometryCandidateTests(unittest.TestCase):
         self.assertIs(model.bbox_head.test_cfg, config)
         self.assertEqual(config.max_per_img, 300)
         self.assertEqual(config.nms.iou_threshold, 0.65)
+        cloned = copy.deepcopy(config)
+        self.assertEqual(cloned.max_per_img, 300)
+        self.assertEqual(cloned.nms.iou_threshold, 0.65)
 
     def test_replay_does_not_invent_truth_for_a_different_accept(self):
         self.assertEqual(

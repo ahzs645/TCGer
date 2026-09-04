@@ -38,7 +38,11 @@ DECODER_CONFIG = {
 class AttributeDict(dict):
     """Dictionary with the attribute access expected by MMYOLO heads."""
 
-    __getattr__ = dict.__getitem__
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self[name]
+        except KeyError as error:
+            raise AttributeError(name) from error
 
 
 def configure_yolox_test(model: Any) -> AttributeDict:
