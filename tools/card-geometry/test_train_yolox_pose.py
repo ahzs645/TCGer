@@ -101,6 +101,8 @@ class TrainYoloxPoseTests(unittest.TestCase):
                 seed=20260903,
             ).read_text()
             self.assertIn("pipeline=shared_pipeline", config)
+            self.assertIn("loss_pose=dict(_delete_=True", config)
+            self.assertIn("dataset=dict(_delete_=True, type='PoseCocoDataset'", config)
             self.assertNotIn("Mosaic", config)
             self.assertNotIn("RandomFlip", config)
 

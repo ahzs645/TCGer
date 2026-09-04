@@ -212,14 +212,18 @@ def write_config(
                 "img_scale = (640, 640)",
                 f"shared_pipeline = {shared_pipeline}",
                 "model = dict(bbox_head=dict(head_module=dict(num_keypoints=4), "
-                "loss_pose=dict(metainfo=metainfo)), train_cfg=dict(assigner=dict("
-                "oks_calculator=dict(metainfo=metainfo))))",
+                "loss_pose=dict(_delete_=True, type='OksLoss', metainfo=metainfo, "
+                "loss_weight=30.0)), train_cfg=dict(assigner=dict("
+                "oks_calculator=dict(_delete_=True, type='OksLoss', "
+                "metainfo=metainfo))))",
                 f"train_dataloader = dict(batch_size={batch}, num_workers={workers}, "
-                "dataset=dict(data_root=data_root, ann_file='annotations/train.json', "
+                "dataset=dict(_delete_=True, type='PoseCocoDataset', data_mode='bottomup', "
+                "data_root=data_root, ann_file='annotations/train.json', "
                 "data_prefix=dict(img='images/train/'), metainfo=metainfo, "
                 "pipeline=shared_pipeline))",
                 f"val_dataloader = dict(batch_size={batch}, num_workers={workers}, "
-                "dataset=dict(data_root=data_root, ann_file='annotations/validation.json', "
+                "dataset=dict(_delete_=True, type='PoseCocoDataset', data_mode='bottomup', "
+                "data_root=data_root, ann_file='annotations/validation.json', "
                 "data_prefix=dict(img='images/validation/'), metainfo=metainfo, "
                 "pipeline=shared_pipeline))",
                 "test_dataloader = val_dataloader",
