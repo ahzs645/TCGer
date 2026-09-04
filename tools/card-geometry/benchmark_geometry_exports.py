@@ -74,6 +74,21 @@ def fixture_pixels(spec: dict[str, Any], size: int):
     raise ValueError(f"unsupported fixture kind: {spec['kind']}")
 
 
+def preprocess_fixture(candidate: str, pixels):
+    """Apply the exact tensor-side preprocessing expected by each raw export."""
+    import numpy as np
+
+    if candidate == "yolox-pose":
+        tensor = np.transpose(pixels[..., ::-1].astype(np.float32), (2, 0, 1))[None]
+        return tensor, "RGB uint8 -> BGR float32 NCHW in [0,255]"
+    tensor = np.transpose(pixels.astype(np.float32) / 255.0, (2, 0, 1))[None]
+    if candidate == "fastvit-t8-four-corner":
+        mean = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)[None, :, None, None]
+        std = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)[None, :, None, None]
+        return (tensor - mean) / std, "RGB float32 NCHW, ImageNet mean/std"
+    return tensor, "RGB float32 NCHW in [0,1]"
+
+
 def output_metrics(reference, candidate) -> dict[str, Any]:
     import numpy as np
 
@@ -161,13 +176,10 @@ def benchmark(
     onnx_identity = artifact_identity(onnx_path)
     latency_coreml_input = None
     latency_tensor = None
+    preprocessing = None
     for spec in FIXTURE_SPECS:
         pixels = fixture_pixels(spec, size)
-        tensor = np.transpose(pixels.astype(np.float32) / 255.0, (2, 0, 1))[None]
-        if candidate == "fastvit-t8-four-corner":
-            mean = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)[None, :, None, None]
-            std = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)[None, :, None, None]
-            tensor = (tensor - mean) / std
+        tensor, preprocessing = preprocess_fixture(candidate, pixels)
         image = Image.fromarray(pixels)
         onnx_values = [
             np.asarray(value, dtype=np.float32)
@@ -302,6 +314,7 @@ def benchmark(
         },
         "io": {
             "inputSize": [size, size],
+            "preprocessing": preprocessing,
             "onnx": {"input": onnx_input, "outputs": onnx_outputs},
             "coreml": {
                 "input": coreml_input,

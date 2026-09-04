@@ -35,6 +35,24 @@ def artifact(path: Path, output: Path) -> dict[str, Any]:
     }
 
 
+def input_contract(candidate: str, format_name: str, resolution: int = 640) -> dict[str, Any]:
+    if candidate.startswith("yolo11"):
+        value = (
+            "RGB image; Core ML applies 1/255 scale"
+            if format_name == "coreml"
+            else "RGB float32 NCHW in [0,1]"
+        )
+    elif candidate == "fastvit-t8-four-corner":
+        value = "RGB float32 NCHW, divide by 255 then ImageNet mean/std"
+    else:
+        value = "RGB source converted to BGR float32 NCHW in [0,255]"
+    return {
+        "resolution": [resolution, resolution],
+        "value": value,
+        "context": "black exterior margin, then 114 letterbox",
+    }
+
+
 def find_one(root: Path, patterns: tuple[str, ...]) -> Path:
     matches = []
     for pattern in patterns:
@@ -190,6 +208,9 @@ def run(candidate: str, format_name: str) -> dict[str, Any]:
         "candidate": candidate,
         "format": format_name,
         "bundledNms": False,
+        "inputContract": input_contract(
+            candidate, format_name, int(os.environ["TCGER_GEOMETRY_INPUT_RESOLUTION"])
+        ),
         "checkpointSha256": sha256_file(checkpoint),
         "artifact": artifact(exported, output),
     }

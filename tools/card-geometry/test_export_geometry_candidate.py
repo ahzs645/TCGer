@@ -3,7 +3,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from export_geometry_candidate import artifact, find_one, tree_sha256, yolo_export_options
+from export_geometry_candidate import (
+    artifact,
+    find_one,
+    input_contract,
+    tree_sha256,
+    yolo_export_options,
+)
 
 
 class ExportGeometryCandidateTests(unittest.TestCase):
@@ -40,6 +46,10 @@ class ExportGeometryCandidateTests(unittest.TestCase):
         self.assertNotIn("simplify", coreml)
         self.assertNotIn("opset", coreml)
         self.assertEqual(onnx["opset"], 17)
+
+    def test_input_contracts_distinguish_candidate_preprocessing(self):
+        self.assertIn("ImageNet", input_contract("fastvit-t8-four-corner", "onnx")["value"])
+        self.assertIn("BGR", input_contract("yolox-pose", "onnx")["value"])
 
 
 if __name__ == "__main__":

@@ -19,6 +19,19 @@ class BenchmarkGeometryExportsTests(unittest.TestCase):
         self.assertEqual(first.tobytes(), second.tobytes())
         self.assertEqual(first.shape, (16, 16, 3))
 
+    def test_candidate_preprocessing_is_explicit(self):
+        import numpy as np
+
+        pixels = np.asarray([[[10, 20, 30]]], dtype=np.uint8)
+        yolox, yolox_description = MODULE.preprocess_fixture("yolox-pose", pixels)
+        self.assertEqual(yolox[0, :, 0, 0].tolist(), [30.0, 20.0, 10.0])
+        self.assertIn("BGR", yolox_description)
+        fastvit, fastvit_description = MODULE.preprocess_fixture(
+            "fastvit-t8-four-corner", pixels
+        )
+        self.assertEqual(fastvit.shape, (1, 3, 1, 1))
+        self.assertIn("mean/std", fastvit_description)
+
     def test_output_metrics_detect_exact_and_shifted_values(self):
         import numpy as np
 
