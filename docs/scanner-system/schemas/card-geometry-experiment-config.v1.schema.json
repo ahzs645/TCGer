@@ -77,6 +77,7 @@
         },
         "gpuFlavor": { "const": "l4x1" },
         "trainCommand": { "$ref": "#/$defs/command" },
+        "evaluationCommand": { "$ref": "#/$defs/command" },
         "privateExportCommands": {
           "type": "object",
           "additionalProperties": false,

@@ -278,6 +278,29 @@ def _download_and_preflight(resolved: dict[str, Any], token: str, work: Path) ->
     return release, report
 
 
+def _download_evaluation_release(
+    release: dict[str, Any], token: str, work: Path, name: str
+) -> Path:
+    from huggingface_hub import snapshot_download
+
+    snapshot = Path(
+        snapshot_download(
+            repo_id=release["datasetRepo"],
+            repo_type="dataset",
+            revision=release["datasetRevision"],
+            allow_patterns=[release["releasePath"], f"{release['releasePath']}/**"],
+            token=token,
+        )
+    )
+    source = snapshot / release["releasePath"]
+    if not (source / "manifest.json").is_file():
+        raise RuntimeError(f"pinned {name} evaluation release not found: {source}")
+    destination = work / "evaluations" / name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source, destination, symlinks=False)
+    return destination
+
+
 def _upload_json(api: Any, repo_id: str, path: str, value: Any, message: str) -> str:
     commit = api.upload_file(
         path_or_fileobj=(pretty_json(value)).encode("utf-8"),
@@ -344,6 +367,8 @@ def execute(
             "TCGER_GEOMETRY_OUTPUT_DIR": str(output),
             "TCGER_GEOMETRY_CHECKPOINT_REPO": checkpoint_repo,
             "TCGER_GEOMETRY_CHECKPOINT_PREFIX": prefix,
+            "TCGER_GEOMETRY_CANDIDATE": resolved["candidate"],
+            "TCGER_GEOMETRY_TOOLING_REVISION": resolved["toolingRevision"],
             "TCGER_GEOMETRY_EXPERIMENT_HASH": run_descriptor["experimentHash"],
             "TCGER_GEOMETRY_INPUT_RESOLUTION": str(
                 resolved["fairness"]["inputResolution"]
@@ -391,6 +416,25 @@ def execute(
         command = resolved["execution"]["privateExportCommands"][export_format]
 
     _run(command, env=env)
+    if action == "train" and resolved["execution"].get("evaluationCommand"):
+        real = _download_evaluation_release(
+            resolved["evaluations"]["frozenRealV3"], token, work, "real-v3"
+        )
+        synthetic = _download_evaluation_release(
+            resolved["evaluations"]["syntheticDuelField"],
+            token,
+            work,
+            "synthetic-duel-field",
+        )
+        env["TCGER_GEOMETRY_EVAL_REAL_ROOT"] = str(real)
+        env["TCGER_GEOMETRY_EVAL_REAL_HASH"] = resolved["evaluations"][
+            "frozenRealV3"
+        ]["corpusHash"]
+        env["TCGER_GEOMETRY_EVAL_SYNTHETIC_ROOT"] = str(synthetic)
+        env["TCGER_GEOMETRY_EVAL_SYNTHETIC_HASH"] = resolved["evaluations"][
+            "syntheticDuelField"
+        ]["corpusHash"]
+        _run(resolved["execution"]["evaluationCommand"], env=env)
     elapsed = time.monotonic() - started
     run_descriptor.update(
         {

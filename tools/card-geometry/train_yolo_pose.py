@@ -185,7 +185,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 
     dataset = output / "yolo-dataset"
     materialization = materialize_yolo(release, dataset)
-    base = output / "base-yolo11n-pose.pt"
+    base = output / f"base-{args.candidate}.pt"
     download_verified(args.base_url, args.base_sha256, base)
 
     from ultralytics import YOLO, __version__ as ultralytics_version
