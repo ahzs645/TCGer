@@ -98,6 +98,10 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             export_format="coreml",
         )
         self.assertIn("coremltools==9.0", command[-1])
+        self.assertGreater(
+            command[-1].rfind("numpy==1.26.4"),
+            command[-1].find("coremltools==9.0"),
+        )
         self.assertIn("--action export --export-format coreml", command[-1])
         self.assertNotIn("asset-store", command[-1])
 

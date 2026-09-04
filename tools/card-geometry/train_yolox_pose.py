@@ -201,7 +201,9 @@ def write_config(
                 "loss_pose=dict(_delete_=True, type='OksLoss', metainfo=metainfo_file, "
                 "loss_weight=30.0)), train_cfg=dict(assigner=dict("
                 "oks_calculator=dict(_delete_=True, type='OksLoss', "
-                "metainfo=metainfo_file))))",
+                "metainfo=metainfo_file))), test_cfg=dict(yolox_style=True, "
+                "multi_label=True, score_thr=0.01, max_per_img=300, "
+                "nms=dict(type='nms', iou_threshold=0.65)))",
                 f"train_dataloader = dict(batch_size={batch}, num_workers={workers}, "
                 "dataset=dict(_delete_=True, type='PoseCocoDataset', data_mode='bottomup', "
                 "data_root=data_root, ann_file='annotations/train.json', "

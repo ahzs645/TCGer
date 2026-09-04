@@ -322,7 +322,12 @@ def bootstrap_command(
     if action == "export":
         setup += ["python -m pip install --no-cache-dir onnx==1.22.0"]
         if export_format == "coreml":
-            setup += ["python -m pip install --no-cache-dir coremltools==9.0"]
+            setup += [
+                "python -m pip install --no-cache-dir coremltools==9.0",
+                # coremltools may otherwise upgrade NumPy after the initial pin.
+                # YOLO11's C2PSA trace fails in coremltools with NumPy >= 2.4.
+                "python -m pip install --no-cache-dir numpy==1.26.4",
+            ]
     smoke = " --pipeline-smoke" if pipeline_smoke else ""
     export = f" --export-format {export_format}" if export_format else ""
     program = f"""

@@ -115,6 +115,8 @@ class TrainYoloxPoseTests(unittest.TestCase):
             self.assertIn("metainfo=metainfo_file", config)
             self.assertIn("metainfo = dict(from_file=metainfo_file)", config)
             self.assertIn("load_from = None", config)
+            self.assertIn("test_cfg=dict(yolox_style=True", config)
+            self.assertIn("max_per_img=300", config)
             self.assertIn("dataset=dict(_delete_=True, type='PoseCocoDataset'", config)
             self.assertNotIn("Mosaic", config)
             self.assertNotIn("RandomFlip", config)
