@@ -195,6 +195,26 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             self.assertFalse(checks["normalizedCornerP95"])
             self.assertFalse(checks["outsideFrameNormalizedP50"])
 
+    def test_rejects_candidate_trained_on_a_different_corpus(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidate = self.write_candidate(root / "candidate", "candidate", 1)
+            config_path = Path(candidate["reportsRoot"]) / "resolved-config.json"
+            config = json.loads(config_path.read_text())
+            config["corpus"]["corpusHash"] = "f" * 64
+            config_path.write_text(json.dumps(config))
+            with self.assertRaisesRegex(ValueError, "declared training corpus"):
+                build(self.spec(root, [candidate]))
+
+    def test_rejects_incomplete_required_shortlist(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidate = self.write_candidate(root / "candidate", "candidate", 1)
+            spec = self.spec(root, [candidate])
+            spec["requiredCandidates"] = ["candidate", "missing"]
+            with self.assertRaisesRegex(ValueError, "required candidate shortlist"):
+                build(spec)
+
 
 if __name__ == "__main__":
     unittest.main()

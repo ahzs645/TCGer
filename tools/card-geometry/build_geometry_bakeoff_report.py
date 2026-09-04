@@ -223,6 +223,7 @@ def candidate_row(
         "experimentHash": run["experimentHash"],
         "fairnessHash": run["fairnessHash"],
         "effectiveFairnessHash": effective_fairness_hash(config),
+        "trainingCorpusHash": config["corpus"]["corpusHash"],
         "deviations": config["deviations"],
         "training": {
             "jobId": candidate.get("jobId"),
@@ -285,6 +286,15 @@ def build(spec: dict[str, Any]) -> dict[str, Any]:
     budgets = {**DEFAULT_BUDGETS, **spec.get("budgets", {})}
     training_corpus = training_corpus_summary(spec)
     candidates = [candidate_row(item, budgets) for item in spec["candidates"]]
+    candidate_names = [row["candidate"] for row in candidates]
+    if len(candidate_names) != len(set(candidate_names)):
+        raise ValueError("candidate names must be unique")
+    required_candidates = spec.get("requiredCandidates")
+    if required_candidates is not None and set(candidate_names) != set(required_candidates):
+        raise ValueError("comparison does not contain the required candidate shortlist")
+    training_hashes = {row["trainingCorpusHash"] for row in candidates}
+    if training_hashes != {spec["trainingCorpusHash"]}:
+        raise ValueError("all candidates must use the declared training corpus")
     corpus_hashes = {row["real"]["corpusHash"] for row in candidates}
     synthetic_hashes = {row["synthetic"]["corpusHash"] for row in candidates}
     fairness_hashes = {row["effectiveFairnessHash"] for row in candidates}
@@ -302,6 +312,7 @@ def build(spec: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema": SCHEMA_ID,
         "bakeoffId": spec["bakeoffId"],
+        "requiredCandidates": required_candidates or candidate_names,
         "trainingCorpusHash": spec["trainingCorpusHash"],
         "trainingCorpus": training_corpus,
         "realEvaluationCorpusHash": next(iter(corpus_hashes)),
