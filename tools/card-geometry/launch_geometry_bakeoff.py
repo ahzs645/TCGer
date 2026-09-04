@@ -13,11 +13,11 @@ from typing import Any
 from corpus_release import (
     REPOSITORY,
     canonical_json,
-    load_json,
     pretty_json,
     sha256_bytes,
     sha256_file,
 )
+from preflight import Expectations, run_preflight
 from run_card_geometry_hf_job import descriptor, resolve_config
 
 
@@ -330,16 +330,20 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
     from huggingface_hub import CommitOperationAdd, HfApi, get_token
 
     revision = checked_git_revision()
-    preflight = load_json(args.preflight_report)
-    if (
-        preflight.get("failedChecks")
-        or preflight.get("readyFor") != "training"
-        or preflight.get("recomputedCorpusHash") != args.corpus_hash
-        or preflight.get("readinessPolicyId") != "training-minimums-v2"
-        or preflight.get("readinessPolicySha256") != args.policy_sha256
-    ):
-        raise RuntimeError("local preflight report does not approve the requested corpus")
-    preflight_sha = sha256_file(args.preflight_report)
+    preflight = run_preflight(
+        args.local_release_root,
+        expectations=Expectations(
+            corpus_hash=args.corpus_hash,
+            policy_id="training-minimums-v2",
+            policy_sha256=args.policy_sha256,
+            purpose="training",
+        ),
+        tooling_revision=revision,
+    )
+    if preflight.get("failedChecks") or preflight.get("readyFor") != "training":
+        raise RuntimeError("local preflight did not approve the requested corpus")
+    preflight_bytes = pretty_json(preflight).encode("utf-8")
+    preflight_sha = sha256_bytes(preflight_bytes)
     preflight_path = f"geometry/preflights/{args.corpus_hash}/{preflight_sha}.json"
     corpus = {
         "datasetRepo": args.dataset_repo,
@@ -398,7 +402,7 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
             CommitOperationAdd(path_in_repo=tooling_path, path_or_fileobj=tooling),
             CommitOperationAdd(
                 path_in_repo=preflight_path,
-                path_or_fileobj=args.preflight_report,
+                path_or_fileobj=preflight_bytes,
             ),
         ]
         config_files = {}
@@ -467,7 +471,7 @@ def main() -> int:
     parser.add_argument("--dataset-revision", required=True)
     parser.add_argument("--release-path", required=True)
     parser.add_argument("--corpus-hash", required=True)
-    parser.add_argument("--preflight-report", type=Path, required=True)
+    parser.add_argument("--local-release-root", type=Path, required=True)
     parser.add_argument("--real-evaluation-revision", required=True)
     parser.add_argument("--real-evaluation-path", required=True)
     parser.add_argument("--real-evaluation-hash", required=True)
