@@ -1,0 +1,57 @@
+import sys
+import unittest
+from pathlib import Path
+
+import numpy as np
+
+
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+
+from decode_geometry_exports import (  # noqa: E402
+    decode_yolo_pose,
+    model_point_to_source,
+    yolo_pose_candidates,
+)
+
+
+def output_with_duplicate_quads():
+    raw = np.zeros((1, 17, 2), dtype=np.float32)
+    points = [64, 64, 1, 320, 64, 1, 320, 448, 1, 64, 448, 1]
+    for index, score in enumerate((0.9, 0.8)):
+        raw[0, 4, index] = score
+        raw[0, 5:, index] = points
+    return raw
+
+
+class DecodeGeometryExportsTests(unittest.TestCase):
+    def test_yolo_pose_decodes_ordered_normalized_corners(self):
+        rows = yolo_pose_candidates(output_with_duplicate_quads(), resolution=640)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["corners"][0]["point"], {"x": 0.1, "y": 0.1})
+        self.assertEqual(rows[0]["corners"][2]["point"], {"x": 0.5, "y": 0.7})
+
+    def test_quad_nms_keeps_higher_confidence_duplicate(self):
+        rows = decode_yolo_pose(output_with_duplicate_quads())
+        self.assertEqual(len(rows), 1)
+        self.assertAlmostEqual(rows[0]["confidence"], 0.9)
+
+    def test_inverse_letterbox_and_context_margin(self):
+        transform = {
+            "sourceWidth": 100,
+            "sourceHeight": 200,
+            "contextMarginPixels": {"left": 10, "top": 20, "right": 10, "bottom": 20},
+            "scale": 2,
+            "padLeft": 5,
+            "padTop": 7,
+        }
+        self.assertEqual(model_point_to_source(25, 47, transform), {"x": 0.0, "y": 0.0})
+        self.assertEqual(model_point_to_source(225, 447, transform), {"x": 1.0, "y": 1.0})
+
+    def test_invalid_channel_count_fails(self):
+        with self.assertRaisesRegex(ValueError, "17 channels"):
+            yolo_pose_candidates(np.zeros((1, 16, 10)), resolution=640)
+
+
+if __name__ == "__main__":
+    unittest.main()

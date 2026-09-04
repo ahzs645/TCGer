@@ -153,6 +153,7 @@ def benchmark(
     rows = []
     golden_manifest = []
     golden_arrays: dict[str, Any] = {}
+    onnx_identity = artifact_identity(onnx_path)
     latency_image = None
     latency_tensor = None
     for spec in FIXTURE_SPECS:
@@ -173,15 +174,25 @@ def benchmark(
             }
         )
         golden_arrays[spec["id"]] = onnx_value
-        golden_manifest.append(
-            {
-                "fixture": spec,
-                "rawTensorKey": spec["id"],
-                "rawTensorSha256": hashlib.sha256(onnx_value.tobytes()).hexdigest(),
-                "shape": list(onnx_value.shape),
-                "dtype": "float32-little-endian",
-            }
-        )
+        golden = {
+            "fixture": spec,
+            "rawTensorKey": spec["id"],
+            "rawTensorSha256": hashlib.sha256(onnx_value.tobytes()).hexdigest(),
+            "shape": list(onnx_value.shape),
+            "dtype": "float32-little-endian",
+        }
+        if candidate.startswith("yolo11"):
+            from decode_geometry_exports import decode_yolo_pose
+
+            golden["expectedResults"] = decode_yolo_pose(
+                onnx_value,
+                resolution=size,
+                model_id={
+                    "releaseVersion": 1,
+                    "artifactSha256": onnx_identity["sha256"],
+                },
+            )
+        golden_manifest.append(golden)
         if spec["id"] == "gradient":
             latency_image, latency_tensor = image, tensor
     if latency_image is None or latency_tensor is None:
@@ -206,6 +217,7 @@ def benchmark(
                     "schema": "https://tcger.app/fixtures/card-geometry-raw-tensors/v1",
                     "candidate": candidate,
                     "experimentHash": experiment_hash,
+                    "modelArtifact": {"format": "onnx", **onnx_identity},
                     "fixtures": golden_manifest,
                 }
             )
@@ -221,7 +233,7 @@ def benchmark(
             "numpy": np.__version__,
         },
         "artifacts": {
-            "onnx": artifact_identity(onnx_path),
+            "onnx": onnx_identity,
             "coreml": artifact_identity(coreml_path),
         },
         "io": {
