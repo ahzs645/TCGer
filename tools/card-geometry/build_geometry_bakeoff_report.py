@@ -77,6 +77,11 @@ def outside_frame_p50(report: dict[str, Any]) -> float | None:
     return None if row is None else row["normalized"]["p50"]
 
 
+def at_most(value: float | None, maximum: float) -> bool:
+    """A missing percentile means the candidate did not produce a scorable sample."""
+    return value is not None and value <= maximum
+
+
 def parity_extrema(export: dict[str, Any]) -> tuple[float, float]:
     cosines = [row.get("minimumCosine", row.get("cosine")) for row in export["parity"]]
     differences = [
@@ -133,12 +138,11 @@ def candidate_row(
     checks = {
         "realRecallAt05": detection["recall@0.5"] >= budgets["realRecallAt05Minimum"],
         "realRecallAt075": detection["recall@0.75"] >= budgets["realRecallAt075Minimum"],
-        "normalizedCornerP50": corner["p50"] <= budgets["normalizedCornerP50Maximum"],
-        "normalizedCornerP90": corner["p90"] <= budgets["normalizedCornerP90Maximum"],
-        "normalizedCornerP95": corner["p95"] <= budgets["normalizedCornerP95Maximum"],
-        "outsideFrameNormalizedP50": (
-            outside_p50 is not None
-            and outside_p50 <= budgets["outsideFrameNormalizedP50Maximum"]
+        "normalizedCornerP50": at_most(corner["p50"], budgets["normalizedCornerP50Maximum"]),
+        "normalizedCornerP90": at_most(corner["p90"], budgets["normalizedCornerP90Maximum"]),
+        "normalizedCornerP95": at_most(corner["p95"], budgets["normalizedCornerP95Maximum"]),
+        "outsideFrameNormalizedP50": at_most(
+            outside_p50, budgets["outsideFrameNormalizedP50Maximum"]
         ),
         "duplicates": detection["duplicate"] <= budgets["duplicateMaximum"],
         "extras": detection["extraPerImage"] <= budgets["extraPerImageMaximum"],

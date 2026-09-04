@@ -154,6 +154,29 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
                     }
                 )
 
+    def test_missing_corner_percentiles_fail_without_crashing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = self.write_candidate(Path(temporary) / "candidate", "candidate", 0)
+            path = Path(candidate["reportsRoot"]) / "real-v3.benchmark.json"
+            real = json.loads(path.read_text())
+            real["cornerError"]["overall"]["normalized"].update(
+                {"count": 0, "mean": None, "p50": None, "p90": None, "p95": None}
+            )
+            real["cornerError"]["byTruthVisibility"] = {}
+            path.write_text(json.dumps(real))
+            report = build(
+                {
+                    "bakeoffId": "test",
+                    "trainingCorpusHash": "d" * 64,
+                    "candidates": [candidate],
+                }
+            )
+            checks = report["candidates"][0]["checks"]
+            self.assertFalse(checks["normalizedCornerP50"])
+            self.assertFalse(checks["normalizedCornerP90"])
+            self.assertFalse(checks["normalizedCornerP95"])
+            self.assertFalse(checks["outsideFrameNormalizedP50"])
+
 
 if __name__ == "__main__":
     unittest.main()
