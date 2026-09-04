@@ -17,6 +17,10 @@ CORPUS = {
     "corpusHash": "b" * 64,
     "policyId": "training-minimums-v2",
     "policySha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+    "preflightReport": {
+        "path": "geometry/preflights/report.json",
+        "sha256": "d" * 64,
+    },
 }
 
 
@@ -50,6 +54,8 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             config_path="config.json",
             config_sha="c" * 64,
             pipeline_smoke=True,
+            preflight_path="geometry/preflights/report.json",
+            preflight_sha="d" * 64,
             action="train",
         )
         self.assertIn("os.environ['HF_TOKEN']", command[-1])
@@ -65,6 +71,8 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             config_path="config.json",
             config_sha="c" * 64,
             pipeline_smoke=False,
+            preflight_path="geometry/preflights/report.json",
+            preflight_sha="d" * 64,
             action="export",
             export_format="coreml",
         )
@@ -82,6 +90,8 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             config_path="config.json",
             config_sha="c" * 64,
             pipeline_smoke=False,
+            preflight_path="geometry/preflights/report.json",
+            preflight_sha="d" * 64,
         )
         self.assertIn("mmcv==2.0.1", command[-1])
         self.assertIn("cu117/torch2.0/index.html", command[-1])

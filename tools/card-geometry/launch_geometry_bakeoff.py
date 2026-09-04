@@ -10,7 +10,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from corpus_release import REPOSITORY, canonical_json, pretty_json, sha256_bytes, sha256_file
+from corpus_release import (
+    REPOSITORY,
+    canonical_json,
+    load_json,
+    pretty_json,
+    sha256_bytes,
+    sha256_file,
+)
 from run_card_geometry_hf_job import descriptor, resolve_config
 
 
@@ -234,6 +241,8 @@ def bootstrap_command(
     config_path: str,
     config_sha: str,
     pipeline_smoke: bool,
+    preflight_path: str,
+    preflight_sha: str,
     action: str = "train",
     export_format: str | None = None,
 ) -> list[str]:
@@ -288,7 +297,8 @@ revision = {hub_revision!r}
 token = os.environ['HF_TOKEN']
 tooling = Path(hf_hub_download(repo_id=repo, filename={tooling_path!r}, revision=revision, token=token))
 config = Path(hf_hub_download(repo_id=repo, filename={config_path!r}, revision=revision, token=token))
-for path, expected in ((tooling, {tooling_sha!r}), (config, {config_sha!r})):
+preflight = Path(hf_hub_download(repo_id=repo, filename={preflight_path!r}, revision=revision, token=token))
+for path, expected in ((tooling, {tooling_sha!r}), (config, {config_sha!r}), (preflight, {preflight_sha!r})):
     actual = hashlib.sha256(path.read_bytes()).hexdigest()
     if actual != expected:
         raise SystemExit(f'pinned input hash mismatch for {{path.name}}: {{actual}}')
@@ -297,8 +307,17 @@ source.mkdir(parents=True, exist_ok=False)
 with tarfile.open(tooling, 'r:gz') as archive:
     archive.extractall(source)
 Path('/work/experiment.json').write_bytes(config.read_bytes())
+Path('/work/preflight-report.json').write_bytes(preflight.read_bytes())
 """.strip()
-    shell = ["set -euo pipefail", *setup, "python - <<'PY'", program, "PY", "cd /work/src"]
+    shell = [
+        "set -euo pipefail",
+        *setup,
+        "python - <<'PY'",
+        program,
+        "PY",
+        "export TCGER_GEOMETRY_PREFLIGHT_REPORT=/work/preflight-report.json",
+        "cd /work/src",
+    ]
     shell.append(
         "python tools/card-geometry/run_card_geometry_hf_job.py "
         f"--config /work/experiment.json --action {action}{export}{smoke} "
@@ -311,6 +330,17 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
     from huggingface_hub import CommitOperationAdd, HfApi, get_token
 
     revision = checked_git_revision()
+    preflight = load_json(args.preflight_report)
+    if (
+        preflight.get("failedChecks")
+        or preflight.get("readyFor") != "training"
+        or preflight.get("recomputedCorpusHash") != args.corpus_hash
+        or preflight.get("readinessPolicyId") != "training-minimums-v2"
+        or preflight.get("readinessPolicySha256") != args.policy_sha256
+    ):
+        raise RuntimeError("local preflight report does not approve the requested corpus")
+    preflight_sha = sha256_file(args.preflight_report)
+    preflight_path = f"geometry/preflights/{args.corpus_hash}/{preflight_sha}.json"
     corpus = {
         "datasetRepo": args.dataset_repo,
         "datasetRevision": args.dataset_revision,
@@ -318,6 +348,7 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
         "corpusHash": args.corpus_hash,
         "policyId": "training-minimums-v2",
         "policySha256": args.policy_sha256,
+        "preflightReport": {"path": preflight_path, "sha256": preflight_sha},
     }
     candidates = ["yolo11n-pose"] if args.pipeline_smoke else args.candidate
     configs = {
@@ -363,7 +394,13 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
         )
         tooling_sha = sha256_file(tooling)
         tooling_path = f"geometry/tooling/{revision}/card-geometry-tooling.tar.gz"
-        operations: list[Any] = [CommitOperationAdd(path_in_repo=tooling_path, path_or_fileobj=tooling)]
+        operations: list[Any] = [
+            CommitOperationAdd(path_in_repo=tooling_path, path_or_fileobj=tooling),
+            CommitOperationAdd(
+                path_in_repo=preflight_path,
+                path_or_fileobj=args.preflight_report,
+            ),
+        ]
         config_files = {}
         for candidate, config in configs.items():
             path = root / f"{candidate}.json"
@@ -394,6 +431,8 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
                     config_path=config_path,
                     config_sha=config_sha,
                     pipeline_smoke=args.pipeline_smoke,
+                    preflight_path=preflight_path,
+                    preflight_sha=preflight_sha,
                     action=args.action,
                     export_format=args.export_format,
                 ),
@@ -428,6 +467,7 @@ def main() -> int:
     parser.add_argument("--dataset-revision", required=True)
     parser.add_argument("--release-path", required=True)
     parser.add_argument("--corpus-hash", required=True)
+    parser.add_argument("--preflight-report", type=Path, required=True)
     parser.add_argument("--real-evaluation-revision", required=True)
     parser.add_argument("--real-evaluation-path", required=True)
     parser.add_argument("--real-evaluation-hash", required=True)

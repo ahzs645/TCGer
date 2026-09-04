@@ -510,6 +510,12 @@ training now waits on a combined shippable release that meets the frozen
    manifest without its own hash member; every record and image hash is a
    manifest member.
 
+   The launcher also binds the locally approved preflight report path and
+   SHA-256 into the resolved experiment config and uploads it in the same
+   immutable Hub commit as that config. The GPU job verifies those exact bytes,
+   recomputes preflight from the pinned dataset revision, and refuses training
+   unless corpus hash, policy id, policy hash, and `readyFor: training` agree.
+
    Until a geometry corpus release exists at a pinned dataset revision (none
    did on 2026-09-02), every preflight run is a tooling test against the
    checked-in fixture releases. The first meaningful preflight is the output

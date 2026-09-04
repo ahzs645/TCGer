@@ -54,7 +54,16 @@
         "releasePath": { "$ref": "#/$defs/relativePath" },
         "corpusHash": { "$ref": "#/$defs/sha256" },
         "policyId": { "const": "training-minimums-v2" },
-        "policySha256": { "$ref": "#/$defs/sha256" }
+        "policySha256": { "$ref": "#/$defs/sha256" },
+        "preflightReport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "$ref": "#/$defs/relativePath" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
       }
     },
     "execution": {

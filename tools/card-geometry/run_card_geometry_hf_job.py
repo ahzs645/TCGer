@@ -142,6 +142,12 @@ def resolve_config(raw: dict[str, Any], *, pipeline_smoke: bool = False) -> dict
         raise ConfigurationError(
             "execution.evaluationCommand requires evaluations.recognitionModels"
         )
+    if resolved["execution"].get("evaluationCommand") and not resolved["corpus"].get(
+        "preflightReport"
+    ):
+        raise ConfigurationError(
+            "evaluation runs require a corpus.preflightReport pinned into the experiment"
+        )
 
     return resolved
 
@@ -282,6 +288,19 @@ def _download_and_preflight(resolved: dict[str, Any], token: str, work: Path) ->
             "training release preflight failed: "
             f"readyFor={report['readyFor']} failedChecks={report['failedChecks']}"
         )
+    pinned_path = os.environ.get("TCGER_GEOMETRY_PREFLIGHT_REPORT")
+    if not pinned_path:
+        raise RuntimeError("TCGER_GEOMETRY_PREFLIGHT_REPORT is required")
+    pinned = load_json(Path(pinned_path))
+    if pinned.get("failedChecks") or pinned.get("readyFor") != "training":
+        raise RuntimeError("pinned preflight report did not authorize training")
+    for field in (
+        "recomputedCorpusHash",
+        "readinessPolicyId",
+        "readinessPolicySha256",
+    ):
+        if pinned.get(field) != report.get(field):
+            raise RuntimeError(f"pinned and recomputed preflight disagree on {field}")
     return release, report
 
 
