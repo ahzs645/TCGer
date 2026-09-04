@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import runpy
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,15 @@ SPEC.loader.exec_module(MODULE)
 
 
 class TrainYoloxPoseTests(unittest.TestCase):
+    def test_pinned_metainfo_defines_four_ordered_corners(self):
+        metadata = runpy.run_path(ROOT / MODULE.METAINFO_FILE)["dataset_info"]
+        self.assertEqual(metadata["dataset_name"], "tcger-card-corners")
+        self.assertEqual(
+            [metadata["keypoint_info"][index]["name"] for index in range(4)],
+            ["top_left", "top_right", "bottom_right", "bottom_left"],
+        )
+        self.assertEqual(len(metadata["sigmas"]), 4)
+
     def test_coco_annotation_keeps_card_order_and_visibility(self):
         instance = {
             "instanceId": "card-0",
@@ -102,6 +112,9 @@ class TrainYoloxPoseTests(unittest.TestCase):
             ).read_text()
             self.assertIn("pipeline=shared_pipeline", config)
             self.assertIn("loss_pose=dict(_delete_=True", config)
+            self.assertIn("metainfo=metainfo_file", config)
+            self.assertIn("metainfo = dict(from_file=metainfo_file)", config)
+            self.assertIn("load_from = None", config)
             self.assertIn("dataset=dict(_delete_=True, type='PoseCocoDataset'", config)
             self.assertNotIn("Mosaic", config)
             self.assertNotIn("RandomFlip", config)

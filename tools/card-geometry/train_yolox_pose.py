@@ -21,28 +21,11 @@ from typing import Any
 
 from PIL import Image
 
-from train_yolo_pose import load_json, padded_point, sha256_file
+from train_yolo_pose import download_verified, load_json, padded_point, sha256_file
 
 
 VISIBILITY = {"visible": 2, "occluded": 1, "outsideFrame": 1}
-CARD_METAINFO = {
-    "dataset_name": "tcger-card-corners",
-    "paper_info": {},
-    "keypoint_info": {
-        0: {"name": "top_left", "id": 0, "color": [0, 255, 0], "type": "", "swap": "top_right"},
-        1: {"name": "top_right", "id": 1, "color": [0, 255, 0], "type": "", "swap": "top_left"},
-        2: {"name": "bottom_right", "id": 2, "color": [0, 255, 0], "type": "", "swap": "bottom_left"},
-        3: {"name": "bottom_left", "id": 3, "color": [0, 255, 0], "type": "", "swap": "bottom_right"},
-    },
-    "skeleton_info": {
-        0: {"link": ("top_left", "top_right"), "id": 0, "color": [0, 255, 0]},
-        1: {"link": ("top_right", "bottom_right"), "id": 1, "color": [0, 255, 0]},
-        2: {"link": ("bottom_right", "bottom_left"), "id": 2, "color": [0, 255, 0]},
-        3: {"link": ("bottom_left", "top_left"), "id": 3, "color": [0, 255, 0]},
-    },
-    "joint_weights": [1.0, 1.0, 1.0, 1.0],
-    "sigmas": [0.025, 0.025, 0.025, 0.025],
-}
+METAINFO_FILE = "tools/card-geometry/configs/tcger-card-corners.py"
 
 
 def coco_annotation(
@@ -189,8 +172,9 @@ def write_config(
     base = mmyolo_root / "configs/yolox/pose/yolox-pose_s_8xb32-300e-rtmdet-hyp_coco.py"
     if not base.is_file():
         raise ValueError(f"pinned MMYOLO checkout lacks YOLOX-Pose config: {base}")
+    if not Path(METAINFO_FILE).is_file():
+        raise ValueError(f"missing pinned card-corner metainfo: {METAINFO_FILE}")
     config = output / "yolox-pose-card.py"
-    metainfo = repr(CARD_METAINFO)
     shared_pipeline = """[
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_keypoints=True),
@@ -207,15 +191,17 @@ def write_config(
             [
                 f"_base_ = {str(base)!r}",
                 f"data_root = {str(dataset.resolve()) + '/'!r}",
-                f"metainfo = {metainfo}",
+                f"metainfo_file = {METAINFO_FILE!r}",
+                "metainfo = dict(from_file=metainfo_file)",
+                "load_from = None",
                 "num_keypoints = 4",
                 "img_scale = (640, 640)",
                 f"shared_pipeline = {shared_pipeline}",
                 "model = dict(bbox_head=dict(head_module=dict(num_keypoints=4), "
-                "loss_pose=dict(_delete_=True, type='OksLoss', metainfo=metainfo, "
+                "loss_pose=dict(_delete_=True, type='OksLoss', metainfo=metainfo_file, "
                 "loss_weight=30.0)), train_cfg=dict(assigner=dict("
                 "oks_calculator=dict(_delete_=True, type='OksLoss', "
-                "metainfo=metainfo))))",
+                "metainfo=metainfo_file))))",
                 f"train_dataloader = dict(batch_size={batch}, num_workers={workers}, "
                 "dataset=dict(_delete_=True, type='PoseCocoDataset', data_mode='bottomup', "
                 "data_root=data_root, ann_file='annotations/train.json', "
@@ -257,6 +243,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     seed = int(os.environ["TCGER_GEOMETRY_BASE_SEED"])
     if int(os.environ["TCGER_GEOMETRY_REPEAT_COUNT"]) != 1:
         raise ValueError("one Job invocation trains exactly one resolved repeat")
+    base_checkpoint = output / "base-yolox-pose.pth"
+    download_verified(args.base_url, args.base_sha256, base_checkpoint)
     dataset = output / "coco-dataset"
     materialization = materialize_coco(release, dataset)
     config = write_config(
@@ -277,6 +265,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "--work-dir",
             str(work_dir),
             "--amp",
+            "--cfg-options",
+            f"load_from={base_checkpoint}",
         ],
         check=True,
     )
@@ -289,6 +279,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "experimentHash": os.environ["TCGER_GEOMETRY_EXPERIMENT_HASH"],
         "materialization": materialization,
         "mmyolo": {"root": str(args.mmyolo_root), "revision": args.mmyolo_revision},
+        "baseCheckpoint": {"url": args.base_url, "sha256": args.base_sha256},
         "training": {
             "epochs": epochs,
             "inputResolution": int(os.environ["TCGER_GEOMETRY_INPUT_RESOLUTION"]),
@@ -308,6 +299,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     shutil.rmtree(dataset)
+    base_checkpoint.unlink()
     return summary
 
 
@@ -315,6 +307,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mmyolo-root", type=Path, required=True)
     parser.add_argument("--mmyolo-revision", required=True)
+    parser.add_argument("--base-url", required=True)
+    parser.add_argument("--base-sha256", required=True)
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--materialize-only", action="store_true")

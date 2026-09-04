@@ -30,6 +30,12 @@ PYTORCH_MMYOLO_IMAGE = (
 )
 MMYOLO_REVISION = "8c4d9dc503dc8e327bec8147e8dc97124052f693"
 MMYOLO_ARCHIVE_SHA256 = "6a1f2e65b0746353e94cf87d172503e00e98cc9b2529bb38718d278e6be63d9c"
+MMYOLO_BASE_URL = (
+    "https://download.openmmlab.com/mmyolo/v0/yolox/"
+    "yolox_s_fast_8xb32-300e-rtmdet-hyp_coco/"
+    "yolox_s_fast_8xb32-300e-rtmdet-hyp_coco_20230210_134645-3a8dfbd7.pth"
+)
+MMYOLO_BASE_SHA256 = "3a8dfbd76b4493580449925f6cd01d1ae3b2b7425c6d1ed168dbe5282920c9b3"
 RECOGNITION_MODEL_REVISION = "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
 RECOGNITION_ASSETS = {
     "pokemon": {
@@ -170,6 +176,10 @@ def base_config(
             "/work/mmyolo",
             "--mmyolo-revision",
             MMYOLO_REVISION,
+            "--base-url",
+            MMYOLO_BASE_URL,
+            "--base-sha256",
+            MMYOLO_BASE_SHA256,
         ],
         "fastvit-t8-four-corner": [
             "python",

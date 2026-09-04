@@ -125,6 +125,18 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         self.assertNotIn("git clone", command[-1])
         self.assertNotIn("mim install", command[-1])
 
+        config = base_config(
+            candidate="yolox-pose",
+            corpus=CORPUS,
+            tooling_revision="c" * 40,
+            epochs=50,
+        )
+        train_command = config["execution"]["trainCommand"]
+        self.assertIn(
+            "3a8dfbd76b4493580449925f6cd01d1ae3b2b7425c6d1ed168dbe5282920c9b3",
+            train_command,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
