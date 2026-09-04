@@ -272,7 +272,7 @@ def benchmark(
             from decode_geometry_exports import decode_yolox_pose
 
             golden["expectedResults"] = decode_yolox_pose(
-                onnx_values,
+                *onnx_values,
                 resolution=size,
                 model_id={
                     "releaseVersion": 1,

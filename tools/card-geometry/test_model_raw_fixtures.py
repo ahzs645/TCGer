@@ -10,7 +10,11 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from decode_geometry_exports import decode_fastvit_four_corner, decode_yolo_pose  # noqa: E402
+from decode_geometry_exports import (  # noqa: E402
+    decode_fastvit_four_corner,
+    decode_yolox_pose,
+    decode_yolo_pose,
+)
 
 
 class ModelRawFixturesTests(unittest.TestCase):
@@ -58,6 +62,16 @@ class ModelRawFixturesTests(unittest.TestCase):
                         actual = decode_fastvit_four_corner(
                             values[0],
                             values[1],
+                            model_id={
+                                "releaseVersion": 1,
+                                "artifactSha256": manifest["modelArtifact"]["sha256"],
+                            },
+                        )
+                        self.assertEqual(actual, fixture["expectedResults"])
+                    elif manifest["candidate"] == "yolox-pose":
+                        self.assertEqual(len(values), 15)
+                        actual = decode_yolox_pose(
+                            *values,
                             model_id={
                                 "releaseVersion": 1,
                                 "artifactSha256": manifest["modelArtifact"]["sha256"],
