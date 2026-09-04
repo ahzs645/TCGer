@@ -58,6 +58,25 @@ class CornerEditorServerTest(unittest.TestCase):
         changed = [[0.11, 0.1], *quad[1:]]
         self.assertFalse(SERVER.geometry_is_finalized(sample, [changed]))
 
+    def test_explicit_no_labelable_card_is_finalized_without_a_quad(self):
+        sample = _Sample(
+            key="frame-1",
+            manual_instances_json=(
+                '{"noLabelableCard":true,"instances":[],"sceneSlice":"steep_playmat"}'
+            ),
+        )
+        self.assertTrue(SERVER.geometry_is_negative(sample))
+        self.assertTrue(SERVER.geometry_is_finalized(sample, []))
+
+    def test_payload_accepts_only_explicit_empty_negative_frame(self):
+        quads, metadata = SERVER.validate_payload(
+            {"quads": [], "metadata": [], "noLabelableCard": True}
+        )
+        self.assertEqual(quads, [])
+        self.assertEqual(metadata, [])
+        with self.assertRaisesRegex(ValueError, "at least one card quad"):
+            SERVER.validate_payload({"quads": [], "metadata": []})
+
     def test_payload_accepts_amodal_ordered_corners(self):
         payload = {
             "quads": [[[0.1, 0.1], [0.9, 0.1], [0.9, 1.05], [0.1, 1.05]]],

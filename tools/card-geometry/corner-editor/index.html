@@ -47,7 +47,7 @@
       </section>
       <section class="controls">
         <div class="button-row">
-          <button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="save" class="primary">Save frame</button>
+          <button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="no-card">No labelable card</button><button id="save" class="primary">Save frame</button>
           <label class="scene-label">Evaluation slice
             <select id="scene-slice">
               <option value="single_handheld">Single handheld</option>
@@ -57,6 +57,7 @@
             </select>
           </label>
         </div>
+        <p class="tip">“No labelable card” means no physical card outline can be placed reliably. If the card identity is unknown but its edges are visible, label its corners normally.</p>
         <div id="metadata" class="metadata"></div>
       </section>
     </main>

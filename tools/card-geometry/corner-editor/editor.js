@@ -24,6 +24,10 @@ function status(message, kind = "") {
   statusEl.className = kind;
 }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function sampleLabel(sample) {
+  const cards = sample.noLabelableCard ? "no labelable card" : `${sample.cards} cards`;
+  return `${sample.key} · ${cards} · ${sample.finalized ? "finalized" : "draft"}`;
+}
 async function jsonRequest(url, options = {}) {
   const response = await fetch(url, options);
   const payload = await response.json();
@@ -340,6 +344,7 @@ async function persist(finalize, message) {
         metadata: state.sample.metadata,
         sceneSlice: state.sample.sceneSlice,
         finalize,
+        noLabelableCard: false,
       }),
     });
     state.dirty = false;
@@ -365,7 +370,7 @@ async function refreshProgress() {
   renderProgress();
   for (const sample of state.samples) {
     const option = Array.from(document.querySelector("#sample").options).find(o => o.value === sample.id);
-    if (option) option.textContent = `${sample.key} · ${sample.cards} cards · ${sample.finalized ? "finalized" : "draft"}`;
+    if (option) option.textContent = sampleLabel(sample);
   }
 }
 
@@ -440,6 +445,7 @@ function addCard() {
   });
   state.activeCard = index;
   state.activeCorner = 0;
+  state.sample.noLabelableCard = false;
   state.dirty = true;
   renderControls();
   draw();
@@ -468,7 +474,49 @@ document.querySelector("#delete").onclick = async () => {
   draw();
   await persist(false, "Card deleted and remaining draft saved");
 };
+document.querySelector("#no-card").onclick = async () => {
+  if (!state.sample) return;
+  const confirmed = window.confirm(
+    "Mark this frame as having no labelable card?\n\n" +
+    "Use this only when no physical card outline can be placed reliably. " +
+    "If a card is visible but its identity is unknown, cancel and label its corners instead. " +
+    "Any unsaved corners on this frame will be discarded.",
+  );
+  if (!confirmed) return;
+  try {
+    await jsonRequest(`/api/sample/${state.sample.id}`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        quads: [],
+        metadata: [],
+        sceneSlice: state.sample.sceneSlice,
+        finalize: true,
+        noLabelableCard: true,
+      }),
+    });
+    state.sample.quads = [];
+    state.sample.metadata = [];
+    state.sample.noLabelableCard = true;
+    state.sample.draftSource = null;
+    state.sample.finalized = true;
+    state.activeCard = 0;
+    state.activeCorner = 0;
+    state.reviewedCorners = new Set();
+    state.dirty = false;
+    renderControls();
+    draw();
+    await refreshProgress();
+    status("Frame finalized with no labelable card.", "ok");
+  } catch (error) {
+    status(`Save failed: ${error.message}`, "error");
+  }
+};
 document.querySelector("#save").onclick = () => {
+  if (!state.sample?.quads.length) {
+    status("Add a card, or use No labelable card to finalize this frame.", "error");
+    return;
+  }
   const missing = unreviewedCorners();
   if (missing.length) {
     const labels = missing.map((item) => item.label).join(", ");
@@ -513,7 +561,10 @@ async function loadSample(index) {
     const draft = state.sample.draftSource === "detector"
       ? " Detector corners are a starting draft—click each correct corner or drag it to correct it before saving."
       : "";
-    status(`Ready — choose a card; Tab / Shift+Tab switches cards while editing.${draft}`, "ok");
+    const negative = state.sample.noLabelableCard
+      ? " This frame is finalized with no labelable card; use Add card to revise it."
+      : "";
+    status(`Ready — choose a card; Tab / Shift+Tab switches cards while editing.${draft}${negative}`, "ok");
   };
   state.image.onerror = () => status("Could not load source image", "error");
   state.image.src = `${state.sample.imageUrl}?v=${Date.now()}`;
@@ -546,7 +597,7 @@ async function start() {
     renderProgress();
     const select = document.querySelector("#sample");
     state.samples.forEach((sample) => select.add(new Option(
-      `${sample.key} · ${sample.cards} cards · ${sample.finalized ? "finalized" : "draft"}`,
+      sampleLabel(sample),
       sample.id,
     )));
     await loadSample(0);

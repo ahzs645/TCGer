@@ -121,6 +121,12 @@ def durable_geometry(sample):
     return value if isinstance(value, dict) else None
 
 
+def geometry_is_negative(sample):
+    """True when a reviewer explicitly finalized the frame with no labelable card."""
+    record = durable_geometry(sample) or {}
+    return record.get("noLabelableCard") is True and not (record.get("instances") or [])
+
+
 def scene_slice_for(sample, requested=None):
     """Choose an explicit editor slice without rewriting finalized truth."""
     saved = (durable_geometry(sample) or {}).get("sceneSlice")
@@ -138,6 +144,8 @@ def scene_slice_for(sample, requested=None):
 
 def geometry_is_finalized(sample, quads):
     """True only when the durable payload contains these exact current quads."""
+    if geometry_is_negative(sample):
+        return not quads
     instances = (durable_geometry(sample) or {}).get("instances") or []
     if not quads or len(instances) != len(quads):
         return False
@@ -158,6 +166,10 @@ def validate_payload(payload):
     """Validate and normalize a save payload without requiring FiftyOne."""
     raw_quads = payload.get("quads")
     raw_metadata = payload.get("metadata")
+    if payload.get("noLabelableCard") is True:
+        if raw_quads != [] or raw_metadata != []:
+            raise ValueError("a no-labelable-card frame must not contain card quads")
+        return [], []
     if not isinstance(raw_quads, list) or not raw_quads:
         raise ValueError("at least one card quad is required")
     if not isinstance(raw_metadata, list) or len(raw_metadata) != len(raw_quads):
@@ -255,8 +267,9 @@ class EditorStore:
         for value in self.sample_ids:
             sample = self.dataset[value]
             quads = manual_quads(sample)
+            no_labelable_card = geometry_is_negative(sample)
             draft_source = None
-            if not quads:
+            if not quads and not no_labelable_card:
                 quads = polyline_quads(
                     sample, "detection_quads", preferred_label="decisive", limit=1
                 )
@@ -268,6 +281,7 @@ class EditorStore:
                     "cards": len(quads),
                     "finalized": geometry_is_finalized(sample, quads),
                     "draftSource": draft_source,
+                    "noLabelableCard": no_labelable_card,
                 }
             )
         return result
@@ -301,8 +315,9 @@ class EditorStore:
             raise KeyError(value)
         sample = self.dataset[value]
         quads = manual_quads(sample)
+        no_labelable_card = geometry_is_negative(sample)
         draft_source = None
-        if not quads:
+        if not quads and not no_labelable_card:
             quads = polyline_quads(
                 sample, "detection_quads", preferred_label="decisive", limit=1
             )
@@ -322,6 +337,7 @@ class EditorStore:
             "metadata": load_editor_metadata(sample, quads),
             "finalized": geometry_is_finalized(sample, quads),
             "draftSource": draft_source,
+            "noLabelableCard": no_labelable_card,
         }
 
     def image_path(self, value):
@@ -350,11 +366,17 @@ class EditorStore:
             record = geometry_record(
                 sample_key(sample), field_value(sample, "game"), scene_slice, quads, metadata
             )
+            if payload.get("noLabelableCard") is True:
+                record["noLabelableCard"] = True
             if not self.dataset.has_sample_field("manual_instances_json"):
                 self.dataset.add_sample_field(
                     "manual_instances_json", self.fo.StringField
                 )
             sample["manual_instances_json"] = json.dumps(record, sort_keys=True)
+        elif quads and geometry_is_negative(sample):
+            # Revising an explicit negative into a card draft must not leave the
+            # old negative marker active across a reload.
+            sample["manual_instances_json"] = None
         sample.save()
         append_journal(sample)
         return {"ok": True, "cards": len(quads), "finalized": bool(payload.get("finalize"))}
