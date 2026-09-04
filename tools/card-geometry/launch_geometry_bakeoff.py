@@ -283,6 +283,7 @@ def bootstrap_command(
     preflight_sha: str,
     action: str = "train",
     export_format: str | None = None,
+    training_input_revision: str | None = None,
 ) -> list[str]:
     setup = [
         "python -m pip install --no-cache-dir huggingface_hub==1.28.0 "
@@ -336,10 +337,11 @@ from pathlib import Path
 from huggingface_hub import hf_hub_download
 repo = {checkpoint_repo!r}
 revision = {hub_revision!r}
+training_revision = {str(training_input_revision or hub_revision)!r}
 token = os.environ['HF_TOKEN']
 tooling = Path(hf_hub_download(repo_id=repo, filename={tooling_path!r}, revision=revision, token=token))
-config = Path(hf_hub_download(repo_id=repo, filename={config_path!r}, revision=revision, token=token))
-preflight = Path(hf_hub_download(repo_id=repo, filename={preflight_path!r}, revision=revision, token=token))
+config = Path(hf_hub_download(repo_id=repo, filename={config_path!r}, revision=training_revision, token=token))
+preflight = Path(hf_hub_download(repo_id=repo, filename={preflight_path!r}, revision=training_revision, token=token))
 for path, expected in ((tooling, {tooling_sha!r}), (config, {config_sha!r}), (preflight, {preflight_sha!r})):
     actual = hashlib.sha256(path.read_bytes()).hexdigest()
     if actual != expected:

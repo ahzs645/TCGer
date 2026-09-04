@@ -105,6 +105,26 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         self.assertIn("--action export --export-format coreml", command[-1])
         self.assertNotIn("asset-store", command[-1])
 
+    def test_export_bootstrap_can_split_training_and_export_revisions(self):
+        command = bootstrap_command(
+            candidate="yolo11n-pose",
+            checkpoint_repo="owner/private",
+            hub_revision="a" * 40,
+            tooling_path="tooling.tar.gz",
+            tooling_sha="b" * 64,
+            config_path="config.json",
+            config_sha="c" * 64,
+            pipeline_smoke=False,
+            preflight_path="geometry/preflights/report.json",
+            preflight_sha="d" * 64,
+            action="export",
+            export_format="onnx",
+            training_input_revision="e" * 40,
+        )
+        self.assertIn(f"revision = {'a' * 40!r}", command[-1])
+        self.assertIn(f"training_revision = {'e' * 40!r}", command[-1])
+        self.assertIn("revision=training_revision", command[-1])
+
     def test_mmyolo_bootstrap_uses_compatible_binary_wheel(self):
         command = bootstrap_command(
             candidate="yolox-pose",
