@@ -147,6 +147,8 @@
         "syntheticDuelField": { "$ref": "#/$defs/pinnedRelease" },
         "recognitionReplay": { "$ref": "#/$defs/hashedArtifact" },
         "goldenFixtures": { "$ref": "#/$defs/hashedArtifact" }
+        ,
+        "recognitionModels": { "$ref": "#/$defs/recognitionModels" }
       }
     },
     "measurements": {
@@ -234,6 +236,46 @@
       }
     },
     "hashedArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "recognitionModels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modelRepo", "modelRevision", "games"],
+      "properties": {
+        "modelRepo": { "$ref": "#/$defs/hubRepo" },
+        "modelRevision": { "$ref": "#/$defs/gitRevision" },
+        "games": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pokemon", "magic", "yugioh"],
+          "properties": {
+            "pokemon": { "$ref": "#/$defs/recognitionGame" },
+            "magic": { "$ref": "#/$defs/recognitionGame" },
+            "yugioh": { "$ref": "#/$defs/recognitionGame" }
+          }
+        }
+      }
+    },
+    "recognitionGame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["onnx", "metadata", "vectors", "strongThreshold", "queryNormalization"],
+      "properties": {
+        "onnx": { "$ref": "#/$defs/hubFile" },
+        "metadata": { "$ref": "#/$defs/hubFile" },
+        "vectors": { "$ref": "#/$defs/hubFile" },
+        "strongThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "queryNormalization": { "enum": ["none", "grey-world-autocontrast"] }
+      }
+    },
+    "hubFile": {
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "sha256"],

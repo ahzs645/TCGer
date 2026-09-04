@@ -21,6 +21,49 @@ PYTORCH_21_IMAGE = (
     "pytorch/pytorch@sha256:3387e598cb94fc248d82e712a65b10931a990cea3a2e76362ca30d135f565de4"
 )
 MMYOLO_REVISION = "8c4d9dc503dc8e327bec8147e8dc97124052f693"
+RECOGNITION_MODEL_REVISION = "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
+RECOGNITION_ASSETS = {
+    "pokemon": {
+        "onnx": ("card-embeddings-arcface-fp32.onnx", "bd7367284130639345efbe967e5e80b4aadf0ab5d5bc922968d2b06e497eea44"),
+        "metadata": ("CardsIndexMetadata.json", "5bcc886d58fca214800d366d080a438515d7820ffe03fcea7395496b5ef08117"),
+        "vectors": ("CardsIndexVectors-arcface.bin", "d78e06b0909f39f57deab5c04c1bfb20671bf933f95033f143942e8cc388bdc3"),
+        "strongThreshold": 0.65,
+        "queryNormalization": "none",
+    },
+    "magic": {
+        "onnx": ("card-embeddings-arcface-fp32.onnx", "ebc725476ec2866cd054cd16ef9bcda257bbfdc5aa05326a79335abc4fdc0d3e"),
+        "metadata": ("CardsIndexMetadata.json", "35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54"),
+        "vectors": ("CardsIndexVectors-arcface.bin", "4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8"),
+        "strongThreshold": 0.70,
+        "queryNormalization": "grey-world-autocontrast",
+    },
+    "yugioh": {
+        "onnx": ("card-embeddings-arcface-fp32.onnx", "b304bde2171d8ca4a824a4e0cab4bc22c3b31e425a8ba5e3ef91aab4ec6f9d58"),
+        "metadata": ("CardsIndexMetadata.json", "0ab3fec12511b401244b1f80ac12ac432f10cdb2afdcfc59f7797568d50cca5e"),
+        "vectors": ("CardsIndexVectors-arcface.bin", "2de604679f08018e18fe3f3db188414add77fba51c6e8c52c4eb8b87cea8cbdd"),
+        "strongThreshold": 0.65,
+        "queryNormalization": "none",
+    },
+}
+
+
+def recognition_models() -> dict[str, Any]:
+    games = {}
+    for game, values in RECOGNITION_ASSETS.items():
+        games[game] = {}
+        for name in ("onnx", "metadata", "vectors"):
+            filename, digest = values[name]
+            games[game][name] = {
+                "path": f"exports/{game}/full/{filename}",
+                "sha256": digest,
+            }
+        games[game]["strongThreshold"] = values["strongThreshold"]
+        games[game]["queryNormalization"] = values["queryNormalization"]
+    return {
+        "modelRepo": "ahzs645/tcger-universal-arcface",
+        "modelRevision": RECOGNITION_MODEL_REVISION,
+        "games": games,
+    }
 
 
 def checked_git_revision() -> str:
@@ -172,6 +215,7 @@ def base_config(
             "goldenFixtures": hashed_artifact(
                 "tools/card-geometry/fixtures/validation-nms.v1.json"
             ),
+            "recognitionModels": recognition_models(),
         },
         "deviations": [],
     }
@@ -210,6 +254,9 @@ def bootstrap_command(
         setup += [
             "python -m pip install --no-cache-dir timm==1.0.22 safetensors==0.6.2",
         ]
+    setup += [
+        "python -m pip install --no-cache-dir onnxruntime==1.29.0 opencv-python-headless==4.12.0.88"
+    ]
     smoke = " --pipeline-smoke" if pipeline_smoke else ""
     program = f"""
 import hashlib, os, tarfile

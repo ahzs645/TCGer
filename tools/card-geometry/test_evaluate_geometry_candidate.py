@@ -4,7 +4,12 @@ from pathlib import Path
 
 from PIL import Image
 
-from evaluate_geometry_candidate import candidate_result, padded_image, source_point
+from evaluate_geometry_candidate import (
+    candidate_result,
+    classify_replay_outcome,
+    padded_image,
+    source_point,
+)
 
 
 class EvaluateGeometryCandidateTests(unittest.TestCase):
@@ -25,6 +30,28 @@ class EvaluateGeometryCandidateTests(unittest.TestCase):
         )
         self.assertEqual(row["corners"][0]["point"], {"x": 0.1, "y": 0.1})
         self.assertEqual(row["corners"][3]["confidence"], 0.4)
+
+    def test_replay_does_not_invent_truth_for_a_different_accept(self):
+        self.assertEqual(
+            classify_replay_outcome(
+                "forbidden-accept",
+                accepted=True,
+                family="different",
+                expected_families=set(),
+                forbidden_families={"archived-wrong"},
+            ),
+            "unknown",
+        )
+        self.assertEqual(
+            classify_replay_outcome(
+                "identify",
+                accepted=True,
+                family="expected",
+                expected_families={"expected"},
+                forbidden_families=set(),
+            ),
+            "correct",
+        )
 
 
 if __name__ == "__main__":

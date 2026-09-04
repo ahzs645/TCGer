@@ -136,6 +136,13 @@ def resolve_config(raw: dict[str, Any], *, pipeline_smoke: bool = False) -> dict
             f"{resolved['candidate']} uses the permissive publication route"
         )
 
+    if resolved["execution"].get("evaluationCommand") and not resolved[
+        "evaluations"
+    ].get("recognitionModels"):
+        raise ConfigurationError(
+            "execution.evaluationCommand requires evaluations.recognitionModels"
+        )
+
     return resolved
 
 
@@ -301,6 +308,39 @@ def _download_evaluation_release(
     return destination
 
 
+def _download_recognition_models(resolved: dict[str, Any], token: str, work: Path) -> Path:
+    from huggingface_hub import hf_hub_download
+
+    spec = resolved["evaluations"]["recognitionModels"]
+    root = work / "recognition-models"
+    for game, assets in spec["games"].items():
+        game_root = root / game
+        game_root.mkdir(parents=True, exist_ok=True)
+        for name in ("onnx", "metadata", "vectors"):
+            item = assets[name]
+            source = Path(
+                hf_hub_download(
+                    repo_id=spec["modelRepo"],
+                    filename=item["path"],
+                    revision=spec["modelRevision"],
+                    token=token,
+                )
+            )
+            if sha256_file(source) != item["sha256"]:
+                raise RuntimeError(f"{game} {name} recognition artifact hash mismatch")
+            shutil.copy2(source, game_root / Path(item["path"]).name)
+        (game_root / "policy.json").write_text(
+            pretty_json(
+                {
+                    "strongThreshold": assets["strongThreshold"],
+                    "queryNormalization": assets["queryNormalization"],
+                }
+            ),
+            encoding="utf-8",
+        )
+    return root
+
+
 def _upload_json(api: Any, repo_id: str, path: str, value: Any, message: str) -> str:
     commit = api.upload_file(
         path_or_fileobj=(pretty_json(value)).encode("utf-8"),
@@ -434,6 +474,9 @@ def execute(
         env["TCGER_GEOMETRY_EVAL_SYNTHETIC_HASH"] = resolved["evaluations"][
             "syntheticDuelField"
         ]["corpusHash"]
+        env["TCGER_GEOMETRY_RECOGNITION_MODELS_ROOT"] = str(
+            _download_recognition_models(resolved, token, work)
+        )
         _run(resolved["execution"]["evaluationCommand"], env=env)
     elapsed = time.monotonic() - started
     run_descriptor.update(

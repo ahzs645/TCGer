@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
 import subprocess
@@ -13,6 +14,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+from crop_parity import EncoderRuntime, warp_reference
 from export_geometry_candidate import find_one
 from reference_geometry import process_candidates
 from train_fastvit_four_corner import letterbox_geometry
@@ -229,6 +231,171 @@ def write_predictions(
             handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
 
 
+def _families_by_card(metadata: list[dict[str, Any]]) -> dict[str, set[str]]:
+    result: dict[str, set[str]] = collections.defaultdict(set)
+    for row in metadata:
+        family = row.get("recognitionFamilyId") or row["cardId"]
+        for item in [row, *(row.get("printings") or [])]:
+            for key in ("cardId", "exactPrintingId"):
+                value = item.get(key)
+                if value:
+                    result[str(value)].add(str(family))
+    return result
+
+
+def _recognition_decision(runtime: EncoderRuntime, crops: list[Image.Image]) -> tuple[str, bool, float, float]:
+    best = None
+    for crop in crops:
+        embedding = runtime.embed(crop)
+        scores = runtime.vectors @ embedding
+        order = np.argsort(-scores)
+        first = int(order[0])
+        rival = next(
+            int(index)
+            for index in order[1:]
+            if runtime.families[int(index)] != runtime.families[first]
+        )
+        top = float(scores[first])
+        margin = top - float(scores[rival])
+        value = (runtime.families[first], top >= runtime.threshold and margin >= 0.05, top, margin)
+        if best is None or top > best[2]:
+            best = value
+    if best is None:
+        raise ValueError("recognition decision received no crops")
+    return best
+
+
+def classify_replay_outcome(
+    expectation: str,
+    *,
+    accepted: bool,
+    family: str | None,
+    expected_families: set[str],
+    forbidden_families: set[str],
+) -> str:
+    if expectation == "identify":
+        return "correct" if accepted and family in expected_families else "wrong" if accepted else "abstain"
+    if expectation == "forbidden-accept":
+        return "wrong" if accepted and family in forbidden_families else "unknown" if accepted else "abstain"
+    if expectation == "reject":
+        return "wrong" if accepted else "correctReject"
+    return "unknown"
+
+
+def evaluate_recognition_replay(
+    *, release: Path, predictions_path: Path, models_root: Path, output: Path
+) -> dict[str, Any]:
+    replay_path = release / "recognition-replay.json"
+    if not replay_path.is_file():
+        raise ValueError(f"real evaluation release lacks {replay_path.name}")
+    replay = load_json(replay_path)
+    predictions = {}
+    with predictions_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            row = json.loads(line)
+            predictions[row["recordId"]] = row["results"]
+    manifest = load_json(release / "manifest.json")
+    entries = {entry["recordId"]: entry for entry in manifest["records"]}
+    runtimes = {}
+    families = {}
+    for game in ("pokemon", "magic", "yugioh"):
+        root = models_root / game
+        policy = load_json(root / "policy.json")
+        runtimes[game] = EncoderRuntime.load(
+            game,
+            root / "card-embeddings-arcface-fp32.onnx",
+            root,
+            float(policy["strongThreshold"]),
+            str(policy["queryNormalization"]),
+        )
+        metadata = json.loads((root / "CardsIndexMetadata.json").read_text(encoding="utf-8"))
+        families[game] = _families_by_card(metadata)
+    rows = []
+    for case in replay["records"]:
+        record_id = case["recordId"]
+        game = case["game"]
+        expectation = case["expectation"]
+        results = predictions.get(record_id, [])
+        top_result = max(results, key=lambda result: result["confidence"], default=None)
+        accepted = False
+        family = None
+        top_score = None
+        margin = None
+        if top_result is not None:
+            record = load_json(release / entries[record_id]["path"])
+            with Image.open(release / record["source"]["path"]) as opened:
+                image = np.asarray(opened.convert("RGB"))
+            quad = [
+                [corner["point"]["x"], corner["point"]["y"]]
+                for corner in top_result["corners"]
+            ]
+            crop = Image.fromarray(
+                warp_reference(
+                    image,
+                    quad,
+                    mapping="imageEdge",
+                    kernel="bilinear",
+                    inset=0.0,
+                    border="black",
+                )
+            )
+            family, accepted, top_score, margin = _recognition_decision(
+                runtimes[game], [crop, crop.rotate(180)]
+            )
+        expected = families[game].get(str(case["expectedCardId"]), set())
+        forbidden = families[game].get(str(case["forbiddenCardId"]), set())
+        outcome = classify_replay_outcome(
+            expectation,
+            accepted=accepted,
+            family=family,
+            expected_families=expected,
+            forbidden_families=forbidden,
+        )
+        rows.append(
+            {
+                "recordId": record_id,
+                "game": game,
+                "expectation": expectation,
+                "geometryFound": top_result is not None,
+                "accepted": accepted,
+                "acceptedFamily": family,
+                "topScore": top_score,
+                "rivalMargin": margin,
+                "outcome": outcome,
+            }
+        )
+    counts = collections.Counter(row["outcome"] for row in rows)
+    report = {
+        "schema": "https://tcger.app/reports/card-geometry-recognition-replay/v1",
+        "corpusHash": manifest["corpusHash"],
+        "replayManifestSha256": sha256_file(replay_path),
+        "predictionsSha256": sha256_file(predictions_path),
+        "cropContract": {
+            "sourceMapping": "imageEdge",
+            "kernel": "bilinear",
+            "inset": 0,
+            "border": "black",
+            "destination": [720, 1000],
+            "orientation": "0 and 180 degrees; best encoder top score",
+        },
+        "counts": {
+            "frames": len(rows),
+            "correct": counts["correct"],
+            "wrong": counts["wrong"],
+            "abstain": counts["abstain"],
+            "correctReject": counts["correctReject"],
+            "unknown": counts["unknown"],
+        },
+        "scopeCaveat": (
+            "Human labels identify 11 correct archived accepts and 4 specific forbidden accepts; "
+            "the remaining frames lack a verified card identity and stay unknown."
+        ),
+        "frames": rows,
+    }
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return report
+
+
 def evaluate(candidate: str) -> dict[str, Any]:
     output = Path(os.environ["TCGER_GEOMETRY_OUTPUT_DIR"])
     checkpoint = find_one(
@@ -249,6 +416,8 @@ def evaluate(candidate: str) -> dict[str, Any]:
     evaluation_dir = output / "evaluation"
     evaluation_dir.mkdir()
     results = {}
+    real_release = None
+    real_predictions = None
     for name, root_env, hash_env in (
         ("real-v3", "TCGER_GEOMETRY_EVAL_REAL_ROOT", "TCGER_GEOMETRY_EVAL_REAL_HASH"),
         (
@@ -282,6 +451,22 @@ def evaluate(candidate: str) -> dict[str, Any]:
             "predictionsSha256": sha256_file(predictions),
             "reportSha256": sha256_file(report),
         }
+        if name == "real-v3":
+            real_release = release
+            real_predictions = predictions
+    if real_release is None or real_predictions is None:
+        raise RuntimeError("real evaluation did not run")
+    recognition_report_path = evaluation_dir / "recognition-replay.json"
+    recognition_report = evaluate_recognition_replay(
+        release=real_release,
+        predictions_path=real_predictions,
+        models_root=Path(os.environ["TCGER_GEOMETRY_RECOGNITION_MODELS_ROOT"]),
+        output=recognition_report_path,
+    )
+    results["recognitionReplay"] = {
+        "reportSha256": sha256_file(recognition_report_path),
+        "counts": recognition_report["counts"],
+    }
     summary = {
         "schema": "https://tcger.app/reports/card-geometry-candidate-evaluation/v1",
         "candidate": candidate,
