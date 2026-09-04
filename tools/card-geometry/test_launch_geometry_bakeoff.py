@@ -49,9 +49,27 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             config_path="config.json",
             config_sha="c" * 64,
             pipeline_smoke=True,
+            action="train",
         )
         self.assertIn("os.environ['HF_TOKEN']", command[-1])
         self.assertIn("--pipeline-smoke", command[-1])
+
+    def test_export_bootstrap_is_private_and_installs_converter(self):
+        command = bootstrap_command(
+            candidate="fastvit-t8-four-corner",
+            checkpoint_repo="owner/private",
+            hub_revision="a" * 40,
+            tooling_path="tooling.tar.gz",
+            tooling_sha="b" * 64,
+            config_path="config.json",
+            config_sha="c" * 64,
+            pipeline_smoke=False,
+            action="export",
+            export_format="coreml",
+        )
+        self.assertIn("coremltools==9.0", command[-1])
+        self.assertIn("--action export --export-format coreml", command[-1])
+        self.assertNotIn("asset-store", command[-1])
 
 
 if __name__ == "__main__":

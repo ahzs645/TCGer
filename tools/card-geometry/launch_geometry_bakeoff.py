@@ -232,6 +232,8 @@ def bootstrap_command(
     config_path: str,
     config_sha: str,
     pipeline_smoke: bool,
+    action: str = "train",
+    export_format: str | None = None,
 ) -> list[str]:
     setup = [
         "python -m pip install --no-cache-dir huggingface_hub==1.28.0 jsonschema==4.23.0",
@@ -257,7 +259,12 @@ def bootstrap_command(
     setup += [
         "python -m pip install --no-cache-dir onnxruntime==1.29.0 opencv-python-headless==4.12.0.88"
     ]
+    if action == "export":
+        setup += ["python -m pip install --no-cache-dir onnx==1.22.0"]
+        if export_format == "coreml":
+            setup += ["python -m pip install --no-cache-dir coremltools==9.0"]
     smoke = " --pipeline-smoke" if pipeline_smoke else ""
+    export = f" --export-format {export_format}" if export_format else ""
     program = f"""
 import hashlib, os, tarfile
 from pathlib import Path
@@ -280,7 +287,7 @@ Path('/work/experiment.json').write_bytes(config.read_bytes())
     shell = ["set -euo pipefail", *setup, "python - <<'PY'", program, "PY", "cd /work/src"]
     shell.append(
         "python tools/card-geometry/run_card_geometry_hf_job.py "
-        f"--config /work/experiment.json --action train{smoke} "
+        f"--config /work/experiment.json --action {action}{export}{smoke} "
         f"--workdir /work/tcger-card-geometry-{candidate}"
     )
     return ["bash", "-lc", "\n".join(shell)]
@@ -367,11 +374,18 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
                     config_path=config_path,
                     config_sha=config_sha,
                     pipeline_smoke=args.pipeline_smoke,
+                    action=args.action,
+                    export_format=args.export_format,
                 ),
                 secrets={"HF_TOKEN": token},
                 flavor="l4x1",
                 timeout="6h",
-                name=f"geometry-{candidate}-{'smoke' if args.pipeline_smoke else 'bakeoff'}",
+                name=(
+                    f"geometry-{candidate}-smoke"
+                    if args.pipeline_smoke
+                    else f"geometry-{candidate}-{args.action}"
+                    + (f"-{args.export_format}" if args.export_format else "")
+                ),
             )
             jobs.append({"candidate": candidate, "id": job.id, "url": job.url})
     return {
@@ -400,6 +414,8 @@ def main() -> int:
     )
     parser.add_argument("--checkpoint-repo", default="ahzs645/tcger-universal-arcface")
     parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--action", choices=("train", "export"), default="train")
+    parser.add_argument("--export-format", choices=("onnx", "coreml"))
     parser.add_argument(
         "--candidate",
         action="append",
@@ -409,6 +425,12 @@ def main() -> int:
     parser.add_argument("--pipeline-smoke", action="store_true")
     parser.add_argument("--publish-only", action="store_true")
     args = parser.parse_args()
+    if args.action == "export" and not args.export_format:
+        parser.error("--action export requires --export-format")
+    if args.action == "train" and args.export_format:
+        parser.error("--export-format is valid only with --action export")
+    if args.pipeline_smoke and args.action != "train":
+        parser.error("--pipeline-smoke is valid only with --action train")
     if not args.pipeline_smoke and not args.candidate:
         args.candidate = [
             "yolo11n-pose",
