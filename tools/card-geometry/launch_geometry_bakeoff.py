@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import tempfile
 from pathlib import Path
@@ -28,6 +29,7 @@ PYTORCH_MMYOLO_IMAGE = (
     "pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806"
 )
 MMYOLO_REVISION = "8c4d9dc503dc8e327bec8147e8dc97124052f693"
+MMYOLO_ARCHIVE_SHA256 = "6a1f2e65b0746353e94cf87d172503e00e98cc9b2529bb38718d278e6be63d9c"
 RECOGNITION_MODEL_REVISION = "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
 RECOGNITION_ASSETS = {
     "pokemon": {
@@ -71,6 +73,31 @@ def recognition_models() -> dict[str, Any]:
         "modelRevision": RECOGNITION_MODEL_REVISION,
         "games": games,
     }
+
+
+def mmyolo_source_command() -> str:
+    """Return a git-free, digest-pinned MMYOLO source bootstrap command."""
+    archive_url = (
+        "https://github.com/open-mmlab/mmyolo/archive/"
+        f"{MMYOLO_REVISION}.tar.gz"
+    )
+    code = f"""
+import hashlib
+import tarfile
+import urllib.request
+from pathlib import Path
+
+archive = Path('/work/mmyolo-source.tar.gz')
+urllib.request.urlretrieve({archive_url!r}, archive)
+actual = hashlib.sha256(archive.read_bytes()).hexdigest()
+if actual != {MMYOLO_ARCHIVE_SHA256!r}:
+    raise SystemExit(f'MMYOLO archive SHA-256 mismatch: {{actual}}')
+with tarfile.open(archive, 'r:gz') as bundle:
+    bundle.extractall('/work')
+Path('/work/mmyolo-{MMYOLO_REVISION}').rename('/work/mmyolo')
+archive.unlink()
+""".strip()
+    return f"python -c {shlex.quote(code)}"
 
 
 def checked_git_revision() -> str:
@@ -263,8 +290,7 @@ def bootstrap_command(
             "-f https://download.openmmlab.com/mmcv/dist/cu117/torch2.0/index.html",
             "python -m pip install --no-cache-dir 'mmengine==0.10.7' "
             "'mmdet==3.3.0' 'mmpose==1.3.2'",
-            "git clone --filter=blob:none https://github.com/open-mmlab/mmyolo.git /work/mmyolo",
-            f"git -C /work/mmyolo checkout --detach {MMYOLO_REVISION}",
+            mmyolo_source_command(),
             "python -m pip install --no-cache-dir -e /work/mmyolo",
         ]
     else:
