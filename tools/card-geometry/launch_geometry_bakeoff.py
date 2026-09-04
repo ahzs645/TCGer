@@ -54,6 +54,7 @@ def base_config(
     corpus: dict[str, str],
     tooling_revision: str,
     epochs: int,
+    real_evaluation: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     framework = {
         "yolo11n-pose": "ultralytics",
@@ -101,6 +102,12 @@ def base_config(
         ],
     }
     container = PYTORCH_21_IMAGE if candidate == "yolox-pose" else PYTORCH_26_IMAGE
+    real_evaluation = real_evaluation or {
+        "datasetRepo": "ahzs645/tcger-scanner-images",
+        "datasetRevision": "65017ce8da9137fea491739bd06388ab513831a2",
+        "releasePath": "geometry/releases/real-geometry-devmode-orientation-smoke-v3",
+        "corpusHash": "97780e7e96cbd98da91173a00b37e6304514f758a9046f5bd98adf30c418820e",
+    }
     raw = {
         "schema": "https://tcger.app/schemas/card-geometry-experiment-config/v1",
         "bakeoffId": "shared-card-geometry-licensing-v1",
@@ -152,12 +159,7 @@ def base_config(
             "evaluationScript": hashed_artifact("tools/card-geometry/benchmark_geometry.py"),
         },
         "evaluations": {
-            "frozenRealV3": {
-                "datasetRepo": "ahzs645/tcger-scanner-images",
-                "datasetRevision": "65017ce8da9137fea491739bd06388ab513831a2",
-                "releasePath": "geometry/releases/real-geometry-devmode-orientation-smoke-v3",
-                "corpusHash": "97780e7e96cbd98da91173a00b37e6304514f758a9046f5bd98adf30c418820e",
-            },
+            "frozenRealV3": real_evaluation,
             "syntheticDuelField": {
                 "datasetRepo": "ahzs645/tcger-scanner-images",
                 "datasetRevision": "b4ef746b06c725cbe196e709d518dc53eea0ad13",
@@ -256,6 +258,12 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
             corpus=corpus,
             tooling_revision=revision,
             epochs=args.epochs,
+            real_evaluation={
+                "datasetRepo": args.dataset_repo,
+                "datasetRevision": args.real_evaluation_revision,
+                "releasePath": args.real_evaluation_path,
+                "corpusHash": args.real_evaluation_hash,
+            },
         )
         for candidate in candidates
     }
@@ -336,6 +344,9 @@ def main() -> int:
     parser.add_argument("--dataset-revision", required=True)
     parser.add_argument("--release-path", required=True)
     parser.add_argument("--corpus-hash", required=True)
+    parser.add_argument("--real-evaluation-revision", required=True)
+    parser.add_argument("--real-evaluation-path", required=True)
+    parser.add_argument("--real-evaluation-hash", required=True)
     parser.add_argument(
         "--policy-sha256",
         default="b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
