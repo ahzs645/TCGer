@@ -41,7 +41,22 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
                 "fairnessHash": "c" * 64,
                 "elapsedSeconds": 3600,
             },
-            "resolved-config.json": {"deviations": []},
+            "resolved-config.json": {
+                "bakeoffId": "test",
+                "corpus": {
+                    "datasetRepo": "owner/data",
+                    "datasetRevision": "a" * 40,
+                    "releasePath": "release",
+                    "corpusHash": "d" * 64,
+                    "policyId": "policy",
+                    "policySha256": "e" * 64,
+                    "preflightReport": {"path": "ignored", "sha256": "f" * 64},
+                },
+                "fairness": {"inputResolution": 640},
+                "evaluations": {"real": "frozen"},
+                "measurements": ["geometry"],
+                "deviations": [],
+            },
             "real-v3.benchmark.json": common,
             "synthetic-duel-field.benchmark.json": common,
             "recognition-replay.json": {

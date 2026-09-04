@@ -68,6 +68,29 @@ def parity_extrema(export: dict[str, Any]) -> tuple[float, float]:
     return min(cosines), max(differences)
 
 
+def effective_fairness_hash(config: dict[str, Any]) -> str:
+    """Hash fair inputs while excluding tooling-bound preflight report identity."""
+    corpus = config["corpus"]
+    shared = {
+        "bakeoffId": config["bakeoffId"],
+        "corpus": {
+            key: corpus[key]
+            for key in (
+                "datasetRepo",
+                "datasetRevision",
+                "releasePath",
+                "corpusHash",
+                "policyId",
+                "policySha256",
+            )
+        },
+        "fairness": config["fairness"],
+        "evaluations": config["evaluations"],
+        "measurements": config["measurements"],
+    }
+    return hashlib.sha256(canonical_json(shared)).hexdigest()
+
+
 def candidate_row(
     candidate: dict[str, Any], budgets: dict[str, float]
 ) -> dict[str, Any]:
@@ -126,6 +149,7 @@ def candidate_row(
         "licenseRoute": run["licenseRoute"],
         "experimentHash": run["experimentHash"],
         "fairnessHash": run["fairnessHash"],
+        "effectiveFairnessHash": effective_fairness_hash(config),
         "deviations": config["deviations"],
         "training": {
             "jobId": candidate.get("jobId"),
@@ -183,8 +207,11 @@ def build(spec: dict[str, Any]) -> dict[str, Any]:
     candidates = [candidate_row(item, budgets) for item in spec["candidates"]]
     corpus_hashes = {row["real"]["corpusHash"] for row in candidates}
     synthetic_hashes = {row["synthetic"]["corpusHash"] for row in candidates}
+    fairness_hashes = {row["effectiveFairnessHash"] for row in candidates}
     if len(corpus_hashes) != 1 or len(synthetic_hashes) != 1:
         raise ValueError("all candidates must use the same frozen evaluation corpora")
+    if len(fairness_hashes) != 1:
+        raise ValueError("all candidates must have the same effective fairness identity")
     measured_winners = [row["candidate"] for row in candidates if row["passesMeasuredMetricBudgets"]]
     production_winners = [row["candidate"] for row in candidates if row["productionReady"]]
     recommendation = (
@@ -198,6 +225,7 @@ def build(spec: dict[str, Any]) -> dict[str, Any]:
         "trainingCorpusHash": spec["trainingCorpusHash"],
         "realEvaluationCorpusHash": next(iter(corpus_hashes)),
         "syntheticEvaluationCorpusHash": next(iter(synthetic_hashes)),
+        "effectiveFairnessHash": next(iter(fairness_hashes)),
         "budgets": budgets,
         "candidates": candidates,
         "outcome": {
