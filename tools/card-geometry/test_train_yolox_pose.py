@@ -17,6 +17,50 @@ SPEC.loader.exec_module(MODULE)
 
 
 class TrainYoloxPoseTests(unittest.TestCase):
+    def test_checkpoint_helpers_select_latest_epoch_in_experiment(self):
+        prefix = "geometry/yolox-pose/corpus/experiment"
+        paths = [
+            f"{prefix}/training-output/training/repeat-0/epoch_2.pth",
+            f"{prefix}/training-output/training/repeat-0/epoch_12.pth",
+            f"{prefix}/training-output/training/repeat-0/latest.pth",
+            "geometry/yolox-pose/other/run/training-output/training/repeat-0/epoch_50.pth",
+        ]
+        self.assertEqual(MODULE.checkpoint_epoch(paths[1]), 12)
+        self.assertIsNone(MODULE.checkpoint_epoch(paths[2]))
+        self.assertEqual(MODULE.latest_checkpoint_path(paths, prefix), paths[1])
+
+    def test_stable_checkpoints_waits_for_unchanged_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work_dir = Path(temporary)
+            checkpoint = work_dir / "epoch_1.pth"
+            checkpoint.write_bytes(b"first")
+            ready, previous = MODULE.stable_checkpoints(work_dir, {}, set())
+            self.assertEqual(ready, [])
+            ready, previous = MODULE.stable_checkpoints(work_dir, previous, set())
+            self.assertEqual(ready, [checkpoint])
+            checkpoint.write_bytes(b"changed")
+            ready, previous = MODULE.stable_checkpoints(work_dir, previous, set())
+            self.assertEqual(ready, [])
+            ready, _ = MODULE.stable_checkpoints(work_dir, previous, set())
+            self.assertEqual(ready, [checkpoint])
+
+    def test_training_command_uses_base_or_resume_checkpoint(self):
+        common = {
+            "mmyolo_root": Path("/mmyolo"),
+            "config": Path("/run/config.py"),
+            "work_dir": Path("/run/work"),
+            "base_checkpoint": Path("/run/base.pth"),
+        }
+        base = MODULE.training_command(**common, resume_checkpoint=None)
+        self.assertIn("--cfg-options", base)
+        self.assertIn("load_from=/run/base.pth", base)
+        self.assertNotIn("--resume", base)
+        resumed = MODULE.training_command(
+            **common, resume_checkpoint=Path("/cache/epoch_8.pth")
+        )
+        self.assertEqual(resumed[-2:], ["--resume", "/cache/epoch_8.pth"])
+        self.assertNotIn("--cfg-options", resumed)
+
     def test_pinned_metainfo_defines_four_ordered_corners(self):
         metadata = runpy.run_path(ROOT / MODULE.METAINFO_FILE)["dataset_info"]
         self.assertEqual(metadata["dataset_name"], "tcger-card-corners")

@@ -13,8 +13,10 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
+import threading
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,139 @@ from train_yolo_pose import download_verified, load_json, padded_point, sha256_f
 
 VISIBILITY = {"visible": 2, "occluded": 1, "outsideFrame": 1}
 METAINFO_FILE = "tools/card-geometry/configs/tcger-card-corners.py"
+CHECKPOINT_PATTERN = re.compile(r"epoch_(\d+)\.pth$")
+
+
+def checkpoint_epoch(path: str | Path) -> int | None:
+    match = CHECKPOINT_PATTERN.search(str(path))
+    return None if match is None else int(match.group(1))
+
+
+def latest_checkpoint_path(paths: list[str], prefix: str) -> str | None:
+    root = f"{prefix}/training-output/training/repeat-0/"
+    candidates = [
+        (checkpoint_epoch(path), path)
+        for path in paths
+        if path.startswith(root) and checkpoint_epoch(path) is not None
+    ]
+    return None if not candidates else max(candidates)[1]
+
+
+def stable_checkpoints(
+    work_dir: Path,
+    previous: dict[Path, tuple[int, int]],
+    uploaded: set[Path],
+) -> tuple[list[Path], dict[Path, tuple[int, int]]]:
+    current = {
+        path: (path.stat().st_size, path.stat().st_mtime_ns)
+        for path in work_dir.glob("epoch_*.pth")
+        if path.is_file()
+    }
+    ready = [
+        path
+        for path, identity in current.items()
+        if previous.get(path) == identity and path not in uploaded
+    ]
+    return sorted(ready, key=lambda path: checkpoint_epoch(path) or -1), current
+
+
+class CheckpointPersistence:
+    """Persist completed epoch checkpoints while the GPU process is alive."""
+
+    def __init__(self, work_dir: Path) -> None:
+        from huggingface_hub import HfApi
+
+        self.work_dir = work_dir
+        self.repo = os.environ["TCGER_GEOMETRY_CHECKPOINT_REPO"]
+        self.prefix = os.environ["TCGER_GEOMETRY_CHECKPOINT_PREFIX"]
+        self.api = HfApi(token=os.environ.get("HF_TOKEN"))
+        self.uploaded: set[Path] = set()
+        self.commits: dict[str, str] = {}
+        self.errors: dict[str, str] = {}
+        self.previous: dict[Path, tuple[int, int]] = {}
+        self.stop = threading.Event()
+
+    def upload(self, path: Path) -> None:
+        epoch = checkpoint_epoch(path)
+        if epoch is None:
+            return
+        target = f"{self.prefix}/training-output/training/repeat-0/{path.name}"
+        try:
+            commit = self.api.upload_file(
+                path_or_fileobj=path,
+                path_in_repo=target,
+                repo_id=self.repo,
+                repo_type="model",
+                commit_message=f"geometry YOLOX checkpoint epoch {epoch}",
+            )
+            self.commits[path.name] = str(commit.oid)
+            self.uploaded.add(path)
+            self.errors.pop(path.name, None)
+        except Exception as error:  # retry on the next polling pass
+            self.errors[path.name] = f"{type(error).__name__}: {error}"
+
+    def scan(self, *, force: bool = False) -> None:
+        ready, current = stable_checkpoints(
+            self.work_dir, self.previous, self.uploaded
+        )
+        if force:
+            ready = sorted(
+                (path for path in current if path not in self.uploaded),
+                key=lambda path: checkpoint_epoch(path) or -1,
+            )
+        for path in ready:
+            self.upload(path)
+        self.previous = current
+
+    def run(self) -> None:
+        while not self.stop.wait(15):
+            self.scan()
+
+
+def remote_resume_checkpoint() -> tuple[Path | None, int | None]:
+    from huggingface_hub import HfApi, hf_hub_download
+
+    repo = os.environ["TCGER_GEOMETRY_CHECKPOINT_REPO"]
+    prefix = os.environ["TCGER_GEOMETRY_CHECKPOINT_PREFIX"]
+    token = os.environ.get("HF_TOKEN")
+    api = HfApi(token=token)
+    path = latest_checkpoint_path(
+        api.list_repo_files(repo_id=repo, repo_type="model"), prefix
+    )
+    if path is None:
+        return None, None
+    downloaded = Path(
+        hf_hub_download(
+            repo_id=repo,
+            repo_type="model",
+            filename=path,
+            token=token,
+        )
+    )
+    return downloaded, checkpoint_epoch(path)
+
+
+def training_command(
+    *,
+    mmyolo_root: Path,
+    config: Path,
+    work_dir: Path,
+    base_checkpoint: Path,
+    resume_checkpoint: Path | None,
+) -> list[str]:
+    command = [
+        os.environ.get("PYTHON", "python"),
+        str(mmyolo_root / "tools/train.py"),
+        str(config),
+        "--work-dir",
+        str(work_dir),
+        "--amp",
+    ]
+    if resume_checkpoint is not None:
+        command.extend(("--resume", str(resume_checkpoint)))
+    else:
+        command.extend(("--cfg-options", f"load_from={base_checkpoint}"))
+    return command
 
 
 def coco_annotation(
@@ -254,8 +389,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     seed = int(os.environ["TCGER_GEOMETRY_BASE_SEED"])
     if int(os.environ["TCGER_GEOMETRY_REPEAT_COUNT"]) != 1:
         raise ValueError("one Job invocation trains exactly one resolved repeat")
+    resume_checkpoint, resume_epoch = remote_resume_checkpoint()
     base_checkpoint = output / "base-yolox-pose.pth"
-    download_verified(args.base_url, args.base_sha256, base_checkpoint)
+    if resume_checkpoint is None:
+        download_verified(args.base_url, args.base_sha256, base_checkpoint)
     dataset = output / "coco-dataset"
     materialization = materialize_coco(release, dataset)
     config = write_config(
@@ -268,19 +405,23 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         seed=seed,
     )
     work_dir = output / "training" / "repeat-0"
-    subprocess.run(
-        [
-            os.environ.get("PYTHON", "python"),
-            str(args.mmyolo_root / "tools/train.py"),
-            str(config),
-            "--work-dir",
-            str(work_dir),
-            "--amp",
-            "--cfg-options",
-            f"load_from={base_checkpoint}",
-        ],
-        check=True,
+    command = training_command(
+        mmyolo_root=args.mmyolo_root,
+        config=config,
+        work_dir=work_dir,
+        base_checkpoint=base_checkpoint,
+        resume_checkpoint=resume_checkpoint,
     )
+    persistence = CheckpointPersistence(work_dir)
+    persistence_thread = threading.Thread(target=persistence.run, daemon=True)
+    persistence_thread.start()
+    process = subprocess.Popen(command)
+    returncode = process.wait()
+    persistence.stop.set()
+    persistence_thread.join()
+    persistence.scan(force=True)
+    if returncode:
+        raise subprocess.CalledProcessError(returncode, command)
     checkpoints = sorted(work_dir.glob("*.pth"))
     if not checkpoints:
         raise RuntimeError("MMYOLO training produced no checkpoint")
@@ -291,6 +432,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "materialization": materialization,
         "mmyolo": {"root": str(args.mmyolo_root), "revision": args.mmyolo_revision},
         "baseCheckpoint": {"url": args.base_url, "sha256": args.base_sha256},
+        "resume": (
+            None
+            if resume_checkpoint is None
+            else {"checkpoint": str(resume_checkpoint), "epoch": resume_epoch}
+        ),
+        "checkpointPersistence": {
+            "pathPrefix": os.environ["TCGER_GEOMETRY_CHECKPOINT_PREFIX"],
+            "uploaded": dict(sorted(persistence.commits.items())),
+            "errors": dict(sorted(persistence.errors.items())),
+        },
         "training": {
             "epochs": epochs,
             "inputResolution": int(os.environ["TCGER_GEOMETRY_INPUT_RESOLUTION"]),
@@ -310,7 +461,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     shutil.rmtree(dataset)
-    base_checkpoint.unlink()
+    base_checkpoint.unlink(missing_ok=True)
     return summary
 
 
