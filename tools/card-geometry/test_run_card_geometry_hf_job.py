@@ -24,6 +24,7 @@ from run_card_geometry_hf_job import (  # noqa: E402
     execute,
     experiment_hash,
     fairness_hash,
+    materialize_downloaded_release,
     resolve_config,
 )
 
@@ -202,6 +203,52 @@ class CandidateExperimentConfigTests(unittest.TestCase):
     def test_fixture_round_trips_as_json(self):
         resolved = resolve_config(self.raw)
         self.assertEqual(json.loads(json.dumps(resolved)), resolved)
+
+    def test_materializes_transport_shards_to_canonical_layout(self):
+        import hashlib
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            canonical = Path("records/one.json")
+            shard = hashlib.sha256(canonical.as_posix().encode("utf-8")).hexdigest()[:2]
+            (source / "records" / shard).mkdir(parents=True)
+            (source / "records" / shard / "one.json").write_text("{}")
+            (source / "manifest.json").write_text("{}")
+            (source / "_transport-layout.v1.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "https://tcger.app/datasets/card-geometry-transport-layout/v1",
+                        "algorithm": "sha256-relative-path-prefix",
+                        "prefixLength": 2,
+                        "directories": ["records"],
+                    }
+                )
+            )
+            destination = root / "destination"
+            materialize_downloaded_release(source, destination)
+            self.assertEqual((destination / canonical).read_text(), "{}")
+            self.assertEqual((destination / "manifest.json").read_text(), "{}")
+            self.assertFalse((destination / "_transport-layout.v1.json").exists())
+
+    def test_rejects_transport_file_in_wrong_shard(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            (source / "records/zz").mkdir(parents=True)
+            (source / "records/zz/one.json").write_text("{}")
+            (source / "_transport-layout.v1.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "https://tcger.app/datasets/card-geometry-transport-layout/v1",
+                        "algorithm": "sha256-relative-path-prefix",
+                        "prefixLength": 2,
+                        "directories": ["records"],
+                    }
+                )
+            )
+            with self.assertRaisesRegex(RuntimeError, "transport shard mismatch"):
+                materialize_downloaded_release(source, root / "destination")
 
 
 if __name__ == "__main__":

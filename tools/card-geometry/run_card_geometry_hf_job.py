@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import os
 import shutil
 import subprocess
@@ -44,6 +45,8 @@ from preflight import Expectations, run_preflight
 CONFIG_SCHEMA_ID = "https://tcger.app/schemas/card-geometry-experiment-config/v1"
 CONFIG_SCHEMA_FILE = "card-geometry-experiment-config.v1.schema.json"
 REPORT_SCHEMA_ID = "https://tcger.app/reports/card-geometry-candidate-run/v1"
+TRANSPORT_LAYOUT_FILE = "_transport-layout.v1.json"
+TRANSPORT_LAYOUT_SCHEMA = "https://tcger.app/datasets/card-geometry-transport-layout/v1"
 
 CANDIDATES: dict[str, dict[str, str]] = {
     "yolo11n-pose": {"framework": "ultralytics", "licenseFamily": "ultralytics"},
@@ -255,6 +258,47 @@ def _require_private_model_repo(api: Any, repo_id: str) -> None:
         raise RuntimeError(f"checkpoint repo must already be private: {repo_id}")
 
 
+def materialize_downloaded_release(source: Path, destination: Path) -> None:
+    """Restore a transport-sharded Hub release to its canonical local layout."""
+    layout_path = source / TRANSPORT_LAYOUT_FILE
+    if not layout_path.is_file():
+        shutil.copytree(source, destination, symlinks=False)
+        return
+    layout = load_json(layout_path)
+    expected_layout = {
+        "schema": TRANSPORT_LAYOUT_SCHEMA,
+        "algorithm": "sha256-relative-path-prefix",
+        "prefixLength": 2,
+        "directories": layout.get("directories"),
+    }
+    if layout != expected_layout:
+        raise RuntimeError("unsupported geometry release transport layout")
+    directories = layout.get("directories")
+    if not isinstance(directories, list) or not directories or not all(
+        isinstance(value, str) and value and "/" not in value for value in directories
+    ):
+        raise RuntimeError("invalid geometry release transport directories")
+    sharded = set(directories)
+    destination.mkdir(parents=True)
+    for item in sorted(path for path in source.rglob("*") if path.is_file()):
+        relative = item.relative_to(source)
+        if relative.as_posix() == TRANSPORT_LAYOUT_FILE:
+            continue
+        canonical = relative
+        if relative.parts[0] in sharded:
+            if len(relative.parts) != 3:
+                raise RuntimeError(f"invalid sharded transport path: {relative}")
+            canonical = Path(relative.parts[0], relative.parts[2])
+            expected = hashlib.sha256(canonical.as_posix().encode("utf-8")).hexdigest()[:2]
+            if relative.parts[1] != expected:
+                raise RuntimeError(f"transport shard mismatch: {relative}")
+        target = destination / canonical
+        if target.exists():
+            raise RuntimeError(f"duplicate canonical transport path: {canonical}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, target)
+
+
 def _download_and_preflight(resolved: dict[str, Any], token: str, work: Path) -> tuple[Path, dict[str, Any]]:
     from huggingface_hub import snapshot_download
 
@@ -272,7 +316,7 @@ def _download_and_preflight(resolved: dict[str, Any], token: str, work: Path) ->
     if not (source / "manifest.json").is_file():
         raise RuntimeError(f"pinned training release not found: {source}")
     release = work / "release"
-    shutil.copytree(source, release, symlinks=False)
+    materialize_downloaded_release(source, release)
     report = run_preflight(
         release,
         expectations=Expectations(
@@ -323,7 +367,7 @@ def _download_evaluation_release(
         raise RuntimeError(f"pinned {name} evaluation release not found: {source}")
     destination = work / "evaluations" / name
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, destination, symlinks=False)
+    materialize_downloaded_release(source, destination)
     return destination
 
 

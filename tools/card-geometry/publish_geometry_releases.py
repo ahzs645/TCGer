@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -11,6 +12,33 @@ from pathlib import Path
 from typing import Any
 
 from corpus_release import load_json, sha256_file
+
+
+TRANSPORT_LAYOUT_FILE = "_transport-layout.v1.json"
+TRANSPORT_LAYOUT_SCHEMA = "https://tcger.app/datasets/card-geometry-transport-layout/v1"
+MAX_HUB_DIRECTORY_FILES = 10_000
+SHARD_PREFIX_LENGTH = 2
+
+
+def _transport_path(relative: Path, sharded_directories: set[str]) -> Path:
+    if len(relative.parts) == 2 and relative.parts[0] in sharded_directories:
+        shard = hashlib.sha256(relative.as_posix().encode("utf-8")).hexdigest()[
+            :SHARD_PREFIX_LENGTH
+        ]
+        return Path(relative.parts[0], shard, relative.parts[1])
+    return relative
+
+
+def _sharded_directories(source: Path) -> set[str]:
+    counts: dict[str, int] = {}
+    for item in source.iterdir():
+        if item.is_dir():
+            counts[item.name] = sum(1 for child in item.iterdir() if child.is_file())
+    return {
+        directory
+        for directory, count in counts.items()
+        if count > MAX_HUB_DIRECTORY_FILES
+    }
 
 
 def stage_release(source: Path, staging: Path, remote_path: str) -> int:
@@ -21,14 +49,27 @@ def stage_release(source: Path, staging: Path, remote_path: str) -> int:
     destination = staging / remote_path
     if destination.exists():
         raise FileExistsError(f"staged destination already exists: {destination}")
+    sharded_directories = _sharded_directories(source)
     count = 0
     for item in sorted(path for path in source.rglob("*") if path.is_file()):
-        target = destination / item.relative_to(source)
+        relative = item.relative_to(source)
+        target = destination / _transport_path(relative, sharded_directories)
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
             os.link(item, target)
         except OSError:
             shutil.copy2(item, target)
+        count += 1
+    if sharded_directories:
+        layout = {
+            "schema": TRANSPORT_LAYOUT_SCHEMA,
+            "algorithm": "sha256-relative-path-prefix",
+            "prefixLength": SHARD_PREFIX_LENGTH,
+            "directories": sorted(sharded_directories),
+        }
+        (destination / TRANSPORT_LAYOUT_FILE).write_text(
+            json.dumps(layout, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         count += 1
     return count
 
