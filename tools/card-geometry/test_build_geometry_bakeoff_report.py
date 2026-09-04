@@ -79,10 +79,14 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
                 }
             )
         )
+        decoder = root / "decoder.py"
+        decoder.write_text("one\ntwo\n")
         return {
             "reportsRoot": str(root),
             "exportBenchmark": str(export),
             "productionDecodersComplete": True,
+            "referenceDecoderSources": [str(decoder)],
+            "productionDecoderSources": [str(decoder)],
         }
 
     def test_recommends_promoting_a_complete_passing_candidate(self):
@@ -97,6 +101,7 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             )
             self.assertEqual(report["outcome"]["productionReadyCandidates"], ["winner"])
             self.assertTrue(report["candidates"][0]["productionReady"])
+            self.assertEqual(report["candidates"][0]["decoder"]["production"]["lines"], 2)
 
     def test_recommends_shipping_none_when_real_recall_fails(self):
         with tempfile.TemporaryDirectory() as temporary:

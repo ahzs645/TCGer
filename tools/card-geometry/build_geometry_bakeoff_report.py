@@ -53,6 +53,25 @@ def source(path: Path) -> dict[str, str]:
     return {"path": path.as_posix(), "sha256": sha256_file(path)}
 
 
+def code_sources(paths: list[str]) -> dict[str, Any]:
+    rows = []
+    for raw in paths:
+        path = Path(raw)
+        data = path.read_bytes()
+        rows.append(
+            {
+                **source(path),
+                "bytes": len(data),
+                "lines": len(data.splitlines()),
+            }
+        )
+    return {
+        "sources": rows,
+        "bytes": sum(row["bytes"] for row in rows),
+        "lines": sum(row["lines"] for row in rows),
+    }
+
+
 def outside_frame_p50(report: dict[str, Any]) -> float | None:
     row = report["cornerError"]["byTruthVisibility"].get("outsideFrame")
     return None if row is None else row["normalized"]["p50"]
@@ -198,7 +217,13 @@ def candidate_row(
                 "physicalDeviceLatency": export["physicalDeviceLatency"],
             }
         ),
-        "decoder": candidate.get("decoder", {}),
+        "decoder": {
+            "status": candidate.get("decoderStatus", "unknown"),
+            "reference": code_sources(candidate.get("referenceDecoderSources", [])),
+            "production": code_sources(candidate.get("productionDecoderSources", [])),
+            "productionComplete": bool(candidate.get("productionDecodersComplete", False)),
+            "notes": candidate.get("decoderNotes", []),
+        },
         "checks": checks,
         "passesMeasuredMetricBudgets": all(metric_checks.values()),
         "productionReady": all(checks.values()),
