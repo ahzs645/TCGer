@@ -37,6 +37,7 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             )
             hashes.add(descriptor(config)["fairnessHash"])
             self.assertEqual(config["fairness"]["budget"], {"kind": "epochs", "value": 50})
+            self.assertTrue(descriptor(config)["checkpointPrefix"].startswith(f"geometry/{candidate}/"))
         self.assertEqual(len(hashes), 1)
 
     def test_bootstrap_never_embeds_token_value(self):

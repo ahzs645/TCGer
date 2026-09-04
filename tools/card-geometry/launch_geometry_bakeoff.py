@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from corpus_release import REPOSITORY, canonical_json, pretty_json, sha256_bytes, sha256_file
-from run_card_geometry_hf_job import resolve_config
+from run_card_geometry_hf_job import descriptor, resolve_config
 
 
 PYTORCH_26_IMAGE = (
@@ -405,6 +405,9 @@ def publish_and_launch(args: argparse.Namespace) -> dict[str, Any]:
         "inputCommit": hub_revision,
         "corpusHash": args.corpus_hash,
         "configHashes": {candidate: sha256_bytes(canonical_json(config)) for candidate, config in configs.items()},
+        "experiments": {
+            candidate: descriptor(config) for candidate, config in configs.items()
+        },
         "jobs": jobs,
     }
 
@@ -437,6 +440,7 @@ def main() -> int:
     )
     parser.add_argument("--pipeline-smoke", action="store_true")
     parser.add_argument("--publish-only", action="store_true")
+    parser.add_argument("--report", type=Path)
     args = parser.parse_args()
     if args.action == "export" and not args.export_format:
         parser.error("--action export requires --export-format")
@@ -452,7 +456,11 @@ def main() -> int:
             "fastvit-t8-four-corner",
         ]
     result = publish_and_launch(args)
-    print(json.dumps(result, indent=2, sort_keys=True))
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
     return 0
 
 
