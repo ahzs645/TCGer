@@ -59,10 +59,10 @@ def render(report: dict[str, Any]) -> str:
         f"Recommendation: **{report['outcome']['recommendation']}**.",
         "",
         "| Candidate | License route | R@0.5 | R@0.75 | Corner p50 | p90 | p95 | "
-        "Outside p50 | Duplicates | Extras | Wrong accepts | Parity cosine | Measured budgets | "
-        "Production ready |",
+        "Outside p50 | Duplicates | Extras | Correct | Wrong | Abstain | Parity cosine | "
+        "Measured budgets | Production ready |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
-        "---: | --- | --- |",
+        "---: | ---: | ---: | ---: | --- | --- |",
     ]
     for candidate in report["candidates"]:
         real = candidate["real"]
@@ -83,7 +83,9 @@ def render(report: dict[str, Any]) -> str:
                     number(real["outsideFrameNormalizedP50"]),
                     number(real["duplicates"]),
                     number(real["extras"]),
+                    number(candidate["recognition"]["correct"]),
                     number(candidate["recognition"]["wrong"]),
+                    number(candidate["recognition"]["abstain"]),
                     number(cosine, 6),
                     status(candidate["passesMeasuredMetricBudgets"]),
                     status(candidate["productionReady"]),

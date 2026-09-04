@@ -25,7 +25,7 @@ def candidate() -> dict:
             "extras": 1,
         },
         "synthetic": {"recallAt05": 1.0, "recallAt075": 0.9, "recallAt09": 0.8},
-        "recognition": {"wrong": 0},
+        "recognition": {"correct": 3, "wrong": 0, "abstain": 4},
         "export": {
             "onnxBytes": 12,
             "coremlBytes": 13,
