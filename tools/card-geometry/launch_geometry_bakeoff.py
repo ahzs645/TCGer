@@ -242,12 +242,14 @@ def bootstrap_command(
     ]
     if candidate.startswith("yolo11"):
         setup += [
+            "python -m pip install --no-cache-dir torchvision==0.21.0",
             "python -m pip install --no-cache-dir ultralytics==8.4.138",
             "python -m pip uninstall -y opencv-python",
             "python -m pip install --no-cache-dir opencv-python-headless==4.12.0.88",
         ]
     elif candidate == "yolox-pose":
         setup += [
+            "python -m pip install --no-cache-dir numpy==1.26.4 torchvision==0.15.2",
             "python -m pip install --no-cache-dir 'mmcv==2.0.1' "
             "-f https://download.openmmlab.com/mmcv/dist/cu117/torch2.0/index.html",
             "python -m pip install --no-cache-dir 'mmengine==0.10.7' "
@@ -258,11 +260,19 @@ def bootstrap_command(
         ]
     else:
         setup += [
+            "python -m pip install --no-cache-dir torchvision==0.21.0",
             "python -m pip install --no-cache-dir timm==1.0.22 safetensors==0.6.2",
         ]
-    setup += [
-        "python -m pip install --no-cache-dir onnxruntime==1.29.0 opencv-python-headless==4.12.0.88"
-    ]
+    if candidate == "yolox-pose":
+        setup += [
+            "python -m pip install --no-cache-dir numpy==1.26.4 "
+            "onnxruntime==1.23.2 opencv-python-headless==4.10.0.84"
+        ]
+    else:
+        setup += [
+            "python -m pip install --no-cache-dir onnxruntime==1.29.0 "
+            "opencv-python-headless==4.12.0.88"
+        ]
     if action == "export":
         setup += ["python -m pip install --no-cache-dir onnx==1.22.0"]
         if export_format == "coreml":

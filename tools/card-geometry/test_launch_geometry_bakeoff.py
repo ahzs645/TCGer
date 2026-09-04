@@ -85,6 +85,9 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         )
         self.assertIn("mmcv==2.0.1", command[-1])
         self.assertIn("cu117/torch2.0/index.html", command[-1])
+        self.assertIn("numpy==1.26.4", command[-1])
+        self.assertIn("torchvision==0.15.2", command[-1])
+        self.assertIn("opencv-python-headless==4.10.0.84", command[-1])
         self.assertNotIn("mim install", command[-1])
 
 
