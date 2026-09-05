@@ -1,0 +1,80 @@
+{
+  "schema": "https://tcger.app/reports/card-geometry-round-two-launch/v1",
+  "replacesCanceledJobs": [
+    {
+      "candidate": "yolo11n-pose",
+      "id": "6a9c64e5e686246ca69a4359",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    },
+    {
+      "candidate": "yolo11s-pose",
+      "id": "6a9c64f9259f8e97255e408d",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    },
+    {
+      "candidate": "yolox-pose",
+      "id": "6a9c6504259f8e97255e408f",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    },
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "id": "6a9c650e259f8e97255e4091",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    }
+  ],
+  "freezeCommit": "6d3298f3",
+  "toolingRevision": "f9daf4a19a91b2a459ef531779aead6d531f1b18",
+  "inputCommit": "bea82c5183ce00108a3b555b4291c08ee08a8f2d",
+  "datasetRevision": "cabee73ac46a5901cc3060cfd17b7c63408bf66a",
+  "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+  "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+  "epochs": 50,
+  "seed": 20260905,
+  "automaticPostTrainingEvaluation": true,
+  "jobs": [
+    {
+      "candidate": "yolo11n-pose",
+      "id": "6a9c6665e686246ca69a4373",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c6665e686246ca69a4373",
+      "createdAt": "2026-09-05T18:58:45.718Z",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    },
+    {
+      "candidate": "yolo11s-pose",
+      "id": "6a9c6670e686246ca69a4377",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c6670e686246ca69a4377",
+      "createdAt": "2026-09-05T18:58:56.562Z",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    },
+    {
+      "candidate": "yolox-pose",
+      "id": "6a9c667be686246ca69a437a",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c667be686246ca69a437a",
+      "createdAt": "2026-09-05T18:59:07.342Z",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    },
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "id": "6a9c6687e686246ca69a437c",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c6687e686246ca69a437c",
+      "createdAt": "2026-09-05T18:59:19.312Z",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    }
+  ]
+}

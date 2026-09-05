@@ -1,0 +1,65 @@
+{
+  "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+  "experiments": {
+    "fastvit-t8-four-corner": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "fastvit-t8-four-corner",
+      "checkpointPrefix": "geometry/fastvit-t8-four-corner/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/79fef26cbbd704f6d8d7b0a9e6bfeb7fa836f490339fba6ef23bae3a7a085049",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "79fef26cbbd704f6d8d7b0a9e6bfeb7fa836f490339fba6ef23bae3a7a085049",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "tcger-pytorch",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "79fef26cbbd704f6d8d7b0a9e6bfeb7fa836f490339fba6ef23bae3a7a085049",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolo11n-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolo11n-pose",
+      "checkpointPrefix": "geometry/yolo11n-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/30e7226cc7a0137c5423a64036b106dd3237130e4b533d46ed7bb2a778a33475",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "30e7226cc7a0137c5423a64036b106dd3237130e4b533d46ed7bb2a778a33475",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "30e7226cc7a0137c5423a64036b106dd3237130e4b533d46ed7bb2a778a33475",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolo11s-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolo11s-pose",
+      "checkpointPrefix": "geometry/yolo11s-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/8b06b80db3e570bbb006a44027c7e21552b9fad5348cb21764e42abf17afebfc",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "8b06b80db3e570bbb006a44027c7e21552b9fad5348cb21764e42abf17afebfc",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "8b06b80db3e570bbb006a44027c7e21552b9fad5348cb21764e42abf17afebfc",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolox-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolox-pose",
+      "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "mmyolo",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "inputCommit": "bea82c5183ce00108a3b555b4291c08ee08a8f2d",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "jobs": [],
+  "toolingRevision": "f9daf4a19a91b2a459ef531779aead6d531f1b18"
+}
