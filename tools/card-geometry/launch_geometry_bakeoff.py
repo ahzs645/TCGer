@@ -351,7 +351,12 @@ def bootstrap_command(
             "opencv-python-headless==4.10.0.84"
         ]
     if action == "export":
-        setup += ["python -m pip install --no-cache-dir onnx==1.22.0"]
+        setup += [
+            "python -m pip install --no-cache-dir onnx==1.22.0",
+            # ONNX may resolve NumPy 2.x, which is binary-incompatible with
+            # the pinned xtcocotools wheel imported by MMYOLO/MMPose.
+            "python -m pip install --no-cache-dir numpy==1.26.4",
+        ]
         if export_format == "coreml":
             setup += [
                 "python -m pip install --no-cache-dir coremltools==9.0",

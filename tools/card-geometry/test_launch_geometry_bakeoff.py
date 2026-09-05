@@ -125,6 +125,10 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         self.assertIn(f"revision = {'a' * 40!r}", command[-1])
         self.assertIn(f"training_revision = {'e' * 40!r}", command[-1])
         self.assertIn("revision=training_revision", command[-1])
+        self.assertGreater(
+            command[-1].rfind("numpy==1.26.4"),
+            command[-1].find("onnx==1.22.0"),
+        )
 
     def test_mmyolo_bootstrap_uses_compatible_binary_wheel(self):
         command = bootstrap_command(
