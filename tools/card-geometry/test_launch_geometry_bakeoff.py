@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/card-geometry"))
 
-from launch_geometry_bakeoff import base_config, bootstrap_command  # noqa: E402
+from launch_geometry_bakeoff import base_config, bootstrap_command, round_two_config  # noqa: E402
 from run_card_geometry_hf_job import descriptor, resolve_config  # noqa: E402
 
 
@@ -25,6 +25,22 @@ CORPUS = {
 
 
 class LaunchGeometryBakeoffTests(unittest.TestCase):
+    def test_round_two_binds_real_padding_and_renamed_evaluation_keys(self):
+        config = round_two_config(candidate="yolox-pose", corpus=CORPUS,
+                                  tooling_revision="c" * 40, epochs=50)
+        self.assertTrue(config["schema"].endswith("/v2"))
+        self.assertIn("frozenReal", config["evaluations"])
+        self.assertIn("syntheticMultigame", config["evaluations"])
+        self.assertNotIn("frozenRealV3", config["evaluations"])
+        self.assertEqual(config["fairness"]["realContextMarginPolicy"]["fraction"], .15)
+        self.assertFalse(config["deviations"])
+        original = descriptor(config)["fairnessHash"]
+        config["fairness"]["realContextMarginPolicy"]["fraction"] = .2
+        self.assertNotEqual(original, descriptor(resolve_config(config))["fairnessHash"])
+        del config["fairness"]["realContextMarginPolicy"]
+        with self.assertRaisesRegex(ValueError, "realContextMarginPolicy"):
+            resolve_config(config)
+
     def test_all_candidate_configs_resolve_with_one_fairness_hash(self):
         hashes = set()
         for candidate in (

@@ -24,8 +24,8 @@ Raw-tensor fixtures are model-specific and belong to the later export step.
 ## Corpus releases and the preflight
 
 A corpus release is a directory with `manifest.json`
-(`https://tcger.app/schemas/card-geometry-release-manifest/v2`, in the existing
-`card-geometry-release-manifest.v1.schema.json` file), the readiness policy it binds to
+(`https://tcger.app/schemas/card-geometry-release-manifest/v2`, in
+`card-geometry-release-manifest.v2.schema.json`), the readiness policy it binds to
 (`card-geometry-readiness-policy.v1`), record files
 (`card-geometry-corpus-record.v1`), and images. Split, scene slice, and
 leakage keys live in the manifest; the record schema is unchanged.

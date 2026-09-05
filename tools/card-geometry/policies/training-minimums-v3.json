@@ -1,0 +1,83 @@
+{
+  "allowedSourceTiers": [
+    "shippable"
+  ],
+  "description": "Round-two training and validation only. Frozen real v6-full and synthetic multigame evaluations remain separate pinned releases, required by the combiner and training cross-release gate; their records must never be copied into this corpus. Real polygon fits support training but are not metric ground truth. All source tiers must be shippable.",
+  "metricEligibleCornerSources": [
+    "human",
+    "synthetic"
+  ],
+  "minimumInstancesPerSplit": {
+    "train": 20000,
+    "validation": 3000
+  },
+  "minimumMetricEligibleInstances": {
+    "train": 10000,
+    "validation": 1000
+  },
+  "minimumRealEvaluationSessions": 0,
+  "minimumRecordsPerSplit": {
+    "train": 12000,
+    "validation": 2000
+  },
+  "policyId": "training-minimums-v3",
+  "realOnlySplits": [],
+  "requiredLeakageKeys": {
+    "real": [
+      "sourceAssetIds"
+    ],
+    "synthetic": [
+      "physicalCardIds",
+      "sourceAssetIds"
+    ]
+  },
+  "requiredSceneSlices": [
+    {
+      "minimumInstances": 5000,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "single_card_archive",
+      "split": "train"
+    },
+    {
+      "minimumInstances": 1000,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "single_card_archive",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 150,
+      "minimumMetricEligibleInstances": 150,
+      "sceneSlice": "single_handheld",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 75,
+      "minimumMetricEligibleInstances": 75,
+      "sceneSlice": "single_handheld_distractor_free",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 150,
+      "minimumMetricEligibleInstances": 150,
+      "sceneSlice": "steep_playmat",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 900,
+      "minimumMetricEligibleInstances": 900,
+      "sceneSlice": "duel_field",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 1000,
+      "minimumMetricEligibleInstances": 1000,
+      "sceneSlice": "binder_page",
+      "split": "validation"
+    }
+  ],
+  "requiredSplits": [
+    "train",
+    "validation"
+  ],
+  "schema": "https://tcger.app/schemas/card-geometry-readiness-policy/v1"
+}

@@ -119,7 +119,12 @@ def resolve_config(raw: dict[str, Any], *, pipeline_smoke: bool = False) -> dict
                 "reason": "one-epoch pipeline smoke before the full bake-off batch",
             }
         )
-    validator = make_validator(load_json(SCHEMAS_DIR / CONFIG_SCHEMA_FILE))
+    schema_file = (
+        "card-geometry-experiment-config.v2.schema.json"
+        if resolved.get("schema") == "https://tcger.app/schemas/card-geometry-experiment-config/v2"
+        else CONFIG_SCHEMA_FILE
+    )
+    validator = make_validator(load_json(SCHEMAS_DIR / schema_file))
     errors = validation_errors(validator, resolved, limit=50)
     if errors:
         raise ConfigurationError("invalid experiment config:\n- " + "\n- ".join(errors))
@@ -634,15 +639,23 @@ def execute(
 
     _run(command, env=env)
     if action == "train" and resolved["execution"].get("evaluationCommand"):
-        real = evaluation_roots["frozenRealV3"]
-        synthetic = evaluation_roots["syntheticDuelField"]
+        # Preserve completed training before running optional evaluation. A
+        # decoder/evaluator failure must not discard hours of optimization.
+        api.upload_folder(
+            folder_path=str(output), path_in_repo=f"{prefix}/training-output",
+            repo_id=checkpoint_repo, repo_type="model",
+        )
+        real_key = "frozenReal" if "frozenReal" in evaluation_roots else "frozenRealV3"
+        synthetic_key = "syntheticMultigame" if "syntheticMultigame" in evaluation_roots else "syntheticDuelField"
+        real = evaluation_roots[real_key]
+        synthetic = evaluation_roots[synthetic_key]
         env["TCGER_GEOMETRY_EVAL_REAL_ROOT"] = str(real)
         env["TCGER_GEOMETRY_EVAL_REAL_HASH"] = resolved["evaluations"][
-            "frozenRealV3"
+            real_key
         ]["corpusHash"]
         env["TCGER_GEOMETRY_EVAL_SYNTHETIC_ROOT"] = str(synthetic)
         env["TCGER_GEOMETRY_EVAL_SYNTHETIC_HASH"] = resolved["evaluations"][
-            "syntheticDuelField"
+            synthetic_key
         ]["corpusHash"]
         env["TCGER_GEOMETRY_RECOGNITION_MODELS_ROOT"] = str(
             _download_recognition_models(resolved, token, work)

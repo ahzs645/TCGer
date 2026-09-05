@@ -12,6 +12,19 @@ from corpus_release import RELEASES_DIR, load_json, sha256_file, write_json  # n
 
 
 class CombineGeometryReleasesTests(unittest.TestCase):
+    def test_v3_requires_external_evaluations_and_forbids_embedded_test(self):
+        policy = ROOT / "policies" / "training-minimums-v3.json"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaisesRegex(ValueError, "separately pinned"):
+                combine(inputs=[RELEASES_DIR / "valid-fixture"], output=root / "missing",
+                        release_id="v3", policy_path=policy)
+            evaluations = {name: RELEASES_DIR / "valid-fixture"
+                           for name in ("frozenReal", "syntheticMultigame")}
+            with self.assertRaisesRegex(ValueError, "must not embed test"):
+                combine(inputs=[RELEASES_DIR / "valid-fixture"], output=root / "test",
+                        release_id="v3", policy_path=policy, evaluation_releases=evaluations)
+
     def test_link_or_copy_preserves_exact_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

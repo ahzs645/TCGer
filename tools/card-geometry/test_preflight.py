@@ -101,6 +101,24 @@ class FixtureReleaseTests(unittest.TestCase):
 
 
 class PreflightTests(unittest.TestCase):
+    def test_assembly_background_provenance_cannot_change_after_freeze(self):
+        from corpus_release import canonical_json, sha256_bytes
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "release"
+            shutil.copytree(RELEASES_DIR / "valid-fixture", release)
+            source = release / "background-review.json"
+            source.write_bytes(b'{"reviewer":"fixture"}')
+            inventory = {"provenanceFiles": {source.name: sha256_file(source)}}
+            write_json(release / "assembly-provenance.json", inventory)
+            manifest = load_json(release / "manifest.json")
+            manifest["splitAssignment"] = {"method":"combined-pinned-releases-v3", "seed":0,
+                "inputInventorySha256":sha256_bytes(canonical_json(inventory))}
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(release / "manifest.json", manifest)
+            self.assertNotIn("CORPUS_HASH", run_preflight(release)["failedChecks"])
+            source.write_bytes(b'{"reviewer":"changed"}')
+            self.assertIn("CORPUS_HASH", run_preflight(release)["failedChecks"])
+
     def test_record_cannot_disagree_with_computed_archive_assignment(self):
         with tempfile.TemporaryDirectory() as tmp:
             release = Path(tmp) / "release"

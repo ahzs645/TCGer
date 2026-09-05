@@ -45,6 +45,7 @@ from corpus_release import (  # noqa: E402
     REPORT_SCHEMA_ID,
     REPOSITORY,
     SPLITS,
+    canonical_json,
     corpus_hash,
     leakage_keys_from_record,
     load_json,
@@ -260,6 +261,18 @@ def check_corpus_hash(ctx: Context) -> None:
     recomputed = corpus_hash(ctx.manifest)
     declared = ctx.manifest["corpusHash"]
     expected = ctx.expectations.corpus_hash
+    if ctx.manifest["splitAssignment"]["method"] == "combined-pinned-releases-v3":
+        try:
+            inventory = load_json(ctx.root / "assembly-provenance.json")
+            if sha256_bytes(canonical_json(inventory)) != ctx.manifest["splitAssignment"].get("inputInventorySha256"):
+                raise ValueError("assembly provenance inventory hash mismatch")
+            for relative, digest in inventory["provenanceFiles"].items():
+                path = _safe_path(ctx.root, relative)
+                if path is None or not path.is_file() or sha256_bytes(path.read_bytes()) != digest:
+                    raise ValueError(f"assembly provenance bytes changed: {relative}")
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            ctx.add("CORPUS_HASH", FAIL, str(error), declared=declared, recomputed=recomputed, expected=expected)
+            return
     if recomputed == declared and (expected is None or declared == expected):
         ctx.add(
             "CORPUS_HASH",

@@ -2,7 +2,7 @@
 
 A release is a directory holding `manifest.json`, the readiness policy it
 binds to, its record JSON files, and its images. The manifest is validated by
-`docs/scanner-system/schemas/card-geometry-release-manifest.v1.schema.json`,
+`docs/scanner-system/schemas/card-geometry-release-manifest.v2.schema.json`,
 the policy by `card-geometry-readiness-policy.v1.schema.json`, and each record
 by `card-geometry-corpus-record.v1.schema.json`.
 
@@ -23,7 +23,7 @@ SCHEMAS_DIR = REPOSITORY / "docs" / "scanner-system" / "schemas"
 FIXTURES_DIR = ROOT / "fixtures"
 RELEASES_DIR = FIXTURES_DIR / "releases"
 
-MANIFEST_SCHEMA_FILE = "card-geometry-release-manifest.v1.schema.json"
+MANIFEST_SCHEMA_FILE = "card-geometry-release-manifest.v2.schema.json"
 POLICY_SCHEMA_FILE = "card-geometry-readiness-policy.v1.schema.json"
 RECORD_SCHEMA_FILE = "card-geometry-corpus-record.v1.schema.json"
 

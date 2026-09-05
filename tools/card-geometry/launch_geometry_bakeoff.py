@@ -299,6 +299,23 @@ def base_config(
     return resolve_config(raw)
 
 
+def round_two_config(**kwargs: Any) -> dict[str, Any]:
+    """Freeze the repaired four-candidate comparison, retaining legacy v1 loading."""
+    config = base_config(**kwargs)
+    config["schema"] = "https://tcger.app/schemas/card-geometry-experiment-config/v2"
+    config["bakeoffId"] = "shared-card-geometry-round-two-v1"
+    config["fairness"]["seedPolicy"]["baseSeed"] = 20260905
+    config["fairness"]["realContextMarginPolicy"] = {
+        "kind": "fraction-of-long-side", "fraction": 0.15,
+        "rounding": "ceil", "application": "each-side",
+    }
+    config["evaluations"]["frozenReal"] = config["evaluations"].pop("frozenRealV3")
+    config["evaluations"]["syntheticMultigame"] = config["evaluations"].pop("syntheticDuelField")
+    config["deviations"] = [item for item in config["deviations"]
+                            if item["rule"] != "framework-internal-validation"]
+    return resolve_config(config)
+
+
 def bootstrap_command(
     *,
     candidate: str,
