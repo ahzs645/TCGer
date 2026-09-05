@@ -1,0 +1,74 @@
+{
+  "configFiles": {
+    "yolox-pose": {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/yolox-validation-repair-v2/configs/yolox-pose.json",
+      "path": "geometry/bakeoffs/d8b617072a928a8cc6da69c32ae8336419f07a0e/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/yolox-pose.json",
+      "sha256": "dbae59909f5be37e78709c133c16b4f6817edf016e09c7360d26912777b6b019"
+    }
+  },
+  "corpus": {
+    "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "cabee73ac46a5901cc3060cfd17b7c63408bf66a",
+    "policyId": "training-minimums-v3",
+    "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+    "preflightReport": {
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    },
+    "releasePath": "geometry/releases/card-geometry-training-round-two-v1"
+  },
+  "experiments": {
+    "yolox-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolox-pose",
+      "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "mmyolo",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "preflight": {
+    "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/preflight-report.json",
+    "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+    "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+  },
+  "reason": {
+    "candidateValue": {
+      "resumeFrom": {
+        "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+        "checkpointSha256": "096c45e52828fa367796733dc6b4c4412a424bf44e89f9e7c52a6b21824c2e00",
+        "epoch": 2,
+        "jobId": "6a9c667be686246ca69a437a"
+      },
+      "toolingRevision": "d8b617072a928a8cc6da69c32ae8336419f07a0e"
+    },
+    "reason": "Execution repair: retain sample id in the YOLOX inference metadata required by CocoMetric. Previous restart 6a9c8770e686246ca69a45e5 failed its pre-resume test loop before optimizer steps. Run the exact test-loop fixture before release download, then fully validate and resume the original epoch-2 checkpoint. The CUDA indexing repair remains in place. Corpus, policy, evaluation pins, seed and total 50-epoch budget remain unchanged; other candidate results were available but no data or training settings were tuned.",
+    "rule": "framework-internal-validation"
+  },
+  "resumeFrom": {
+    "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+    "checkpointSha256": "096c45e52828fa367796733dc6b4c4412a424bf44e89f9e7c52a6b21824c2e00",
+    "epoch": 2,
+    "jobId": "6a9c667be686246ca69a437a"
+  },
+  "schema": "https://tcger.app/reports/card-geometry-resume-freeze/v1",
+  "testEvidence": {
+    "fullValidationRequiredBeforeResume": true,
+    "geometryTestsPassed": 224,
+    "ruff": "pass",
+    "ruffVersion": "0.15.8"
+  },
+  "tooling": {
+    "localPath": ".artifacts/card-geometry/yolox-validation-repair-v2-tooling.tar.gz",
+    "path": "geometry/tooling/d8b617072a928a8cc6da69c32ae8336419f07a0e/card-geometry-tooling.tar.gz",
+    "sha256": "a413c56d99569dbd9b7f65ce9a5ea88abdc4ee2f10c30235244eb43494efb3dd"
+  },
+  "toolingRevision": "d8b617072a928a8cc6da69c32ae8336419f07a0e"
+}

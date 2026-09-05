@@ -1,0 +1,23 @@
+{
+  "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+  "experiments": {
+    "yolox-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolox-pose",
+      "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "mmyolo",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "inputCommit": "484e326b1fded1a3c6facdccbe2651817e2903d9",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "jobs": [],
+  "toolingRevision": "d8b617072a928a8cc6da69c32ae8336419f07a0e"
+}
