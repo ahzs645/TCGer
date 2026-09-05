@@ -3,6 +3,8 @@ import json
 import runpy
 import tempfile
 import unittest
+from unittest.mock import patch
+import subprocess
 from pathlib import Path
 
 from PIL import Image
@@ -17,6 +19,21 @@ SPEC.loader.exec_module(MODULE)
 
 
 class TrainYoloxPoseTests(unittest.TestCase):
+    def test_resume_validation_failure_blocks_resume_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            checkpoint = output / "epoch_2.pth"
+            checkpoint.write_bytes(b"checkpoint")
+            with patch.object(MODULE.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "test")):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    MODULE.validate_resume_checkpoint(Path("/mmyolo"), Path("/config.py"), checkpoint, output)
+            self.assertFalse((output / "resume-validation.json").exists())
+            with patch.object(MODULE.subprocess, "run") as run:
+                MODULE.validate_resume_checkpoint(Path("/mmyolo"), Path("/config.py"), checkpoint, output)
+            self.assertTrue(run.call_args.kwargs["check"])
+            self.assertIn("/mmyolo/tools/test.py", run.call_args.args[0])
+            self.assertTrue(json.loads((output / "resume-validation.json").read_text())["fullValidationPassed"])
+
     def test_checkpoint_helpers_select_latest_epoch_in_experiment(self):
         prefix = "geometry/yolox-pose/corpus/experiment"
         paths = [

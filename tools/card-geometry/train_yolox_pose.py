@@ -16,6 +16,7 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import threading
 from collections import Counter
 from pathlib import Path
@@ -456,6 +457,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         resume_checkpoint = stage_resume_checkpoint(
             resume_checkpoint, resume_epoch, work_dir
         )
+        validate_resume_checkpoint(args.mmyolo_root, config, resume_checkpoint, output)
     command = training_command(
         mmyolo_root=args.mmyolo_root,
         config=config,
@@ -521,6 +523,19 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     shutil.rmtree(dataset)
     base_checkpoint.unlink(missing_ok=True)
     return summary
+
+
+def validate_resume_checkpoint(mmyolo_root: Path, config: Path, checkpoint: Path, output: Path) -> None:
+    """Require a full validation pass before resuming optimizer steps."""
+    command = [sys.executable, str(mmyolo_root / "tools/test.py"), str(config),
+               str(checkpoint), "--work-dir", str(output / "resume-validation")]
+    print("YOLOX_RESUME_VALIDATION_START", flush=True)
+    subprocess.run(command, check=True)
+    (output / "resume-validation.json").write_text(json.dumps({
+        "checkpointSha256": sha256_file(checkpoint), "command": command,
+        "fullValidationPassed": True,
+    }, indent=2) + "\n")
+    print("YOLOX_RESUME_VALIDATION_PASSED", flush=True)
 
 
 def main() -> int:

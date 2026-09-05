@@ -10,6 +10,12 @@ REPLACEMENTS = (
      '\n        cfg = self.test_cfg if cfg is None else cfg\n        with OutputSaveFunctionWrapper(\n'),
     ('                vis_targets) / vis_targets.sum()',
      '                vis_targets) / vis_targets.sum().clamp(min=1)'),
+    ('out[2][:cfg.max_per_img] for out in outputs_1',
+     'out[2] for out in outputs_1'),
+    ('out[1][:cfg.max_per_img] for out in outputs_2',
+     'out[1] for out in outputs_2'),
+    ('            keep_idxs_nms = keep_indices_nms[keep_indices_nms_idx]',
+     '            keep_idxs_nms = keep_indices_nms[keep_indices_nms_idx][:len(pred_instances)]'),
 )
 
 
@@ -24,7 +30,7 @@ def repaired_source(source: str) -> str:
 def repair_source(root: Path) -> dict:
     path = root / RELATIVE_PATH
     source = path.read_text()
-    # Accept only the exact original or the exact result of these two edits.
+    # Accept only the exact original or the exact result of all guarded edits.
     original = source
     for before, after in reversed(REPLACEMENTS):
         original = original.replace(after, before, 1)
@@ -38,4 +44,5 @@ def repair_source(root: Path) -> dict:
     return {'path': RELATIVE_PATH, 'originalSha256': before_hash,
             'repairedSha256': hashlib.sha256(repaired.encode()).hexdigest(),
             'changes': ['bind missing local cfg to self.test_cfg',
-                        'clamp visibility-loss denominator for box-only batches']}
+                        'clamp visibility-loss denominator for box-only batches',
+                        'preserve all pre-NMS keypoint candidates and select exactly the returned boxes']}
