@@ -1,0 +1,51 @@
+{
+  "schema": "https://tcger.app/reports/card-geometry-round-two-launch/v1",
+  "freezeCommit": "d63b4de8",
+  "toolingRevision": "df28e20ce4dfbb910fbd6115743d0641798cc368",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "inputCommit": "d4a03700da4f4732208e2bf1265891747cf31596",
+  "datasetRevision": "cabee73ac46a5901cc3060cfd17b7c63408bf66a",
+  "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+  "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+  "epochs": 50,
+  "seed": 20260905,
+  "postTraining": "Pinned real v6-full successor and synthetic multigame successor geometry benchmarks, followed by recognition replay; completed training output uploaded before evaluation.",
+  "jobs": [
+    {
+      "candidate": "yolo11n-pose",
+      "id": "6a9c64e5e686246ca69a4359",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c64e5e686246ca69a4359",
+      "createdAt": "2026-09-05T18:52:21.822Z",
+      "statusAtSubmission": "SCHEDULING",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    },
+    {
+      "candidate": "yolo11s-pose",
+      "id": "6a9c64f9259f8e97255e408d",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c64f9259f8e97255e408d",
+      "createdAt": "2026-09-05T18:52:41.516Z",
+      "statusAtSubmission": "SCHEDULING",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    },
+    {
+      "candidate": "yolox-pose",
+      "id": "6a9c6504259f8e97255e408f",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c6504259f8e97255e408f",
+      "createdAt": "2026-09-05T18:52:52.311Z",
+      "statusAtSubmission": "SCHEDULING",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    },
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "id": "6a9c650e259f8e97255e4091",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9c650e259f8e97255e4091",
+      "createdAt": "2026-09-05T18:53:02.995Z",
+      "statusAtSubmission": "SCHEDULING",
+      "flavor": "l4x1",
+      "timeoutSeconds": 43200
+    }
+  ]
+}
