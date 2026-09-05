@@ -77,7 +77,7 @@
           "$ref": "#/$defs/sha256"
         },
         "policyId": {
-          "const": "training-minimums-v2"
+          "const": "training-minimums-v3"
         },
         "policySha256": {
           "$ref": "#/$defs/sha256"

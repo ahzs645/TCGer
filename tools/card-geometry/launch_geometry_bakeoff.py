@@ -141,6 +141,7 @@ def base_config(
     real_evaluation: dict[str, str] | None = None,
     synthetic_evaluation: dict[str, str] | None = None,
     resume_from: dict[str, Any] | None = None,
+    resolve: bool = True,
 ) -> dict[str, Any]:
     framework = {
         "yolo11n-pose": "ultralytics",
@@ -296,12 +297,12 @@ def base_config(
         },
         "deviations": deviations,
     }
-    return resolve_config(raw)
+    return resolve_config(raw) if resolve else raw
 
 
 def round_two_config(**kwargs: Any) -> dict[str, Any]:
     """Freeze the repaired four-candidate comparison, retaining legacy v1 loading."""
-    config = base_config(**kwargs)
+    config = base_config(**kwargs, resolve=False)
     config["schema"] = "https://tcger.app/schemas/card-geometry-experiment-config/v2"
     config["bakeoffId"] = "shared-card-geometry-round-two-v1"
     config["fairness"]["seedPolicy"]["baseSeed"] = 20260905

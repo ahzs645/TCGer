@@ -25,8 +25,23 @@ CORPUS = {
 
 
 class LaunchGeometryBakeoffTests(unittest.TestCase):
+    def test_round_two_candidates_require_v3_and_share_fairness(self):
+        corpus = {**CORPUS, "policyId": "training-minimums-v3",
+                  "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da"}
+        hashes = set()
+        for candidate in ("yolo11n-pose", "yolo11s-pose", "yolox-pose", "fastvit-t8-four-corner"):
+            config = round_two_config(candidate=candidate, corpus=corpus,
+                                      tooling_revision="c" * 40, epochs=50)
+            self.assertEqual(config["corpus"]["policyId"], "training-minimums-v3")
+            self.assertIn("measurements", config)
+            hashes.add(descriptor(config)["fairnessHash"])
+        self.assertEqual(len(hashes), 1)
+        with self.assertRaisesRegex(ValueError, "training-minimums-v3"):
+            round_two_config(candidate="yolo11n-pose", corpus=CORPUS,
+                             tooling_revision="c" * 40, epochs=50)
+
     def test_round_two_binds_real_padding_and_renamed_evaluation_keys(self):
-        config = round_two_config(candidate="yolox-pose", corpus=CORPUS,
+        config = round_two_config(candidate="yolox-pose", corpus={**CORPUS, "policyId":"training-minimums-v3"},
                                   tooling_revision="c" * 40, epochs=50)
         self.assertTrue(config["schema"].endswith("/v2"))
         self.assertIn("frozenReal", config["evaluations"])
