@@ -1,0 +1,37 @@
+{
+  "schema": "https://tcger.app/reports/card-geometry-resume-launch/v1",
+  "freezeCommit": "87a5257e",
+  "toolingRevision": "92277045342a8bb8b4d7718d3b6093dcc531da0f",
+  "inputCommit": "85f12e093820efa07bcde32241c29e6b689b76fa",
+  "sourceJobId": "6a9c667be686246ca69a437a",
+  "resumeEpoch": 2,
+  "checkpointSha256": "096c45e52828fa367796733dc6b4c4412a424bf44e89f9e7c52a6b21824c2e00",
+  "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+  "job": {
+    "id": "6a9c8770e686246ca69a45e5",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9c8770e686246ca69a45e5",
+    "created_at": "2026-09-05T21:19:44.356Z",
+    "docker_image": "pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806",
+    "arguments": [],
+    "environment_variable_names": [],
+    "secret_names": [
+      "0"
+    ],
+    "flavor": "l4x1",
+    "status": {
+      "stage": "SCHEDULING",
+      "message": null
+    },
+    "owner": {
+      "id": "684cda58d7e0d83496c9b780",
+      "name": "ahzs645",
+      "type": "user"
+    },
+    "created_by": {
+      "id": "684cda58d7e0d83496c9b780",
+      "name": "ahzs645"
+    },
+    "labels": {},
+    "timeout_seconds": 43200
+  }
+}
