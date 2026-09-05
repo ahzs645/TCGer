@@ -42,6 +42,8 @@ def generate_fixture(root: Path):
 
 
 def run(root: Path, mmyolo_root: Path):
+    # Patch before any framework import can cache the original head bytecode.
+    repair=repair_source(mmyolo_root)
     from mmengine.config import Config
     from mmengine.runner import Runner
     from mmengine.dataset import pseudo_collate
@@ -50,8 +52,11 @@ def run(root: Path, mmyolo_root: Path):
 
     torch.set_num_threads(4)
     root.mkdir(parents=True,exist_ok=True)
-    repair=repair_source(mmyolo_root)
     register_all_modules()
+    import dis
+    from mmyolo.models.dense_heads.yolox_pose_head import YOLOXPoseHead
+    assert any(i.opname == "STORE_FAST" and i.argval == "cfg"
+               for i in dis.get_instructions(YOLOXPoseHead.predict_by_feat)), "unpatched loaded head"
     generate_fixture(root/'fixture')
     materialization=materialize_coco(root/'fixture',root/'coco',POLICY)
     config_path=write_config(mmyolo_root=mmyolo_root,dataset=root/'coco',output=root,
