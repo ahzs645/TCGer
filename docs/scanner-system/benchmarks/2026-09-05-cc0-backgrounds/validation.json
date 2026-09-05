@@ -1,0 +1,33 @@
+{
+  "assets": 60,
+  "bytes": 175675103,
+  "categoryCounts": {
+    "fabric-leather-carpet": 28,
+    "stone-rubber": 8,
+    "wood": 24
+  },
+  "compositorLoadValidated": 60,
+  "crossSplitNearDuplicatePairs": 0,
+  "exactImageDisjointness": {
+    "real-geometry-evaluation-v6-full-aliases-v2": {
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "sharedImageHashes": []
+    },
+    "real-geometry-round-two-candidate-v3": {
+      "corpusHash": "d41b0881a30f03be56e9ec734ff3f8bb40ee90525a46cfde442b9188c57cabee",
+      "sharedImageHashes": []
+    },
+    "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2": {
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "sharedImageHashes": []
+    }
+  },
+  "manifestSha256": "71d31e1ac762696a01a99729386a66bec661af1eb497e25c67413edccac3d177",
+  "providerMd5AndSizeVerified": 60,
+  "sameSplitSimilarityPairs": 3,
+  "sessionExclusionCount": 43,
+  "splitCounts": {
+    "train": 48,
+    "validation": 12
+  }
+}

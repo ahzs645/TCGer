@@ -1,0 +1,1466 @@
+[
+  {
+    "id": "american_walnut_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:american_walnut_veneer",
+    "sourceUrl": "https://polyhaven.com/a/american_walnut_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/american_walnut_veneer/american_walnut_veneer_diff_2k.jpg",
+      "md5": "c3db17b94fbd90a079a8bdc915cd5960",
+      "size": 2418767
+    },
+    "sha256": "278ed3382b3a28a95861a84ccf4f3b591abf96a203698152064d65fcc6425271",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/american_walnut_veneer.jpg",
+    "filesMetadataSha256": "abdd28152ec3e01fb3f07dc27768c7c7a826092cbd7d07bbba655b6b398436a8"
+  },
+  {
+    "id": "angli_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:angli_veneer",
+    "sourceUrl": "https://polyhaven.com/a/angli_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/angli_veneer/angli_veneer_diff_2k.jpg",
+      "md5": "88c9655a5a800d325c11711626475cb4",
+      "size": 2403237
+    },
+    "sha256": "681be4fd4702bed0a340fe696496f8b4dc5330c9641e3408f1aba2e7313707db",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/angli_veneer.jpg",
+    "filesMetadataSha256": "2e8b516f014a4c1095e81a2c2a238ede05fe293d22750954560c0ef26c1129d3"
+  },
+  {
+    "id": "ash_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:ash_veneer",
+    "sourceUrl": "https://polyhaven.com/a/ash_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/ash_veneer/ash_veneer_diff_2k.jpg",
+      "md5": "4b720b76d3d3004b68fa4cdb77008865",
+      "size": 2479757
+    },
+    "sha256": "00abb70f86bdfe49aa6e09f350af9e8e1605ccf13171f9be46ceb6018846c06b",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/ash_veneer.jpg",
+    "filesMetadataSha256": "720ae98421b8d48b380034d107b6f1f0e17c05fc11cca0247e2f2761d7c1175f"
+  },
+  {
+    "id": "bamboo_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:bamboo_veneer",
+    "sourceUrl": "https://polyhaven.com/a/bamboo_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/bamboo_veneer/bamboo_veneer_diff_2k.jpg",
+      "md5": "fa0e742547faf21baa35455528d03da5",
+      "size": 2086606
+    },
+    "sha256": "f706462756c039c104838cddf4877a3b899da5e5cd0573ec441d4e20f9843f4b",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/bamboo_veneer.jpg",
+    "filesMetadataSha256": "6c46d65f17ee1878f99e6e17c969d09523dec84ed01c51720804cabb3822648f"
+  },
+  {
+    "id": "bi_stretch",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:bi_stretch",
+    "sourceUrl": "https://polyhaven.com/a/bi_stretch",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      264.5644946243421,
+      264.4000053405762
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/bi_stretch/bi_stretch_diff_2k.jpg",
+      "md5": "8da4c43c744ecd0ec2bb62deb95f2287",
+      "size": 3249605
+    },
+    "sha256": "67cd1633c6417a39448eb03b76c15b974f728691e95429d86cd493276f20f6b0",
+    "width": 2048,
+    "height": 2047,
+    "path": "assets/bi_stretch.jpg",
+    "filesMetadataSha256": "8f52c471209c74d7fefd7bf347cd16b344d7e64c80a52d41e2fc93c84a74b531"
+  },
+  {
+    "id": "black_oak_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:black_oak_veneer",
+    "sourceUrl": "https://polyhaven.com/a/black_oak_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_oak_veneer/black_oak_veneer_diff_2k.jpg",
+      "md5": "41e682d7c8e5b5598e39d5b7d100817f",
+      "size": 2398434
+    },
+    "sha256": "d2653c9cf8e05171ba2256c92315cf39fe230482b433a6a9c02cf26ef566624c",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/black_oak_veneer.jpg",
+    "filesMetadataSha256": "0352cf09bbdcb645414b1d10f438ac0355d773dd1fb0dccf3903b2126ded63e5"
+  },
+  {
+    "id": "book_pattern",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:book_pattern",
+    "sourceUrl": "https://polyhaven.com/a/book_pattern",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      299.9999523162842,
+      300.00001192092896
+    ],
+    "colorMap": "col1",
+    "file": {
+      "size": 1382402,
+      "md5": "bb223836024d8b03b4098ae9c8c078b4",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/book_pattern/book_pattern_col1_2k.jpg"
+    },
+    "sha256": "ce8254ae9e8543c98fec02dd0bf93df59561342a4d99681a45c2730b55c3d577",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/book_pattern.jpg",
+    "filesMetadataSha256": "e2e1012dc8b4ab7b5058c5b6adbaf4e1bd7611bb2b31cb279d2087bdbd1ff5a5"
+  },
+  {
+    "id": "brown_leather",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:brown_leather",
+    "sourceUrl": "https://polyhaven.com/a/brown_leather",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      400.0000059604645,
+      400.00003576278687
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 2137518,
+      "md5": "1bd381c43817743a2affdd1ce2d193c7",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_albedo_2k.jpg"
+    },
+    "sha256": "b0de2403a31efa31e501b0028c0bd8e504d5bd6318f4a5ce90c550c3067f96d8",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/brown_leather.jpg",
+    "filesMetadataSha256": "c988de9b099cc47ac170a2fdb55622684be5df102323a447bdc511a5525a6baa"
+  },
+  {
+    "id": "caban",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:caban",
+    "sourceUrl": "https://polyhaven.com/a/caban",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      273.9921411828764,
+      273.2999920845032
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/caban/caban_diff_2k.jpg",
+      "md5": "477c56f93f158317c633f9e7f351429c",
+      "size": 2964872
+    },
+    "sha256": "c616fd58f9e0b484e664094d47632bd9d0d2247d943389b69e0e89465a68af77",
+    "width": 2048,
+    "height": 2043,
+    "path": "assets/caban.jpg",
+    "filesMetadataSha256": "8a6d1a5d26281d1d36cbf637c3dc591d9e475c9b14256097ddad522dd0563442"
+  },
+  {
+    "id": "cherry_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:cherry_veneer",
+    "sourceUrl": "https://polyhaven.com/a/cherry_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cherry_veneer/cherry_veneer_diff_2k.jpg",
+      "md5": "6d5c8b7fe2d3c262bf9d0e0178a86b20",
+      "size": 2068772
+    },
+    "sha256": "dc572a16d860d56f03ae7b2df6fbf684adda4a5eee784733069d784a7dfe1a9c",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/cherry_veneer.jpg",
+    "filesMetadataSha256": "9448638598ad47edae7ee483b6063923565a776a4b81b41f9ac137aa5884bdf4"
+  },
+  {
+    "id": "coated_pine",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:coated_pine",
+    "sourceUrl": "https://polyhaven.com/a/coated_pine",
+    "authors": [
+      "Charlotte Baglioni",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      740.0000095367432,
+      740.0000095367432
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coated_pine/coated_pine_diff_2k.jpg",
+      "md5": "2589f6ecab859532fb654ac73834a974",
+      "size": 2993766
+    },
+    "sha256": "377fa07523a1d2a52fb4a3b099eba0e81a6167038210cdd9791c07a0f1d39497",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/coated_pine.jpg",
+    "filesMetadataSha256": "06d809ffc0e569080aa8f180967f555c7fcfa36118e1227997c2210ce18c16f0"
+  },
+  {
+    "id": "concrete_floor",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:concrete_floor",
+    "sourceUrl": "https://polyhaven.com/a/concrete_floor",
+    "authors": [
+      "eye-candy.xyz"
+    ],
+    "dimensionsMillimeters": [
+      2079.9996852874756,
+      2079.9996852874756
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 4169270,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor/concrete_floor_diff_2k.jpg",
+      "md5": "b31fcf4f48ca62a0c36ecd0e5b0d47de"
+    },
+    "sha256": "72249ce8ba5cedd518ebb60840e882a3506a4b2a24958055d1b36752dbcfda36",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/concrete_floor.jpg",
+    "filesMetadataSha256": "ccb3251a7a5b76bccb227eea643df666ec90c72d27286adaa326bfe1db375dab"
+  },
+  {
+    "id": "cotton_jersey",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:cotton_jersey",
+    "sourceUrl": "https://polyhaven.com/a/cotton_jersey",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      263.6027473872483,
+      263.7999951839447
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cotton_jersey/cotton_jersey_diff_2k.jpg",
+      "md5": "911fa5b8031c69d7051489f813b170ac",
+      "size": 3009673
+    },
+    "sha256": "ddaedb1e9d7d903eac532f7f8722fbb397a9efb0da82801b97002bada416d2d0",
+    "width": 2048,
+    "height": 2050,
+    "path": "assets/cotton_jersey.jpg",
+    "filesMetadataSha256": "90d1d0b054acb2e1dbb65487a5c942959f58c7f7fc66a11d6b7cc38f7357c7ca"
+  },
+  {
+    "id": "crepe_georgette",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:crepe_georgette",
+    "sourceUrl": "https://polyhaven.com/a/crepe_georgette",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      261.1946943115489,
+      265.5999958515167
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/crepe_georgette/crepe_georgette_diff_2k.jpg",
+      "md5": "4dab9733531ff3e42525b1c20110dba7",
+      "size": 2607549
+    },
+    "sha256": "301e1d3ee0ce105cdfe514a157fc0691a19838a061148a221b4a44b59b34cba2",
+    "width": 2048,
+    "height": 2083,
+    "path": "assets/crepe_georgette.jpg",
+    "filesMetadataSha256": "6df8d32224db720df410428d61e7b2b09eb94a8c4faf32fdb9ce767e6e29dad0"
+  },
+  {
+    "id": "crepe_satin",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:crepe_satin",
+    "sourceUrl": "https://polyhaven.com/a/crepe_satin",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      263.19942218838304,
+      267.8999900817871
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/crepe_satin/crepe_satin_diff_2k.jpg",
+      "md5": "239e951740cabd339d3672442a2a8d9c",
+      "size": 3179570
+    },
+    "sha256": "f835aa033c55d192391c26be643c54edca8e88ee4c5b05387a0de355b220628d",
+    "width": 2048,
+    "height": 2085,
+    "path": "assets/crepe_satin.jpg",
+    "filesMetadataSha256": "eb5c225ddc068633189ae345cdbdfd19b5f0bf06d6d1cd82a06f37f42041b7ce"
+  },
+  {
+    "id": "curly_teddy_natural",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:curly_teddy_natural",
+    "sourceUrl": "https://polyhaven.com/a/curly_teddy_natural",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      335.804452696631,
+      330.90004324913025
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/curly_teddy_natural/curly_teddy_natural_diff_2k.jpg",
+      "md5": "e773ba1903e343cdd9d95db0de063d4a",
+      "size": 2266933
+    },
+    "sha256": "512aa3bf7839190eb805f5d095860622c84417449929dd8c5370880d4989b7c6",
+    "width": 2048,
+    "height": 2018,
+    "path": "assets/curly_teddy_natural.jpg",
+    "filesMetadataSha256": "1e5c0d6fe2e14a5dbe7e0f1f69ab90e774c3a661fb8cfda1173591fbb10ec19d"
+  },
+  {
+    "id": "dark_wood",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:dark_wood",
+    "sourceUrl": "https://polyhaven.com/a/dark_wood",
+    "authors": [
+      "Dario Barresi",
+      "Dimitrios Savva",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      2000,
+      2000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 2894186,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dark_wood/dark_wood_diff_2k.jpg",
+      "md5": "f6e205a05ff7f1b45c675795b18ea0f5"
+    },
+    "sha256": "ff811f97ab46f1148f2753451fd9d64abf0ab9101e85922ed9f45fc3595a3cf2",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/dark_wood.jpg",
+    "filesMetadataSha256": "345b92e082cb37654afa7c6176c6312e336c682f9f91dc76c01fad64f111e421"
+  },
+  {
+    "id": "denim_fabric",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:denim_fabric",
+    "sourceUrl": "https://polyhaven.com/a/denim_fabric",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      100.00000149011612,
+      99.99999403953552
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 3980719,
+      "md5": "5d84c58b94a3094ea1edff88f4ed39d0",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denim_fabric/denim_fabric_diff_2k.jpg"
+    },
+    "sha256": "164fdc3adbae7eab65171b05fb43aac5e3945615cb905b37b48049b2630c56d2",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/denim_fabric.jpg",
+    "filesMetadataSha256": "888af5f1a264062b8891885bf558d67e53970c653ab3347c1f51d984d253d75a"
+  },
+  {
+    "id": "dirty_carpet",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:dirty_carpet",
+    "sourceUrl": "https://polyhaven.com/a/dirty_carpet",
+    "authors": [
+      "Rohit Seervi"
+    ],
+    "dimensionsMillimeters": [
+      599.9999046325684,
+      599.9999046325684
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 3818108,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirty_carpet/dirty_carpet_diff_2k.jpg",
+      "md5": "d2f1c8d121996a8f46c8da89968ed95c"
+    },
+    "sha256": "6337d3ef1a11ca8bea2d31b86da15a65f10ae92c7f3345fae62924bae194f6c0",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/dirty_carpet.jpg",
+    "filesMetadataSha256": "69163571a8950baf5618ef54e380ceb52c81639acf71415ae0dc5908d80675fc"
+  },
+  {
+    "id": "fabric_leather_01",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:fabric_leather_01",
+    "sourceUrl": "https://polyhaven.com/a/fabric_leather_01",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      400.0000059604645,
+      400.00003576278687
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 2467670,
+      "md5": "f9c0c71ebadf92071d5779257c12d73a",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_leather_01/fabric_leather_01_diff_2k.jpg"
+    },
+    "sha256": "ca8123e6c031365fd782323bee05ce9da8bf05cc2ed57a83a66f0874923648d8",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/fabric_leather_01.jpg",
+    "filesMetadataSha256": "742c8faba2de8d5fc76c9dd1f635862c9a9a4abdfe77c7f1214b7b1afc688bbe"
+  },
+  {
+    "id": "fabric_pattern_05",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:fabric_pattern_05",
+    "sourceUrl": "https://polyhaven.com/a/fabric_pattern_05",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      500,
+      499.9999403953552
+    ],
+    "colorMap": "col_01",
+    "file": {
+      "size": 3000828,
+      "md5": "5b1497806235db931b92b2149920dc7a",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_pattern_05/fabric_pattern_05_col_01_2k.jpg"
+    },
+    "sha256": "090e3b8a097153c66539616ff7e4eaabcbbd39104b7ad98d6e0ed436843aa23f",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/fabric_pattern_05.jpg",
+    "filesMetadataSha256": "a4735c2bf596e6808b81bf61ed57a661088a4b2b7b9bb966b362e68126313068"
+  },
+  {
+    "id": "fabric_pattern_07",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:fabric_pattern_07",
+    "sourceUrl": "https://polyhaven.com/a/fabric_pattern_07",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      400.0000059604645,
+      400.00003576278687
+    ],
+    "colorMap": "col_1",
+    "file": {
+      "size": 2650991,
+      "md5": "ad5b3f69e889a6890d6413ea1568ff25",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_pattern_07/fabric_pattern_07_col_1_2k.jpg"
+    },
+    "sha256": "1f4941638b890d4535b1078067be8a831ca302d1e696ed959b4e4512de893cba",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/fabric_pattern_07.jpg",
+    "filesMetadataSha256": "313de448d01da21c807581f80f4629b7435d1303609b3333bb23f864129fd372"
+  },
+  {
+    "id": "gingham_check",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:gingham_check",
+    "sourceUrl": "https://polyhaven.com/a/gingham_check",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      283.65123073689267,
+      296.79998755455017
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gingham_check/gingham_check_diff_2k.jpg",
+      "md5": "9e2b46193b62567f781a7074b53eb31f",
+      "size": 3893812
+    },
+    "sha256": "a031eb9878875c3b5d3338768bcff385cebe6ed214f5e2eee1c942eefcd46837",
+    "width": 2048,
+    "height": 2143,
+    "path": "assets/gingham_check.jpg",
+    "filesMetadataSha256": "31b589655e585db628126228605a3e6a226f1faf96956d017df5440071c2ca51"
+  },
+  {
+    "id": "granite_tile",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:granite_tile",
+    "sourceUrl": "https://polyhaven.com/a/granite_tile",
+    "authors": [
+      "Charlotte Baglioni"
+    ],
+    "dimensionsMillimeters": [
+      2299.999952316284,
+      2299.999952316284
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 2938829,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/granite_tile/granite_tile_diff_2k.jpg",
+      "md5": "79a1eaac48a3d6720a88c216997dbd67"
+    },
+    "sha256": "758f9b1cdce11bc6f6a805cdea18fb789639befe40608020ab6087c5c1cba1e5",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/granite_tile.jpg",
+    "filesMetadataSha256": "65bfbdc616dfab163f7e2e90d810e76f0bdfd64f486832c57a581ec407336117"
+  },
+  {
+    "id": "grey_lati_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:grey_lati_veneer",
+    "sourceUrl": "https://polyhaven.com/a/grey_lati_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grey_lati_veneer/grey_lati_veneer_diff_2k.jpg",
+      "md5": "1c4da666cd97773e1f91a4ee9c9bad73",
+      "size": 2606337
+    },
+    "sha256": "9832d19e93b0e4a7c33d6bb1d272733be54d5d9fcae5370a461f57a4da8c5863",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/grey_lati_veneer.jpg",
+    "filesMetadataSha256": "a9ee7daab884d21f01e2f42574c58e898b8542fa71135963c1efb502892aa614"
+  },
+  {
+    "id": "hessian_230",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:hessian_230",
+    "sourceUrl": "https://polyhaven.com/a/hessian_230",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      268.7538661074732,
+      267.1999931335449
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/hessian_230/hessian_230_diff_2k.jpg",
+      "md5": "e73dcb7ae06f7267f74fc5869c63233c",
+      "size": 3828573
+    },
+    "sha256": "1c1d66e3764dded1cfafa5147ea56a28ef7648e3c5cae6892b8dada92d408685",
+    "width": 2048,
+    "height": 2036,
+    "path": "assets/hessian_230.jpg",
+    "filesMetadataSha256": "e3ae175e1ea48b897b8804e9c73d29f5acb8ee79cbc303a756500c6b1dd605a5"
+  },
+  {
+    "id": "jersey_melange",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:jersey_melange",
+    "sourceUrl": "https://polyhaven.com/a/jersey_melange",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      290.62397202303356,
+      276.19999647140503
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/jersey_melange/jersey_melange_diff_2k.jpg",
+      "md5": "627563d04a347af78d35e5a7a586b4a3",
+      "size": 4552827
+    },
+    "sha256": "257e6f6a0e56dade355c3ff94198733c323d04c1f6e8c9e0395f35c0671b7893",
+    "width": 2048,
+    "height": 1946,
+    "path": "assets/jersey_melange.jpg",
+    "filesMetadataSha256": "ffa60cfd529657d6aaea8319a34dac0507c192d3a104529a53729c75dd27ec63"
+  },
+  {
+    "id": "jogging_melange",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:jogging_melange",
+    "sourceUrl": "https://polyhaven.com/a/jogging_melange",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      273.4973732349353,
+      273.2999920845032
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/jogging_melange/jogging_melange_diff_2k.jpg",
+      "md5": "62f774c3ee1e6b108a42edd3fac33429",
+      "size": 3494010
+    },
+    "sha256": "cb84b8a621003c11eede17c349b1a21bc43abe6d9bbb79928cb82b8aa4c69c3c",
+    "width": 2048,
+    "height": 2047,
+    "path": "assets/jogging_melange.jpg",
+    "filesMetadataSha256": "211343213c2e2c6942f27edfb8ba223ca4769214ae68b3328073cb3380af4fa1"
+  },
+  {
+    "id": "knitted_fleece",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:knitted_fleece",
+    "sourceUrl": "https://polyhaven.com/a/knitted_fleece",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      266.35669526830077,
+      270.3999876976013
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/knitted_fleece/knitted_fleece_diff_2k.jpg",
+      "md5": "5ae8d0ed7af13b0ca1b61b1467854b2a",
+      "size": 3531764
+    },
+    "sha256": "7cc9a0bf3adca4a913d79fbe70149729e1ed2cc0ef479a9e9ab020a35d006e3a",
+    "width": 2048,
+    "height": 2079,
+    "path": "assets/knitted_fleece.jpg",
+    "filesMetadataSha256": "40be10ad36f6502e9a1e67ea2b581ab392bec6e4b9ded79bb78f5ab72fd66844"
+  },
+  {
+    "id": "leather_red_02",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:leather_red_02",
+    "sourceUrl": "https://polyhaven.com/a/leather_red_02",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      600.0000238418579,
+      600.0000238418579
+    ],
+    "colorMap": "coll1",
+    "file": {
+      "size": 4160234,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_red_02/leather_red_02_coll1_2k.jpg",
+      "md5": "b027e31de9b4a08114e1e1a706810d2c"
+    },
+    "sha256": "a900630e541991b7ee63aab820f425610fbf2db32f7ae6c63b6ef4fc2325ab60",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/leather_red_02.jpg",
+    "filesMetadataSha256": "d2d6d34788483e360a759aec2fa3d7ae182f0b2d2c32dd567f1499023bfe7aac"
+  },
+  {
+    "id": "leather_white",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:leather_white",
+    "sourceUrl": "https://polyhaven.com/a/leather_white",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      300.00001192092896,
+      300.00001192092896
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 3460639,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_diff_2k.jpg",
+      "md5": "1292cc2c6b26508dc242a4a12220d4a9"
+    },
+    "sha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/leather_white.jpg",
+    "filesMetadataSha256": "7ebf43c2a3a0ae41d2d305770f59e981c24a63298e1f7d167f760c614427f166"
+  },
+  {
+    "id": "marble_01",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:marble_01",
+    "sourceUrl": "https://polyhaven.com/a/marble_01",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      1500,
+      1500
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 1269188,
+      "md5": "4eeefea16242cecb3b429ac0c8f88740",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_diff_2k.jpg"
+    },
+    "sha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/marble_01.jpg",
+    "filesMetadataSha256": "4837766b9fb2ecd05598affea2d062abbc6b07b71e78c19d56cdc6755c75359f"
+  },
+  {
+    "id": "marble_tiles",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:marble_tiles",
+    "sourceUrl": "https://polyhaven.com/a/marble_tiles",
+    "authors": [
+      "Charlotte Baglioni"
+    ],
+    "dimensionsMillimeters": [
+      2000,
+      2000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 3246069,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_tiles/marble_tiles_diff_2k.jpg",
+      "md5": "0407b80b586989cd552ff718186fd3d1"
+    },
+    "sha256": "9a73fe867cf0c4a14b903542106dee4e33a1de8abf942b1725ff679c00492668",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/marble_tiles.jpg",
+    "filesMetadataSha256": "a9f18d561c95848f89490415bdd32088d9f038544545fba91e0e720d30c59561"
+  },
+  {
+    "id": "mocha_oak_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:mocha_oak_veneer",
+    "sourceUrl": "https://polyhaven.com/a/mocha_oak_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/mocha_oak_veneer/mocha_oak_veneer_diff_2k.jpg",
+      "md5": "1cf9f773c31edc139e191580273fe5c7",
+      "size": 2348611
+    },
+    "sha256": "e07686bc7e73958f607df9e11ae5e52d7da070ff539a8d5c993d574916643030",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/mocha_oak_veneer.jpg",
+    "filesMetadataSha256": "71311c870a49d9ab807455617a45aedb66ef4a5dffa1319c0756283997b5640f"
+  },
+  {
+    "id": "natural_walnut_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:natural_walnut_veneer",
+    "sourceUrl": "https://polyhaven.com/a/natural_walnut_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/natural_walnut_veneer/natural_walnut_veneer_diff_2k.jpg",
+      "md5": "29646b1b28066cd414595040e5cb978e",
+      "size": 2484434
+    },
+    "sha256": "4a1a84e9537b291ac0cce1e2b8908fb9b5d1057a246ee0b3c25345565ac9686d",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/natural_walnut_veneer.jpg",
+    "filesMetadataSha256": "349ab0b25e541e1152c3a15d59f4f6d8b4bdd2e4a70cea0a4efae866929128a9"
+  },
+  {
+    "id": "okoume_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:okoume_veneer",
+    "sourceUrl": "https://polyhaven.com/a/okoume_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/okoume_veneer/okoume_veneer_diff_2k.jpg",
+      "md5": "60b7630a6a0588ff7766b6709218efba",
+      "size": 2157184
+    },
+    "sha256": "c89231023b37d6fde0b82087eaf8c61b04a2fc82558348fd6091dba4bb9aa463",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/okoume_veneer.jpg",
+    "filesMetadataSha256": "71a1882724a3542bf9b62888fa69016f60a8c32884555df03afa0556c3302fe3"
+  },
+  {
+    "id": "olive_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:olive_veneer",
+    "sourceUrl": "https://polyhaven.com/a/olive_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/olive_veneer/olive_veneer_diff_2k.jpg",
+      "md5": "1d3d29668dd314410e36e767ce70f364",
+      "size": 2228386
+    },
+    "sha256": "799f18ab265ebb416fcc6de36adaeb8b846add512cc3ba446b4eedbe7512fad3",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/olive_veneer.jpg",
+    "filesMetadataSha256": "fcbfeaeb778a1bf2116799aca9b7a47f03f0e1ee85ef9fde2f2ca019ad8af156"
+  },
+  {
+    "id": "plywood",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:plywood",
+    "sourceUrl": "https://polyhaven.com/a/plywood",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "dimensionsMillimeters": [
+      499.999940395355,
+      499.999940395355
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 4009658,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plywood/plywood_diff_2k.jpg",
+      "md5": "ce20176e90b0984ca7dec366832e8198"
+    },
+    "sha256": "050a15a796413b91c9cd5ca026dd3c4df83746bb1103ae14ae91503577dead8c",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/plywood.jpg",
+    "filesMetadataSha256": "08dfbd1cdc21c10f20ca5bf7aa8fa25538605d255a992787204a5b8e2b239451"
+  },
+  {
+    "id": "polar_fleece",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:polar_fleece",
+    "sourceUrl": "https://polyhaven.com/a/polar_fleece",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      273.2870444699951,
+      271.49999141693115
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/polar_fleece/polar_fleece_diff_2k.jpg",
+      "md5": "ad4d2ac2a4a75dfdd6ad4efe204140f8",
+      "size": 2616215
+    },
+    "sha256": "f438e737c6d626408089644e31f3552e4a2006249bfa80e63edfd557ae6b2835",
+    "width": 2048,
+    "height": 2035,
+    "path": "assets/polar_fleece.jpg",
+    "filesMetadataSha256": "b0d204253b0ba290475d73ed5d1e6b242566d3e7d4e39b1f7592e3f24f6a112a"
+  },
+  {
+    "id": "poly_wool_herringbone",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:poly_wool_herringbone",
+    "sourceUrl": "https://polyhaven.com/a/poly_wool_herringbone",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      270.0788548673393,
+      275.70000290870667
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/poly_wool_herringbone/poly_wool_herringbone_diff_2k.jpg",
+      "md5": "ab20cb6c120dfa5d38f4e4d3fd9b980d",
+      "size": 3650614
+    },
+    "sha256": "ca21de8e2e7f43178f8290361bfb2271eb264af0d2887c7c93e76a113ff3cc64",
+    "width": 2048,
+    "height": 2091,
+    "path": "assets/poly_wool_herringbone.jpg",
+    "filesMetadataSha256": "4fcdb7cee772205baf892df1cd6e03eaf78d019f6a19e2afe850b24ed4fa52ee"
+  },
+  {
+    "id": "red_oak_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:red_oak_veneer",
+    "sourceUrl": "https://polyhaven.com/a/red_oak_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_oak_veneer/red_oak_veneer_diff_2k.jpg",
+      "md5": "81802f7174b4b02eb67d85170015ce19",
+      "size": 2426419
+    },
+    "sha256": "adc970218b87a6435269f33bb60eb4bfbeb1d1863d668dfda8234f17f95481b7",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/red_oak_veneer.jpg",
+    "filesMetadataSha256": "dff3eacf66048a60e56bf09995c4acad493253468dd79c097c66aaf9fbbfbec7"
+  },
+  {
+    "id": "ribbed_corduroy",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:ribbed_corduroy",
+    "sourceUrl": "https://polyhaven.com/a/ribbed_corduroy",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      266.40417517521894,
+      266.69999957084656
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/ribbed_corduroy/ribbed_corduroy_diff_2k.jpg",
+      "md5": "e1c46721886a7e5df3f952d9f34e11cd",
+      "size": 3319894
+    },
+    "sha256": "f5cebad7e75f473d7369ddb9898b3fd1fb744b4417cc372ca845538bdd9ff17b",
+    "width": 2048,
+    "height": 2050,
+    "path": "assets/ribbed_corduroy.jpg",
+    "filesMetadataSha256": "df1c2f86e41ab948df6e5bda0709c4aeb03763d51159cac8f3df82b685e9b5ed"
+  },
+  {
+    "id": "romantic_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:romantic_veneer",
+    "sourceUrl": "https://polyhaven.com/a/romantic_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/romantic_veneer/romantic_veneer_diff_2k.jpg",
+      "md5": "95c6379b9c28e8c401523d95408247dd",
+      "size": 2038579
+    },
+    "sha256": "0abe4c94f2121a1beb038e5afeb5c338bd0c311524fe34a79666c19667f2d2a0",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/romantic_veneer.jpg",
+    "filesMetadataSha256": "e0cd7580125a9f6ed72e5c66f5fbebb24af9f7e051bd5b931a71ed76339a2ee1"
+  },
+  {
+    "id": "rough_linen",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:rough_linen",
+    "sourceUrl": "https://polyhaven.com/a/rough_linen",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      270.7081392676629,
+      271.29998803138733
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rough_linen/rough_linen_diff_2k.jpg",
+      "md5": "1287d4d1183c511e4adc55b8d006d763",
+      "size": 3607181
+    },
+    "sha256": "e71016e08dfebea1dd4e8a2a675e3b617a889a782af782f1abb795906f4db1b4",
+    "width": 2048,
+    "height": 2052,
+    "path": "assets/rough_linen.jpg",
+    "filesMetadataSha256": "14d222418e4dbe1a0fc3e6bbf9776694474cac43fd531b5f77f8da819616cd49"
+  },
+  {
+    "id": "rubber_tiles",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:rubber_tiles",
+    "sourceUrl": "https://polyhaven.com/a/rubber_tiles",
+    "authors": [
+      "Amal Kumar"
+    ],
+    "dimensionsMillimeters": [
+      1999.9996423721313,
+      1999.9996423721313
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 1685204,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rubber_tiles/rubber_tiles_diff_2k.jpg",
+      "md5": "5bfab6657e8b95310d22cb40b81fe42e"
+    },
+    "sha256": "a14ed9c9b8235a71ce2d7d0d5d0d949a07b8e895d2b78cb3589a6c755bd95215",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/rubber_tiles.jpg",
+    "filesMetadataSha256": "d5da33a87fd9a93f0418177460733ef954263a6279e47ad927fe961779d2ef62"
+  },
+  {
+    "id": "rubberized_track",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:rubberized_track",
+    "sourceUrl": "https://polyhaven.com/a/rubberized_track",
+    "authors": [
+      "Charlotte Baglioni"
+    ],
+    "dimensionsMillimeters": [
+      2000,
+      2000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 3631740,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rubberized_track/rubberized_track_diff_2k.jpg",
+      "md5": "5c0c0fe12441db5a1a52147f95d793f9"
+    },
+    "sha256": "1b7cb225ae8ae7be9cc91f48a234dcd76ed32d4f98a4ac547e0b2f299752438a",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/rubberized_track.jpg",
+    "filesMetadataSha256": "8f0d4cd1e2686bb8214a27491d4e960e7611c3f9607afb6c49dee50a3235bc4f"
+  },
+  {
+    "id": "sapele_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:sapele_veneer",
+    "sourceUrl": "https://polyhaven.com/a/sapele_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      500,
+      500
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sapele_veneer/sapele_veneer_diff_2k.jpg",
+      "md5": "788e26fc053ef34a925bc31f80e61ff7",
+      "size": 2829181
+    },
+    "sha256": "677f56c6e70f04ca20f452b48cc7b149b6023ecf2228ac29f3c2369d8d263837",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/sapele_veneer.jpg",
+    "filesMetadataSha256": "df4756abf14a99aad9b487e2fdaa42da7b3a49c83d0b251695e3fcd03b40dba7"
+  },
+  {
+    "id": "scuba_suede",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:scuba_suede",
+    "sourceUrl": "https://polyhaven.com/a/scuba_suede",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      285.2202902890041,
+      278.89999747276306
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/scuba_suede/scuba_suede_diff_2k.jpg",
+      "md5": "1cfa0ca16f7b3339bbe16aeef10835e7",
+      "size": 3694081
+    },
+    "sha256": "9c0b3ed2ffc4862c571940b139680ac6f612041b9454bbddff21f90dc027033c",
+    "width": 2048,
+    "height": 2003,
+    "path": "assets/scuba_suede.jpg",
+    "filesMetadataSha256": "1212548a7da65e0c081f8922902c29b43996ee64fdb8d443b75276a977b6e5c0"
+  },
+  {
+    "id": "smooth_concrete_floor",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:smooth_concrete_floor",
+    "sourceUrl": "https://polyhaven.com/a/smooth_concrete_floor",
+    "authors": [
+      "Dimitrios Savva"
+    ],
+    "dimensionsMillimeters": [
+      2000,
+      2000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 3561275,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/smooth_concrete_floor/smooth_concrete_floor_diff_2k.jpg",
+      "md5": "3b9f88588c6fec0110f7e112163a8986"
+    },
+    "sha256": "19fecf502443f53f5e94b67569461dc571f1de60d3676f925b74b78b398f4897",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/smooth_concrete_floor.jpg",
+    "filesMetadataSha256": "3fb47c2f2eb2f0745bb020c7943bb40a131d71bba2068eeaaac2a2708341caa7"
+  },
+  {
+    "id": "stretch_poplin",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:stretch_poplin",
+    "sourceUrl": "https://polyhaven.com/a/stretch_poplin",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      291.0233241569048,
+      280.8000147342682
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/stretch_poplin/stretch_poplin_diff_2k.jpg",
+      "md5": "c70169b9f61ccb883cea0b4dfd12db81",
+      "size": 2645846
+    },
+    "sha256": "227e4a7d75c042fad254c1600e739c4a385eebbe905c8601e7c5c3a90316f523",
+    "width": 2048,
+    "height": 1976,
+    "path": "assets/stretch_poplin.jpg",
+    "filesMetadataSha256": "b2f9622eaca90685cfa960fc1de9371ddd9f2776e6329576fd8f5bf7db7e49ca"
+  },
+  {
+    "id": "teak_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:teak_veneer",
+    "sourceUrl": "https://polyhaven.com/a/teak_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/teak_veneer/teak_veneer_diff_2k.jpg",
+      "md5": "e9e8bbaff47d03a1199e7560b7e3ed71",
+      "size": 2547317
+    },
+    "sha256": "9041a872e0125064e94433117491b97f69488d94e375bb0265084fb93b11ef59",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/teak_veneer.jpg",
+    "filesMetadataSha256": "30e4e485ae6e64b8b053e7a805887397532fc71305dab457ab46454ec6b35f6d"
+  },
+  {
+    "id": "terrazzo_tiles",
+    "category": "stone-rubber",
+    "sourceFamilyId": "polyhaven:terrazzo_tiles",
+    "sourceUrl": "https://polyhaven.com/a/terrazzo_tiles",
+    "authors": [
+      "Amal Kumar"
+    ],
+    "dimensionsMillimeters": [
+      2000,
+      2000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/terrazzo_tiles/terrazzo_tiles_diff_2k.jpg",
+      "md5": "b4bfb01525c22e611d9a0651f372ae91",
+      "size": 4554044
+    },
+    "sha256": "26cc390c19e468de03fc9699198398590a7adc1ddd4972e6d6fb65d76403bb66",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/terrazzo_tiles.jpg",
+    "filesMetadataSha256": "e3d74f2f49b2a5985f220d6d9d8906cf0968ae2a88fc87ab603aef6792fcb3ad"
+  },
+  {
+    "id": "terry_cloth",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:terry_cloth",
+    "sourceUrl": "https://polyhaven.com/a/terry_cloth",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      367.0535953781794,
+      363.20000886917114
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/terry_cloth/terry_cloth_diff_2k.jpg",
+      "md5": "ec68f836af445018e34273276d352739",
+      "size": 3866360
+    },
+    "sha256": "de2d64c46dbd964b6028ec5ca905a43b8ee278f8ac5ef7fe084f796003681b5a",
+    "width": 2048,
+    "height": 2026,
+    "path": "assets/terry_cloth.jpg",
+    "filesMetadataSha256": "543e58dd404e2c6057ffd7d08d1a1d8f646d385c40f81ed23702c7422cba7dee"
+  },
+  {
+    "id": "velour_velvet",
+    "category": "fabric-leather-carpet",
+    "sourceFamilyId": "polyhaven:velour_velvet",
+    "sourceUrl": "https://polyhaven.com/a/velour_velvet",
+    "authors": [
+      "colormass",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      284.22817052147235,
+      273.499995470047
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/velour_velvet/velour_velvet_diff_2k.jpg",
+      "md5": "8a177e9b50140fda3a46e1349b65473a",
+      "size": 3195339
+    },
+    "sha256": "7c81a1577f50a023825d8d5e26ec7f8596e47534d8ff601aa0b074980833e875",
+    "width": 2048,
+    "height": 1971,
+    "path": "assets/velour_velvet.jpg",
+    "filesMetadataSha256": "f16ffd3476008096871ad8037387a7e50bb4c1416081bfef1af1dfd507759b1b"
+  },
+  {
+    "id": "white_maple_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:white_maple_veneer",
+    "sourceUrl": "https://polyhaven.com/a/white_maple_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_maple_veneer/white_maple_veneer_diff_2k.jpg",
+      "md5": "3a4572664bea18b46c801d04ff82f2b2",
+      "size": 1768512
+    },
+    "sha256": "45ee4e8def749bdb41401f98277313b632e52c901d9deb62ca32578347063105",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/white_maple_veneer.jpg",
+    "filesMetadataSha256": "18296e6d6f054709993ac8990b0b5769daa08a7e3dcab90d70028bd12b4a8e40"
+  },
+  {
+    "id": "white_oak_veneer",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:white_oak_veneer",
+    "sourceUrl": "https://polyhaven.com/a/white_oak_veneer",
+    "authors": [
+      "Jenelle van Heerden"
+    ],
+    "dimensionsMillimeters": [
+      500,
+      500
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_oak_veneer/white_oak_veneer_diff_2k.jpg",
+      "md5": "38d61468709c2bcd17ae9efbef8b0ad0",
+      "size": 2537257
+    },
+    "sha256": "00e09e2f901fb76c6d206e7a0197f257f8a9d5f662d3cd863c2258c9b287131e",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/white_oak_veneer.jpg",
+    "filesMetadataSha256": "032d534d83f9667e2f02ee4fb18d3ac2d29b284640da00b7346968e0a4406d2e"
+  },
+  {
+    "id": "wood_table",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:wood_table",
+    "sourceUrl": "https://polyhaven.com/a/wood_table",
+    "authors": [
+      "Dimitrios Savva"
+    ],
+    "dimensionsMillimeters": [
+      1000,
+      1000
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table/wood_table_diff_2k.jpg",
+      "md5": "767c1f81d6398aaf9a09353b5d12682d",
+      "size": 3954552
+    },
+    "sha256": "abf40084777a3abdb8136ea8b643de40ec9bae4b36c865a0206badb1cacd07a7",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/wood_table.jpg",
+    "filesMetadataSha256": "c7ac360450cb5246022effeae7fc3fcfce9618325249e389b2dfd2c1c3cdfd70"
+  },
+  {
+    "id": "wood_table_001",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:wood_table",
+    "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+    "authors": [
+      "Dimitrios Savva",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      1500,
+      1500.0001192092896
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 924532,
+      "md5": "a36483628b915dabf82961ab2a62a85c",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_diff_2k.jpg"
+    },
+    "sha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/wood_table_001.jpg",
+    "filesMetadataSha256": "e047bb4fed24f5200cbf8743fd193aa02ce08f36489e6decb1a17a11d90ef809"
+  },
+  {
+    "id": "wood_table_large",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:wood_table",
+    "sourceUrl": "https://polyhaven.com/a/wood_table_large",
+    "authors": [
+      "Dimitrios Savva"
+    ],
+    "dimensionsMillimeters": [
+      1550.0000715255737,
+      1550.0000715255737
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_large/wood_table_large_diff_2k.jpg",
+      "md5": "4575d5968324bc9d847704e102409854",
+      "size": 2672834
+    },
+    "sha256": "0715b5761a4fd46074ce0ff533af49ae06fd3750d23865bc0bf537b67b92d5de",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/wood_table_large.jpg",
+    "filesMetadataSha256": "eb4195a6c4431f18b073e21ddd177cb57be6c35ead3026297c51efd7592c38ce"
+  },
+  {
+    "id": "wood_table_worn",
+    "category": "wood",
+    "sourceFamilyId": "polyhaven:wood_table",
+    "sourceUrl": "https://polyhaven.com/a/wood_table_worn",
+    "authors": [
+      "Dimitrios Savva",
+      "Rico Cilliers"
+    ],
+    "dimensionsMillimeters": [
+      549.9999523162842,
+      550.0000715255737
+    ],
+    "colorMap": "Diffuse",
+    "file": {
+      "size": 3108339,
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_worn/wood_table_worn_diff_2k.jpg",
+      "md5": "44d2440f1581401e0ea65133c0e11d79"
+    },
+    "sha256": "165cdba449d56ea8e9675116622b95d7af372b7d7c47b8a98a03fcc630f1d51c",
+    "width": 2048,
+    "height": 2048,
+    "path": "assets/wood_table_worn.jpg",
+    "filesMetadataSha256": "74f885b16c5822f32907e90e74d84c39a2760c164bfcda31b4ad9cf2e7b3ede1"
+  }
+]

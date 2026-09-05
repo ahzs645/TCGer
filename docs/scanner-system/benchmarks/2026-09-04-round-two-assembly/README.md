@@ -71,6 +71,12 @@ hashes, pinned evaluation hashes, exclusions and counts are recorded in
 
 ## Background gap and remaining freeze
 
+**Update 2026-09-05:** The user requested external background pictures. A
+[reviewed 60-image CC0 surface pack](../2026-09-05-cc0-backgrounds/README.md)
+now supplies an alternative to the unavailable self-captured pool. The old
+capture crops remain excluded. Complete corpus generation and freeze are
+still pending.
+
 All 100 crops in `backgrounds-production-v1` originate in Dev Mode sessions.
 `background-eligibility-audit.json` records every excluded crop hash/session and
 the complete union of Dev Mode and v6-full evaluation session exclusions.

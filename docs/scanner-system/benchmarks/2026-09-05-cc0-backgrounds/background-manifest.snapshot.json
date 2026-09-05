@@ -1,0 +1,2910 @@
+{
+  "assemblyEvidence": {
+    "licenseUrl": "https://polyhaven.com/license",
+    "nearDuplicatePairs": [
+      {
+        "hammingDistance": 0,
+        "left": "bi_stretch",
+        "resolution": "keep same split conservatively; visual review confirms surface-only assets",
+        "right": "cotton_jersey"
+      },
+      {
+        "hammingDistance": 0,
+        "left": "bi_stretch",
+        "resolution": "keep same split conservatively; visual review confirms surface-only assets",
+        "right": "crepe_satin"
+      },
+      {
+        "hammingDistance": 0,
+        "left": "cotton_jersey",
+        "resolution": "keep same split conservatively; visual review confirms surface-only assets",
+        "right": "crepe_satin"
+      }
+    ],
+    "nearDuplicateThreshold": 4,
+    "reviewedAssets": 60,
+    "scopeChange": "External CC0 surface textures replace the unavailable self-captured background pool; do not claim these are hands or complete binder scenes.",
+    "source": "Poly Haven",
+    "sourceLicense": "CC0-1.0",
+    "splitAssignment": {
+      "componentByAsset": {
+        "american_walnut_veneer": "american_walnut_veneer",
+        "angli_veneer": "angli_veneer",
+        "ash_veneer": "ash_veneer",
+        "bamboo_veneer": "bamboo_veneer",
+        "bi_stretch": "bi_stretch",
+        "black_oak_veneer": "black_oak_veneer",
+        "book_pattern": "book_pattern",
+        "brown_leather": "brown_leather",
+        "caban": "caban",
+        "cherry_veneer": "cherry_veneer",
+        "coated_pine": "coated_pine",
+        "concrete_floor": "concrete_floor",
+        "cotton_jersey": "bi_stretch",
+        "crepe_georgette": "crepe_georgette",
+        "crepe_satin": "bi_stretch",
+        "curly_teddy_natural": "curly_teddy_natural",
+        "dark_wood": "dark_wood",
+        "denim_fabric": "denim_fabric",
+        "dirty_carpet": "dirty_carpet",
+        "fabric_leather_01": "fabric_leather_01",
+        "fabric_pattern_05": "fabric_pattern_05",
+        "fabric_pattern_07": "fabric_pattern_07",
+        "gingham_check": "gingham_check",
+        "granite_tile": "granite_tile",
+        "grey_lati_veneer": "grey_lati_veneer",
+        "hessian_230": "hessian_230",
+        "jersey_melange": "jersey_melange",
+        "jogging_melange": "jogging_melange",
+        "knitted_fleece": "knitted_fleece",
+        "leather_red_02": "leather_red_02",
+        "leather_white": "leather_white",
+        "marble_01": "marble_01",
+        "marble_tiles": "marble_tiles",
+        "mocha_oak_veneer": "mocha_oak_veneer",
+        "natural_walnut_veneer": "natural_walnut_veneer",
+        "okoume_veneer": "okoume_veneer",
+        "olive_veneer": "olive_veneer",
+        "plywood": "plywood",
+        "polar_fleece": "polar_fleece",
+        "poly_wool_herringbone": "poly_wool_herringbone",
+        "red_oak_veneer": "red_oak_veneer",
+        "ribbed_corduroy": "ribbed_corduroy",
+        "romantic_veneer": "romantic_veneer",
+        "rough_linen": "rough_linen",
+        "rubber_tiles": "rubber_tiles",
+        "rubberized_track": "rubberized_track",
+        "sapele_veneer": "sapele_veneer",
+        "scuba_suede": "scuba_suede",
+        "smooth_concrete_floor": "smooth_concrete_floor",
+        "stretch_poplin": "stretch_poplin",
+        "teak_veneer": "teak_veneer",
+        "terrazzo_tiles": "terrazzo_tiles",
+        "terry_cloth": "terry_cloth",
+        "velour_velvet": "velour_velvet",
+        "white_maple_veneer": "white_maple_veneer",
+        "white_oak_veneer": "white_oak_veneer",
+        "wood_table": "wood_table",
+        "wood_table_001": "wood_table",
+        "wood_table_large": "wood_table",
+        "wood_table_worn": "wood_table"
+      },
+      "counts": {
+        "train": 48,
+        "validation": 12
+      },
+      "method": "largest source/similarity component first toward 80/20",
+      "seed": 20260905
+    },
+    "userAuthorization": "2026-09-05 request to find external background pictures"
+  },
+  "assets": [
+    {
+      "assetId": "polyhaven-bg-american_walnut_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/american_walnut_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "278ed3382b3a28a95861a84ccf4f3b591abf96a203698152064d65fcc6425271",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/american_walnut_veneer/american_walnut_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "c3db17b94fbd90a079a8bdc915cd5960",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:american_walnut_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:american_walnut_veneer",
+        "sourceImageSha256": "278ed3382b3a28a95861a84ccf4f3b591abf96a203698152064d65fcc6425271",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/american_walnut_veneer"
+      },
+      "sha256": "278ed3382b3a28a95861a84ccf4f3b591abf96a203698152064d65fcc6425271",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-angli_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/angli_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "681be4fd4702bed0a340fe696496f8b4dc5330c9641e3408f1aba2e7313707db",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/angli_veneer/angli_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "88c9655a5a800d325c11711626475cb4",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:angli_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:angli_veneer",
+        "sourceImageSha256": "681be4fd4702bed0a340fe696496f8b4dc5330c9641e3408f1aba2e7313707db",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/angli_veneer"
+      },
+      "sha256": "681be4fd4702bed0a340fe696496f8b4dc5330c9641e3408f1aba2e7313707db",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-ash_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/ash_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "00abb70f86bdfe49aa6e09f350af9e8e1605ccf13171f9be46ceb6018846c06b",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/ash_veneer/ash_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "4b720b76d3d3004b68fa4cdb77008865",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:ash_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:ash_veneer",
+        "sourceImageSha256": "00abb70f86bdfe49aa6e09f350af9e8e1605ccf13171f9be46ceb6018846c06b",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/ash_veneer"
+      },
+      "sha256": "00abb70f86bdfe49aa6e09f350af9e8e1605ccf13171f9be46ceb6018846c06b",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-bamboo_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/bamboo_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "f706462756c039c104838cddf4877a3b899da5e5cd0573ec441d4e20f9843f4b",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/bamboo_veneer/bamboo_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "fa0e742547faf21baa35455528d03da5",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:bamboo_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:bamboo_veneer",
+        "sourceImageSha256": "f706462756c039c104838cddf4877a3b899da5e5cd0573ec441d4e20f9843f4b",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/bamboo_veneer"
+      },
+      "sha256": "f706462756c039c104838cddf4877a3b899da5e5cd0573ec441d4e20f9843f4b",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-bi_stretch",
+      "licenseId": "CC0-1.0",
+      "path": "assets/bi_stretch.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "67cd1633c6417a39448eb03b76c15b974f728691e95429d86cd493276f20f6b0",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2047
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/bi_stretch/bi_stretch_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "8da4c43c744ecd0ec2bb62deb95f2287",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:bi_stretch",
+        "sourceDimensions": [
+          2048,
+          2047
+        ],
+        "sourceDimensionsMillimeters": [
+          264.5644946243421,
+          264.4000053405762
+        ],
+        "sourceFamilyId": "polyhaven:bi_stretch",
+        "sourceImageSha256": "67cd1633c6417a39448eb03b76c15b974f728691e95429d86cd493276f20f6b0",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/bi_stretch"
+      },
+      "sha256": "67cd1633c6417a39448eb03b76c15b974f728691e95429d86cd493276f20f6b0",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-black_oak_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/black_oak_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "d2653c9cf8e05171ba2256c92315cf39fe230482b433a6a9c02cf26ef566624c",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_oak_veneer/black_oak_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "41e682d7c8e5b5598e39d5b7d100817f",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:black_oak_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:black_oak_veneer",
+        "sourceImageSha256": "d2653c9cf8e05171ba2256c92315cf39fe230482b433a6a9c02cf26ef566624c",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/black_oak_veneer"
+      },
+      "sha256": "d2653c9cf8e05171ba2256c92315cf39fe230482b433a6a9c02cf26ef566624c",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-book_pattern",
+      "licenseId": "CC0-1.0",
+      "path": "assets/book_pattern.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "ce8254ae9e8543c98fec02dd0bf93df59561342a4d99681a45c2730b55c3d577",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "col1",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/book_pattern/book_pattern_col1_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "bb223836024d8b03b4098ae9c8c078b4",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:book_pattern",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          299.9999523162842,
+          300.00001192092896
+        ],
+        "sourceFamilyId": "polyhaven:book_pattern",
+        "sourceImageSha256": "ce8254ae9e8543c98fec02dd0bf93df59561342a4d99681a45c2730b55c3d577",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/book_pattern"
+      },
+      "sha256": "ce8254ae9e8543c98fec02dd0bf93df59561342a4d99681a45c2730b55c3d577",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-brown_leather",
+      "licenseId": "CC0-1.0",
+      "path": "assets/brown_leather.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "b0de2403a31efa31e501b0028c0bd8e504d5bd6318f4a5ce90c550c3067f96d8",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_albedo_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "1bd381c43817743a2affdd1ce2d193c7",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:brown_leather",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          400.0000059604645,
+          400.00003576278687
+        ],
+        "sourceFamilyId": "polyhaven:brown_leather",
+        "sourceImageSha256": "b0de2403a31efa31e501b0028c0bd8e504d5bd6318f4a5ce90c550c3067f96d8",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/brown_leather"
+      },
+      "sha256": "b0de2403a31efa31e501b0028c0bd8e504d5bd6318f4a5ce90c550c3067f96d8",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-caban",
+      "licenseId": "CC0-1.0",
+      "path": "assets/caban.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "c616fd58f9e0b484e664094d47632bd9d0d2247d943389b69e0e89465a68af77",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2043
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/caban/caban_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "477c56f93f158317c633f9e7f351429c",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:caban",
+        "sourceDimensions": [
+          2048,
+          2043
+        ],
+        "sourceDimensionsMillimeters": [
+          273.9921411828764,
+          273.2999920845032
+        ],
+        "sourceFamilyId": "polyhaven:caban",
+        "sourceImageSha256": "c616fd58f9e0b484e664094d47632bd9d0d2247d943389b69e0e89465a68af77",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/caban"
+      },
+      "sha256": "c616fd58f9e0b484e664094d47632bd9d0d2247d943389b69e0e89465a68af77",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-cherry_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/cherry_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "dc572a16d860d56f03ae7b2df6fbf684adda4a5eee784733069d784a7dfe1a9c",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cherry_veneer/cherry_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "6d5c8b7fe2d3c262bf9d0e0178a86b20",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:cherry_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:cherry_veneer",
+        "sourceImageSha256": "dc572a16d860d56f03ae7b2df6fbf684adda4a5eee784733069d784a7dfe1a9c",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/cherry_veneer"
+      },
+      "sha256": "dc572a16d860d56f03ae7b2df6fbf684adda4a5eee784733069d784a7dfe1a9c",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-coated_pine",
+      "licenseId": "CC0-1.0",
+      "path": "assets/coated_pine.jpg",
+      "provenance": {
+        "author": "Charlotte Baglioni, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "377fa07523a1d2a52fb4a3b099eba0e81a6167038210cdd9791c07a0f1d39497",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coated_pine/coated_pine_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "2589f6ecab859532fb654ac73834a974",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:coated_pine",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          740.0000095367432,
+          740.0000095367432
+        ],
+        "sourceFamilyId": "polyhaven:coated_pine",
+        "sourceImageSha256": "377fa07523a1d2a52fb4a3b099eba0e81a6167038210cdd9791c07a0f1d39497",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/coated_pine"
+      },
+      "sha256": "377fa07523a1d2a52fb4a3b099eba0e81a6167038210cdd9791c07a0f1d39497",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-concrete_floor",
+      "licenseId": "CC0-1.0",
+      "path": "assets/concrete_floor.jpg",
+      "provenance": {
+        "author": "eye-candy.xyz",
+        "backgroundReview": {
+          "cropSha256": "72249ce8ba5cedd518ebb60840e882a3506a4b2a24958055d1b36752dbcfda36",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor/concrete_floor_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "b31fcf4f48ca62a0c36ecd0e5b0d47de",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:concrete_floor",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          2079.9996852874756,
+          2079.9996852874756
+        ],
+        "sourceFamilyId": "polyhaven:concrete_floor",
+        "sourceImageSha256": "72249ce8ba5cedd518ebb60840e882a3506a4b2a24958055d1b36752dbcfda36",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/concrete_floor"
+      },
+      "sha256": "72249ce8ba5cedd518ebb60840e882a3506a4b2a24958055d1b36752dbcfda36",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-cotton_jersey",
+      "licenseId": "CC0-1.0",
+      "path": "assets/cotton_jersey.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "ddaedb1e9d7d903eac532f7f8722fbb397a9efb0da82801b97002bada416d2d0",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2050
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cotton_jersey/cotton_jersey_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "911fa5b8031c69d7051489f813b170ac",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:cotton_jersey",
+        "sourceDimensions": [
+          2048,
+          2050
+        ],
+        "sourceDimensionsMillimeters": [
+          263.6027473872483,
+          263.7999951839447
+        ],
+        "sourceFamilyId": "polyhaven:cotton_jersey",
+        "sourceImageSha256": "ddaedb1e9d7d903eac532f7f8722fbb397a9efb0da82801b97002bada416d2d0",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/cotton_jersey"
+      },
+      "sha256": "ddaedb1e9d7d903eac532f7f8722fbb397a9efb0da82801b97002bada416d2d0",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-crepe_georgette",
+      "licenseId": "CC0-1.0",
+      "path": "assets/crepe_georgette.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "301e1d3ee0ce105cdfe514a157fc0691a19838a061148a221b4a44b59b34cba2",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2083
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/crepe_georgette/crepe_georgette_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "4dab9733531ff3e42525b1c20110dba7",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:crepe_georgette",
+        "sourceDimensions": [
+          2048,
+          2083
+        ],
+        "sourceDimensionsMillimeters": [
+          261.1946943115489,
+          265.5999958515167
+        ],
+        "sourceFamilyId": "polyhaven:crepe_georgette",
+        "sourceImageSha256": "301e1d3ee0ce105cdfe514a157fc0691a19838a061148a221b4a44b59b34cba2",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/crepe_georgette"
+      },
+      "sha256": "301e1d3ee0ce105cdfe514a157fc0691a19838a061148a221b4a44b59b34cba2",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-crepe_satin",
+      "licenseId": "CC0-1.0",
+      "path": "assets/crepe_satin.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "f835aa033c55d192391c26be643c54edca8e88ee4c5b05387a0de355b220628d",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2085
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/crepe_satin/crepe_satin_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "239e951740cabd339d3672442a2a8d9c",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:crepe_satin",
+        "sourceDimensions": [
+          2048,
+          2085
+        ],
+        "sourceDimensionsMillimeters": [
+          263.19942218838304,
+          267.8999900817871
+        ],
+        "sourceFamilyId": "polyhaven:crepe_satin",
+        "sourceImageSha256": "f835aa033c55d192391c26be643c54edca8e88ee4c5b05387a0de355b220628d",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/crepe_satin"
+      },
+      "sha256": "f835aa033c55d192391c26be643c54edca8e88ee4c5b05387a0de355b220628d",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-curly_teddy_natural",
+      "licenseId": "CC0-1.0",
+      "path": "assets/curly_teddy_natural.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "512aa3bf7839190eb805f5d095860622c84417449929dd8c5370880d4989b7c6",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2018
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/curly_teddy_natural/curly_teddy_natural_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "e773ba1903e343cdd9d95db0de063d4a",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:curly_teddy_natural",
+        "sourceDimensions": [
+          2048,
+          2018
+        ],
+        "sourceDimensionsMillimeters": [
+          335.804452696631,
+          330.90004324913025
+        ],
+        "sourceFamilyId": "polyhaven:curly_teddy_natural",
+        "sourceImageSha256": "512aa3bf7839190eb805f5d095860622c84417449929dd8c5370880d4989b7c6",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/curly_teddy_natural"
+      },
+      "sha256": "512aa3bf7839190eb805f5d095860622c84417449929dd8c5370880d4989b7c6",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-dark_wood",
+      "licenseId": "CC0-1.0",
+      "path": "assets/dark_wood.jpg",
+      "provenance": {
+        "author": "Dario Barresi, Dimitrios Savva, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "ff811f97ab46f1148f2753451fd9d64abf0ab9101e85922ed9f45fc3595a3cf2",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dark_wood/dark_wood_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "f6e205a05ff7f1b45c675795b18ea0f5",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:dark_wood",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          2000,
+          2000
+        ],
+        "sourceFamilyId": "polyhaven:dark_wood",
+        "sourceImageSha256": "ff811f97ab46f1148f2753451fd9d64abf0ab9101e85922ed9f45fc3595a3cf2",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/dark_wood"
+      },
+      "sha256": "ff811f97ab46f1148f2753451fd9d64abf0ab9101e85922ed9f45fc3595a3cf2",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-denim_fabric",
+      "licenseId": "CC0-1.0",
+      "path": "assets/denim_fabric.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "164fdc3adbae7eab65171b05fb43aac5e3945615cb905b37b48049b2630c56d2",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denim_fabric/denim_fabric_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "5d84c58b94a3094ea1edff88f4ed39d0",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:denim_fabric",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          100.00000149011612,
+          99.99999403953552
+        ],
+        "sourceFamilyId": "polyhaven:denim_fabric",
+        "sourceImageSha256": "164fdc3adbae7eab65171b05fb43aac5e3945615cb905b37b48049b2630c56d2",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/denim_fabric"
+      },
+      "sha256": "164fdc3adbae7eab65171b05fb43aac5e3945615cb905b37b48049b2630c56d2",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-dirty_carpet",
+      "licenseId": "CC0-1.0",
+      "path": "assets/dirty_carpet.jpg",
+      "provenance": {
+        "author": "Rohit Seervi",
+        "backgroundReview": {
+          "cropSha256": "6337d3ef1a11ca8bea2d31b86da15a65f10ae92c7f3345fae62924bae194f6c0",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirty_carpet/dirty_carpet_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "d2f1c8d121996a8f46c8da89968ed95c",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:dirty_carpet",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          599.9999046325684,
+          599.9999046325684
+        ],
+        "sourceFamilyId": "polyhaven:dirty_carpet",
+        "sourceImageSha256": "6337d3ef1a11ca8bea2d31b86da15a65f10ae92c7f3345fae62924bae194f6c0",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/dirty_carpet"
+      },
+      "sha256": "6337d3ef1a11ca8bea2d31b86da15a65f10ae92c7f3345fae62924bae194f6c0",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-fabric_leather_01",
+      "licenseId": "CC0-1.0",
+      "path": "assets/fabric_leather_01.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "ca8123e6c031365fd782323bee05ce9da8bf05cc2ed57a83a66f0874923648d8",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_leather_01/fabric_leather_01_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "f9c0c71ebadf92071d5779257c12d73a",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:fabric_leather_01",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          400.0000059604645,
+          400.00003576278687
+        ],
+        "sourceFamilyId": "polyhaven:fabric_leather_01",
+        "sourceImageSha256": "ca8123e6c031365fd782323bee05ce9da8bf05cc2ed57a83a66f0874923648d8",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/fabric_leather_01"
+      },
+      "sha256": "ca8123e6c031365fd782323bee05ce9da8bf05cc2ed57a83a66f0874923648d8",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-fabric_pattern_05",
+      "licenseId": "CC0-1.0",
+      "path": "assets/fabric_pattern_05.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "090e3b8a097153c66539616ff7e4eaabcbbd39104b7ad98d6e0ed436843aa23f",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "col_01",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_pattern_05/fabric_pattern_05_col_01_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "5b1497806235db931b92b2149920dc7a",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:fabric_pattern_05",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          500,
+          499.9999403953552
+        ],
+        "sourceFamilyId": "polyhaven:fabric_pattern_05",
+        "sourceImageSha256": "090e3b8a097153c66539616ff7e4eaabcbbd39104b7ad98d6e0ed436843aa23f",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/fabric_pattern_05"
+      },
+      "sha256": "090e3b8a097153c66539616ff7e4eaabcbbd39104b7ad98d6e0ed436843aa23f",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-fabric_pattern_07",
+      "licenseId": "CC0-1.0",
+      "path": "assets/fabric_pattern_07.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "1f4941638b890d4535b1078067be8a831ca302d1e696ed959b4e4512de893cba",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "col_1",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_pattern_07/fabric_pattern_07_col_1_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "ad5b3f69e889a6890d6413ea1568ff25",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:fabric_pattern_07",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          400.0000059604645,
+          400.00003576278687
+        ],
+        "sourceFamilyId": "polyhaven:fabric_pattern_07",
+        "sourceImageSha256": "1f4941638b890d4535b1078067be8a831ca302d1e696ed959b4e4512de893cba",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/fabric_pattern_07"
+      },
+      "sha256": "1f4941638b890d4535b1078067be8a831ca302d1e696ed959b4e4512de893cba",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-gingham_check",
+      "licenseId": "CC0-1.0",
+      "path": "assets/gingham_check.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "a031eb9878875c3b5d3338768bcff385cebe6ed214f5e2eee1c942eefcd46837",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2143
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gingham_check/gingham_check_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "9e2b46193b62567f781a7074b53eb31f",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:gingham_check",
+        "sourceDimensions": [
+          2048,
+          2143
+        ],
+        "sourceDimensionsMillimeters": [
+          283.65123073689267,
+          296.79998755455017
+        ],
+        "sourceFamilyId": "polyhaven:gingham_check",
+        "sourceImageSha256": "a031eb9878875c3b5d3338768bcff385cebe6ed214f5e2eee1c942eefcd46837",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/gingham_check"
+      },
+      "sha256": "a031eb9878875c3b5d3338768bcff385cebe6ed214f5e2eee1c942eefcd46837",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-granite_tile",
+      "licenseId": "CC0-1.0",
+      "path": "assets/granite_tile.jpg",
+      "provenance": {
+        "author": "Charlotte Baglioni",
+        "backgroundReview": {
+          "cropSha256": "758f9b1cdce11bc6f6a805cdea18fb789639befe40608020ab6087c5c1cba1e5",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/granite_tile/granite_tile_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "79a1eaac48a3d6720a88c216997dbd67",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:granite_tile",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          2299.999952316284,
+          2299.999952316284
+        ],
+        "sourceFamilyId": "polyhaven:granite_tile",
+        "sourceImageSha256": "758f9b1cdce11bc6f6a805cdea18fb789639befe40608020ab6087c5c1cba1e5",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/granite_tile"
+      },
+      "sha256": "758f9b1cdce11bc6f6a805cdea18fb789639befe40608020ab6087c5c1cba1e5",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-grey_lati_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/grey_lati_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "9832d19e93b0e4a7c33d6bb1d272733be54d5d9fcae5370a461f57a4da8c5863",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grey_lati_veneer/grey_lati_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "1c4da666cd97773e1f91a4ee9c9bad73",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:grey_lati_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:grey_lati_veneer",
+        "sourceImageSha256": "9832d19e93b0e4a7c33d6bb1d272733be54d5d9fcae5370a461f57a4da8c5863",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/grey_lati_veneer"
+      },
+      "sha256": "9832d19e93b0e4a7c33d6bb1d272733be54d5d9fcae5370a461f57a4da8c5863",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-hessian_230",
+      "licenseId": "CC0-1.0",
+      "path": "assets/hessian_230.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "1c1d66e3764dded1cfafa5147ea56a28ef7648e3c5cae6892b8dada92d408685",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2036
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/hessian_230/hessian_230_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "e73dcb7ae06f7267f74fc5869c63233c",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:hessian_230",
+        "sourceDimensions": [
+          2048,
+          2036
+        ],
+        "sourceDimensionsMillimeters": [
+          268.7538661074732,
+          267.1999931335449
+        ],
+        "sourceFamilyId": "polyhaven:hessian_230",
+        "sourceImageSha256": "1c1d66e3764dded1cfafa5147ea56a28ef7648e3c5cae6892b8dada92d408685",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/hessian_230"
+      },
+      "sha256": "1c1d66e3764dded1cfafa5147ea56a28ef7648e3c5cae6892b8dada92d408685",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-jersey_melange",
+      "licenseId": "CC0-1.0",
+      "path": "assets/jersey_melange.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "257e6f6a0e56dade355c3ff94198733c323d04c1f6e8c9e0395f35c0671b7893",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          1946
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/jersey_melange/jersey_melange_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "627563d04a347af78d35e5a7a586b4a3",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:jersey_melange",
+        "sourceDimensions": [
+          2048,
+          1946
+        ],
+        "sourceDimensionsMillimeters": [
+          290.62397202303356,
+          276.19999647140503
+        ],
+        "sourceFamilyId": "polyhaven:jersey_melange",
+        "sourceImageSha256": "257e6f6a0e56dade355c3ff94198733c323d04c1f6e8c9e0395f35c0671b7893",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/jersey_melange"
+      },
+      "sha256": "257e6f6a0e56dade355c3ff94198733c323d04c1f6e8c9e0395f35c0671b7893",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-jogging_melange",
+      "licenseId": "CC0-1.0",
+      "path": "assets/jogging_melange.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "cb84b8a621003c11eede17c349b1a21bc43abe6d9bbb79928cb82b8aa4c69c3c",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2047
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/jogging_melange/jogging_melange_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "62f774c3ee1e6b108a42edd3fac33429",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:jogging_melange",
+        "sourceDimensions": [
+          2048,
+          2047
+        ],
+        "sourceDimensionsMillimeters": [
+          273.4973732349353,
+          273.2999920845032
+        ],
+        "sourceFamilyId": "polyhaven:jogging_melange",
+        "sourceImageSha256": "cb84b8a621003c11eede17c349b1a21bc43abe6d9bbb79928cb82b8aa4c69c3c",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/jogging_melange"
+      },
+      "sha256": "cb84b8a621003c11eede17c349b1a21bc43abe6d9bbb79928cb82b8aa4c69c3c",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-knitted_fleece",
+      "licenseId": "CC0-1.0",
+      "path": "assets/knitted_fleece.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "7cc9a0bf3adca4a913d79fbe70149729e1ed2cc0ef479a9e9ab020a35d006e3a",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2079
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/knitted_fleece/knitted_fleece_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "5ae8d0ed7af13b0ca1b61b1467854b2a",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:knitted_fleece",
+        "sourceDimensions": [
+          2048,
+          2079
+        ],
+        "sourceDimensionsMillimeters": [
+          266.35669526830077,
+          270.3999876976013
+        ],
+        "sourceFamilyId": "polyhaven:knitted_fleece",
+        "sourceImageSha256": "7cc9a0bf3adca4a913d79fbe70149729e1ed2cc0ef479a9e9ab020a35d006e3a",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/knitted_fleece"
+      },
+      "sha256": "7cc9a0bf3adca4a913d79fbe70149729e1ed2cc0ef479a9e9ab020a35d006e3a",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-leather_red_02",
+      "licenseId": "CC0-1.0",
+      "path": "assets/leather_red_02.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "a900630e541991b7ee63aab820f425610fbf2db32f7ae6c63b6ef4fc2325ab60",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "coll1",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_red_02/leather_red_02_coll1_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "b027e31de9b4a08114e1e1a706810d2c",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:leather_red_02",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          600.0000238418579,
+          600.0000238418579
+        ],
+        "sourceFamilyId": "polyhaven:leather_red_02",
+        "sourceImageSha256": "a900630e541991b7ee63aab820f425610fbf2db32f7ae6c63b6ef4fc2325ab60",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/leather_red_02"
+      },
+      "sha256": "a900630e541991b7ee63aab820f425610fbf2db32f7ae6c63b6ef4fc2325ab60",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-leather_white",
+      "licenseId": "CC0-1.0",
+      "path": "assets/leather_white.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "1292cc2c6b26508dc242a4a12220d4a9",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:leather_white",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          300.00001192092896,
+          300.00001192092896
+        ],
+        "sourceFamilyId": "polyhaven:leather_white",
+        "sourceImageSha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/leather_white"
+      },
+      "sha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-marble_01",
+      "licenseId": "CC0-1.0",
+      "path": "assets/marble_01.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "4eeefea16242cecb3b429ac0c8f88740",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:marble_01",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1500,
+          1500
+        ],
+        "sourceFamilyId": "polyhaven:marble_01",
+        "sourceImageSha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/marble_01"
+      },
+      "sha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-marble_tiles",
+      "licenseId": "CC0-1.0",
+      "path": "assets/marble_tiles.jpg",
+      "provenance": {
+        "author": "Charlotte Baglioni",
+        "backgroundReview": {
+          "cropSha256": "9a73fe867cf0c4a14b903542106dee4e33a1de8abf942b1725ff679c00492668",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_tiles/marble_tiles_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "0407b80b586989cd552ff718186fd3d1",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:marble_tiles",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          2000,
+          2000
+        ],
+        "sourceFamilyId": "polyhaven:marble_tiles",
+        "sourceImageSha256": "9a73fe867cf0c4a14b903542106dee4e33a1de8abf942b1725ff679c00492668",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/marble_tiles"
+      },
+      "sha256": "9a73fe867cf0c4a14b903542106dee4e33a1de8abf942b1725ff679c00492668",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-mocha_oak_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/mocha_oak_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "e07686bc7e73958f607df9e11ae5e52d7da070ff539a8d5c993d574916643030",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/mocha_oak_veneer/mocha_oak_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "1cf9f773c31edc139e191580273fe5c7",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:mocha_oak_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:mocha_oak_veneer",
+        "sourceImageSha256": "e07686bc7e73958f607df9e11ae5e52d7da070ff539a8d5c993d574916643030",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/mocha_oak_veneer"
+      },
+      "sha256": "e07686bc7e73958f607df9e11ae5e52d7da070ff539a8d5c993d574916643030",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-natural_walnut_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/natural_walnut_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "4a1a84e9537b291ac0cce1e2b8908fb9b5d1057a246ee0b3c25345565ac9686d",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/natural_walnut_veneer/natural_walnut_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "29646b1b28066cd414595040e5cb978e",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:natural_walnut_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:natural_walnut_veneer",
+        "sourceImageSha256": "4a1a84e9537b291ac0cce1e2b8908fb9b5d1057a246ee0b3c25345565ac9686d",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/natural_walnut_veneer"
+      },
+      "sha256": "4a1a84e9537b291ac0cce1e2b8908fb9b5d1057a246ee0b3c25345565ac9686d",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-okoume_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/okoume_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "c89231023b37d6fde0b82087eaf8c61b04a2fc82558348fd6091dba4bb9aa463",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/okoume_veneer/okoume_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "60b7630a6a0588ff7766b6709218efba",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:okoume_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:okoume_veneer",
+        "sourceImageSha256": "c89231023b37d6fde0b82087eaf8c61b04a2fc82558348fd6091dba4bb9aa463",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/okoume_veneer"
+      },
+      "sha256": "c89231023b37d6fde0b82087eaf8c61b04a2fc82558348fd6091dba4bb9aa463",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-olive_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/olive_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "799f18ab265ebb416fcc6de36adaeb8b846add512cc3ba446b4eedbe7512fad3",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/olive_veneer/olive_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "1d3d29668dd314410e36e767ce70f364",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:olive_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:olive_veneer",
+        "sourceImageSha256": "799f18ab265ebb416fcc6de36adaeb8b846add512cc3ba446b4eedbe7512fad3",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/olive_veneer"
+      },
+      "sha256": "799f18ab265ebb416fcc6de36adaeb8b846add512cc3ba446b4eedbe7512fad3",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-plywood",
+      "licenseId": "CC0-1.0",
+      "path": "assets/plywood.jpg",
+      "provenance": {
+        "author": "Rob Tuytel",
+        "backgroundReview": {
+          "cropSha256": "050a15a796413b91c9cd5ca026dd3c4df83746bb1103ae14ae91503577dead8c",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plywood/plywood_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "ce20176e90b0984ca7dec366832e8198",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:plywood",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          499.999940395355,
+          499.999940395355
+        ],
+        "sourceFamilyId": "polyhaven:plywood",
+        "sourceImageSha256": "050a15a796413b91c9cd5ca026dd3c4df83746bb1103ae14ae91503577dead8c",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/plywood"
+      },
+      "sha256": "050a15a796413b91c9cd5ca026dd3c4df83746bb1103ae14ae91503577dead8c",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-polar_fleece",
+      "licenseId": "CC0-1.0",
+      "path": "assets/polar_fleece.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "f438e737c6d626408089644e31f3552e4a2006249bfa80e63edfd557ae6b2835",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2035
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/polar_fleece/polar_fleece_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "ad4d2ac2a4a75dfdd6ad4efe204140f8",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:polar_fleece",
+        "sourceDimensions": [
+          2048,
+          2035
+        ],
+        "sourceDimensionsMillimeters": [
+          273.2870444699951,
+          271.49999141693115
+        ],
+        "sourceFamilyId": "polyhaven:polar_fleece",
+        "sourceImageSha256": "f438e737c6d626408089644e31f3552e4a2006249bfa80e63edfd557ae6b2835",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/polar_fleece"
+      },
+      "sha256": "f438e737c6d626408089644e31f3552e4a2006249bfa80e63edfd557ae6b2835",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-poly_wool_herringbone",
+      "licenseId": "CC0-1.0",
+      "path": "assets/poly_wool_herringbone.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "ca21de8e2e7f43178f8290361bfb2271eb264af0d2887c7c93e76a113ff3cc64",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2091
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/poly_wool_herringbone/poly_wool_herringbone_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "ab20cb6c120dfa5d38f4e4d3fd9b980d",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:poly_wool_herringbone",
+        "sourceDimensions": [
+          2048,
+          2091
+        ],
+        "sourceDimensionsMillimeters": [
+          270.0788548673393,
+          275.70000290870667
+        ],
+        "sourceFamilyId": "polyhaven:poly_wool_herringbone",
+        "sourceImageSha256": "ca21de8e2e7f43178f8290361bfb2271eb264af0d2887c7c93e76a113ff3cc64",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/poly_wool_herringbone"
+      },
+      "sha256": "ca21de8e2e7f43178f8290361bfb2271eb264af0d2887c7c93e76a113ff3cc64",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-red_oak_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/red_oak_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "adc970218b87a6435269f33bb60eb4bfbeb1d1863d668dfda8234f17f95481b7",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_oak_veneer/red_oak_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "81802f7174b4b02eb67d85170015ce19",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:red_oak_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:red_oak_veneer",
+        "sourceImageSha256": "adc970218b87a6435269f33bb60eb4bfbeb1d1863d668dfda8234f17f95481b7",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/red_oak_veneer"
+      },
+      "sha256": "adc970218b87a6435269f33bb60eb4bfbeb1d1863d668dfda8234f17f95481b7",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-ribbed_corduroy",
+      "licenseId": "CC0-1.0",
+      "path": "assets/ribbed_corduroy.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "f5cebad7e75f473d7369ddb9898b3fd1fb744b4417cc372ca845538bdd9ff17b",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2050
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/ribbed_corduroy/ribbed_corduroy_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "e1c46721886a7e5df3f952d9f34e11cd",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:ribbed_corduroy",
+        "sourceDimensions": [
+          2048,
+          2050
+        ],
+        "sourceDimensionsMillimeters": [
+          266.40417517521894,
+          266.69999957084656
+        ],
+        "sourceFamilyId": "polyhaven:ribbed_corduroy",
+        "sourceImageSha256": "f5cebad7e75f473d7369ddb9898b3fd1fb744b4417cc372ca845538bdd9ff17b",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/ribbed_corduroy"
+      },
+      "sha256": "f5cebad7e75f473d7369ddb9898b3fd1fb744b4417cc372ca845538bdd9ff17b",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-romantic_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/romantic_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "0abe4c94f2121a1beb038e5afeb5c338bd0c311524fe34a79666c19667f2d2a0",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/romantic_veneer/romantic_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "95c6379b9c28e8c401523d95408247dd",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:romantic_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:romantic_veneer",
+        "sourceImageSha256": "0abe4c94f2121a1beb038e5afeb5c338bd0c311524fe34a79666c19667f2d2a0",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/romantic_veneer"
+      },
+      "sha256": "0abe4c94f2121a1beb038e5afeb5c338bd0c311524fe34a79666c19667f2d2a0",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-rough_linen",
+      "licenseId": "CC0-1.0",
+      "path": "assets/rough_linen.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "e71016e08dfebea1dd4e8a2a675e3b617a889a782af782f1abb795906f4db1b4",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2052
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rough_linen/rough_linen_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "1287d4d1183c511e4adc55b8d006d763",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:rough_linen",
+        "sourceDimensions": [
+          2048,
+          2052
+        ],
+        "sourceDimensionsMillimeters": [
+          270.7081392676629,
+          271.29998803138733
+        ],
+        "sourceFamilyId": "polyhaven:rough_linen",
+        "sourceImageSha256": "e71016e08dfebea1dd4e8a2a675e3b617a889a782af782f1abb795906f4db1b4",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/rough_linen"
+      },
+      "sha256": "e71016e08dfebea1dd4e8a2a675e3b617a889a782af782f1abb795906f4db1b4",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-rubber_tiles",
+      "licenseId": "CC0-1.0",
+      "path": "assets/rubber_tiles.jpg",
+      "provenance": {
+        "author": "Amal Kumar",
+        "backgroundReview": {
+          "cropSha256": "a14ed9c9b8235a71ce2d7d0d5d0d949a07b8e895d2b78cb3589a6c755bd95215",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rubber_tiles/rubber_tiles_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "5bfab6657e8b95310d22cb40b81fe42e",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:rubber_tiles",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1999.9996423721313,
+          1999.9996423721313
+        ],
+        "sourceFamilyId": "polyhaven:rubber_tiles",
+        "sourceImageSha256": "a14ed9c9b8235a71ce2d7d0d5d0d949a07b8e895d2b78cb3589a6c755bd95215",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/rubber_tiles"
+      },
+      "sha256": "a14ed9c9b8235a71ce2d7d0d5d0d949a07b8e895d2b78cb3589a6c755bd95215",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-rubberized_track",
+      "licenseId": "CC0-1.0",
+      "path": "assets/rubberized_track.jpg",
+      "provenance": {
+        "author": "Charlotte Baglioni",
+        "backgroundReview": {
+          "cropSha256": "1b7cb225ae8ae7be9cc91f48a234dcd76ed32d4f98a4ac547e0b2f299752438a",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rubberized_track/rubberized_track_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "5c0c0fe12441db5a1a52147f95d793f9",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:rubberized_track",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          2000,
+          2000
+        ],
+        "sourceFamilyId": "polyhaven:rubberized_track",
+        "sourceImageSha256": "1b7cb225ae8ae7be9cc91f48a234dcd76ed32d4f98a4ac547e0b2f299752438a",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/rubberized_track"
+      },
+      "sha256": "1b7cb225ae8ae7be9cc91f48a234dcd76ed32d4f98a4ac547e0b2f299752438a",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-sapele_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/sapele_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "677f56c6e70f04ca20f452b48cc7b149b6023ecf2228ac29f3c2369d8d263837",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sapele_veneer/sapele_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "788e26fc053ef34a925bc31f80e61ff7",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:sapele_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          500,
+          500
+        ],
+        "sourceFamilyId": "polyhaven:sapele_veneer",
+        "sourceImageSha256": "677f56c6e70f04ca20f452b48cc7b149b6023ecf2228ac29f3c2369d8d263837",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/sapele_veneer"
+      },
+      "sha256": "677f56c6e70f04ca20f452b48cc7b149b6023ecf2228ac29f3c2369d8d263837",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-scuba_suede",
+      "licenseId": "CC0-1.0",
+      "path": "assets/scuba_suede.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "9c0b3ed2ffc4862c571940b139680ac6f612041b9454bbddff21f90dc027033c",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2003
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/scuba_suede/scuba_suede_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "1cfa0ca16f7b3339bbe16aeef10835e7",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:scuba_suede",
+        "sourceDimensions": [
+          2048,
+          2003
+        ],
+        "sourceDimensionsMillimeters": [
+          285.2202902890041,
+          278.89999747276306
+        ],
+        "sourceFamilyId": "polyhaven:scuba_suede",
+        "sourceImageSha256": "9c0b3ed2ffc4862c571940b139680ac6f612041b9454bbddff21f90dc027033c",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/scuba_suede"
+      },
+      "sha256": "9c0b3ed2ffc4862c571940b139680ac6f612041b9454bbddff21f90dc027033c",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-smooth_concrete_floor",
+      "licenseId": "CC0-1.0",
+      "path": "assets/smooth_concrete_floor.jpg",
+      "provenance": {
+        "author": "Dimitrios Savva",
+        "backgroundReview": {
+          "cropSha256": "19fecf502443f53f5e94b67569461dc571f1de60d3676f925b74b78b398f4897",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/smooth_concrete_floor/smooth_concrete_floor_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "3b9f88588c6fec0110f7e112163a8986",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:smooth_concrete_floor",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          2000,
+          2000
+        ],
+        "sourceFamilyId": "polyhaven:smooth_concrete_floor",
+        "sourceImageSha256": "19fecf502443f53f5e94b67569461dc571f1de60d3676f925b74b78b398f4897",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/smooth_concrete_floor"
+      },
+      "sha256": "19fecf502443f53f5e94b67569461dc571f1de60d3676f925b74b78b398f4897",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-stretch_poplin",
+      "licenseId": "CC0-1.0",
+      "path": "assets/stretch_poplin.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "227e4a7d75c042fad254c1600e739c4a385eebbe905c8601e7c5c3a90316f523",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          1976
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/stretch_poplin/stretch_poplin_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "c70169b9f61ccb883cea0b4dfd12db81",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:stretch_poplin",
+        "sourceDimensions": [
+          2048,
+          1976
+        ],
+        "sourceDimensionsMillimeters": [
+          291.0233241569048,
+          280.8000147342682
+        ],
+        "sourceFamilyId": "polyhaven:stretch_poplin",
+        "sourceImageSha256": "227e4a7d75c042fad254c1600e739c4a385eebbe905c8601e7c5c3a90316f523",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/stretch_poplin"
+      },
+      "sha256": "227e4a7d75c042fad254c1600e739c4a385eebbe905c8601e7c5c3a90316f523",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-teak_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/teak_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "9041a872e0125064e94433117491b97f69488d94e375bb0265084fb93b11ef59",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/teak_veneer/teak_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "e9e8bbaff47d03a1199e7560b7e3ed71",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:teak_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:teak_veneer",
+        "sourceImageSha256": "9041a872e0125064e94433117491b97f69488d94e375bb0265084fb93b11ef59",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/teak_veneer"
+      },
+      "sha256": "9041a872e0125064e94433117491b97f69488d94e375bb0265084fb93b11ef59",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-terrazzo_tiles",
+      "licenseId": "CC0-1.0",
+      "path": "assets/terrazzo_tiles.jpg",
+      "provenance": {
+        "author": "Amal Kumar",
+        "backgroundReview": {
+          "cropSha256": "26cc390c19e468de03fc9699198398590a7adc1ddd4972e6d6fb65d76403bb66",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/terrazzo_tiles/terrazzo_tiles_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "stone-rubber",
+        "providerMd5": "b4bfb01525c22e611d9a0651f372ae91",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:terrazzo_tiles",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          2000,
+          2000
+        ],
+        "sourceFamilyId": "polyhaven:terrazzo_tiles",
+        "sourceImageSha256": "26cc390c19e468de03fc9699198398590a7adc1ddd4972e6d6fb65d76403bb66",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/terrazzo_tiles"
+      },
+      "sha256": "26cc390c19e468de03fc9699198398590a7adc1ddd4972e6d6fb65d76403bb66",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-terry_cloth",
+      "licenseId": "CC0-1.0",
+      "path": "assets/terry_cloth.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "de2d64c46dbd964b6028ec5ca905a43b8ee278f8ac5ef7fe084f796003681b5a",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2026
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/terry_cloth/terry_cloth_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "ec68f836af445018e34273276d352739",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:terry_cloth",
+        "sourceDimensions": [
+          2048,
+          2026
+        ],
+        "sourceDimensionsMillimeters": [
+          367.0535953781794,
+          363.20000886917114
+        ],
+        "sourceFamilyId": "polyhaven:terry_cloth",
+        "sourceImageSha256": "de2d64c46dbd964b6028ec5ca905a43b8ee278f8ac5ef7fe084f796003681b5a",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/terry_cloth"
+      },
+      "sha256": "de2d64c46dbd964b6028ec5ca905a43b8ee278f8ac5ef7fe084f796003681b5a",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-velour_velvet",
+      "licenseId": "CC0-1.0",
+      "path": "assets/velour_velvet.jpg",
+      "provenance": {
+        "author": "colormass, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "7c81a1577f50a023825d8d5e26ec7f8596e47534d8ff601aa0b074980833e875",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          1971
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/velour_velvet/velour_velvet_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "fabric-leather-carpet",
+        "providerMd5": "8a177e9b50140fda3a46e1349b65473a",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:velour_velvet",
+        "sourceDimensions": [
+          2048,
+          1971
+        ],
+        "sourceDimensionsMillimeters": [
+          284.22817052147235,
+          273.499995470047
+        ],
+        "sourceFamilyId": "polyhaven:velour_velvet",
+        "sourceImageSha256": "7c81a1577f50a023825d8d5e26ec7f8596e47534d8ff601aa0b074980833e875",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/velour_velvet"
+      },
+      "sha256": "7c81a1577f50a023825d8d5e26ec7f8596e47534d8ff601aa0b074980833e875",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-white_maple_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/white_maple_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "45ee4e8def749bdb41401f98277313b632e52c901d9deb62ca32578347063105",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_maple_veneer/white_maple_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "3a4572664bea18b46c801d04ff82f2b2",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:white_maple_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:white_maple_veneer",
+        "sourceImageSha256": "45ee4e8def749bdb41401f98277313b632e52c901d9deb62ca32578347063105",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/white_maple_veneer"
+      },
+      "sha256": "45ee4e8def749bdb41401f98277313b632e52c901d9deb62ca32578347063105",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-white_oak_veneer",
+      "licenseId": "CC0-1.0",
+      "path": "assets/white_oak_veneer.jpg",
+      "provenance": {
+        "author": "Jenelle van Heerden",
+        "backgroundReview": {
+          "cropSha256": "00e09e2f901fb76c6d206e7a0197f257f8a9d5f662d3cd863c2258c9b287131e",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_oak_veneer/white_oak_veneer_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "38d61468709c2bcd17ae9efbef8b0ad0",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:white_oak_veneer",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          500,
+          500
+        ],
+        "sourceFamilyId": "polyhaven:white_oak_veneer",
+        "sourceImageSha256": "00e09e2f901fb76c6d206e7a0197f257f8a9d5f662d3cd863c2258c9b287131e",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/white_oak_veneer"
+      },
+      "sha256": "00e09e2f901fb76c6d206e7a0197f257f8a9d5f662d3cd863c2258c9b287131e",
+      "split": "validation"
+    },
+    {
+      "assetId": "polyhaven-bg-wood_table",
+      "licenseId": "CC0-1.0",
+      "path": "assets/wood_table.jpg",
+      "provenance": {
+        "author": "Dimitrios Savva",
+        "backgroundReview": {
+          "cropSha256": "abf40084777a3abdb8136ea8b643de40ec9bae4b36c865a0206badb1cacd07a7",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table/wood_table_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "767c1f81d6398aaf9a09353b5d12682d",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:wood_table",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1000,
+          1000
+        ],
+        "sourceFamilyId": "polyhaven:wood_table",
+        "sourceImageSha256": "abf40084777a3abdb8136ea8b643de40ec9bae4b36c865a0206badb1cacd07a7",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/wood_table"
+      },
+      "sha256": "abf40084777a3abdb8136ea8b643de40ec9bae4b36c865a0206badb1cacd07a7",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-wood_table_001",
+      "licenseId": "CC0-1.0",
+      "path": "assets/wood_table_001.jpg",
+      "provenance": {
+        "author": "Dimitrios Savva, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "a36483628b915dabf82961ab2a62a85c",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:wood_table_001",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1500,
+          1500.0001192092896
+        ],
+        "sourceFamilyId": "polyhaven:wood_table",
+        "sourceImageSha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/wood_table_001"
+      },
+      "sha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-wood_table_large",
+      "licenseId": "CC0-1.0",
+      "path": "assets/wood_table_large.jpg",
+      "provenance": {
+        "author": "Dimitrios Savva",
+        "backgroundReview": {
+          "cropSha256": "0715b5761a4fd46074ce0ff533af49ae06fd3750d23865bc0bf537b67b92d5de",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_large/wood_table_large_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "4575d5968324bc9d847704e102409854",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:wood_table_large",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          1550.0000715255737,
+          1550.0000715255737
+        ],
+        "sourceFamilyId": "polyhaven:wood_table",
+        "sourceImageSha256": "0715b5761a4fd46074ce0ff533af49ae06fd3750d23865bc0bf537b67b92d5de",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/wood_table_large"
+      },
+      "sha256": "0715b5761a4fd46074ce0ff533af49ae06fd3750d23865bc0bf537b67b92d5de",
+      "split": "train"
+    },
+    {
+      "assetId": "polyhaven-bg-wood_table_worn",
+      "licenseId": "CC0-1.0",
+      "path": "assets/wood_table_worn.jpg",
+      "provenance": {
+        "author": "Dimitrios Savva, Rico Cilliers",
+        "backgroundReview": {
+          "cropSha256": "165cdba449d56ea8e9675116622b95d7af372b7d7c47b8a98a03fcc630f1d51c",
+          "reviewMethod": "Inspected full-frame color-map thumbnails on three contact sheets; surface texture only, no cards, people, text overlays or scene objects.",
+          "reviewer": "Codex visual review 2026-09-05",
+          "sessionExclusionsSha256": "67011b79ac10500827a236f8beca988211349b6ff5c69687bc33adc2769de7a0",
+          "sourceSessionId": null,
+          "verdict": "card-free"
+        },
+        "colorMap": "Diffuse",
+        "cropPixels": [
+          0,
+          0,
+          2048,
+          2048
+        ],
+        "downloadUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_worn/wood_table_worn_diff_2k.jpg",
+        "downloadedDate": "2026-09-05",
+        "licenseUrl": "https://polyhaven.com/license",
+        "materialCategory": "wood",
+        "providerMd5": "44d2440f1581401e0ea65133c0e11d79",
+        "redistributionStatus": "CC0",
+        "sourceAssetId": "polyhaven:wood_table_worn",
+        "sourceDimensions": [
+          2048,
+          2048
+        ],
+        "sourceDimensionsMillimeters": [
+          549.9999523162842,
+          550.0000715255737
+        ],
+        "sourceFamilyId": "polyhaven:wood_table",
+        "sourceImageSha256": "165cdba449d56ea8e9675116622b95d7af372b7d7c47b8a98a03fcc630f1d51c",
+        "sourceSessionId": null,
+        "sourceSessionStatus": "not-applicable: external provider asset, not a TCGer capture session",
+        "sourceType": "external-surface-texture",
+        "sourceUrl": "https://polyhaven.com/a/wood_table_worn"
+      },
+      "sha256": "165cdba449d56ea8e9675116622b95d7af372b7d7c47b8a98a03fcc630f1d51c",
+      "split": "train"
+    }
+  ],
+  "role": "background",
+  "schema": "https://tcger.app/manifests/card-geometry-compositor-assets/v1",
+  "sessionExclusions": [
+    "scan-session-20260809-145850",
+    "scan-session-20260809-145947",
+    "scan-session-20260809-160556",
+    "scan-session-20260809-175313",
+    "scan-session-20260809-175804",
+    "scan-session-20260809-183843",
+    "scan-session-20260809-184048",
+    "scan-session-20260809-190752",
+    "scan-session-20260809-210958",
+    "scan-session-20260809-211223",
+    "scan-session-20260809-215559",
+    "scan-session-20260809-223944",
+    "scan-session-20260809-230224",
+    "scan-session-20260810-112257",
+    "scan-session-20260810-173108",
+    "scan-session-20260810-220315",
+    "scan-session-20260811-114121",
+    "scan-session-20260812-220107",
+    "scan-session-20260812-224415",
+    "scan-session-20260813-062035",
+    "scan-session-20260813-183749",
+    "scan-session-20260813-220015",
+    "scan-session-20260814-081249",
+    "scan-session-20260814-124705",
+    "scan-session-20260815-090217",
+    "scan-session-20260815-115155",
+    "scan-session-20260816-165452",
+    "scan-session-20260816-204703",
+    "scan-session-20260817-214446",
+    "scan-session-20260818-103659",
+    "scan-session-20260818-144857",
+    "scan-session-20260820-135949",
+    "scan-session-20260821-121821",
+    "scan-session-20260821-211659",
+    "scan-session-20260821-215651",
+    "scan-session-20260821-231419",
+    "scan-session-20260826-143226",
+    "scan-session-20260827-223150",
+    "scan-session-20260829-155957",
+    "scan-session-20260829-200235",
+    "scan-session-20260829-233753",
+    "scan-session-20260830-171145",
+    "scan-session-20260903-110212"
+  ]
+}
