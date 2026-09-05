@@ -1,0 +1,11 @@
+[
+  {
+    "canonicalArchiveIds": [
+      "coco:labelyolo.v4i.coco",
+      "coco:card-seg-j74w1.v3i.coco-segmentation"
+    ],
+    "decision": "keep-same-split",
+    "evidenceSha256": "41eb30f93feb2506b01b82c34117cc747b176b51ab9a1dfe6846b396ead1e28c",
+    "reviewer": "Codex visual review 2026-09-04"
+  }
+]

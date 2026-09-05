@@ -1,0 +1,36 @@
+{
+  "archiveSplits": {
+    "card-detector-wmbbb.v8i.coco-segmentation.zip": "train",
+    "card-scanner-seg.v3i.coco-segmentation.zip": "train",
+    "card-seg-j74w1-q8yst.v1i.coco-segmentation.zip": "validation",
+    "card-seg-j74w1.v3i.coco-segmentation.zip": "validation",
+    "card-segmentation-gldmt.v2i.coco-segmentation.zip": "train",
+    "carddetection-hegxe.v7i.coco.zip": "train",
+    "labelyolo.v4i.coco.zip": "train",
+    "mtg-rqful.v1i.coco.zip": "train",
+    "mtg-scanner-bughx.v4i.coco.zip": "train",
+    "pk-detect.v3i.coco.zip": "train",
+    "pokefolio.v1i.coco.zip": "train",
+    "pokemon-card-outliner.v1i.coco-yolo.zip": "train",
+    "pokemon_card_detector.v1-versie-1.coco.zip": "validation"
+  },
+  "corpusHash": "fba31d0c62d4844219faa15ff3f29a515933a44bbd9f93898d8e047b1b7c1981",
+  "devmodeLabelBackups": [],
+  "instances": 8651,
+  "maxRecordsPerArchive": null,
+  "multiInstanceLabelFiles": [],
+  "policySha256": "ba1a012dfdbdad48fb51e1be22723597889b7ca51ddcbbc01c2a32a2fd55c802",
+  "records": 5744,
+  "release": ".artifacts/card-geometry/releases/real-geometry-round-two-candidate-v1",
+  "stats": {
+    "canonicalInstancesRetained": 8651,
+    "canonicalRecordsIncluded": 5744,
+    "maskFit:accepted": 2795,
+    "maskFit:aspect": 696,
+    "maskFit:box-only": 4344,
+    "maskFit:residual": 816,
+    "recordsExcludedNoGeometry": 32,
+    "sourceLicense:CC BY 4.0": 4944,
+    "sourceLicense:MIT": 800
+  }
+}

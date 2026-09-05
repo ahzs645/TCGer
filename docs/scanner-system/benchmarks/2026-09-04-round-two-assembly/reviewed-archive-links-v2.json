@@ -1,0 +1,29 @@
+[
+  {
+    "canonicalArchiveIds": [
+      "coco:labelyolo.v4i.coco",
+      "coco:card-seg-j74w1.v3i.coco-segmentation"
+    ],
+    "decision": "keep-same-split",
+    "evidenceSha256": "41eb30f93feb2506b01b82c34117cc747b176b51ab9a1dfe6846b396ead1e28c",
+    "reviewer": "Codex visual review 2026-09-04"
+  },
+  {
+    "canonicalArchiveIds": [
+      "coco:pokefolio.v1i.coco",
+      "coco:pk-detect.v3i.coco"
+    ],
+    "decision": "keep-same-split",
+    "evidenceSha256": "260bd1661631ef3aa7424090d82125eac37d16b13b77fab042ed3d505629cacc",
+    "reviewer": "Codex visual review 2026-09-04"
+  },
+  {
+    "canonicalArchiveIds": [
+      "coco:pokefolio.v1i.coco",
+      "coco:pokemon-card-outliner.v1i.coco-yolo"
+    ],
+    "decision": "keep-same-split",
+    "evidenceSha256": "260bd1661631ef3aa7424090d82125eac37d16b13b77fab042ed3d505629cacc",
+    "reviewer": "Codex visual review 2026-09-04"
+  }
+]

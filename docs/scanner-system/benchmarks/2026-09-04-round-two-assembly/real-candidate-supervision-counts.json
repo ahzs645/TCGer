@@ -1,0 +1,8 @@
+{
+  "train:boxOnly": 4628,
+  "train:knownQuad": 2402,
+  "train:records": 4465,
+  "validation:boxOnly": 1228,
+  "validation:knownQuad": 393,
+  "validation:records": 1279
+}

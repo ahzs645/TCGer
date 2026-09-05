@@ -1,0 +1,652 @@
+{
+  "eligibleExistingCrops": 0,
+  "evaluationCorpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+  "excludedCrops": [
+    {
+      "assetId": "capture-bg-scan-session-20260817-214446-860da278c958937919d1",
+      "cropSha256": "74aadddd6318f23137feded2e6e3848327438288de8f854019dba0a7c61679a1",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260817-214446"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-01ce2208adb8f4e831c2",
+      "cropSha256": "64882f2c578214b68f9a386a76458587152a406bd9aa6fb3593083381ed41eb9",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-0973516a72ce86c7a6cd",
+      "cropSha256": "bd14a9ca0027534a9fac4161deef59137493ce563198e2aaa741b3da1f26c2f1",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-09cba037d9ddbaa0bbed",
+      "cropSha256": "9160734edff5a802ce8ea53aca7b6908065bca48321f2dfc24ca81c6e5050884",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-174421c83116fad111df",
+      "cropSha256": "43a360f69abf927ccf537da58a251f516902da4c789b8f776dc2ec75cdbb7e7a",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-249762e82344af616a18",
+      "cropSha256": "380f96910bf5848bd70ad051e7cc06d7f48eb77a8ac1fea63a761b8b6740f2f6",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-59e70a00fc59ffdff0f2",
+      "cropSha256": "30d9ae105004bf8cd5c7c15984a95a761123abf5d113f5b2fe9e9ddfb2637c39",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-611059e78277886b3eae",
+      "cropSha256": "6a23fbc43f00cf58f16ce1f5a325bc6a5a08bd1d103d43875090ef07d6664c3e",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-61643ebe1b2ec9c95db9",
+      "cropSha256": "382619d9a3ffcf645d8c08c424103550804fe403dca70ce089f9bdcdb142679b",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-74175a192000040495e9",
+      "cropSha256": "d2f4b21d18dc38abaaccdf8656f5d9da2fba9008d409b96e91b0db10510b2ba2",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-7ab6fdca198341cc370d",
+      "cropSha256": "85fe946e6239ef759821db2cae7a63104aae8144808fb971a7c2e1fe66a17452",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-91e553fd50befaa29081",
+      "cropSha256": "a4adafab50dff902e4d6a89c7e08a09fabdda0f896bb8c7e5d13e42387c9cdad",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-96fbcdb689dbd0055191",
+      "cropSha256": "1057070f3e135af30593f12bbf9158f21318de6807531c977d163507d9e53461",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-9936b580e938482e6b6c",
+      "cropSha256": "a63c6a1932877edf8a162a0ae4079d3ee706bd46ce4c885cd04f9d44adba8622",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-d20130498a39302fde21",
+      "cropSha256": "78691906674dfd6cc8be622eb69b440867aa7eec9c73ad3a9a62f63134bcb407",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-d658ef4bf9ebb6edf631",
+      "cropSha256": "9ca2758ee8fab9ab23368f5ce9d106987cb15e4ba5b4168230e19add1b7d87f6",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-dc34b829032759f76d6e",
+      "cropSha256": "0118788166bd3b979916f4ccab03e360d8b8131d41cdd86fd3e801840cda289c",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-dcdd6fa6182103346fdd",
+      "cropSha256": "a6de9a3b9495194302d91d91e9ddf662a3863200ab80f80f7504d41e49e715e2",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-e7a9a54a64ca41a6b754",
+      "cropSha256": "25873433f434eeefc3fee29a99e754d3932ea23b9ba443a76c7dd84eab111f83",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-e905dfc8016c60de772a",
+      "cropSha256": "8c542d95e3c31e970e8eb9d7917ef7bb880dfb5105f2831f29fa162d3abbbb15",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-103659-f53f59fc750a284c6fac",
+      "cropSha256": "5660b542f55d6245478cb3b7b741fb1d9246bfccfceb599d352eb15cbd861496",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-103659"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-1c90212c4a43bf06d5a0",
+      "cropSha256": "cf6fb3ef0f22f4340a60a47fd010e1f300b1f73bb4c64bc013f70052aa3873cf",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-21f94d234a52d100c81e",
+      "cropSha256": "57a5dc484df100b2fbb69f63145a2d9f799c86c2c36b6a3d692ccb123980e73f",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-222b08e4d9130a43bb81",
+      "cropSha256": "ac3387f94ad9e5937022090d6fcbe50b439899c207907e8e9b0cea7a6e33f206",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-2dbdcbf5baa778c1e59a",
+      "cropSha256": "c0c076edd268204ba246a5c4718e84663c887a2d7a60dd62e2c5629206099de9",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-66009f4605621d7798d2",
+      "cropSha256": "964ac66871e4ab19a2249929a4c137b95d94b79e0d2dd9108e8d847cc9db9d87",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-67d78855183ece606df5",
+      "cropSha256": "b9ec1ab1f218356dfa3c48b87c04064663c02f3b17dca424c61676260ac427ca",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-75e5a95d12ac5642a58d",
+      "cropSha256": "7d91d20627087a5f5dd140ef761e66bdedd58a71fffe32957c2f3c301cf39db1",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-82912d4677d4a6975b4c",
+      "cropSha256": "9be74a2f750252b655295f20d026fecfa14e2ee66eef1a51299d9ee3b3b7a4a2",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-8a716f2f5bdb42e70f0b",
+      "cropSha256": "d2798b7d9257a5f3c54570bf0030f38cff9a60562ec2d5237a8d40bf1bf86a22",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-8fe603ac63991c3addb5",
+      "cropSha256": "4d5246b0359a9ddb4566ec0ddcb495f4b7b117ffd8b6e2f135a311f20de7153b",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-a61c9d0f8a4eecee839e",
+      "cropSha256": "1dcc726cda3dc0bebdeb2456dd1a15ceb6bed4e5b548539dc8807eb34475b765",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-c7f14c814b5468774636",
+      "cropSha256": "05a0a84ddc37b7cefebbfd44e0cb31d25431a1d261825ecebe3092b17996f75a",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-d680984079614010ee2a",
+      "cropSha256": "62c85c1047d0a42c7c00961916da39e5b6356a7610c682410e3782bdc8393f30",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-dbad0665fa68aafb94fa",
+      "cropSha256": "57e68fdbc97287280b48bc204b11fdbe60cbfcfd87f6d20150a7413d85099fc4",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-e0ea9a7c8e7dd84e61ca",
+      "cropSha256": "d6ed6f271403bff913b65d6893e4050cc652d9aebad83f9d7ea4125eabe06a5d",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-ea6bd7f46a79a146dde3",
+      "cropSha256": "d1e9eafdbd25c269d0dd74bfe7ed58a512a845a2441da020108588855064c9b0",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260818-144857-fd4d7a255451d27a22ea",
+      "cropSha256": "09465172b3dc4c744661098cceba6de23f07be801e8d0e9475c87f01d1d9d480",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260818-144857"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-121821-0e00ff612225291ef53e",
+      "cropSha256": "b3a31fa432a3a6db45d84dc991c015f3dec6a4229747aad3db1bf5a9416cbbcb",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-121821"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-121821-5201dbea773fdb24eeba",
+      "cropSha256": "730a06fffe1938a4bfd17db66c851561c425bfaf6f52ffedb4d566a3cc18005f",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-121821"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-121821-fccc33b350f70cec1e91",
+      "cropSha256": "3ba822c8e670b0feaf22371345dd7e64835d340938f7480c5b63f8c3ce344a94",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-121821"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-1319247f90dde83ffcff",
+      "cropSha256": "13df558eb9c153e3210f306f79668a5bd2a03b75625827d9500db633ac5e2bad",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-159a748009147bf1d3f9",
+      "cropSha256": "3d55a9bedff9d648b52baaf6d72e05c7fb67c4cdb6d6dd24d1c9ae571ac12395",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-29943de47a1475b12556",
+      "cropSha256": "3f7c6fac255235a3e2b6074c2e7ae4e14781f2dad7895fa280017fb2341b2e72",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-3d4f412eee4f5a0dca81",
+      "cropSha256": "72d789f35e72140691d7a703255fac1acb63dccd4d5b1f7553f8fae8aa76933c",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-4be47eb23be928bf76a9",
+      "cropSha256": "188bd3c24097803da6e2499cd48c629516fa38d7b838a026fd67a156001011aa",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-53621ad03a77191a04f2",
+      "cropSha256": "1967fdef7132738cfa087e6d554bb4975f19d258307a1b04219b06b027f668af",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-6455b2cdec92e092d171",
+      "cropSha256": "f6074064ad395bc1d31d804d5141eca081d5ee8930029bcce3232a3f0b046f0a",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-702b5faf22bae93e7153",
+      "cropSha256": "c66fba3f4c0bd4626a6d5c598da15121869609b3d18c44687af2595a3ffbffe0",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-91d9b835f6f5c66f63a9",
+      "cropSha256": "4e2030ec974f3e5385587808e714126a1376200e5204d52f0627104b2a7f405b",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-95b402c3bb5b9855430f",
+      "cropSha256": "0c35377e195a7f5ad06b46ea08e6c557f6da9b4355483d1453609503a4600497",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-9ab447cfa3b3c19fd102",
+      "cropSha256": "f78d23964c6cf4481d5de4e54f48807bb9e06303b5656f849801fe89393db4d8",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-ca0108ca7d0de269f4a4",
+      "cropSha256": "09bd7b38a27e0977a0d3d22532aa746768179412fa7f61dde9a014284c37e564",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-caedab15d6c0435fcef4",
+      "cropSha256": "e4b63b5e03f41086be546d0570d093d90a476c8b125d2267b2dc4378143250ff",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-de516b8b14b27244ae75",
+      "cropSha256": "94047874bbe4b133437a38d13f953e7426de48d8e4e7344dbd3b3a72e6173b1f",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260821-231419-efb428f87b976ba6e1a9",
+      "cropSha256": "b7270a08bcb00d38dda0ca081cf6edd17209d1309eab9c53461cd3beda57735f",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260821-231419"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-07f9736a7831e115832a",
+      "cropSha256": "9dfcda372b554e5cb6999f255679c9cddd7b0862ced215a93a38340223e6a969",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-29deb2ec9f79a24fb0ed",
+      "cropSha256": "b8b8536709b99d1c252f722a6eeb15ca6b3dd05ee4f9d18e47358f7ee4fe1402",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-463e55a5d1eb0f0ea5f0",
+      "cropSha256": "edab91c69bb92daa45810e847bbae2fb175d08d7ca97c6e8886971c3163f89a9",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-894c67618afddfc0c668",
+      "cropSha256": "efd957c0ae6cfddd53a32eb9128c22f9fa0dc756eb4c199f9215995175c29336",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-939686faef322c387d70",
+      "cropSha256": "6bdb7031bdae706b068e71d2b18b4238132132a44a40cd6d8f06aa61efb3fc38",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-cf2c97be4a19ea095453",
+      "cropSha256": "9063a49f4f556500a09cdf11b59adda76071a64a53255ce2d25908bc4bc897ae",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-e158660245b2bc5d3d12",
+      "cropSha256": "bd30f2cfb7bf8c66e91e57079f6209e681dc0453b03312b41ae245412a3bdb2a",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-f8fd089844b63716b572",
+      "cropSha256": "0fd8204be95ce3593e5b594184866c072faa026f77d84bd285b97bbf8297f642",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260826-143226-fa10bfd25e439c89e92c",
+      "cropSha256": "8f058d405c6c497ee6cba87e231ed4b0ee17a76ad63b6306d7e542f4354445bd",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260826-143226"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-045ae52de61b9501fbeb",
+      "cropSha256": "3f06ee18c704023f61abb01754b110f3edcbc7a05eb94127a025aa983834e320",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-2b38cd14649d744228df",
+      "cropSha256": "c1ebd627d6893a42ab3602fa109d14c88265925eeb55709d76e50305ae587b62",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-44d271bc0d35fbf8cb33",
+      "cropSha256": "59f6297cd7014c17ef35cd46a7e7a768606f7be1e5cb396599338d0d3dcc9af7",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-596323b5219d4a53a790",
+      "cropSha256": "1bc57dc3af9769a8f490273703a58849d44134e363d96810b1250ea620422276",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-6473b94ff6fc827d0015",
+      "cropSha256": "72064f2e930f3ea9ecd94c530504870bdaad88c7aec4ad09e015919b322bfd61",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-884eed7af51eb8a05db3",
+      "cropSha256": "f938fba85e898f34469b0e13a4b90950c5f7223c98d972b9249d0c75b81b6d26",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-924d4f42dd13c23c9957",
+      "cropSha256": "45c01f294d37ba95a14c5d7f717ae17b0ce03971063079d46b9cb83d507da7d0",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-9eee25c18893f6f47de9",
+      "cropSha256": "42c614bfe97d73bca2650bd34c7b8d2b4264cd64417487c170a993e1c6b75fd3",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-cf2fd39ed1460c864204",
+      "cropSha256": "784c01ed4e43225a396f76ef9e11803cdc006db5cb4323bcbea46d05c9330d85",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-cfce6df673b72bb44b53",
+      "cropSha256": "ea927b14412de6f6b9f7591402103c2d28aadfac747dcb5e79b89c90737fba40",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-d58a83713fe6643405d0",
+      "cropSha256": "b8c6d5779ca6578eef3b040474b6ab239c1110f1681e5406e7a7e92102b5c69f",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-da4edd3432579fc66e31",
+      "cropSha256": "0089e286055138b82c65173b2582919f511762d1eb9f9cc80cb5a0945b657687",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-e62824043934edf2f42f",
+      "cropSha256": "784e963ef22adb26093046836fbf24e4ac3b69a81e05466986ddab205148781d",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-e9a59d9756fdf6100b97",
+      "cropSha256": "c3b8798efb599b0d4531d5b484217b8b21264f59c5d6c741ea5bede972b1c5e0",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260829-155957-f326fd06d80069388ac5",
+      "cropSha256": "9b7e158f0202cffa4a5af23e0835d240c0efeb3ce2732c5f7c4c85ecb9de1b1b",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260829-155957"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-02495ea77e89681eba35",
+      "cropSha256": "7e02b2f6f65f891482ff88d768ffaec460090c58037287c4aacac97c89152caf",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-04a73163ace08c60450c",
+      "cropSha256": "97c00a1273006b5ac51c65e90cb3176922e61f172c27abf9a607c71a434b48df",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-0535bb3132019b58ea41",
+      "cropSha256": "c68146d04854b196a2e46219cc8847a5de01d3c581d8b038aab80756f7d10e12",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-2b020a874783d545de0e",
+      "cropSha256": "ce31457c87960fb05c451d24f5b489ab266872f9b9af313991a6c2998cf2ab0c",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-370c96456b2ca1cccaf4",
+      "cropSha256": "04a6d7b7f59647ef88c1808d8a836a368de05362f7c500e98a598c32f6fb0c3a",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-4da80f325e440fc72f3a",
+      "cropSha256": "96ea694e866b0b1629470dd335a0c1bfa121cc980180b492b3847a37c315cce8",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-4f48b084021148e11e1d",
+      "cropSha256": "e7a1915f22e281bb95161d4a4af8e77b21b2bb0170bfb04c162952a49d2e0baf",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-57bfd303a247518b889b",
+      "cropSha256": "52fe8b0889d9c759ab6609d80ee140ca526e8e153bf3e8a0309d5619c52ee419",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-6f800efcb9614053ed7c",
+      "cropSha256": "d83547f51e9f0923b4ab39576caaba65343202820a9382a3e30ab0f6d6dabd72",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-73d97e86caa15ca4ab52",
+      "cropSha256": "b1260662e07ac45d9047fd2bf6ac021013a690d1fed99e703c71a4e8503c3be6",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-7492af374662b2d45c0d",
+      "cropSha256": "8d2fb26ae764ecc6dbacf4c902042acd9fdec25bad6bdf7a91023a47c583f8e3",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-7d927688f9b9702d3f28",
+      "cropSha256": "3e66c7772c27b3ea2566b45b5aeacb297dfcf6f0f3ca25138aafc35da50e562e",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-9d3f7acf040432e1b308",
+      "cropSha256": "79e68d8a47ed85158932cdc2d2f9709248434c913c6f34ccac441a3ade1225e2",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-bda5780fb72f629d9b9a",
+      "cropSha256": "38ef007d149c0625e03295341c534d23c725b2b2dbe818a6eec2a81a1e9eadb4",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-c51dc486a423e383c301",
+      "cropSha256": "4162ece94b7825aa43170df274f9716cad0de0da8cc8bd281ea838642b35aed2",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-ce3eb9226c70a0fc2d69",
+      "cropSha256": "ddb6146a28ca614827a9bff7ab722582422c617a123caa239705a765445b788c",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-d6668d97a5c68b954a89",
+      "cropSha256": "53b195a0da44d8cbaf5fe73e782241c08bd6569dd0a289668e688212ed23fa10",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-e15234be264e9008ff81",
+      "cropSha256": "9368dac7dceae1606e22346fcd0ed02cce8e372934f4238b5d8003b937da2383",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-e7296c0573324404e913",
+      "cropSha256": "0dc84986ddd4e13be4524507b5a1eddf89907479c5a38291a196b1f6092b55df",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    },
+    {
+      "assetId": "capture-bg-scan-session-20260830-171145-e72e11a71c3b8387604c",
+      "cropSha256": "c47a6c6e4973b03b6793be9ad49dd7138ecaecc6d20685b2496efd72e4961e93",
+      "reason": "Dev Mode session excluded from training",
+      "sourceSessionId": "scan-session-20260830-171145"
+    }
+  ],
+  "sessionExclusions": [
+    "scan-session-20260809-145850",
+    "scan-session-20260809-145947",
+    "scan-session-20260809-160556",
+    "scan-session-20260809-175313",
+    "scan-session-20260809-175804",
+    "scan-session-20260809-183843",
+    "scan-session-20260809-184048",
+    "scan-session-20260809-190752",
+    "scan-session-20260809-210958",
+    "scan-session-20260809-211223",
+    "scan-session-20260809-215559",
+    "scan-session-20260809-223944",
+    "scan-session-20260809-230224",
+    "scan-session-20260810-112257",
+    "scan-session-20260810-173108",
+    "scan-session-20260810-220315",
+    "scan-session-20260811-114121",
+    "scan-session-20260812-220107",
+    "scan-session-20260812-224415",
+    "scan-session-20260813-062035",
+    "scan-session-20260813-183749",
+    "scan-session-20260813-220015",
+    "scan-session-20260814-081249",
+    "scan-session-20260814-124705",
+    "scan-session-20260815-090217",
+    "scan-session-20260815-115155",
+    "scan-session-20260816-165452",
+    "scan-session-20260816-204703",
+    "scan-session-20260817-214446",
+    "scan-session-20260818-103659",
+    "scan-session-20260818-144857",
+    "scan-session-20260820-135949",
+    "scan-session-20260821-121821",
+    "scan-session-20260821-211659",
+    "scan-session-20260821-215651",
+    "scan-session-20260821-231419",
+    "scan-session-20260826-143226",
+    "scan-session-20260827-223150",
+    "scan-session-20260829-155957",
+    "scan-session-20260829-200235",
+    "scan-session-20260829-233753",
+    "scan-session-20260830-171145",
+    "scan-session-20260903-110212"
+  ],
+  "sourceManifestSha256": "f63a272a11d96156baa5418b6761f9175eaeb6f98f97d65c0908f7f315619f14"
+}

@@ -1,0 +1,37 @@
+{
+  "corpusHash": "d41b0881a30f03be56e9ec734ff3f8bb40ee90525a46cfde442b9188c57cabee",
+  "diagnosticOnly": true,
+  "fastvitImageAndAllTargetTensorsFinite": true,
+  "fastvitMissingBoxSkips": 0,
+  "fastvitSampledRecordIds": [
+    "coco-0001809889362d0c60dc30e323fff8da7a645260ab542dde461f26b7d59c2a15",
+    "coco-0005f70cc6478d085363cce836a7ddf516a0d891a4db383f1133f791d4b6f3d9",
+    "coco-000ef0db261977d38a6b7296a61e925c0c8ef99c07528a9ac2f0d3b7cf7d0229",
+    "coco-0056c9ed1a5376c36447c6f0f0886c3c3276dce396dbb5748ea4d93baddad430",
+    "coco-005ff234dd856fd0d5d2bfb099409f3b4e0100dcdaa0bd9cec566eacf205d9de",
+    "coco-007f7c61db9b61813f5d1c14b9a077f678e3d230aafe86f0f4c8c9170ce4048c",
+    "coco-0087f2fc1dca0873d4c7bccff44aa0950d04ff26fe3324415e8b50d293e23477",
+    "coco-008c9b23a890bb8b5f9b8dc7d10c7dd8060e718833eea58ed8a7dd9256624e70",
+    "coco-013a142fac43d7c65d23e69d44295781c20ee3571cdd51e1bb1778ddd0666bb4",
+    "coco-01e3fe9195322fbbe55994a4b94c61921447e31dd8875a3b6cbc0c530f5861f1",
+    "coco-05416344fd80971bb03059ebbf2914f5486578794ffe87b311f071136514cd00",
+    "coco-4694b018db04af981b83fc08a0f47b8cd8e25defbe6484002702dcd7001f1946",
+    "coco-002faf7947b5133bc565365998a631a5dfa8a912079b439ea798f06b6fccc3a5",
+    "coco-005bf58faa595ea07ff51d3ca0443de7c0135528e5af3f943cc3e45ee9c4145d",
+    "coco-00b48d562124d81c48142da163958e540e09c7a8790c76231d03558a8d966407",
+    "coco-01cba12de30f14e5fcabe1b4be71c5083831bcda26c54d958e776c6cdbd79572"
+  ],
+  "fastvitSamples": 16,
+  "policyNote": "Reuse runtime fixture policy for ingestion diagnostics only; production fairness remains unfrozen.",
+  "realContextMarginPolicy": {
+    "application": "each-side",
+    "fraction": 0.125,
+    "kind": "fraction-of-long-side",
+    "rounding": "ceil"
+  },
+  "yoloLabelCounts": {
+    "boxOnlyRetained": 5856,
+    "knownQuadRetained": 2795,
+    "records": 5744
+  }
+}

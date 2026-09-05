@@ -1,0 +1,6 @@
+{
+  "train:boxOnly": 4553,
+  "train:knownQuad": 2402,
+  "validation:boxOnly": 1303,
+  "validation:knownQuad": 393
+}

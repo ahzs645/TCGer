@@ -1,0 +1,16 @@
+{
+  "coco:annotations.v7i.coco-segmentation": "coco:annotations.v7i.coco-segmentation",
+  "coco:card-detector-wmbbb.v8i.coco-segmentation": "coco:card-detector-wmbbb.v8i.coco-segmentation",
+  "coco:card-scanner-seg.v3i.coco-segmentation": "coco:card-scanner-seg.v3i.coco-segmentation",
+  "coco:card-seg-j74w1-q8yst.v1i.coco-segmentation": "coco:card-seg-j74w1.v3i.coco-segmentation",
+  "coco:card-seg-j74w1.v3i.coco-segmentation": "coco:card-seg-j74w1.v3i.coco-segmentation",
+  "coco:card-segmentation-gldmt.v2i.coco-segmentation": "coco:card-segmentation-gldmt.v2i.coco-segmentation",
+  "coco:carddetection-hegxe.v7i.coco": "coco:carddetection-hegxe.v7i.coco",
+  "coco:labelyolo.v4i.coco": "coco:labelyolo.v4i.coco",
+  "coco:mtg-rqful.v1i.coco": "coco:mtg-rqful.v1i.coco",
+  "coco:mtg-scanner-bughx.v4i.coco": "coco:mtg-scanner-bughx.v4i.coco",
+  "coco:pk-detect.v3i.coco": "coco:pk-detect.v3i.coco",
+  "coco:pokefolio.v1i.coco": "coco:pokefolio.v1i.coco",
+  "coco:pokemon-card-outliner.v1i.coco-yolo": "coco:pokemon-card-outliner.v1i.coco-yolo",
+  "coco:pokemon_card_detector.v1-versie-1.coco": "coco:pokemon_card_detector.v1-versie-1.coco"
+}

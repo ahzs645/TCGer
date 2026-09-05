@@ -1,0 +1,28 @@
+{
+  "algorithm": "32x32 grayscale Lanczos, OpenCV DCT, median AC 8x8, DC cleared; 8 rotations/reflections",
+  "counts": {
+    "withinTrainingCrossSplit": 12
+  },
+  "diagnosticOnly": true,
+  "inputInventoryHash": "3a22cfca20b2981006ec6ca143291fd4a44b2c2ba518a9d3d82e3f305986f22e",
+  "maximumHammingDistance": 4,
+  "releases": [
+    {
+      "corpusHash": "fba31d0c62d4844219faa15ff3f29a515933a44bbd9f93898d8e047b1b7c1981",
+      "images": 5744,
+      "releaseId": "real-geometry-round-two-candidate-v1"
+    },
+    {
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "images": 600,
+      "releaseId": "real-geometry-evaluation-v6-full-aliases-v2"
+    },
+    {
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "images": 1000,
+      "releaseId": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+    }
+  ],
+  "reviewPairsSha256": "024d8bd1cdfa9cf7e6dccb2e1b18825f2f42fab30e5571b056df4f966b69a328",
+  "schema": "https://tcger.app/reports/card-geometry-near-duplicate-audit/v1"
+}

@@ -1,0 +1,94 @@
+{
+  "archiveFileSplits": {
+    "card-detector-wmbbb.v8i.coco-segmentation.zip": "train",
+    "card-scanner-seg.v3i.coco-segmentation.zip": "train",
+    "card-seg-j74w1-q8yst.v1i.coco-segmentation.zip": "validation",
+    "card-seg-j74w1.v3i.coco-segmentation.zip": "validation",
+    "card-segmentation-gldmt.v2i.coco-segmentation.zip": "train",
+    "carddetection-hegxe.v7i.coco.zip": "train",
+    "labelyolo.v4i.coco.zip": "validation",
+    "mtg-rqful.v1i.coco.zip": "train",
+    "mtg-scanner-bughx.v4i.coco.zip": "train",
+    "pk-detect.v3i.coco.zip": "train",
+    "pokefolio.v1i.coco.zip": "validation",
+    "pokemon-card-outliner.v1i.coco-yolo.zip": "train",
+    "pokemon_card_detector.v1-versie-1.coco.zip": "train"
+  },
+  "archiveSplits": {
+    "coco:card-detector-wmbbb.v8i.coco-segmentation": "train",
+    "coco:card-scanner-seg.v3i.coco-segmentation": "train",
+    "coco:card-seg-j74w1.v3i.coco-segmentation": "validation",
+    "coco:card-segmentation-gldmt.v2i.coco-segmentation": "train",
+    "coco:carddetection-hegxe.v7i.coco": "train",
+    "coco:labelyolo.v4i.coco": "validation",
+    "coco:mtg-rqful.v1i.coco": "train",
+    "coco:mtg-scanner-bughx.v4i.coco": "train",
+    "coco:pk-detect.v3i.coco": "train",
+    "coco:pokefolio.v1i.coco": "validation",
+    "coco:pokemon-card-outliner.v1i.coco-yolo": "train",
+    "coco:pokemon_card_detector.v1-versie-1.coco": "train"
+  },
+  "componentByCanonicalArchive": {
+    "coco:annotations.v7i.coco-segmentation": "coco:annotations.v7i.coco-segmentation",
+    "coco:card-detector-wmbbb.v8i.coco-segmentation": "coco:card-detector-wmbbb.v8i.coco-segmentation",
+    "coco:card-scanner-seg.v3i.coco-segmentation": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "coco:card-seg-j74w1.v3i.coco-segmentation": "coco:card-seg-j74w1.v3i.coco-segmentation",
+    "coco:card-segmentation-gldmt.v2i.coco-segmentation": "coco:card-segmentation-gldmt.v2i.coco-segmentation",
+    "coco:carddetection-hegxe.v7i.coco": "coco:carddetection-hegxe.v7i.coco",
+    "coco:labelyolo.v4i.coco": "coco:card-seg-j74w1.v3i.coco-segmentation",
+    "coco:mtg-rqful.v1i.coco": "coco:mtg-rqful.v1i.coco",
+    "coco:mtg-scanner-bughx.v4i.coco": "coco:mtg-scanner-bughx.v4i.coco",
+    "coco:pk-detect.v3i.coco": "coco:pk-detect.v3i.coco",
+    "coco:pokefolio.v1i.coco": "coco:pokefolio.v1i.coco",
+    "coco:pokemon-card-outliner.v1i.coco-yolo": "coco:pokemon-card-outliner.v1i.coco-yolo",
+    "coco:pokemon_card_detector.v1-versie-1.coco": "coco:pokemon_card_detector.v1-versie-1.coco"
+  },
+  "evaluationCorpusHashes": [
+    "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05"
+  ],
+  "excludedComponents": {
+    "coco:annotations.v7i.coco-segmentation": [
+      "evaluation canonical archive",
+      "evaluation image bytes"
+    ]
+  },
+  "inputInventorySha256": "a1589c7b89567a33a0b301a64f8255df2124cbc8e8579654e8fadc3c511ed279",
+  "inputRecordCounts": {
+    "train": 4500,
+    "validation": 1276
+  },
+  "method": "whole-archive-components-largest-first-80-20-v1",
+  "reviewedLinks": [
+    {
+      "canonicalArchiveIds": [
+        "coco:labelyolo.v4i.coco",
+        "coco:card-seg-j74w1.v3i.coco-segmentation"
+      ],
+      "decision": "keep-same-split",
+      "evidenceSha256": "41eb30f93feb2506b01b82c34117cc747b176b51ab9a1dfe6846b396ead1e28c",
+      "reviewer": "Codex visual review 2026-09-04"
+    }
+  ],
+  "seed": 20260904,
+  "sourceArchiveAliases": {
+    "coco:annotations.v7i.coco-segmentation": "coco:annotations.v7i.coco-segmentation",
+    "coco:card-detector-wmbbb.v8i.coco-segmentation": "coco:card-detector-wmbbb.v8i.coco-segmentation",
+    "coco:card-scanner-seg.v3i.coco-segmentation": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "coco:card-seg-j74w1-q8yst.v1i.coco-segmentation": "coco:card-seg-j74w1.v3i.coco-segmentation",
+    "coco:card-seg-j74w1.v3i.coco-segmentation": "coco:card-seg-j74w1.v3i.coco-segmentation",
+    "coco:card-segmentation-gldmt.v2i.coco-segmentation": "coco:card-segmentation-gldmt.v2i.coco-segmentation",
+    "coco:carddetection-hegxe.v7i.coco": "coco:carddetection-hegxe.v7i.coco",
+    "coco:labelyolo.v4i.coco": "coco:labelyolo.v4i.coco",
+    "coco:mtg-rqful.v1i.coco": "coco:mtg-rqful.v1i.coco",
+    "coco:mtg-scanner-bughx.v4i.coco": "coco:mtg-scanner-bughx.v4i.coco",
+    "coco:pk-detect.v3i.coco": "coco:pk-detect.v3i.coco",
+    "coco:pokefolio.v1i.coco": "coco:pokefolio.v1i.coco",
+    "coco:pokemon-card-outliner.v1i.coco-yolo": "coco:pokemon-card-outliner.v1i.coco-yolo",
+    "coco:pokemon_card_detector.v1-versie-1.coco": "coco:pokemon_card_detector.v1-versie-1.coco"
+  },
+  "targetFractions": {
+    "train": 0.8,
+    "validation": 0.2
+  }
+}

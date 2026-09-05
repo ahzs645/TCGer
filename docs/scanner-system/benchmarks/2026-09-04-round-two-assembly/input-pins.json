@@ -1,0 +1,23 @@
+{
+  "canonicalCorpusSha256": "aaf98c7f4c81bf36948dda98db905140bd785e964af9980a1d82aef2f905c2c6",
+  "publishedTrainingRelease": false,
+  "reviewedArchiveLinksSha256": "e5f287e66b6aef226fe2ea26cc9d0f6a8e12ff3fe07b2d5d6abacfdfd1f1fc0b",
+  "roundTwoTrainingStarted": false,
+  "sourceArchiveAliasesSha256": "81bee7a50ff100647d3f4ef4d674db7c9110d2c5c8b114242a3055cc6e61fc24",
+  "sourceArchives": {
+    "card-detector-wmbbb.v8i.coco-segmentation.zip": "34b6fb8601c0fb6022fd781953770808fe966fd1164e47212babee1b0ae87755",
+    "card-scanner-seg.v3i.coco-segmentation.zip": "3df8aa58cb403e0009318f3cfc01b457e4f902fdf3bd396dbb407cec93efc1b1",
+    "card-seg-j74w1-q8yst.v1i.coco-segmentation.zip": "574d7bbeff67052bf3fa7c7faa33cb002c288aee04aae5dd1ca7f9c41aae73f2",
+    "card-seg-j74w1.v3i.coco-segmentation.zip": "75a91d226f5b765e43c01f78e4e9fa2b4cc1234edb50de030c83efade4af09d1",
+    "card-segmentation-gldmt.v2i.coco-segmentation.zip": "1afa50ec6f4d59b7bd36b083d7190fff7c203db04f43ec7e00f605ccd754147a",
+    "carddetection-hegxe.v7i.coco.zip": "729cd82732b5defb708d7aca3d7871664441d4d601c35222566f3432f2ddfaad",
+    "labelyolo.v4i.coco.zip": "c9b2a76412890eaf68032a08a53f3d653a55a7519056877f31577049733e4e9c",
+    "mtg-rqful.v1i.coco.zip": "d2270055fdfccbcc0e384bfededd50587fc95e5d773b55d05ec53c5ab1c76210",
+    "mtg-scanner-bughx.v4i.coco.zip": "ac95e156b55ff63dee32233faef6a749018477704e93d118987d5b8edbb9e7cc",
+    "pk-detect.v3i.coco.zip": "20fa399b32355e42395f65381d88ed47f2c3ab8175bf4b6dd59113cdcb1d706f",
+    "pokefolio.v1i.coco.zip": "3e42102fa1623d6fecfeadd246664f331e89f59251893bce6608ebfca8fa93ac",
+    "pokemon-card-outliner.v1i.coco-yolo.zip": "be41b56633b3c91e0b3432b2536684e6a4debe13da4f212ece01262dd22d76b6",
+    "pokemon_card_detector.v1-versie-1.coco.zip": "56bed91daaaca4c7321d7ed662bf52ea47625ef9492537f391f07dc4267e5d9a"
+  },
+  "toolingRevision": "a7907b60d350bbd4d1dd02388586e089fadadd31"
+}

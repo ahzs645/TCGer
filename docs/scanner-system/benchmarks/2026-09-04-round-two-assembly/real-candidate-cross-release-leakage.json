@@ -1,0 +1,14 @@
+{
+  "archiveAliasConflicts": {},
+  "corpusHashes": {
+    "real-geometry-evaluation-v6-full-aliases-v2": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+    "training": "d41b0881a30f03be56e9ec734ff3f8bb40ee90525a46cfde442b9188c57cabee"
+  },
+  "failedChecks": [],
+  "leaks": {
+    "real-geometry-evaluation-v6-full-aliases-v2": [],
+    "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2": []
+  },
+  "schema": "https://tcger.app/reports/card-geometry-cross-release-leakage/v1"
+}
