@@ -9,7 +9,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from train_yolox_pose import write_config, materialize_coco, download_verified
+from train_yolox_pose import (write_config, materialize_coco, download_verified,
+                             validate_resume_checkpoint)
 from launch_geometry_bakeoff import MMYOLO_BASE_URL, MMYOLO_BASE_SHA256
 from yolox_validation_fix import repair_source
 
@@ -70,6 +71,8 @@ def run(root: Path, mmyolo_root: Path):
     cfg.load_from=str(checkpoint)
     cfg.work_dir=str(root/'training')
     cfg.env_cfg.dist_cfg.backend='gloo'
+    # Persist runtime overrides for the independent test.py subprocess too.
+    cfg.dump(config_path)
     runner=Runner.from_cfg(cfg)
     runner.train()
     # A separate wholly unknown batch exercises the zero-visible-keypoint path.
@@ -90,9 +93,15 @@ def run(root: Path, mmyolo_root: Path):
     box_losses={key:float(value) for key,value in losses.items()}
     assert all(math.isfinite(value) for value in box_losses.values()), box_losses
     validation=runner.val()
+    # Exercise the same tools/test.py subprocess used by the resume gate.
+    # runner.val() alone does not cover the inference pipeline's metadata.
+    validate_resume_checkpoint(mmyolo_root, config_path,
+                               root/'training'/'epoch_1.pth', root)
+    resume_validation=json.loads((root/'resume-validation.json').read_text())
     report={'diagnosticOnly':True,'sourceRepair':repair,'materialization':materialization,
             'retainedInstancesPerImage':counts,'boxOnlyBatchLosses':box_losses,
-            'validation':validation,'learningRate':cfg.optim_wrapper.optimizer.lr,
+            'validation':validation,'resumeValidation':resume_validation,
+            'learningRate':cfg.optim_wrapper.optimizer.lr,
             'validationBegin':cfg.train_cfg.val_begin,'validationInterval':cfg.train_cfg.val_interval,
             'batchAugments':cfg.model.data_preprocessor.batch_augments}
     (root/'runtime-validation.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')

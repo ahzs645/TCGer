@@ -184,6 +184,15 @@ class TrainYoloxPoseTests(unittest.TestCase):
             self.assertIn("inference_pipeline = [", config)
             self.assertIn("pipeline=inference_pipeline", config)
             self.assertIn("test_dataloader = dict", config)
+            resolved = {}
+            exec(compile(config, '<generated-config>', 'exec'), resolved)
+            # CocoMetric.process requires both IDs even with annotations on disk.
+            for name in ('val_dataloader', 'test_dataloader'):
+                pack = resolved[name]['dataset']['pipeline'][-1]
+                self.assertEqual(pack['type'], 'PackDetInputs')
+                self.assertTrue({'id', 'img_id'}.issubset(pack['meta_keys']))
+            self.assertNotIn('LoadAnnotations', [step['type'] for step in
+                            resolved['test_dataloader']['dataset']['pipeline']])
             self.assertIn("loss_pose=dict(_delete_=True", config)
             self.assertIn("metainfo=metainfo_file", config)
             self.assertIn("metainfo = dict(from_file=metainfo_file)", config)

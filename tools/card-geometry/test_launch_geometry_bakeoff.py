@@ -123,6 +123,9 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
             installs = [line for line in command.splitlines() if line.startswith("python -m pip install")]
             self.assertEqual(installs[-1], "python -m pip install --no-cache-dir numpy==1.26.4")
             self.assertGreater(command.index("NUMPY_RUNTIME_PIN_OK"), command.rfind("python -m pip install"))
+            if candidate == "yolox-pose":
+                self.assertLess(command.index("python tools/card-geometry/validate_yolox_runtime.py"),
+                                command.index("python tools/card-geometry/run_card_geometry_hf_job.py"))
 
     def test_export_bootstrap_is_private_and_installs_converter(self):
         command = bootstrap_command(

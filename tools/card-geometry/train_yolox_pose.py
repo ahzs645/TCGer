@@ -361,7 +361,7 @@ def write_config(
     dict(type='mmdet.Pad', pad_to_square=True,
          pad_val=dict(img=(114.0, 114.0, 114.0))),
     dict(type='PackDetInputs',
-         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
+         meta_keys=('id', 'img_id', 'img_path', 'ori_shape', 'img_shape',
                     'scale_factor')),
 ]"""
     config.write_text(
