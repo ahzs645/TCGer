@@ -400,7 +400,13 @@ def add_canonical_archive(
                     "width": dimensions[0],
                     "height": dimensions[1],
                 },
-                "grouping": {"sourceArchiveId": source_archive_id},
+                "grouping": {
+                    "sourceArchiveId": source_archive_id,
+                    "sourceAssetIds": sorted({
+                        "coco-source:" + sha256_bytes(value.encode("utf-8"))
+                        for value in row.get("leakageAliases", [])
+                    }),
+                },
                 "instances": instances,
             }
             license_id = _shippable_source_license(row)

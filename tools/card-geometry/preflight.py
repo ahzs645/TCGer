@@ -522,6 +522,9 @@ def check_leakage(ctx: Context) -> None:
             except ValueError as error:
                 alias_errors[entry["recordId"]] = str(error)
         seen[("sourceArchiveId", keys["sourceArchiveId"])].add(split)
+        assignment = ctx.manifest["splitAssignment"].get("archiveSplits")
+        if assignment is not None and assignment.get(keys["sourceArchiveId"]) != split:
+            alias_errors[entry["recordId"]] = "record split disagrees with computed archive assignment"
         if keys.get("sessionId"):
             seen[("sessionId", keys["sessionId"])].add(split)
         for value in keys.get("physicalCardIds", []):

@@ -150,6 +150,7 @@ def leakage_keys_from_record(
             )
         archive_id = canonical_id
     source_asset_ids = set(instance_leakage_ids(record, "sourceAssetId"))
+    source_asset_ids.update(grouping.get("sourceAssetIds", []))
     synthetic = record.get("synthetic", {})
     if isinstance(synthetic, dict):
         background = synthetic.get("backgroundAssetId")

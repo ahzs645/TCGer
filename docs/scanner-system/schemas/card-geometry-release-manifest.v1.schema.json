@@ -58,7 +58,13 @@
       "required": ["method", "seed"],
       "properties": {
         "method": { "type": "string", "minLength": 1, "maxLength": 160 },
-        "seed": { "type": "integer", "minimum": 0 }
+        "seed": { "type": "integer", "minimum": 0 },
+        "inputInventorySha256": { "$ref": "#/$defs/sha256" },
+        "archiveSplits": {
+          "description": "Computed split of each canonical archive, covered by corpusHash and verified by preflight.",
+          "type": "object",
+          "additionalProperties": { "enum": ["train", "validation", "test"] }
+        }
       }
     },
     "sourceArchiveAliases": {

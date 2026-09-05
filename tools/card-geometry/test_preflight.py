@@ -101,6 +101,22 @@ class FixtureReleaseTests(unittest.TestCase):
 
 
 class PreflightTests(unittest.TestCase):
+    def test_record_cannot_disagree_with_computed_archive_assignment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "release"
+            shutil.copytree(RELEASES_DIR / "valid-fixture", release)
+            manifest = load_json(release / "manifest.json")
+            manifest["splitAssignment"]["archiveSplits"] = {
+                entry["leakageKeys"]["sourceArchiveId"]: entry["split"]
+                for entry in manifest["records"]
+            }
+            first = manifest["records"][0]
+            manifest["splitAssignment"]["archiveSplits"][first["leakageKeys"]["sourceArchiveId"]] = "validation" if first["split"] != "validation" else "train"
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(release / "manifest.json", manifest)
+            report = run_preflight(release)
+            self.assertIn("LEAKAGE_DISJOINT", report["failedChecks"])
+
     def run_release(self, name: str, **expectations) -> dict:
         return run_preflight(
             RELEASES_DIR / name,

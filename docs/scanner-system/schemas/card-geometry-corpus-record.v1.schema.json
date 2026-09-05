@@ -101,7 +101,12 @@
       "required": ["sourceArchiveId"],
       "properties": {
         "sourceArchiveId": { "$ref": "#/$defs/id" },
-        "sessionId": { "$ref": "#/$defs/id" }
+        "sessionId": { "$ref": "#/$defs/id" },
+        "sourceAssetIds": {
+          "description": "Source image family identities, including aliases of re-encoded or re-exported images; independent leakage keys.",
+          "type": "array", "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
       }
     },
     "cornerSource": {
