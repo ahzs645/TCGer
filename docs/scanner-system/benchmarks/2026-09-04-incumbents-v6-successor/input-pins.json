@@ -1,0 +1,65 @@
+{
+  "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+  "detrModelRevision": "54330f9a0a671167dcf133e36304dcb58a5d9d76",
+  "draw2ModelRevision": "ff62fec32e0c1c2104d548b6f8dfcc0b3c46d26f",
+  "exporter": "tools/camera-corpus/bench_localizers.py",
+  "host": "macOS-26.6.2-arm64-arm-64bit",
+  "localizers": {
+    "app-detector-box": {
+      "artifactSha256": [
+        "1568a9dd2421b2b1e4f03e6ab4f3b0a26138275d3d72308d01a4034370ac7ad9"
+      ],
+      "predictionRows": 600,
+      "predictionsSha256": "f093570b6013c31f9fbb881c7244aa8bf6218be1db605249eeaa0c7cd9356078"
+    },
+    "detr-pokemon": {
+      "artifactSha256": [
+        "6eb48a3fb6538105d8f3268a67c6c6db181b994e8d0300fc69f99f9071f19118"
+      ],
+      "predictionRows": 600,
+      "predictionsSha256": "b25ce3148f44ee044c4822c5264fec12ef8e6cdbbeef628335280b4e044ab7c1"
+    },
+    "device": {
+      "artifactSha256": [
+        "9dbbeafd4b832258485e84c537ebdbc2b73223453485fbd6ddf608f99571d242"
+      ],
+      "predictionRows": 600,
+      "predictionsSha256": "2781c069f7dc4fa8a098683c3318521061a83a2f78d58bca1c0a4f46dbf5ea01"
+    },
+    "draw2-ygo-obb": {
+      "artifactSha256": [
+        "037e71a818fc76c65b63d9d81addb28dae306e1b2754151385b18d3555de9cb7"
+      ],
+      "predictionRows": 600,
+      "predictionsSha256": "d12ac836e7592c4586ae984fdc1f9c93b9b8bea74b6dc2cd9d491cb134aa6ed1"
+    },
+    "vision-app": {
+      "artifactSha256": [
+        "29fd7d30cc0fb1cfc2acf1607323107a51245f7873aafe2da20730f869a3bd35"
+      ],
+      "predictionRows": 600,
+      "predictionsSha256": "592f9a2940d0d7f17c9fb1904177711d860b4f2e0af56397a91d5da871430dfa"
+    },
+    "vision-doc": {
+      "artifactSha256": [
+        "48256e09d29014baebc8627115b95cdbdbca0dab7589f9196ce45bbc9df5e367"
+      ],
+      "predictionRows": 600,
+      "predictionsSha256": "48a152b0946ecea32ec662358e1ba579851add50f2500977e69a01dfaa60f45c"
+    },
+    "vision-rect": {
+      "artifactSha256": [
+        "c6652a7ffbac1a232eae9aca613413bbf478fc55da194d36d527a513a7c7e9dd"
+      ],
+      "predictionRows": 600,
+      "predictionsSha256": "a240779ce7629087e538a59ba2ad57d6e359cdcad1cef61b9e0ff02f355a6b85"
+    }
+  },
+  "releaseId": "real-geometry-evaluation-v6-full-aliases-v2",
+  "supersedes": {
+    "corpusHash": "7a75cc5ba2f0ac429136fa67f75b473e09c05f6edaee112bf0f5b1ba701a188a",
+    "releaseId": "real-geometry-evaluation-v6-full"
+  },
+  "toolingRevision": "786e5f253bafe6dfb31c121eaa8654bcbbe13d77",
+  "visionScriptSha256": "426f7745e74358f42bfcbff871699250a5d1fa0f9cc5fbbcb0c01d5a8030b3a4"
+}

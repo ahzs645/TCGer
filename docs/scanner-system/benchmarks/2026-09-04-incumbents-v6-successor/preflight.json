@@ -1,0 +1,386 @@
+{
+  "checks": [
+    {
+      "code": "MANIFEST_LOAD",
+      "details": {
+        "path": ".artifacts/card-geometry/releases/real-geometry-evaluation-v6-full-aliases-v2/manifest.json"
+      },
+      "message": "manifest loaded",
+      "status": "pass"
+    },
+    {
+      "code": "MANIFEST_SCHEMA",
+      "details": {},
+      "message": "manifest matches the release-manifest schema",
+      "status": "pass"
+    },
+    {
+      "code": "POLICY_LOAD",
+      "details": {
+        "path": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/releases/real-geometry-evaluation-v6-full-aliases-v2/policy.json"
+      },
+      "message": "readiness policy loaded",
+      "status": "pass"
+    },
+    {
+      "code": "POLICY_SCHEMA",
+      "details": {},
+      "message": "readiness policy matches its schema",
+      "status": "pass"
+    },
+    {
+      "code": "POLICY_HASH",
+      "details": {
+        "actualSha256": "3f8d4c29da90e2d38558a58c755705ba1f2b2d545d83c74a72f3814349d27aee",
+        "expectedPolicyId": null,
+        "expectedSha256": null,
+        "manifestSha256": "3f8d4c29da90e2d38558a58c755705ba1f2b2d545d83c74a72f3814349d27aee",
+        "policyId": "real-ingestion-smoke-v1"
+      },
+      "message": "policy identity and hash bound correctly",
+      "status": "pass"
+    },
+    {
+      "code": "CORPUS_HASH",
+      "details": {
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "expectedCorpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7"
+      },
+      "message": "corpusHash matches canonical manifest content",
+      "status": "pass"
+    },
+    {
+      "code": "RECORD_SCHEMA",
+      "details": {},
+      "message": "all 600 records match the corpus-record schema",
+      "status": "pass"
+    },
+    {
+      "code": "RECORD_HASH",
+      "details": {},
+      "message": "all 600 record files match their manifest hash",
+      "status": "pass"
+    },
+    {
+      "code": "IMAGE_HASH",
+      "details": {},
+      "message": "all images match their manifest and record hashes",
+      "status": "pass"
+    },
+    {
+      "code": "MANIFEST_RECORD_CONSISTENCY",
+      "details": {},
+      "message": "manifest leakage keys agree with record content",
+      "status": "pass"
+    },
+    {
+      "code": "LEAKAGE_KEYS_PRESENT",
+      "details": {},
+      "message": "every record carries the leakage keys its source kind requires",
+      "status": "pass"
+    },
+    {
+      "code": "LEAKAGE_DISJOINT",
+      "details": {},
+      "message": "no leakage key is shared between splits",
+      "status": "pass"
+    },
+    {
+      "code": "EVAL_DENYLIST",
+      "details": {
+        "denylistedSessions": [
+          "scan-session-20260809-160556",
+          "scan-session-20260809-175313",
+          "scan-session-20260809-183843",
+          "scan-session-20260809-190752",
+          "scan-session-20260809-223944",
+          "scan-session-20260827-223150",
+          "scan-session-20260829-200235",
+          "scan-session-20260829-233753",
+          "scan-session-20260903-110212"
+        ]
+      },
+      "message": "frozen evaluation sessions appear only in the test split",
+      "status": "pass"
+    },
+    {
+      "code": "SPLIT_REAL_ONLY",
+      "details": {
+        "realOnlySplits": [
+          "test"
+        ]
+      },
+      "message": "no synthetic records in real-only splits",
+      "status": "pass"
+    },
+    {
+      "code": "SOURCE_TIER",
+      "details": {
+        "allowedSourceTiers": [
+          "shippable"
+        ]
+      },
+      "message": "every record belongs to a source tier admitted by policy",
+      "status": "pass"
+    },
+    {
+      "code": "SHARED_FIXTURES",
+      "details": {
+        "fixturesDir": "/Users/ahmadjalil/github/TCGer/tools/card-geometry/fixtures"
+      },
+      "message": "shared validation/NMS and coordinate round-trip fixtures reproduce",
+      "status": "pass"
+    },
+    {
+      "code": "CORNER_COUNTS",
+      "details": {
+        "bySceneSlice": {
+          "binder_page": {
+            "cornerSource:human": 108,
+            "eligible": 108,
+            "evaluated": 108,
+            "metricEligible": 108,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:outsideFrame": 6,
+            "visibility:visible": 102
+          },
+          "duel_field": {
+            "cornerSource:human": 132,
+            "eligible": 132,
+            "evaluated": 132,
+            "metricEligible": 132,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:outsideFrame": 24,
+            "visibility:visible": 108
+          },
+          "single_card_archive": {
+            "cornerSource:maskFit": 2048,
+            "eligible": 2244,
+            "evaluated": 2048,
+            "metricEligible": 0,
+            "metricExcluded": 2048,
+            "skipped": 196,
+            "visibility:unlabeled": 196,
+            "visibility:visible": 2048
+          },
+          "single_handheld": {
+            "cornerSource:human": 228,
+            "eligible": 228,
+            "evaluated": 228,
+            "metricEligible": 228,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:outsideFrame": 40,
+            "visibility:visible": 188
+          },
+          "steep_playmat": {
+            "cornerSource:human": 88,
+            "eligible": 88,
+            "evaluated": 88,
+            "metricEligible": 88,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:outsideFrame": 22,
+            "visibility:visible": 66
+          }
+        },
+        "bySourceKind": {
+          "real": {
+            "cornerSource:human": 556,
+            "cornerSource:maskFit": 2048,
+            "eligible": 2800,
+            "evaluated": 2604,
+            "metricEligible": 556,
+            "metricExcluded": 2048,
+            "skipped": 196,
+            "visibility:outsideFrame": 92,
+            "visibility:unlabeled": 196,
+            "visibility:visible": 2512
+          }
+        },
+        "bySplit": {
+          "test": {
+            "cornerSource:human": 556,
+            "cornerSource:maskFit": 2048,
+            "eligible": 2800,
+            "evaluated": 2604,
+            "metricEligible": 556,
+            "metricExcluded": 2048,
+            "skipped": 196,
+            "visibility:outsideFrame": 92,
+            "visibility:unlabeled": 196,
+            "visibility:visible": 2512
+          }
+        },
+        "metricEligibleCornerSources": [
+          "human",
+          "synthetic"
+        ]
+      },
+      "message": "annotation corner counts recorded",
+      "status": "pass"
+    },
+    {
+      "code": "READINESS_MINIMUMS",
+      "details": {
+        "instancesPerSplit": {
+          "test": 700,
+          "train": 0,
+          "validation": 0
+        },
+        "metricEligibleInstancesPerSplit": {
+          "test": 139,
+          "train": 0,
+          "validation": 0
+        },
+        "policyId": "real-ingestion-smoke-v1",
+        "recordsPerSplit": {
+          "test": 600,
+          "train": 0,
+          "validation": 0
+        },
+        "sceneSliceInstances": {
+          "test/binder_page": 27,
+          "test/duel_field": 33,
+          "test/single_card_archive": 561,
+          "test/single_handheld": 57,
+          "test/steep_playmat": 22
+        },
+        "sceneSliceMetricEligibleInstances": {
+          "test/binder_page": 27,
+          "test/duel_field": 33,
+          "test/single_card_archive": 0,
+          "test/single_handheld": 57,
+          "test/steep_playmat": 22
+        },
+        "testRealSessions": [
+          "scan-session-20260809-160556",
+          "scan-session-20260809-175313",
+          "scan-session-20260809-183843",
+          "scan-session-20260809-190752",
+          "scan-session-20260809-223944",
+          "scan-session-20260827-223150",
+          "scan-session-20260829-200235",
+          "scan-session-20260829-233753",
+          "scan-session-20260903-110212"
+        ]
+      },
+      "message": "release meets its readiness policy minimums",
+      "status": "pass"
+    },
+    {
+      "code": "RELEASE_PURPOSE",
+      "details": {
+        "expectedPurpose": null,
+        "releasePurpose": "smoke"
+      },
+      "message": "release purpose is 'smoke'",
+      "status": "pass"
+    }
+  ],
+  "cornerCounts": {
+    "bySceneSlice": {
+      "binder_page": {
+        "cornerSource:human": 108,
+        "eligible": 108,
+        "evaluated": 108,
+        "metricEligible": 108,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:outsideFrame": 6,
+        "visibility:visible": 102
+      },
+      "duel_field": {
+        "cornerSource:human": 132,
+        "eligible": 132,
+        "evaluated": 132,
+        "metricEligible": 132,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:outsideFrame": 24,
+        "visibility:visible": 108
+      },
+      "single_card_archive": {
+        "cornerSource:maskFit": 2048,
+        "eligible": 2244,
+        "evaluated": 2048,
+        "metricEligible": 0,
+        "metricExcluded": 2048,
+        "skipped": 196,
+        "visibility:unlabeled": 196,
+        "visibility:visible": 2048
+      },
+      "single_handheld": {
+        "cornerSource:human": 228,
+        "eligible": 228,
+        "evaluated": 228,
+        "metricEligible": 228,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:outsideFrame": 40,
+        "visibility:visible": 188
+      },
+      "steep_playmat": {
+        "cornerSource:human": 88,
+        "eligible": 88,
+        "evaluated": 88,
+        "metricEligible": 88,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:outsideFrame": 22,
+        "visibility:visible": 66
+      }
+    },
+    "bySourceKind": {
+      "real": {
+        "cornerSource:human": 556,
+        "cornerSource:maskFit": 2048,
+        "eligible": 2800,
+        "evaluated": 2604,
+        "metricEligible": 556,
+        "metricExcluded": 2048,
+        "skipped": 196,
+        "visibility:outsideFrame": 92,
+        "visibility:unlabeled": 196,
+        "visibility:visible": 2512
+      }
+    },
+    "bySplit": {
+      "test": {
+        "cornerSource:human": 556,
+        "cornerSource:maskFit": 2048,
+        "eligible": 2800,
+        "evaluated": 2604,
+        "metricEligible": 556,
+        "metricExcluded": 2048,
+        "skipped": 196,
+        "visibility:outsideFrame": 92,
+        "visibility:unlabeled": 196,
+        "visibility:visible": 2512
+      }
+    },
+    "metricEligibleCornerSources": [
+      "human",
+      "synthetic"
+    ]
+  },
+  "declaredCorpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+  "expectations": {
+    "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "policyId": null,
+    "policySha256": null,
+    "purpose": null
+  },
+  "failedChecks": [],
+  "readinessPolicyId": "real-ingestion-smoke-v1",
+  "readinessPolicySha256": "3f8d4c29da90e2d38558a58c755705ba1f2b2d545d83c74a72f3814349d27aee",
+  "readyFor": "tooling",
+  "recomputedCorpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+  "releaseId": "real-geometry-evaluation-v6-full-aliases-v2",
+  "releasePurpose": "smoke",
+  "releaseRoot": ".artifacts/card-geometry/releases/real-geometry-evaluation-v6-full-aliases-v2",
+  "schema": "https://tcger.app/schemas/card-geometry-preflight-report/v1",
+  "toolingRevision": "5bc2de81edea11ce32e0c31badbe063b4cb19c52"
+}
