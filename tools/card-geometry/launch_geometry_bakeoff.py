@@ -382,6 +382,10 @@ def bootstrap_command(
                 # YOLO11's C2PSA trace fails in coremltools with NumPy >= 2.4.
                 "python -m pip install --no-cache-dir numpy==1.26.4",
             ]
+    # Framework dependencies (notably OpenCV pulled by Ultralytics) can
+    # upgrade NumPy after the initial install. Reassert the runtime pin last.
+    setup.append("python -m pip install --no-cache-dir numpy==1.26.4")
+    setup.append('python -c "import numpy; assert numpy.__version__ == \'1.26.4\'; print(\'NUMPY_RUNTIME_PIN_OK\', numpy.__version__)"')
     smoke = " --pipeline-smoke" if pipeline_smoke else ""
     export = f" --export-format {export_format}" if export_format else ""
     program = f"""

@@ -114,6 +114,16 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         self.assertIn("opencv-python-headless==4.10.0.84", command[-1])
         self.assertIn("HF_HUB_DOWNLOAD_TIMEOUT=120", command[-1])
 
+    def test_training_bootstrap_reasserts_numpy_after_framework_dependencies(self):
+        for candidate in ("yolo11n-pose", "yolo11s-pose", "yolox-pose", "fastvit-t8-four-corner"):
+            command = bootstrap_command(candidate=candidate, checkpoint_repo="owner/private",
+                hub_revision="a" * 40, tooling_path="tooling.tar.gz", tooling_sha="b" * 64,
+                config_path="config.json", config_sha="c" * 64, pipeline_smoke=False,
+                preflight_path="preflight.json", preflight_sha="d" * 64)[-1]
+            installs = [line for line in command.splitlines() if line.startswith("python -m pip install")]
+            self.assertEqual(installs[-1], "python -m pip install --no-cache-dir numpy==1.26.4")
+            self.assertGreater(command.index("NUMPY_RUNTIME_PIN_OK"), command.rfind("python -m pip install"))
+
     def test_export_bootstrap_is_private_and_installs_converter(self):
         command = bootstrap_command(
             candidate="fastvit-t8-four-corner",
