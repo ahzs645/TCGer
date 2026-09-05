@@ -1,0 +1,22 @@
+{
+  "jobId": "6a9c9300259f8e97255e4a0e",
+  "epoch": 3,
+  "logLine": "09/05 22:35:36 - mmengine - INFO - Epoch(train)  [3][ 50/842]  base_lr: 2.4905e-04 lr: 2.4905e-04  eta: 5:32:29  time: 0.4942  data_time: 0.0307  memory: 3713  loss: 25.1083  loss_cls: 0.5186  loss_bbox: 0.9230  loss_obj: 1.4794  loss_kpt: 22.0740  loss_vis: 0.1133",
+  "verifiedAt": "2026-09-05T22:44:26.737575+00:00",
+  "fullValidationBatches": 143,
+  "fullValidationPassed": true,
+  "fixtureTestLoopPassed": true,
+  "checkpointSha256": "096c45e52828fa367796733dc6b4c4412a424bf44e89f9e7c52a6b21824c2e00",
+  "sourceEpoch": 2,
+  "totalEpochBudget": 50,
+  "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+  "evidenceLogLines": [
+    "YOLOX_RESUME_VALIDATION_START",
+    "YOLOX_RESUME_VALIDATION_PASSED",
+    "YOLOX_RESUME_VALIDATION_START",
+    "09/05 22:34:18 - mmengine - INFO - Epoch(test) [143/143]    coco/AP: 0.0316  coco/AP .5: 0.1901  coco/AP .75: 0.0000  coco/AP (M): 0.0000  coco/AP (L): 0.0318  coco/AR: 0.0514  coco/AR .5: 0.2324  coco/AR .75: 0.0000  coco/AR (M): 0.0000  coco/AR (L): 0.0527  data_time: 0.0098  time: 0.1414",
+    "YOLOX_RESUME_VALIDATION_PASSED",
+    "09/05 22:35:11 - mmengine - INFO - resumed epoch: 2, iter: 1684",
+    "09/05 22:35:36 - mmengine - INFO - Epoch(train)  [3][ 50/842]  base_lr: 2.4905e-04 lr: 2.4905e-04  eta: 5:32:29  time: 0.4942  data_time: 0.0307  memory: 3713  loss: 25.1083  loss_cls: 0.5186  loss_bbox: 0.9230  loss_obj: 1.4794  loss_kpt: 22.0740  loss_vis: 0.1133"
+  ]
+}
