@@ -2,6 +2,7 @@
 """Run the repaired pinned YOLOX training and validation loops on generated fixtures."""
 
 import argparse
+import copy
 import json
 import math
 from pathlib import Path
@@ -46,7 +47,6 @@ def run(root: Path, mmyolo_root: Path):
     repair=repair_source(mmyolo_root)
     from mmengine.config import Config
     from mmengine.runner import Runner
-    from mmengine.dataset import pseudo_collate
     from mmyolo.utils import register_all_modules
     import torch
 
@@ -84,7 +84,9 @@ def run(root: Path, mmyolo_root: Path):
             unknown_sample=sample
     assert sorted(counts)==[1,1,1,2], counts
     assert unknown_sample is not None
-    losses=runner.model.train_step(pseudo_collate([unknown_sample]*2),runner.optim_wrapper)
+    runner.model.train()
+    batch=runner.train_dataloader.collate_fn([copy.deepcopy(unknown_sample) for _ in range(2)])
+    losses=runner.model.train_step(batch,runner.optim_wrapper)
     box_losses={key:float(value) for key,value in losses.items()}
     assert all(math.isfinite(value) for value in box_losses.values()), box_losses
     validation=runner.val()
