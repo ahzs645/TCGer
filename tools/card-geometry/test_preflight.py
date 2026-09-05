@@ -101,6 +101,37 @@ class FixtureReleaseTests(unittest.TestCase):
 
 
 class PreflightTests(unittest.TestCase):
+    def test_real_source_ids_accept_record_or_instance_identity(self):
+        for representation in ("record", "instances", "missing", "synthetic-record-only"):
+            with self.subTest(representation=representation), tempfile.TemporaryDirectory() as tmp:
+                release = Path(tmp) / "release"
+                shutil.copytree(RELEASES_DIR / "valid-fixture", release)
+                manifest = load_json(release / "manifest.json")
+                policy = load_json(release / "policy.json")
+                policy["requiredLeakageKeys"]["real"] = ["sourceAssetIds"]
+                write_json(release / "policy.json", policy)
+                manifest["readiness"]["readinessPolicySha256"] = sha256_file(release / "policy.json")
+                for entry in manifest["records"]:
+                    record = load_json(release / entry["path"])
+                    if record["source"]["kind"] == "real":
+                        if representation == "instances":
+                            for i, instance in enumerate(record["instances"]):
+                                instance["sourceAssetId"] = f"{entry['recordId']}-{i}"
+                        elif representation != "missing":
+                            record["grouping"]["sourceAssetIds"] = [entry["recordId"]]
+                    elif representation == "synthetic-record-only":
+                        record["grouping"]["sourceAssetIds"] = [entry["recordId"]]
+                        for instance in record["instances"]:
+                            instance.pop("sourceAssetId", None)
+                    write_json(release / entry["path"], record)
+                    entry["sha256"] = sha256_file(release / entry["path"])
+                    entry["leakageKeys"] = leakage_keys_from_record(record, manifest["sourceArchiveAliases"])
+                manifest["corpusHash"] = corpus_hash(manifest)
+                write_json(release / "manifest.json", manifest)
+                failed = run_preflight(release)["failedChecks"]
+                self.assertEqual("LEAKAGE_KEYS_PRESENT" in failed,
+                                 representation in {"missing", "synthetic-record-only"})
+
     def test_assembly_background_provenance_cannot_change_after_freeze(self):
         from corpus_release import canonical_json, sha256_bytes
         with tempfile.TemporaryDirectory() as tmp:

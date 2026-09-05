@@ -498,9 +498,17 @@ def check_leakage(ctx: Context) -> None:
                     instances = (
                         record.get("instances", []) if isinstance(record, dict) else []
                     )
-                    if not keys.get(key) or any(
+                    # A real archive image can identify its source at record
+                    # level; each card is part of that same photographed asset.
+                    # Synthetic scenes still need each composited card's ID.
+                    record_source = (
+                        kind == "real" and key == "sourceAssetIds"
+                        and isinstance(record, dict)
+                        and bool(record.get("grouping", {}).get("sourceAssetIds"))
+                    )
+                    if not keys.get(key) or (not record_source and any(
                         instance_key not in instance for instance in instances
-                    ):
+                    )):
                         missing[entry["recordId"]].append(instance_key)
         if missing:
             ctx.add(
