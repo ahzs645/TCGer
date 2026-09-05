@@ -344,7 +344,7 @@ def write_config(
         raise ValueError(f"missing pinned card-corner metainfo: {METAINFO_FILE}")
     config = output / "yolox-pose-card.py"
     shared_pipeline = """[
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadImageFromFile', to_float32=True),
     dict(type='LoadAnnotations', with_keypoints=True),
     dict(type='Resize', scale=(640, 640), keep_ratio=True),
     dict(type='mmdet.Pad', pad_to_square=True,
@@ -355,7 +355,7 @@ def write_config(
                     'scale_factor', 'flip_indices')),
 ]"""
     inference_pipeline = """[
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadImageFromFile', to_float32=True),
     dict(type='Resize', scale=(640, 640), keep_ratio=True),
     dict(type='mmdet.Pad', pad_to_square=True,
          pad_val=dict(img=(114.0, 114.0, 114.0))),

@@ -87,3 +87,12 @@ canceled before execution. The same pinned Linux diagnostic was resubmitted to
 `cpu-performance` as Job `6a9bb0b6259f8e97255e1c6d`, with historical inference
 explicitly set to CPU. These runs are diagnostic and do not consume or redefine
 a candidate's round-two training budget.
+
+The first CPU runtime attempt exposed a dependency of the pinned YOLOX
+preprocessor on its random-resize batch transform: that transform also cast
+byte pixels to float. With augmentation disabled, the first training step
+failed with a byte/float dtype mismatch. The shared and inference pipelines
+now explicitly request `LoadImageFromFile(to_float32=True)`. This preserves
+BGR float pixels in [0,255] without restoring hidden random resizing. The
+failed attempt is retained as diagnostic evidence; it is not a completed
+trainer validation.

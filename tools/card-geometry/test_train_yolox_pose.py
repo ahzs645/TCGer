@@ -180,6 +180,7 @@ class TrainYoloxPoseTests(unittest.TestCase):
             self.assertNotIn("val_cfg = None", config)
             self.assertIn("save_best=None", config)
             self.assertIn("batch_augments=None", config)
+            self.assertIn("LoadImageFromFile', to_float32=True", config)
             self.assertIn("lr=0.00025", config)
             self.assertIn("auto_scale_lr = dict(enable=False", config)
             self.assertIn("by_keypoints=False", config)
