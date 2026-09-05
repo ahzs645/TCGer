@@ -55,7 +55,7 @@ def run(root: Path, mmyolo_root: Path):
     register_all_modules()
     import dis
     from mmyolo.models.dense_heads.yolox_pose_head import YOLOXPoseHead
-    assert any(i.opname == "STORE_FAST" and i.argval == "cfg"
+    assert any(i.opname in {"STORE_FAST", "STORE_DEREF"} and i.argval == "cfg"
                for i in dis.get_instructions(YOLOXPoseHead.predict_by_feat)), "unpatched loaded head"
     generate_fixture(root/'fixture')
     materialization=materialize_coco(root/'fixture',root/'coco',POLICY)
