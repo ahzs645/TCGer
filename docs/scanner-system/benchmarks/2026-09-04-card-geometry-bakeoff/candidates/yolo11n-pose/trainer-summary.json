@@ -1,0 +1,48 @@
+{
+  "artifacts": {
+    "best": {
+      "path": "training/repeat-0/weights/best.pt",
+      "sha256": "6c9edeed8d7e958fb7a25340c98ee88c98079152fe55b71ad747cb79df4ffbbc"
+    },
+    "last": {
+      "path": "training/repeat-0/weights/last.pt",
+      "sha256": "ae48d492323453e1e3f640a105c7acf554ed83efa69e79d8a428e668a2f9a63d"
+    }
+  },
+  "baseCheckpoint": {
+    "sha256": "869e83fcdffdc7371fa4e34cd8e51c838cc729571d1635e5141e3075e9319dc0",
+    "url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11n-pose.pt"
+  },
+  "candidate": "yolo11n-pose",
+  "experimentHash": "1b12d4e92d5c1372d4a7d6349d7fffd3a019c73df34dcab4b578f79b375959c2",
+  "materialization": {
+    "contextPadding": {
+      "cornerMapping": "(x*sourceWidth+left)/(sourceWidth+left+right)",
+      "fillRgb": [
+        0,
+        0,
+        0
+      ],
+      "order": "source -> black context padding -> Ultralytics letterbox"
+    },
+    "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+    "counts": {
+      "instances:train": 38778,
+      "instances:validation": 694,
+      "records:train": 10800,
+      "records:validation": 200
+    }
+  },
+  "schema": "https://tcger.app/reports/yolo-pose-training-smoke/v1",
+  "training": {
+    "augmentationProfile": "canonical-corpus-baked-v1:no-runtime-augmentation",
+    "batch": 16,
+    "epochs": 50,
+    "inputResolution": 640,
+    "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
+    "pythonVersion": "3.11.11",
+    "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+    "seed": 20260903,
+    "ultralyticsVersion": "8.4.138"
+  }
+}

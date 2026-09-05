@@ -1,8 +1,11 @@
 # Shared card-geometry plan — 2026-09-02
 
-**Status:** approved direction. The geometry, crop, and benchmark contracts
-are frozen. Candidate training remains gated by licensing, approved coverage
-targets, and a training-purpose corpus release.
+**Status:** implemented through the reproducible four-candidate bake-off. The
+geometry, crop, corpus, and benchmark contracts are frozen; the production
+training release was preflighted and all four candidates were trained,
+exported privately, and evaluated. No candidate met the production gates, so
+the measured recommendation is to ship none and retain the current detector
+with the 0°/180° recognition safety net.
 
 **Scope:** card detection, corner localization, and crop rectification for
 iOS, Android, and web. Recognition stays per game and is out of scope here
@@ -164,6 +167,33 @@ The comparison table records, for every candidate:
 - Core ML versus ONNX parity on the golden fixtures;
 - decoder source-code size; and
 - L4 GPU hours.
+
+### Measured bake-off outcome — 2026-09-04
+
+The deterministic
+[four-candidate comparison](benchmarks/2026-09-04-card-geometry-bakeoff/README.md)
+is bound to one production training corpus, one real evaluation corpus, one
+synthetic duel-field corpus, and one effective fairness identity. None of
+YOLO11n-pose, YOLO11s-pose, YOLOX-Pose, or the FastViT-T8 four-corner head
+passed the frozen real-camera geometry budgets. The YOLO11 candidates also
+produced one wrong recognition accept each; the two permissive candidates
+produced no correct accepts. All four private ONNX/Core ML exports passed the
+golden-fixture parity requirement, so export drift does not explain the
+quality result.
+
+The recommendation is therefore **ship none**. Keep the existing detector and
+the unconditional 0°/180° recognition safety net. No candidate was published
+to the asset store, and no production Swift, Kotlin, or TypeScript decoder was
+added because no model qualified for integration. Physical-device latency is
+recorded as unavailable rather than passing: no physical iPhone or Android
+device was connected during the run. That missing measurement would block a
+future winner, but it does not weaken the negative decision for candidates
+that already fail the offline quality gates.
+
+The Ultralytics publication-license decision is consequently deferred rather
+than resolved: it becomes necessary only if a future Ultralytics-derived run
+meets the production budgets. Any future replacement still requires the human
+release decision and measured physical-device latency.
 
 The synthetic duel-field benchmark is a split-only, immutable compositor
 release whose source assets and backgrounds are disjoint from the production
@@ -470,13 +500,13 @@ as unknown and double inference remains mandatory. Removing the second
 inference requires showing that wrong accepts do not increase, not merely good
 orientation accuracy.
 
-## Work that starts now
+## Foundation workstream completion record
 
 The three foundation workstreams were independent of the final licensing
-decision. The contract freeze, benchmark, and compositor tooling are landed.
-Candidate configuration and license-route enforcement are also implemented;
-training now waits on a combined shippable release that meets the frozen
-`training-minimums-v2` policy.
+decision and are complete. The contract and crop freeze, benchmark, compositor
+tooling, candidate configuration, license-route enforcement, combined
+shippable training release, pinned preflight, and frozen real and synthetic
+evaluation releases all landed before the measured bake-off.
 
 1. **Contract freeze**
    - commit JSON schemas for `CardGeometryResult` and the corpus record;
@@ -534,27 +564,32 @@ training now waits on a combined shippable release that meets the frozen
 
 ## Execution order
 
-1. Build the training-purpose release against the frozen
+Steps 1 through 6 are complete. Steps 7 and 8 were deliberately not executed
+because the comparison produced no licensed or licensable quality winner.
+
+1. **Complete.** Build the training-purpose release against the frozen
    `training-minimums-v2` policy and hash, and require the pinned preflight to
    report `readyFor: training`.
-2. Run one epoch of YOLO11n-pose on an L4 to prove corpus download, preflight,
+2. **Complete.** Run one epoch of YOLO11n-pose on an L4 to prove corpus download, preflight,
    training, private checkpoint persistence, config hashing, private export,
    and evaluation end to end.
-3. Run the full four-candidate batch (the three architecture families in the
+3. **Complete.** Run the full four-candidate batch (the three architecture families in the
    Gate 0 table) under the shared fairness configuration.
-4. Export raw heads privately to Core ML and ONNX; implement each model's
-   raw-tensor-to-candidate decoder in Swift, Kotlin, and TypeScript and add
-   its model-specific golden fixtures beside the shared validation/NMS
-   fixtures.
-5. Run offline geometry evaluation, full recognition replay on the labeled
+4. **Complete for evaluation.** Export raw heads privately to Core ML and
+   ONNX, implement reference raw-tensor decoders, and add model-specific
+   golden fixtures beside the shared validation/NMS fixtures. Production
+   Swift, Kotlin, and TypeScript ports are conditional on a qualifying model
+   and were not created for rejected candidates.
+5. **Complete where available.** Run offline geometry evaluation, full recognition replay on the labeled
    Magic, Pokémon, and Yu-Gi-Oh sessions, and physical-device latency and
-   thermal tests.
-6. Produce the comparison table and a recommendation. The human then chooses
-   the license route. An `evaluation-only` Ultralytics run cannot proceed to
-   the asset-store publication step.
-7. Ship the licensed winner through the shared asset store as a
+   thermal tests. No physical devices were connected, so phone latency and
+   thermal rows remain explicitly unavailable and cannot be treated as passes.
+6. **Complete.** Produce the comparison table and recommendation: ship none.
+   The Ultralytics license choice remains deferred; an `evaluation-only` run
+   cannot proceed to asset-store publication.
+7. **Not executed: no winner.** Ship the licensed winner through the shared asset store as a
    content-addressed release with a mutable manifest published last.
-8. Retire the bundled iOS `CardDetector.mlpackage`, the web TensorFlow.js
+8. **Not executed: no replacement shipped.** Retire the bundled iOS `CardDetector.mlpackage`, the web TensorFlow.js
    detector and its runtime dependency, and, under the orientation rule
    above, the unconditional 0°/180° double inference.
 

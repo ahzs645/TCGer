@@ -1,0 +1,508 @@
+{
+  "checks": [
+    {
+      "code": "MANIFEST_LOAD",
+      "details": {
+        "path": ".artifacts/card-geometry/releases/combined-shippable-training-production-v1/manifest.json"
+      },
+      "message": "manifest loaded",
+      "status": "pass"
+    },
+    {
+      "code": "MANIFEST_SCHEMA",
+      "details": {},
+      "message": "manifest matches the release-manifest schema",
+      "status": "pass"
+    },
+    {
+      "code": "POLICY_LOAD",
+      "details": {
+        "path": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/releases/combined-shippable-training-production-v1/policy.json"
+      },
+      "message": "readiness policy loaded",
+      "status": "pass"
+    },
+    {
+      "code": "POLICY_SCHEMA",
+      "details": {},
+      "message": "readiness policy matches its schema",
+      "status": "pass"
+    },
+    {
+      "code": "POLICY_HASH",
+      "details": {
+        "actualSha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+        "expectedPolicyId": "training-minimums-v2",
+        "expectedSha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+        "manifestSha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+        "policyId": "training-minimums-v2"
+      },
+      "message": "policy identity and hash bound correctly",
+      "status": "pass"
+    },
+    {
+      "code": "CORPUS_HASH",
+      "details": {
+        "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+        "expectedCorpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc"
+      },
+      "message": "corpusHash matches canonical manifest content",
+      "status": "pass"
+    },
+    {
+      "code": "RECORD_SCHEMA",
+      "details": {},
+      "message": "all 11600 records match the corpus-record schema",
+      "status": "pass"
+    },
+    {
+      "code": "RECORD_HASH",
+      "details": {},
+      "message": "all 11600 record files match their manifest hash",
+      "status": "pass"
+    },
+    {
+      "code": "IMAGE_HASH",
+      "details": {},
+      "message": "all images match their manifest and record hashes",
+      "status": "pass"
+    },
+    {
+      "code": "MANIFEST_RECORD_CONSISTENCY",
+      "details": {},
+      "message": "manifest leakage keys agree with record content",
+      "status": "pass"
+    },
+    {
+      "code": "LEAKAGE_KEYS_PRESENT",
+      "details": {},
+      "message": "every record carries the leakage keys its source kind requires",
+      "status": "pass"
+    },
+    {
+      "code": "LEAKAGE_DISJOINT",
+      "details": {},
+      "message": "no leakage key is shared between splits",
+      "status": "pass"
+    },
+    {
+      "code": "EVAL_DENYLIST",
+      "details": {
+        "denylistedSessions": [
+          "scan-session-20260809-160556",
+          "scan-session-20260809-175313",
+          "scan-session-20260809-183843",
+          "scan-session-20260809-190752",
+          "scan-session-20260809-223944",
+          "scan-session-20260827-223150",
+          "scan-session-20260829-200235",
+          "scan-session-20260829-233753",
+          "scan-session-20260903-110212"
+        ]
+      },
+      "message": "frozen evaluation sessions appear only in the test split",
+      "status": "pass"
+    },
+    {
+      "code": "SPLIT_REAL_ONLY",
+      "details": {
+        "realOnlySplits": [
+          "test"
+        ]
+      },
+      "message": "no synthetic records in real-only splits",
+      "status": "pass"
+    },
+    {
+      "code": "SOURCE_TIER",
+      "details": {
+        "allowedSourceTiers": [
+          "shippable"
+        ]
+      },
+      "message": "every record belongs to a source tier admitted by policy",
+      "status": "pass"
+    },
+    {
+      "code": "SHARED_FIXTURES",
+      "details": {
+        "fixturesDir": "/Users/ahmadjalil/github/TCGer/tools/card-geometry/fixtures"
+      },
+      "message": "shared validation/NMS and coordinate round-trip fixtures reproduce",
+      "status": "pass"
+    },
+    {
+      "code": "CORNER_COUNTS",
+      "details": {
+        "bySceneSlice": {
+          "binder_page": {
+            "cornerSource:human": 108,
+            "cornerSource:synthetic": 62100,
+            "eligible": 62208,
+            "evaluated": 62208,
+            "metricEligible": 62208,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:occluded": 40,
+            "visibility:outsideFrame": 1111,
+            "visibility:visible": 61057
+          },
+          "duel_field": {
+            "cornerSource:human": 132,
+            "cornerSource:synthetic": 73188,
+            "eligible": 73320,
+            "evaluated": 73320,
+            "metricEligible": 73320,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:occluded": 13855,
+            "visibility:outsideFrame": 3912,
+            "visibility:visible": 55553
+          },
+          "single_card_archive": {
+            "cornerSource:maskFit": 2048,
+            "eligible": 2244,
+            "evaluated": 2048,
+            "metricEligible": 0,
+            "metricExcluded": 2048,
+            "skipped": 196,
+            "visibility:unlabeled": 196,
+            "visibility:visible": 2048
+          },
+          "single_handheld": {
+            "cornerSource:human": 228,
+            "cornerSource:synthetic": 7800,
+            "eligible": 8028,
+            "evaluated": 8028,
+            "metricEligible": 8028,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:occluded": 57,
+            "visibility:outsideFrame": 2110,
+            "visibility:visible": 5861
+          },
+          "single_handheld_distractor_free": {
+            "cornerSource:synthetic": 1300,
+            "eligible": 1300,
+            "evaluated": 1300,
+            "metricEligible": 1300,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:occluded": 12,
+            "visibility:outsideFrame": 325,
+            "visibility:visible": 963
+          },
+          "steep_playmat": {
+            "cornerSource:human": 88,
+            "cornerSource:synthetic": 13500,
+            "eligible": 13588,
+            "evaluated": 13588,
+            "metricEligible": 13588,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:outsideFrame": 2549,
+            "visibility:visible": 11039
+          }
+        },
+        "bySourceKind": {
+          "real": {
+            "cornerSource:human": 556,
+            "cornerSource:maskFit": 2048,
+            "eligible": 2800,
+            "evaluated": 2604,
+            "metricEligible": 556,
+            "metricExcluded": 2048,
+            "skipped": 196,
+            "visibility:outsideFrame": 92,
+            "visibility:unlabeled": 196,
+            "visibility:visible": 2512
+          },
+          "synthetic": {
+            "cornerSource:synthetic": 157888,
+            "eligible": 157888,
+            "evaluated": 157888,
+            "metricEligible": 157888,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:occluded": 13964,
+            "visibility:outsideFrame": 9915,
+            "visibility:visible": 134009
+          }
+        },
+        "bySplit": {
+          "test": {
+            "cornerSource:human": 556,
+            "cornerSource:maskFit": 2048,
+            "eligible": 2800,
+            "evaluated": 2604,
+            "metricEligible": 556,
+            "metricExcluded": 2048,
+            "skipped": 196,
+            "visibility:outsideFrame": 92,
+            "visibility:unlabeled": 196,
+            "visibility:visible": 2512
+          },
+          "train": {
+            "cornerSource:synthetic": 155112,
+            "eligible": 155112,
+            "evaluated": 155112,
+            "metricEligible": 155112,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:occluded": 13683,
+            "visibility:outsideFrame": 9711,
+            "visibility:visible": 131718
+          },
+          "validation": {
+            "cornerSource:synthetic": 2776,
+            "eligible": 2776,
+            "evaluated": 2776,
+            "metricEligible": 2776,
+            "metricExcluded": 0,
+            "skipped": 0,
+            "visibility:occluded": 281,
+            "visibility:outsideFrame": 204,
+            "visibility:visible": 2291
+          }
+        },
+        "metricEligibleCornerSources": [
+          "human",
+          "synthetic"
+        ]
+      },
+      "message": "annotation corner counts recorded",
+      "status": "pass"
+    },
+    {
+      "code": "READINESS_MINIMUMS",
+      "details": {
+        "instancesPerSplit": {
+          "test": 700,
+          "train": 38778,
+          "validation": 694
+        },
+        "metricEligibleInstancesPerSplit": {
+          "test": 139,
+          "train": 38778,
+          "validation": 694
+        },
+        "policyId": "training-minimums-v2",
+        "recordsPerSplit": {
+          "test": 600,
+          "train": 10800,
+          "validation": 200
+        },
+        "sceneSliceInstances": {
+          "test/binder_page": 27,
+          "test/duel_field": 33,
+          "test/single_card_archive": 561,
+          "test/single_handheld": 57,
+          "test/steep_playmat": 22,
+          "train/binder_page": 15300,
+          "train/duel_field": 17928,
+          "train/single_handheld": 1925,
+          "train/single_handheld_distractor_free": 300,
+          "train/steep_playmat": 3325,
+          "validation/binder_page": 225,
+          "validation/duel_field": 369,
+          "validation/single_handheld": 25,
+          "validation/single_handheld_distractor_free": 25,
+          "validation/steep_playmat": 50
+        },
+        "sceneSliceMetricEligibleInstances": {
+          "test/binder_page": 27,
+          "test/duel_field": 33,
+          "test/single_card_archive": 0,
+          "test/single_handheld": 57,
+          "test/steep_playmat": 22,
+          "train/binder_page": 15300,
+          "train/duel_field": 17928,
+          "train/single_handheld": 1925,
+          "train/single_handheld_distractor_free": 300,
+          "train/steep_playmat": 3325,
+          "validation/binder_page": 225,
+          "validation/duel_field": 369,
+          "validation/single_handheld": 25,
+          "validation/single_handheld_distractor_free": 25,
+          "validation/steep_playmat": 50
+        },
+        "testRealSessions": [
+          "scan-session-20260809-160556",
+          "scan-session-20260809-175313",
+          "scan-session-20260809-183843",
+          "scan-session-20260809-190752",
+          "scan-session-20260809-223944",
+          "scan-session-20260827-223150",
+          "scan-session-20260829-200235",
+          "scan-session-20260829-233753",
+          "scan-session-20260903-110212"
+        ]
+      },
+      "message": "release meets its readiness policy minimums",
+      "status": "pass"
+    },
+    {
+      "code": "RELEASE_PURPOSE",
+      "details": {
+        "expectedPurpose": "training",
+        "releasePurpose": "training"
+      },
+      "message": "release purpose is 'training'",
+      "status": "pass"
+    }
+  ],
+  "cornerCounts": {
+    "bySceneSlice": {
+      "binder_page": {
+        "cornerSource:human": 108,
+        "cornerSource:synthetic": 62100,
+        "eligible": 62208,
+        "evaluated": 62208,
+        "metricEligible": 62208,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:occluded": 40,
+        "visibility:outsideFrame": 1111,
+        "visibility:visible": 61057
+      },
+      "duel_field": {
+        "cornerSource:human": 132,
+        "cornerSource:synthetic": 73188,
+        "eligible": 73320,
+        "evaluated": 73320,
+        "metricEligible": 73320,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:occluded": 13855,
+        "visibility:outsideFrame": 3912,
+        "visibility:visible": 55553
+      },
+      "single_card_archive": {
+        "cornerSource:maskFit": 2048,
+        "eligible": 2244,
+        "evaluated": 2048,
+        "metricEligible": 0,
+        "metricExcluded": 2048,
+        "skipped": 196,
+        "visibility:unlabeled": 196,
+        "visibility:visible": 2048
+      },
+      "single_handheld": {
+        "cornerSource:human": 228,
+        "cornerSource:synthetic": 7800,
+        "eligible": 8028,
+        "evaluated": 8028,
+        "metricEligible": 8028,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:occluded": 57,
+        "visibility:outsideFrame": 2110,
+        "visibility:visible": 5861
+      },
+      "single_handheld_distractor_free": {
+        "cornerSource:synthetic": 1300,
+        "eligible": 1300,
+        "evaluated": 1300,
+        "metricEligible": 1300,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:occluded": 12,
+        "visibility:outsideFrame": 325,
+        "visibility:visible": 963
+      },
+      "steep_playmat": {
+        "cornerSource:human": 88,
+        "cornerSource:synthetic": 13500,
+        "eligible": 13588,
+        "evaluated": 13588,
+        "metricEligible": 13588,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:outsideFrame": 2549,
+        "visibility:visible": 11039
+      }
+    },
+    "bySourceKind": {
+      "real": {
+        "cornerSource:human": 556,
+        "cornerSource:maskFit": 2048,
+        "eligible": 2800,
+        "evaluated": 2604,
+        "metricEligible": 556,
+        "metricExcluded": 2048,
+        "skipped": 196,
+        "visibility:outsideFrame": 92,
+        "visibility:unlabeled": 196,
+        "visibility:visible": 2512
+      },
+      "synthetic": {
+        "cornerSource:synthetic": 157888,
+        "eligible": 157888,
+        "evaluated": 157888,
+        "metricEligible": 157888,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:occluded": 13964,
+        "visibility:outsideFrame": 9915,
+        "visibility:visible": 134009
+      }
+    },
+    "bySplit": {
+      "test": {
+        "cornerSource:human": 556,
+        "cornerSource:maskFit": 2048,
+        "eligible": 2800,
+        "evaluated": 2604,
+        "metricEligible": 556,
+        "metricExcluded": 2048,
+        "skipped": 196,
+        "visibility:outsideFrame": 92,
+        "visibility:unlabeled": 196,
+        "visibility:visible": 2512
+      },
+      "train": {
+        "cornerSource:synthetic": 155112,
+        "eligible": 155112,
+        "evaluated": 155112,
+        "metricEligible": 155112,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:occluded": 13683,
+        "visibility:outsideFrame": 9711,
+        "visibility:visible": 131718
+      },
+      "validation": {
+        "cornerSource:synthetic": 2776,
+        "eligible": 2776,
+        "evaluated": 2776,
+        "metricEligible": 2776,
+        "metricExcluded": 0,
+        "skipped": 0,
+        "visibility:occluded": 281,
+        "visibility:outsideFrame": 204,
+        "visibility:visible": 2291
+      }
+    },
+    "metricEligibleCornerSources": [
+      "human",
+      "synthetic"
+    ]
+  },
+  "declaredCorpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+  "expectations": {
+    "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+    "policyId": "training-minimums-v2",
+    "policySha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+    "purpose": "training"
+  },
+  "failedChecks": [],
+  "readinessPolicyId": "training-minimums-v2",
+  "readinessPolicySha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+  "readyFor": "training",
+  "recomputedCorpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+  "releaseId": "combined-shippable-training-production-v1",
+  "releasePurpose": "training",
+  "releaseRoot": ".artifacts/card-geometry/releases/combined-shippable-training-production-v1",
+  "schema": "https://tcger.app/schemas/card-geometry-preflight-report/v1",
+  "toolingRevision": "76811d55"
+}

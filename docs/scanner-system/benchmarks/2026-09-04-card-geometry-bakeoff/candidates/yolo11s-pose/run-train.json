@@ -1,0 +1,21 @@
+{
+  "action": "train",
+  "bakeoffId": "shared-card-geometry-licensing-v1",
+  "candidate": "yolo11s-pose",
+  "checkpointPrefix": "geometry/yolo11s-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/09d60e0ff456f3f0d375243658687bd40b9a81d877aebad9383a9ebbab96f05b",
+  "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+  "elapsedSeconds": 5672.916932,
+  "experimentHash": "09d60e0ff456f3f0d375243658687bd40b9a81d877aebad9383a9ebbab96f05b",
+  "exportDestination": "private-model-repo",
+  "exportFormat": null,
+  "fairnessHash": "dab09908a9a3ae977f700c985f2243840e0de51f37552e2a2eaca5f18fcb1a51",
+  "framework": "ultralytics",
+  "licenseRoute": "evaluation-only",
+  "policyId": "training-minimums-v2",
+  "policySha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+  "preflightCommit": "04668dcb1d362d3aba49c9645b22f953e4c71516",
+  "resolvedConfigCommit": "60d3234920b1b51b72b26f06703e9cf72812f330",
+  "resolvedConfigSha256": "09d60e0ff456f3f0d375243658687bd40b9a81d877aebad9383a9ebbab96f05b",
+  "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1",
+  "wrapperElapsedHours": 1.575810259
+}

@@ -1,0 +1,21 @@
+{
+  "action": "train",
+  "bakeoffId": "shared-card-geometry-licensing-v1",
+  "candidate": "fastvit-t8-four-corner",
+  "checkpointPrefix": "geometry/fastvit-t8-four-corner/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/ec9dc61942f85be5a30bcba64543f1ea971e4a802856463d313ba9169dd37396",
+  "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+  "elapsedSeconds": 15255.766613,
+  "experimentHash": "ec9dc61942f85be5a30bcba64543f1ea971e4a802856463d313ba9169dd37396",
+  "exportDestination": "private-model-repo",
+  "exportFormat": null,
+  "fairnessHash": "dab09908a9a3ae977f700c985f2243840e0de51f37552e2a2eaca5f18fcb1a51",
+  "framework": "tcger-pytorch",
+  "licenseRoute": "permissive",
+  "policyId": "training-minimums-v2",
+  "policySha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+  "preflightCommit": "a01dbe512a4965aeb6dc0fb183ff05dede919e91",
+  "resolvedConfigCommit": "e8190d005253d8a433e7f3e030a9eeddf1c00cee",
+  "resolvedConfigSha256": "ec9dc61942f85be5a30bcba64543f1ea971e4a802856463d313ba9169dd37396",
+  "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1",
+  "wrapperElapsedHours": 4.237712948
+}

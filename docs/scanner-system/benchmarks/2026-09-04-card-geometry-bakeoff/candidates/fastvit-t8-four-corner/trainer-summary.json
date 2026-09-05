@@ -1,0 +1,42 @@
+{
+  "artifacts": {
+    "best": {
+      "path": "training/repeat-0/best.pt",
+      "sha256": "def0355802c569854ff8c460c0939f7aadc7dc1c9a81fdc4d3f3b0351f584850"
+    },
+    "history": {
+      "path": "training/repeat-0/history.json",
+      "sha256": "3fccf1a0f7619097a9e800f28d2a1a8e9846175ab75d7b001274c87ea927d50c"
+    },
+    "last": {
+      "path": "training/repeat-0/last.pt",
+      "sha256": "6ebd80dca45181e45d00f0039ea94f8452ca08366f431f125067a6f1e1584ced"
+    }
+  },
+  "baseCheckpoint": {
+    "filename": "model.safetensors",
+    "repo": "timm/fastvit_t8.apple_in1k",
+    "revision": "f0cc1b82f948280d94a8812b1ce83698111054e1",
+    "sha256": "345af83ed1a7eee2ed322eb327895efd2a2a06c604272dbac92432adc61af889"
+  },
+  "bestValidationLoss": 1.0982826558443217,
+  "candidate": "fastvit-t8-four-corner",
+  "counts": {
+    "trainRecords": 10800,
+    "validationRecords": 200
+  },
+  "experimentHash": "ec9dc61942f85be5a30bcba64543f1ea971e4a802856463d313ba9169dd37396",
+  "schema": "https://tcger.app/reports/fastvit-four-corner-training/v1",
+  "training": {
+    "augmentationProfile": "canonical-corpus-baked-v1:no-runtime-augmentation",
+    "batch": 16,
+    "epochs": 50,
+    "inputResolution": 640,
+    "learningRate": 0.0003,
+    "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
+    "pythonVersion": "3.11.11",
+    "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+    "seed": 20260903,
+    "torchVersion": "2.6.0+cu124"
+  }
+}

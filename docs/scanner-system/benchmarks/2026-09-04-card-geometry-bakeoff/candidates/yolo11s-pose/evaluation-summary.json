@@ -1,0 +1,46 @@
+{
+  "candidate": "yolo11s-pose",
+  "checkpointSha256": "da1a90447e804647b92b3ed9c523a02e1d661aacef99918ddcfa0e4de13be0f4",
+  "decoderConfig": {
+    "aspectRatioBands": {
+      "rawCard": [
+        0.5,
+        3.0
+      ],
+      "slab": [
+        0.5,
+        3.0
+      ],
+      "unknown": [
+        0.5,
+        3.0
+      ]
+    },
+    "exteriorMargin": 0.25,
+    "minimumConfidence": 0.05,
+    "minimumQuadArea": 0.001,
+    "nmsIouThreshold": 0.5
+  },
+  "evaluations": {
+    "real-v3": {
+      "predictionsSha256": "2d011fc9b90686d22a058c6f4a78c844c8eb92dcb7bdc6d8f8b8ed487954e66b",
+      "reportSha256": "b86a9c16cac81bbc8130068b20b23bef20e0aade95df9f919f53b856d066cc63"
+    },
+    "recognitionReplay": {
+      "counts": {
+        "abstain": 8,
+        "correct": 3,
+        "correctReject": 0,
+        "frames": 57,
+        "unknown": 45,
+        "wrong": 1
+      },
+      "reportSha256": "2ba5a2d5bf63a0175893c1a79ac1503839dd0b9fd3d29016478b7e52039de5cf"
+    },
+    "synthetic-duel-field": {
+      "predictionsSha256": "2e0532ee5814738f80c040f0f368c8b983ea360205c6884ee642f102c7e79c93",
+      "reportSha256": "282baa6cf25973d5d984984069413aaf50853944d14b5ef9291ce42cea1d804c"
+    }
+  },
+  "schema": "https://tcger.app/reports/card-geometry-candidate-evaluation/v1"
+}

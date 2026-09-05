@@ -1,0 +1,195 @@
+{
+  "bakeoffId": "shared-card-geometry-licensing-v1",
+  "candidate": "yolox-pose",
+  "corpus": {
+    "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "cd6ddd62c77d9597a3c94d168834e7a11d39cba4",
+    "policyId": "training-minimums-v2",
+    "policySha256": "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d",
+    "preflightReport": {
+      "path": "geometry/preflights/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/8c2c809cb7e7caf0ce2e82a04032915d7a22e48034ee52aa4ddaba1154241344.json",
+      "sha256": "8c2c809cb7e7caf0ce2e82a04032915d7a22e48034ee52aa4ddaba1154241344"
+    },
+    "releasePath": "geometry/releases/combined-shippable-training-production-v1"
+  },
+  "deviations": [
+    {
+      "candidateValue": "disabled; shared frozen evaluation runs after epoch 50",
+      "reason": "Pinned MMYOLO YOLOXPoseHead dereferences a None cfg after parent postprocessing; this avoids a framework-only crash without changing training pixels, budget, seed, or the shared evaluation.",
+      "rule": "framework-internal-validation"
+    },
+    {
+      "candidateValue": {
+        "checkpointPrefix": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/7abcb37425ad9677598a979019db7695e99f8e5fbac37d9efb8c4d1618b184dc",
+        "checkpointSha256": "f515851d71a992f9cdc8244ed5b9eed819d99e5122e26df7c15edaa8b5991ace",
+        "epoch": 50,
+        "jobId": "6a9afc12259f8e97255df803"
+      },
+      "reason": "Reuse the verified completed checkpoint after a post-training evaluator failure; do not repeat the fixed 50-epoch optimization budget.",
+      "rule": "training-resume-lineage"
+    }
+  ],
+  "evaluations": {
+    "frozenRealV3": {
+      "corpusHash": "7a75cc5ba2f0ac429136fa67f75b473e09c05f6edaee112bf0f5b1ba701a188a",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "cd6ddd62c77d9597a3c94d168834e7a11d39cba4",
+      "releasePath": "geometry/releases/real-geometry-evaluation-v6-full"
+    },
+    "goldenFixtures": {
+      "path": "tools/card-geometry/fixtures/validation-nms.v1.json",
+      "sha256": "ec0f877af9d0f2afe4f6a76c7a4590c033fa0d35027815330adb24c540532168"
+    },
+    "recognitionModels": {
+      "games": {
+        "magic": {
+          "metadata": {
+            "path": "exports/magic/full/CardsIndexMetadata.json",
+            "sha256": "35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54"
+          },
+          "onnx": {
+            "path": "exports/magic/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "ebc725476ec2866cd054cd16ef9bcda257bbfdc5aa05326a79335abc4fdc0d3e"
+          },
+          "queryNormalization": "grey-world-autocontrast",
+          "strongThreshold": 0.7,
+          "vectors": {
+            "path": "exports/magic/full/CardsIndexVectors-arcface.bin",
+            "sha256": "4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8"
+          }
+        },
+        "pokemon": {
+          "metadata": {
+            "path": "exports/pokemon/full/CardsIndexMetadata.json",
+            "sha256": "5bcc886d58fca214800d366d080a438515d7820ffe03fcea7395496b5ef08117"
+          },
+          "onnx": {
+            "path": "exports/pokemon/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "bd7367284130639345efbe967e5e80b4aadf0ab5d5bc922968d2b06e497eea44"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/pokemon/full/CardsIndexVectors-arcface.bin",
+            "sha256": "d78e06b0909f39f57deab5c04c1bfb20671bf933f95033f143942e8cc388bdc3"
+          }
+        },
+        "yugioh": {
+          "metadata": {
+            "path": "exports/yugioh/full/CardsIndexMetadata.json",
+            "sha256": "0ab3fec12511b401244b1f80ac12ac432f10cdb2afdcfc59f7797568d50cca5e"
+          },
+          "onnx": {
+            "path": "exports/yugioh/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "b304bde2171d8ca4a824a4e0cab4bc22c3b31e425a8ba5e3ef91aab4ec6f9d58"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/yugioh/full/CardsIndexVectors-arcface.bin",
+            "sha256": "2de604679f08018e18fe3f3db188414add77fba51c6e8c52c4eb8b87cea8cbdd"
+          }
+        }
+      },
+      "modelRepo": "ahzs645/tcger-universal-arcface",
+      "modelRevision": "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
+    },
+    "recognitionReplay": {
+      "path": "docs/scanner-system/benchmarks/2026-09-02-shared-card-geometry/reports/device-geometry-outcomes.json",
+      "sha256": "05b56efb2ece661100fab8c935485174e5d59aae562704002e86349e008a5997"
+    },
+    "syntheticDuelField": {
+      "corpusHash": "bda45771be01d50bde130b6a68afe91ad509154df9aa26050f9cfdf30aad809a",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "cd6ddd62c77d9597a3c94d168834e7a11d39cba4",
+      "releasePath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1"
+    }
+  },
+  "execution": {
+    "checkpointRepo": "ahzs645/tcger-universal-arcface",
+    "checkpointRepoPrivate": true,
+    "containerImage": "pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806",
+    "evaluationCommand": [
+      "python",
+      "tools/card-geometry/evaluate_geometry_candidate.py",
+      "--candidate",
+      "yolox-pose"
+    ],
+    "gpuFlavor": "l4x1",
+    "privateExportCommands": {
+      "coreml": [
+        "python",
+        "tools/card-geometry/export_geometry_candidate.py",
+        "--candidate",
+        "yolox-pose",
+        "--format",
+        "coreml"
+      ],
+      "onnx": [
+        "python",
+        "tools/card-geometry/export_geometry_candidate.py",
+        "--candidate",
+        "yolox-pose",
+        "--format",
+        "onnx"
+      ]
+    },
+    "resumeFrom": {
+      "checkpointPrefix": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/7abcb37425ad9677598a979019db7695e99f8e5fbac37d9efb8c4d1618b184dc",
+      "checkpointSha256": "f515851d71a992f9cdc8244ed5b9eed819d99e5122e26df7c15edaa8b5991ace",
+      "epoch": 50,
+      "jobId": "6a9afc12259f8e97255df803"
+    },
+    "trainCommand": [
+      "python",
+      "tools/card-geometry/train_yolox_pose.py",
+      "--mmyolo-root",
+      "/work/mmyolo",
+      "--mmyolo-revision",
+      "8c4d9dc503dc8e327bec8147e8dc97124052f693",
+      "--base-url",
+      "https://download.openmmlab.com/mmyolo/v0/yolox/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco_20230210_134645-3a8dfbd7.pth",
+      "--base-sha256",
+      "3a8dfbd76b4493580449925f6cd01d1ae3b2b7425c6d1ed168dbe5282920c9b3"
+    ]
+  },
+  "fairness": {
+    "augmentationProfile": "canonical-corpus-baked-v1:no-runtime-augmentation",
+    "budget": {
+      "kind": "epochs",
+      "value": 50
+    },
+    "evaluationScript": {
+      "path": "tools/card-geometry/benchmark_geometry.py",
+      "sha256": "f9736ffca879854f605ad2ac008cd236b595402d4666ad7908e97e86d7361afa"
+    },
+    "inputResolution": 640,
+    "seedPolicy": {
+      "baseSeed": 20260903,
+      "derivation": "base-plus-repeat-index",
+      "repeatCount": 1
+    }
+  },
+  "framework": "mmyolo",
+  "licenseRoute": "permissive",
+  "measurements": {
+    "coremlOnnxParity": true,
+    "decoderCodeSize": true,
+    "exportedBytesPlatforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "geometryRealV3": true,
+    "geometrySyntheticDuelField": true,
+    "l4GpuHours": true,
+    "physicalLatencyPlatforms": [
+      "ios",
+      "android"
+    ],
+    "recognitionReplay": true
+  },
+  "schema": "https://tcger.app/schemas/card-geometry-experiment-config/v1",
+  "toolingRevision": "f12d78964b449f6824c826a33d223bde005e6085"
+}

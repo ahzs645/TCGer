@@ -1,0 +1,124 @@
+{
+  "bakeoffId": "shared-card-geometry-licensing-v1",
+  "trainingCorpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+  "trainingCorpusPreflight": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/training-corpus-preflight.json",
+  "requiredCandidates": [
+    "yolo11n-pose",
+    "yolo11s-pose",
+    "yolox-pose",
+    "fastvit-t8-four-corner"
+  ],
+  "candidates": [
+    {
+      "reportsRoot": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/candidates/yolo11n-pose",
+      "exportBenchmark": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/exports/yolo11n-pose.json",
+      "jobId": "6a9a699b259f8e97255dd286",
+      "optimizationJobId": "6a9a699b259f8e97255dd286",
+      "optimizationElapsedSeconds": 3826,
+      "decoderStatus": "reference-only",
+      "referenceDecoderSources": [
+        "tools/card-geometry/decode_geometry_exports.py",
+        "tools/card-geometry/reference_geometry.py"
+      ],
+      "productionDecoderSources": [],
+      "productionDecodersComplete": false,
+      "decoderNotes": [
+        "The checked-in Python decoder is verified against raw-tensor fixtures; no losing candidate was integrated into Swift, Kotlin, or TypeScript."
+      ],
+      "attemptNotes": []
+    },
+    {
+      "reportsRoot": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/candidates/yolo11s-pose",
+      "exportBenchmark": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/exports/yolo11s-pose.json",
+      "jobId": "6a9a699c259f8e97255dd288",
+      "optimizationJobId": "6a9a699c259f8e97255dd288",
+      "optimizationElapsedSeconds": 5705,
+      "decoderStatus": "reference-only",
+      "referenceDecoderSources": [
+        "tools/card-geometry/decode_geometry_exports.py",
+        "tools/card-geometry/reference_geometry.py"
+      ],
+      "productionDecoderSources": [],
+      "productionDecodersComplete": false,
+      "decoderNotes": [
+        "The checked-in Python decoder is verified against raw-tensor fixtures; no losing candidate was integrated into Swift, Kotlin, or TypeScript."
+      ],
+      "attemptNotes": []
+    },
+    {
+      "reportsRoot": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/candidates/yolox-pose",
+      "exportBenchmark": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/exports/yolox-pose.json",
+      "jobId": "6a9b61b1259f8e97255e0c0e",
+      "optimizationJobId": "6a9afc12259f8e97255df803",
+      "optimizationElapsedSeconds": 15661,
+      "recoveryRuns": [
+        {
+          "jobId": "6a9b4018259f8e97255e06d3",
+          "elapsedSeconds": 866,
+          "status": "error"
+        },
+        {
+          "jobId": "6a9b45e8e686246ca69a2aa4",
+          "elapsedSeconds": 857,
+          "status": "error"
+        },
+        {
+          "jobId": "6a9b4a39e686246ca69a2b06",
+          "elapsedSeconds": 854,
+          "status": "error"
+        },
+        {
+          "jobId": "6a9b4f0d259f8e97255e093b",
+          "elapsedSeconds": 875,
+          "status": "error"
+        },
+        {
+          "jobId": "6a9b61b1259f8e97255e0c0e",
+          "elapsedSeconds": 942,
+          "status": "completed"
+        }
+      ],
+      "decoderStatus": "reference-only",
+      "referenceDecoderSources": [
+        "tools/card-geometry/decode_geometry_exports.py",
+        "tools/card-geometry/reference_geometry.py"
+      ],
+      "productionDecoderSources": [],
+      "productionDecodersComplete": false,
+      "decoderNotes": [
+        "The 15-output raw MMYOLO head decoder is checked in and covered by deterministic fixtures; production language ports are intentionally gated on measured quality."
+      ],
+      "attemptNotes": [
+        "Integration attempts exposed and fixed pinned MMYOLO dependency, head-config, raw-export, and forced-final-validation defects.",
+        "One otherwise healthy run was externally canceled at epoch 8; the final training lineage persisted all 50 completed epochs under job 6a9afc12259f8e97255df803.",
+        "Post-training recovery jobs reused the verified epoch-50 checkpoint without repeating optimization; job 6a9b61b1259f8e97255e0c0e produced the final frozen evaluations."
+      ]
+    },
+    {
+      "reportsRoot": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/candidates/fastvit-t8-four-corner",
+      "exportBenchmark": "docs/scanner-system/benchmarks/2026-09-04-card-geometry-bakeoff/exports/fastvit-t8-four-corner.json",
+      "jobId": "6a9a699c259f8e97255dd28c",
+      "optimizationJobId": "6a9a699c259f8e97255dd28c",
+      "optimizationElapsedSeconds": 15270,
+      "decoderStatus": "reference-only",
+      "referenceDecoderSources": [
+        "tools/card-geometry/decode_geometry_exports.py",
+        "tools/card-geometry/reference_geometry.py"
+      ],
+      "productionDecoderSources": [],
+      "productionDecodersComplete": false,
+      "decoderNotes": [
+        "The checked-in Python decoder is verified against raw-tensor fixtures; no losing candidate was integrated into Swift, Kotlin, or TypeScript."
+      ],
+      "attemptNotes": []
+    }
+  ],
+  "humanDecisionRemaining": [
+    "No Ultralytics-derived export may be published to the asset store unless AGPL compliance or an Enterprise license is deliberately chosen.",
+    "Publishing any replacement detector remains a human release decision after the measured recommendation and physical-device latency gate are reviewed."
+  ],
+  "notes": [
+    "All candidates use one frozen production training corpus, one frozen real evaluation release, one frozen synthetic duel-field release, and the same effective fairness identity.",
+    "Physical-device latency remains unavailable until one iPhone and one Android phone are connected; Mac runtime measurements are diagnostic and do not satisfy that production gate."
+  ]
+}

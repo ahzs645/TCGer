@@ -1,0 +1,60 @@
+{
+  "artifacts": {
+    "epoch_50.pth": {
+      "path": "training/repeat-0/epoch_50.pth",
+      "sha256": "f515851d71a992f9cdc8244ed5b9eed819d99e5122e26df7c15edaa8b5991ace"
+    }
+  },
+  "baseCheckpoint": {
+    "sha256": "3a8dfbd76b4493580449925f6cd01d1ae3b2b7425c6d1ed168dbe5282920c9b3",
+    "url": "https://download.openmmlab.com/mmyolo/v0/yolox/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco_20230210_134645-3a8dfbd7.pth"
+  },
+  "candidate": "yolox-pose",
+  "checkpointPersistence": {
+    "errors": {},
+    "pathPrefix": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/6579b982ffb4daabce421d947f0e2d3625cfcf63252c8f033b7d573fe7e0c658",
+    "uploaded": {
+      "epoch_50.pth": "8598ed5bb93ee6e527313df1be0fe93107ffd68f"
+    }
+  },
+  "experimentHash": "6579b982ffb4daabce421d947f0e2d3625cfcf63252c8f033b7d573fe7e0c658",
+  "materialization": {
+    "contextPadding": {
+      "cornerMapping": "(x*sourceWidth+left)/(sourceWidth+left+right)",
+      "fillRgb": [
+        0,
+        0,
+        0
+      ],
+      "order": "source -> black context padding -> MMYOLO letterbox"
+    },
+    "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+    "counts": {
+      "instances:train": 38778,
+      "instances:validation": 694,
+      "records:train": 10800,
+      "records:validation": 200
+    }
+  },
+  "mmyolo": {
+    "revision": "8c4d9dc503dc8e327bec8147e8dc97124052f693",
+    "root": "/work/mmyolo"
+  },
+  "resume": {
+    "checkpoint": "/work/tcger-card-geometry-yolox-pose/output/training/repeat-0/epoch_50.pth",
+    "epoch": 50,
+    "sourceJobId": "6a9afc12259f8e97255df803",
+    "sourcePrefix": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/7abcb37425ad9677598a979019db7695e99f8e5fbac37d9efb8c4d1618b184dc"
+  },
+  "schema": "https://tcger.app/reports/yolox-pose-training/v1",
+  "training": {
+    "augmentationProfile": "canonical-corpus-baked-v1:no-runtime-augmentation",
+    "batch": 16,
+    "epochs": 50,
+    "inputResolution": 640,
+    "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
+    "pythonVersion": "3.10.11",
+    "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+    "seed": 20260903
+  }
+}

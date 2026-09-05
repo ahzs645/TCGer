@@ -1,0 +1,46 @@
+{
+  "candidate": "yolox-pose",
+  "checkpointSha256": "f515851d71a992f9cdc8244ed5b9eed819d99e5122e26df7c15edaa8b5991ace",
+  "decoderConfig": {
+    "aspectRatioBands": {
+      "rawCard": [
+        0.5,
+        3.0
+      ],
+      "slab": [
+        0.5,
+        3.0
+      ],
+      "unknown": [
+        0.5,
+        3.0
+      ]
+    },
+    "exteriorMargin": 0.25,
+    "minimumConfidence": 0.05,
+    "minimumQuadArea": 0.001,
+    "nmsIouThreshold": 0.5
+  },
+  "evaluations": {
+    "real-v3": {
+      "predictionsSha256": "3e090456ba0846dc537cbc80c3f30468d4752e6e04d21af44e9643dff9b37427",
+      "reportSha256": "cef965f0ecac0546b18fc30427501f83a997097309adbb3ec1d972f6f8501886"
+    },
+    "recognitionReplay": {
+      "counts": {
+        "abstain": 15,
+        "correct": 0,
+        "correctReject": 0,
+        "frames": 57,
+        "unknown": 42,
+        "wrong": 0
+      },
+      "reportSha256": "ad5696614ff9eff93b5faed60529982b7fabc57255fdd9e2bec82afe9336c9bf"
+    },
+    "synthetic-duel-field": {
+      "predictionsSha256": "60bea8954bca3cd3f7b01a1c4bdca8376fe80b356cc77974eb1bf8595ad6c1e5",
+      "reportSha256": "77a0f59eff0d453c9fd322c82e36d10d4e8aff2486416eb0e8ac6e369aa4c944"
+    }
+  },
+  "schema": "https://tcger.app/reports/card-geometry-candidate-evaluation/v1"
+}

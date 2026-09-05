@@ -1,6 +1,6 @@
 # TCGer scanner and offline-game system
 
-**Status date:** 2026-08-29
+**Status date:** 2026-08-29, with card-geometry results updated 2026-09-04
 
 **Purpose:** canonical index for the scanner, catalog, offline-pack, training,
 and distribution work completed during the universal-scanner project.
@@ -64,6 +64,7 @@ the required encoders separately and merging calibrated candidates.
 | [Dynamic scanner runtime audit](dynamic-scanner-runtime-audit.md) | Safe activation contract, platform refactors, trust rollout, and conformance tests for community scanner models |
 | [Dynamic offline-pack runtime audit](dynamic-offline-pack-runtime-audit.md) | Declarative collation schema, cache/activation semantics, hard-coded blockers, and rollout tests |
 | [Shared card-geometry plan](shared-card-geometry-plan-2026-09-02.md) | Approved direction for one shared detector/corner/crop stack across iOS, Android, and web: licensing gate, geometry and crop contracts, corpus schema, benchmark, winner rule, and execution order |
+| [Shared card-geometry four-candidate bake-off](benchmarks/2026-09-04-card-geometry-bakeoff/README.md) | Reproducible YOLO11n, YOLO11s, YOLOX-Pose, and FastViT-T8 comparison on the pinned production corpus, private ONNX/Core ML parity, recognition replay, measured gate failures, and the recommendation to ship none |
 | [Shared card-geometry baselines](benchmarks/2026-09-02-shared-card-geometry/README.md) | Pinned predictions and deterministic geometry reports for device, Vision/app detector, DETR, and DRAW2 on the first 228 human-corner evaluation set |
 | [Card-geometry orientation baselines](benchmarks/2026-09-02-shared-card-geometry-orientation-v3/README.md) | Orientation-known rerun of the same predictions, including fixed-order tail errors, orientation accuracy, and the pinned fail-first Hub smoke |
 | [FiftyOne versus geometry v3](benchmarks/2026-09-02-fiftyone-v3-diff/README.md) | Per-session re-export audit, immutable-release decision, provenance counts, and remaining test-slice capture gaps |
