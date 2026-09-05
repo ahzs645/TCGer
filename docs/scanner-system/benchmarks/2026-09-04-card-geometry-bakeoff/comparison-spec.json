@@ -113,6 +113,7 @@
       "attemptNotes": []
     }
   ],
+  "recognitionScopeNote": "The frozen recognition truth contains verified card identities for Magic and Pokémon only. Yu-Gi-Oh frames are included in the frozen geometry evaluation, but they do not yet have human-verified catalog identities and therefore cannot enter correct/wrong recognition scoring. That missing human ground truth does not change the ship-none recommendation because every candidate already fails the real-camera geometry gates.",
   "humanDecisionRemaining": [
     "No Ultralytics-derived export may be published to the asset store unless AGPL compliance or an Enterprise license is deliberately chosen.",
     "Publishing any replacement detector remains a human release decision after the measured recommendation and physical-device latency gate are reviewed."

@@ -188,6 +188,18 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             self.assertIn("| loser | permissive | 0.500", markdown)
             self.assertIn("`realRecallAt05`", markdown)
 
+    def test_renders_recognition_scope_note(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = self.write_candidate(Path(temporary) / "candidate", "candidate", 1)
+            spec = self.spec(Path(temporary), [candidate])
+            spec["recognitionScopeNote"] = "Recognition truth covers Magic and Pokémon only."
+            report = build(spec)
+            self.assertEqual(
+                report["recognitionScopeNote"],
+                "Recognition truth covers Magic and Pokémon only.",
+            )
+            self.assertIn(report["recognitionScopeNote"], render_markdown(report))
+
     def test_evaluation_only_candidate_cannot_be_production_ready(self):
         with tempfile.TemporaryDirectory() as temporary:
             candidate = self.write_candidate(Path(temporary) / "candidate", "candidate", 1)

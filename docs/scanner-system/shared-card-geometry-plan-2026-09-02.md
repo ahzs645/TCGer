@@ -580,10 +580,14 @@ because the comparison produced no licensed or licensable quality winner.
    golden fixtures beside the shared validation/NMS fixtures. Production
    Swift, Kotlin, and TypeScript ports are conditional on a qualifying model
    and were not created for rejected candidates.
-5. **Complete where available.** Run offline geometry evaluation, full recognition replay on the labeled
-   Magic, Pokémon, and Yu-Gi-Oh sessions, and physical-device latency and
-   thermal tests. No physical devices were connected, so phone latency and
-   thermal rows remain explicitly unavailable and cannot be treated as passes.
+5. **Complete where ground truth and hardware were available.** Run offline
+   geometry evaluation across Magic, Pokémon, and Yu-Gi-Oh, plus full
+   recognition replay on sessions with human-verified catalog identities.
+   Recognition truth currently covers Magic and Pokémon; the Yu-Gi-Oh frames
+   have geometry labels but no verified card identities and are excluded from
+   correct/wrong scoring. No physical devices were connected, so phone latency
+   and thermal rows remain explicitly unavailable and cannot be treated as
+   passes. Both omissions are recorded rather than inferred as passes.
 6. **Complete.** Produce the comparison table and recommendation: ship none.
    The Ultralytics license choice remains deferred; an `evaluation-only` run
    cannot proceed to asset-store publication.

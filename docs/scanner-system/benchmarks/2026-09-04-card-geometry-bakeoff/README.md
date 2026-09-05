@@ -20,6 +20,8 @@ The comparison is bound to one production training corpus, one real evaluation c
 
 Corner errors are normalized by the mean truth-quad side length. Recognition counts exclude outcomes whose catalog identity is unavailable and preserve those as `unknown` in the JSON report.
 
+The frozen recognition truth contains verified card identities for Magic and Pokémon only. Yu-Gi-Oh frames are included in the frozen geometry evaluation, but they do not yet have human-verified catalog identities and therefore cannot enter correct/wrong recognition scoring. That missing human ground truth does not change the ship-none recommendation because every candidate already fails the real-camera geometry gates.
+
 ## Gates
 
 - **yolo11n-pose:** failed `realRecallAt05`, `realRecallAt075`, `normalizedCornerP50`, `normalizedCornerP90`, `normalizedCornerP95`, `outsideFrameNormalizedP50`, `duplicates`, `extras`, `wrongAccepts`, `physicalIosLatency`, `physicalAndroidLatency`, `productionDecoders`, `shippingLicense`.

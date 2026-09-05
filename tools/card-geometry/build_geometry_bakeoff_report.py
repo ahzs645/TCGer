@@ -343,6 +343,7 @@ def build(spec: dict[str, Any]) -> dict[str, Any]:
             "recommendation": recommendation,
             "humanDecisionRemaining": spec.get("humanDecisionRemaining", []),
         },
+        "recognitionScopeNote": spec.get("recognitionScopeNote"),
         "notes": spec.get("notes", []),
     }
 
@@ -417,11 +418,11 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             "Corner errors are normalized by the mean truth-quad side length. Recognition counts "
             "exclude outcomes whose catalog identity is unavailable and preserve those as `unknown` in the JSON report.",
-            "",
-            "## Gates",
-            "",
         ]
     )
+    if report.get("recognitionScopeNote"):
+        lines.extend(["", report["recognitionScopeNote"]])
+    lines.extend(["", "## Gates", ""])
     for row in report["candidates"]:
         failed = [name for name, passed in row["checks"].items() if not passed]
         lines.append(
