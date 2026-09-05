@@ -42,6 +42,9 @@ def run(release: Path, output: Path, candidate: str, checkpoint: Path,
     entries = select_entries(manifest,per_scene)
     if not entries:
         raise ValueError('no training records selected')
+    policy_path = release/manifest['readiness']['readinessPolicyPath']
+    if sha256_file(policy_path) != manifest['readiness']['readinessPolicySha256']:
+        raise ValueError('historical policy hash mismatch')
     predictor = inference.Predictor(candidate,output,checkpoint_sha256,640,device=device)
     truths, predictions, identities = [], {}, []
     original_margin = inference.CONTEXT_MARGIN
@@ -76,7 +79,7 @@ def run(release: Path, output: Path, candidate: str, checkpoint: Path,
                                'imageSha256':record['source']['sha256'],'contextMargins':margins})
     finally:
         inference.CONTEXT_MARGIN=original_margin
-    policy=load_json(release/manifest['readiness']['readinessPolicyPath'])
+    policy=load_json(policy_path)
     metrics=evaluate(manifest={**manifest,'records':entries},policy=policy,truths=truths,prediction_rows=predictions)
     report={'schema':'https://tcger.app/reports/historical-train-split-diagnostic/v1',
             'diagnosticOnly':True,'candidate':candidate,'sourceCorpusHash':expected_corpus_hash,

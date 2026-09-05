@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from collections import Counter
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -11,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 from build_fixture_releases import tiny_png  # noqa: E402
 from build_real_smoke_release import (  # noqa: E402
     build_release,
+    add_canonical_archive,
     conservative_mask_quad,
 )
 from corpus_release import load_json, sha256_bytes  # noqa: E402
@@ -71,6 +73,18 @@ class RealReleaseAdapterTests(unittest.TestCase):
         corpus.write_text(json.dumps(row) + "\n", encoding="utf-8")
         return corpus, raw, image
 
+    def test_missing_box_drops_entire_mixed_source_image(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, _ = self._canonical_source(root)
+            row = json.loads(corpus.read_text())
+            row["annotations"].append({"geometryQuality": "bbox-derived"})
+            stats = Counter()
+            entries = add_canonical_archive(root=root / "output", rows=[row],
+                archive_path=raw / row["archive"], split="train", stats=stats)
+            self.assertEqual(entries, [])
+            self.assertEqual(stats["recordsExcludedMissingBox"], 1)
+
     def test_coco_masks_build_a_test_only_smoke_release(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -88,7 +102,7 @@ class RealReleaseAdapterTests(unittest.TestCase):
 
             self.assertEqual(manifest["releasePurpose"], "smoke")
             self.assertEqual({item["split"] for item in manifest["records"]}, {"test"})
-            self.assertEqual(len(record["instances"]), 1)
+            self.assertEqual(len(record["instances"]), 2)
             self.assertEqual(record["instances"][0]["visibleMask"]["kind"], "polygon")
             self.assertEqual(
                 {
@@ -97,7 +111,10 @@ class RealReleaseAdapterTests(unittest.TestCase):
                 },
                 {"maskFit"},
             )
-            self.assertEqual(summary["stats"]["bboxDerivedExcluded"], 1)
+            self.assertEqual(summary["stats"]["maskFit:box-only"], 1)
+            self.assertFalse(any(c["coordinateKnown"] for c in record["instances"][1]["corners"]))
+            self.assertNotIn("visibleMask", record["instances"][1])
+            self.assertEqual(record["instances"][1]["box"], {"left": 0, "top": 0, "right": 1, "bottom": 1})
 
             report = run_preflight(
                 output,

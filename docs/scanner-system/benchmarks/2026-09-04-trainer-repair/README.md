@@ -53,3 +53,37 @@ Local regression coverage includes actual Ultralytics coordinate-loss gradients,
 FastViT negative/positive gradients, transformed ignore regions, real ingestion,
 wholly unknown and mixed images, missing boxes, rejected polygon fits, margin
 hash sensitivity, and strict checkpoint loading with the pinned timm model.
+
+## Repaired FastViT runtime smoke
+
+The actual trainer completed three epochs at 640 pixels on a generated fixture
+with four train and four validation images. Each split contains five instances,
+including a wholly box-only image and a mixed image. Fixture files are generated
+by `validate_yolox_runtime.generate_fixture`; their `real` source kind exercises
+the real-record code path but does not imply they are camera data. The diagnostic
+margin fraction is 0.125; it is not the round-two experiment's selected value.
+
+`fastvit-runtime/history.json` records finite train loss decreasing from 36.5654
+to 35.9216 and validation loss from 36.1200 to 35.6211. The run used CPU, batch 4,
+and the trainer's unchanged FastViT LR of 0.0003. Its purpose is to exercise
+initialization, real materialization, loss, optimizer, validation, checkpoint
+writing and per-epoch history. It does not measure model quality or satisfy a
+round-two training budget. Checkpoint and history hashes are in its summary.
+
+YOLOX Linux validation and historical train self-evaluation were submitted as
+HF Job `6a9baed4259f8e97255e1c12` (one L4, 45-minute timeout), using commit
+`af8c429b42d8ae39f720f3e16086707c70b0a9da`. Its private diagnostic inputs are
+staged at model repository revision `4a9720ac550a78be5d20940882484a77616c7ef2`.
+The job was queued when this evidence update was written; its outcome is not
+assumed to pass.
+
+The source adapter also now preserves `bbox-derived` annotations as boxes with
+unknown corners and no fabricated visible mask. If any source annotation lacks
+a usable box, its whole image is excluded. This closes the earlier omission
+before trainer materialization. Existing immutable releases are untouched.
+
+The L4 job remained in hardware scheduling for about eight minutes and was
+canceled before execution. The same pinned Linux diagnostic was resubmitted to
+`cpu-performance` as Job `6a9bb0b6259f8e97255e1c6d`, with historical inference
+explicitly set to CPU. These runs are diagnostic and do not consume or redefine
+a candidate's round-two training budget.

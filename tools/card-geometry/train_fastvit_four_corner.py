@@ -348,7 +348,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         num_workers=args.workers,
         pin_memory=True,
     )
-    model = build_model(base).cuda()
+    device = getattr(args, "device", "cuda")
+    model = build_model(base).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0.05)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     training_dir = output / "training" / "repeat-0"
@@ -360,8 +361,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     best_loss = math.inf
     history = []
     for epoch in range(epochs):
-        train_loss = run_epoch(model, train_loader, optimizer, "cuda")
-        validation_loss = run_epoch(model, validation_loader, None, "cuda")
+        train_loss = run_epoch(model, train_loader, optimizer, device)
+        validation_loss = run_epoch(model, validation_loader, None, device)
         learning_rate = optimizer.param_groups[0]["lr"]
         if not math.isfinite(train_loss) or not math.isfinite(validation_loss):
             raise RuntimeError(f"non-finite loss at epoch {epoch + 1}")
@@ -399,6 +400,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "batch": args.batch,
             "seed": seed,
             "learningRate": args.learning_rate,
+            "device": device,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
             "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
             "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
@@ -434,6 +436,7 @@ def main() -> int:
     parser.add_argument("--base-sha256", required=True)
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--device", default="cuda")
     parser.add_argument("--learning-rate", type=float, default=0.0003)
     args = parser.parse_args()
     print(json.dumps(train(args), indent=2, sort_keys=True))

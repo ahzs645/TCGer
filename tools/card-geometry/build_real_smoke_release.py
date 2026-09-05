@@ -3,7 +3,7 @@
 The adapter intentionally has a narrow trust boundary:
 
 * standardized COCO `source-polygon` and `source-rle` annotations contribute
-  visible masks; `bbox-derived` annotations are excluded from geometry v1;
+  visible masks; `bbox-derived` annotations retain boxes with unknown corners;
 * a polygon contributes `maskFit` corners only when an explicit conservative
   four-point fit passes residual, convexity, aspect, and occlusion checks;
 * Dev Mode contributes persisted `fixedQuad` corners with their durable
@@ -214,18 +214,28 @@ def _mask_instance(
     annotation: dict[str, Any], index: int, width: int, height: int, stats: Counter
 ) -> dict[str, Any] | None:
     quality = annotation.get("geometryQuality")
-    if quality == "bbox-derived":
-        stats["bboxDerivedExcluded"] += 1
-        return None
-    if quality not in {"source-polygon", "source-rle"}:
-        stats["unsupportedAnnotationExcluded"] += 1
-        return None
     visible_mask, polygon = _annotation_mask(annotation, width, height)
-    if visible_mask is None:
-        stats["maskMissingExcluded"] += 1
+    box = None
+    raw_box = annotation.get("bbox")
+    if isinstance(raw_box, list) and len(raw_box) == 4:
+        x, y, w, h = map(float, raw_box)
+        if all(math.isfinite(value) for value in (x, y, w, h)) and w > 0 and h > 0:
+            box = {"left": max(0.0, x / width), "top": max(0.0, y / height),
+                   "right": min(1.0, (x + w) / width), "bottom": min(1.0, (y + h) / height)}
+    if box is None and polygon:
+        box = {"left": max(0.0, min(p[0] for p in polygon) / width),
+               "top": max(0.0, min(p[1] for p in polygon) / height),
+               "right": min(1.0, max(p[0] for p in polygon) / width),
+               "bottom": min(1.0, max(p[1] for p in polygon) / height)}
+    if box is None or box["right"] <= box["left"] or box["bottom"] <= box["top"]:
+        stats["instancesMissingBox"] += 1
         return None
     corners = _unknown_corners()
-    fit, outcome = conservative_mask_quad(polygon) if polygon else (None, "rle")
+    fit, outcome = (conservative_mask_quad(polygon) if polygon else (None, "rle")) if quality in {
+        "source-polygon", "source-rle"} else (None, "box-only")
+    if quality not in {"source-polygon", "source-rle"}:
+        # The rectangle encodes only extent, never a visible mask or a quad.
+        visible_mask = None
     stats[f"maskFit:{outcome}"] += 1
     if fit:
         corners = [
@@ -244,9 +254,11 @@ def _mask_instance(
         "orientationKnown": False,
         "side": "unknown",
         "container": "unknown",
-        "visibleMask": visible_mask,
+        "box": box,
         "occlusionOrder": index,
     }
+    if visible_mask is not None:
+        instance["visibleMask"] = visible_mask
     return instance
 
 
@@ -364,9 +376,13 @@ def add_canonical_archive(
                 )
                 if instance:
                     instances.append(instance)
+            if len(instances) != len(row.get("annotations", [])):
+                stats["recordsExcludedMissingBox"] += 1
+                continue
             if not instances:
                 stats["recordsExcludedNoGeometry"] += 1
                 continue
+            stats["canonicalInstancesRetained"] += len(instances)
             image_bytes = archive.read(row["imageMember"])
             image_hash = sha256_bytes(image_bytes)
             if image_hash != row["sha256"]:
@@ -842,7 +858,7 @@ def build_release(
         "corpusHash": manifest["corpusHash"],
         "policySha256": manifest["readiness"]["readinessPolicySha256"],
         "records": len(entries),
-        "instances": sum(stats[key] for key in stats if key.startswith("maskFit:"))
+        "instances": stats["canonicalInstancesRetained"]
         + stats["devmodeQuadRecords"]
         + stats["devmodeMultiInstanceCards"],
         "archiveSplits": dict(sorted(archive_splits.items())),

@@ -135,24 +135,28 @@ class Predictor:
         self.output = output
         self.artifact_sha256 = artifact_sha256
         self.resolution = resolution
+        def verified(path: Path) -> Path:
+            if sha256_file(path) != artifact_sha256:
+                raise ValueError("selected predictor checkpoint SHA-256 mismatch")
+            return path
         if candidate.startswith("yolo11"):
             from ultralytics import YOLO
 
-            checkpoint = find_one(output, ("training/repeat-0/weights/best.pt", "**/weights/best.pt"))
+            checkpoint = verified(find_one(output, ("training/repeat-0/weights/best.pt", "**/weights/best.pt")))
             self.model = YOLO(str(checkpoint))
         elif candidate == "fastvit-t8-four-corner":
             import torch
 
             from export_geometry_candidate import load_fastvit
 
-            checkpoint = find_one(output, ("training/repeat-0/best.pt", "**/best.pt"))
+            checkpoint = verified(find_one(output, ("training/repeat-0/best.pt", "**/best.pt")))
             self.model = load_fastvit(checkpoint).to(device)
             self.model.eval()
             self.torch = torch
         else:
             from mmdet.apis import init_detector
 
-            checkpoint = find_one(output, ("training/repeat-0/*.pth", "**/*.pth"))
+            checkpoint = verified(find_one(output, ("training/repeat-0/*.pth", "**/*.pth")))
             config = find_one(output, ("yolox-pose-card.py", "**/yolox-pose-card.py"))
             self.model = init_detector(str(config), str(checkpoint), device=device)
             configure_yolox_test(self.model)

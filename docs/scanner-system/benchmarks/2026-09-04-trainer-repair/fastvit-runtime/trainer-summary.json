@@ -1,0 +1,57 @@
+{
+  "artifacts": {
+    "best": {
+      "path": "training/repeat-0/best.pt",
+      "sha256": "8982531ad452c44b55dea930c6c02de2ec844f7eb6614d070acdd022a17ccb28"
+    },
+    "checkpointLoad": {
+      "path": "training/repeat-0/checkpoint-load.json",
+      "sha256": "01a2168966a8be399eca3f4b05786cef6bf6ea11b40f9a413fddd28f6167476f"
+    },
+    "history": {
+      "path": "training/repeat-0/history.json",
+      "sha256": "b733aee3727f68ebea7db91a5623ecec254ac3de649fbac9c8536c36cf2ac073"
+    },
+    "last": {
+      "path": "training/repeat-0/last.pt",
+      "sha256": "263b726a115b4332c49cb114e6a5fb2a1658d0bc78a85337d6925aaf085fa5da"
+    }
+  },
+  "baseCheckpoint": {
+    "filename": "model.safetensors",
+    "repo": "timm/fastvit_t8.apple_in1k",
+    "revision": "f0cc1b82f948280d94a8812b1ce83698111054e1",
+    "sha256": "345af83ed1a7eee2ed322eb327895efd2a2a06c604272dbac92432adc61af889"
+  },
+  "bestValidationLoss": 35.62112045288086,
+  "candidate": "fastvit-t8-four-corner",
+  "counts": {
+    "trainRecords": 4,
+    "validationRecords": 4
+  },
+  "experimentHash": "diagnostic-generated-fixture-only",
+  "realContextMarginPolicy": {
+    "application": "each-side",
+    "fraction": 0.125,
+    "kind": "fraction-of-long-side",
+    "rounding": "ceil"
+  },
+  "schema": "https://tcger.app/reports/fastvit-four-corner-training/v1",
+  "skippedMissingBox": {
+    "train": [],
+    "validation": []
+  },
+  "training": {
+    "augmentationProfile": "none-generated-fixture",
+    "batch": 4,
+    "device": "cpu",
+    "epochs": 3,
+    "inputResolution": 640,
+    "learningRate": 0.0003,
+    "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
+    "pythonVersion": "3.12.13",
+    "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+    "seed": 20260904,
+    "torchVersion": "2.6.0"
+  }
+}

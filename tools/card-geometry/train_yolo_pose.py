@@ -286,11 +286,13 @@ def main() -> int:
     parser.add_argument("--materialize-only", action="store_true")
     parser.add_argument("--release-root", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--real-context-policy", type=Path, help="declared policy JSON for materialize-only")
     args = parser.parse_args()
     if args.materialize_only:
         if args.release_root is None or args.output is None:
             parser.error("--materialize-only requires --release-root and --output")
-        print(json.dumps(materialize_yolo(args.release_root, args.output), sort_keys=True))
+        print(json.dumps(materialize_yolo(args.release_root, args.output,
+            load_json(args.real_context_policy) if args.real_context_policy else context_policy_from_environment()), sort_keys=True))
         return 0
     print(json.dumps(train(args), indent=2, sort_keys=True))
     return 0
