@@ -1,98 +1,91 @@
-# Trainer repair and diagnostic evidence — 2026-09-04
+# Trainer repair and self-validation — 2026-09-04
 
-The historical FastViT loader passed a classification checkpoint directly to
-`timm`'s flattened feature model with `strict=False`. Classification keys such
-as `stem.0.conv_kxk.0.conv.weight` become `stem_0.conv_kxk.0.conv.weight` in the
-feature model. The two models have zero matching state-dictionary keys. The
-repaired loader strictly loads all 462 classification keys before extracting
-the 444 feature keys; missing weights now fail instead of silently falling
-back to random initialization. The feature model's final state keys and shapes
-remain compatible with historical trained checkpoints.
+Trainer repair and diagnostic self-validation are complete. The seven incumbent
+evaluations on the v6-full successor are the next stage. No round-two corpus
+or training result was produced by these diagnostics.
 
-The original 50-epoch `history.json` is preserved here with its immutable Hub
-revision in `input-pins.json`. New runs write history atomically after every
-epoch, log learning rate and losses, reject non-finite losses, and retain the
-complete matched/missing/unexpected checkpoint-key report.
+## Repairs
 
-The historical FastViT checkpoint was evaluated on a deterministic sample of
-160 original training images, 32 per scene ordered by SHA-256 of record ID.
-All sampled record and image bytes were verified against the original manifest.
-Its 540 instances yield recall@0.5 of 0.2685 and recall@0.75 of 0.0204; all
-145 matches occur on binder pages. This is a historical train-split diagnostic,
-not a release benchmark, a new corpus, or a round-two result. The diagnostic
-uses the trainers' declared synthetic margins and JPEG materialization, then
-the unchanged shared decoder and scorer. It does not bypass benchmark preflight
-or authorize a training release. The same sample is reserved for YOLOX diagnosis.
+FastViT's original loader passed a classification checkpoint directly to timm's
+flattened feature model with `strict=False`. The two state dictionaries have
+zero matching keys (`stem.0...` becomes `stem_0...`). The repaired loader strictly
+loads all 462 classification keys before retaining 444 feature keys. Missing
+weights fail. Historical trained checkpoints retain compatible keys and shapes.
+`fastvit-checkpoint-load.json` records the exact pinned checkpoint and key lists.
 
-The YOLOX config now enables validation every epoch starting at epoch one,
-explicitly sets AdamW LR to 0.004 × batch / 256 (0.00025 at batch 16, one GPU),
-disables a second automatic scaling, and disables the inherited random resize
-batch transform. A digest-guarded two-line repair binds the pinned pose head's
-local `cfg` and clamps its visibility denominator for wholly box-only batches.
-The exact original and repaired source hashes are recorded at execution.
-Linux runtime validation is pending; no incumbent evaluations or round-two
-training have been launched in this change.
+FastViT now writes history atomically after every epoch, logs learning rate and
+losses, and rejects non-finite losses. The original 50-epoch history is committed
+as `fastvit-original-history.json`; its immutable Hub source is in `input-pins.json`.
 
-All three adapters accept real records only with a declared
-`fairness.realContextMarginPolicy` (`fraction-of-long-side`, fraction, `ceil`,
-`each-side`). The wrapper passes only the hash-covered policy to the trainer;
-it clears an inherited environment value. No real margin fraction is defaulted
-or selected by these repairs; the corpus experiment must declare it before use.
-Synthetic records retain their own per-side margins.
+YOLOX validates every epoch starting at epoch one. Its AdamW LR is explicitly
+0.004 × batch / 256: **0.00025 at batch 16 on one worker**, with a second automatic
+scaling disabled. The inherited random-resize batch transform is disabled;
+`LoadImageFromFile(to_float32=True)` preserves the needed BGR float conversion.
+The pinned pose head receives a digest-guarded repair for its local `cfg` and
+its zero-visible-keypoint denominator. Original and repaired source hashes are
+recorded in `yolox-runtime-validation.json`.
 
-Unknown-corner instances retain explicit normalized boxes, or boxes derived
-from preserved polygon masks. Aspect/residual-rejected fits therefore remain
-box supervision. YOLO/COCO labels carry visibility-zero keypoints. FastViT
-zeros only the negative focal term over the transformed box, retaining positive
-heatmap and corner targets even where boxes overlap. Any unknown instance
-without a usable box drops the whole image. The schema accepts an optional
-normalized `box`; this additive field leaves historical record bytes untouched.
-RLE-only instances need an explicit usable box before training.
+All adapters accept real records only with a declared, hash-covered
+`fairness.realContextMarginPolicy`: `fraction-of-long-side`, fraction, `ceil`,
+`each-side`. The job wrapper clears inherited policy values and passes only the
+resolved config's policy. No production fraction is selected by this repair.
+Synthetic records retain their declared per-side margins.
 
-Local regression coverage includes actual Ultralytics coordinate-loss gradients,
-FastViT negative/positive gradients, transformed ignore regions, real ingestion,
-wholly unknown and mixed images, missing boxes, rejected polygon fits, margin
-hash sensitivity, and strict checkpoint loading with the pinned timm model.
+Unknown-corner cards retain explicit boxes or boxes derived from preserved
+polygon masks. Rejected aspect/residual fits retain box supervision. YOLO/COCO
+labels carry visibility-zero keypoints. FastViT zeros only the negative focal
+term over their transformed boxes, preserving positive and corner targets in
+overlapping regions. An unknown instance without a usable box drops the whole
+image. The archive adapter also preserves bbox-derived annotations as boxes,
+without fabricating visible masks or corner truth. RLE-only instances need an
+explicit usable box. Existing immutable release records remain unchanged.
 
-## Repaired FastViT runtime smoke
+## Runtime evidence
 
-The actual trainer completed three epochs at 640 pixels on a generated fixture
-with four train and four validation images. Each split contains five instances,
-including a wholly box-only image and a mixed image. Fixture files are generated
-by `validate_yolox_runtime.generate_fixture`; their `real` source kind exercises
-the real-record code path but does not imply they are camera data. The diagnostic
-margin fraction is 0.125; it is not the round-two experiment's selected value.
+The actual FastViT trainer completed three epochs at 640 pixels on a generated
+fixture with four train and four validation images. Each split contains five
+instances, including wholly box-only and mixed images. The fixture exercises
+the `real` ingestion branch but is generated data, not camera evidence. CPU,
+batch 4, LR 0.0003 and margin fraction 0.125 are diagnostic settings. Train loss
+fell from 36.5654 to 35.9216; validation loss fell from 36.1200 to 35.6211. Its
+history and artifact hashes are under `fastvit-runtime/`.
 
-`fastvit-runtime/history.json` records finite train loss decreasing from 36.5654
-to 35.9216 and validation loss from 36.1200 to 35.6211. The run used CPU, batch 4,
-and the trainer's unchanged FastViT LR of 0.0003. Its purpose is to exercise
-initialization, real materialization, loss, optimizer, validation, checkpoint
-writing and per-epoch history. It does not measure model quality or satisfy a
-round-two training budget. Checkpoint and history hashes are in its summary.
+YOLOX completed its actual training/validation loop under the pinned Linux
+framework, retained instance counts [1,1,2,1], and produced finite losses for a
+separate wholly box-only batch using the training loader's collator. Validation
+ran at epoch one. The pinned OKS formulation reports a constant loss of 30 for
+all-zero keypoint weights; that scalar is not coordinate supervision. The
+successful job is `6a9bb574259f8e97255e1d3c` on `cpu-performance`, tooling commit
+`5bc2de81edea11ce32e0c31badbe063b4cb19c52`, private tooling/input revision
+`292ee04179daa3f07ce6f8c5df818f975f158b37`.
 
-YOLOX Linux validation and historical train self-evaluation were submitted as
-HF Job `6a9baed4259f8e97255e1c12` (one L4, 45-minute timeout), using commit
-`af8c429b42d8ae39f720f3e16086707c70b0a9da`. Its private diagnostic inputs are
-staged at model repository revision `4a9720ac550a78be5d20940882484a77616c7ef2`.
-The job was queued when this evidence update was written; its outcome is not
-assumed to pass.
+`yolox-validation-jobs.json` retains the attempt statuses: an L4 reservation was
+canceled while queued, and CPU smoke attempts exposed the input dtype dependency
+and harness import-order, bytecode-check and collator defects before the final
+successful run. These are generated-fixture diagnostics, not candidate budget
+runs. CPU validation does not establish CUDA/AMP or physical-device performance.
 
-The source adapter also now preserves `bbox-derived` annotations as boxes with
-unknown corners and no fabricated visible mask. If any source annotation lacks
-a usable box, its whole image is excluded. This closes the earlier omission
-before trainer materialization. Existing immutable releases are untouched.
+## Historical train-split self-evaluation
 
-The L4 job remained in hardware scheduling for about eight minutes and was
-canceled before execution. The same pinned Linux diagnostic was resubmitted to
-`cpu-performance` as Job `6a9bb0b6259f8e97255e1c6d`, with historical inference
-explicitly set to CPU. These runs are diagnostic and do not consume or redefine
-a candidate's round-two training budget.
+Both historical checkpoints were evaluated on the **same 160 training images**:
+32 per scene, ordered by SHA-256 of record ID, containing 540 instances. Sample
+hash: `6725017a2cdb78666bbe4c14aec0954d1772679751766a2d26c08daeb45d76e0`.
+Record/image bytes and checkpoint hashes were verified. The diagnostic reproduces
+training context margins and JPEG materialization and uses the existing shared
+decoder and scoring functions. It is not a release benchmark or authorization
+to train on the historical corpus. Benchmark preflight remains enforced.
 
-The first CPU runtime attempt exposed a dependency of the pinned YOLOX
-preprocessor on its random-resize batch transform: that transform also cast
-byte pixels to float. With augmentation disabled, the first training step
-failed with a byte/float dtype mismatch. The shared and inference pipelines
-now explicitly request `LoadImageFromFile(to_float32=True)`. This preserves
-BGR float pixels in [0,255] without restoring hidden random resizing. The
-failed attempt is retained as diagnostic evidence; it is not a completed
-trainer validation.
+| Historical checkpoint | Recall @0.5 | Recall @0.75 | Matches |
+|---|---:|---:|---:|
+| FastViT | 0.2685 | 0.0204 | 145/540, all binder |
+| YOLOX | 0.0185 | 0.0000 | 10/540 |
+
+Full reports and per-record input hashes are in `*-train-self-evaluation.json`.
+Neither result supports treating the original failures as camera-domain shift
+alone. The repaired models have not undergone a new full training run.
+
+Local verification: 203 top-level tests and 13 compositor tests pass, plus Ruff
+0.15.8 and diff whitespace checks. Tests include actual Ultralytics coordinate
+loss gradients, FastViT negative/positive gradients and checkpoint transfer,
+real ingestion, transformed ignore boxes, missing boxes, rejected polygon fits,
+margin hash sensitivity and deterministic train-only sampling.

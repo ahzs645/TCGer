@@ -1,0 +1,44 @@
+[
+  {
+    "id": "6a9baed4259f8e97255e1c12",
+    "stage": "CANCELED",
+    "flavor": "l4x1",
+    "createdAt": "2026-09-05 05:55:32.586000+00:00",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9baed4259f8e97255e1c12"
+  },
+  {
+    "id": "6a9bb0b6259f8e97255e1c6d",
+    "stage": "ERROR",
+    "flavor": "cpu-performance",
+    "createdAt": "2026-09-05 06:03:34.374000+00:00",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9bb0b6259f8e97255e1c6d"
+  },
+  {
+    "id": "6a9bb1e5259f8e97255e1ca3",
+    "stage": "ERROR",
+    "flavor": "cpu-performance",
+    "createdAt": "2026-09-05 06:08:37.065000+00:00",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9bb1e5259f8e97255e1ca3"
+  },
+  {
+    "id": "6a9bb335e686246ca69a34c7",
+    "stage": "ERROR",
+    "flavor": "cpu-performance",
+    "createdAt": "2026-09-05 06:14:13.266000+00:00",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9bb335e686246ca69a34c7"
+  },
+  {
+    "id": "6a9bb446259f8e97255e1d05",
+    "stage": "ERROR",
+    "flavor": "cpu-performance",
+    "createdAt": "2026-09-05 06:18:46.347000+00:00",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9bb446259f8e97255e1d05"
+  },
+  {
+    "id": "6a9bb574259f8e97255e1d3c",
+    "stage": "COMPLETED",
+    "flavor": "cpu-performance",
+    "createdAt": "2026-09-05 06:23:48.491000+00:00",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9bb574259f8e97255e1d3c"
+  }
+]

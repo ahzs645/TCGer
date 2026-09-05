@@ -60,7 +60,7 @@ def validate_reviews(manifest: dict, reviews: dict, exclusions: list[str]) -> li
 def finalize(*, candidates: Path, reviews: Path, evaluation_release: Path,
              evaluation_corpus_hash: str, devmode_root: Path, output: Path) -> dict:
     report = run_preflight(evaluation_release,
-        expectations=Expectations(corpus_hash=evaluation_corpus_hash, purpose='evaluation'))
+        expectations=Expectations(corpus_hash=evaluation_corpus_hash))
     if report['failedChecks']:
         raise CompositorError(f'evaluation preflight failed: {report["failedChecks"]}')
     evaluation = json.loads((evaluation_release/'manifest.json').read_text())

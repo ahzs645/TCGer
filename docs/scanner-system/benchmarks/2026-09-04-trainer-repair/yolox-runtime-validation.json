@@ -1,0 +1,66 @@
+{
+  "batchAugments": null,
+  "boxOnlyBatchLosses": {
+    "loss": 32.76143264770508,
+    "loss_bbox": 0.7082395553588867,
+    "loss_cls": 0.0030880561098456383,
+    "loss_kpt": 30.0,
+    "loss_obj": 0.7022516131401062,
+    "loss_vis": 1.3478529453277588
+  },
+  "diagnosticOnly": true,
+  "learningRate": 0.00025,
+  "materialization": {
+    "contextPadding": {
+      "cornerMapping": "(x*sourceWidth+left)/(sourceWidth+left+right)",
+      "fillRgb": [
+        0,
+        0,
+        0
+      ],
+      "order": "source -> black context padding -> MMYOLO letterbox"
+    },
+    "corpusHash": "fixture-only",
+    "counts": {
+      "instances:train": 5,
+      "instances:validation": 5,
+      "records:train": 4,
+      "records:validation": 4
+    },
+    "realContextMarginPolicy": {
+      "application": "each-side",
+      "fraction": 0.125,
+      "kind": "fraction-of-long-side",
+      "rounding": "ceil"
+    }
+  },
+  "retainedInstancesPerImage": [
+    1,
+    1,
+    2,
+    1
+  ],
+  "sourceRepair": {
+    "changes": [
+      "bind missing local cfg to self.test_cfg",
+      "clamp visibility-loss denominator for box-only batches"
+    ],
+    "originalSha256": "701ccb1c2e7bebc4e56848ce181ded2710d5b007c783bc78bbea52142a992af3",
+    "path": "mmyolo/models/dense_heads/yolox_pose_head.py",
+    "repairedSha256": "eb3f26b74a8785c0f19c5bab3f8f73faa1227eff165b2b74761bcb363b8b7ad3"
+  },
+  "validation": {
+    "coco/AP": 0.0,
+    "coco/AP (L)": -1.0,
+    "coco/AP (M)": 0.0,
+    "coco/AP .5": 0.0,
+    "coco/AP .75": 0.0,
+    "coco/AR": 0.0,
+    "coco/AR (L)": -1.0,
+    "coco/AR (M)": 0.0,
+    "coco/AR .5": 0.0,
+    "coco/AR .75": 0.0
+  },
+  "validationBegin": 1,
+  "validationInterval": 1
+}
