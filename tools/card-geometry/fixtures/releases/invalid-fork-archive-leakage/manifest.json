@@ -1,5 +1,5 @@
 {
-  "corpusHash": "52ed6305212a4993fff26a28e23000033da100d1c1597708c3b02249f5a3aacf",
+  "corpusHash": "aa0bd6322812efb2362c2ba71849e02d990ca99d367b403b1d12aaeaeab80e4e",
   "evaluationSessionDenylist": [
     "scan-session-20260829-200235"
   ],
@@ -44,14 +44,14 @@
           "physical-card-100"
         ],
         "sessionId": "scan-session-20260901-100000",
-        "sourceArchiveId": "fixture-devmode-validation",
+        "sourceArchiveId": "card-seg-j74w1",
         "sourceAssetIds": [],
         "sourceKind": "real"
       },
       "path": "records/fx-validation-real-001.json",
       "recordId": "fx-validation-real-001",
       "sceneSlice": "single_handheld",
-      "sha256": "645b9c901b43c2a500b5abfe4411165e4a8a2876f686bf903a9f0e10fc8fd857",
+      "sha256": "21820936e9af1ff92a6a066c2383f409908fa06a98f3b3164e6476db7e1378a2",
       "sourceTier": "shippable",
       "split": "validation"
     },
@@ -67,14 +67,14 @@
           "physical-card-200"
         ],
         "sessionId": "scan-session-20260829-200235",
-        "sourceArchiveId": "fixture-devmode-test",
+        "sourceArchiveId": "card-seg-j74w1",
         "sourceAssetIds": [],
         "sourceKind": "real"
       },
       "path": "records/fx-test-real-001.json",
       "recordId": "fx-test-real-001",
       "sceneSlice": "single_handheld",
-      "sha256": "cecea430431ea48f2626f2cbf09e15d8f26cc32cf63a34bcd674715f14123b4f",
+      "sha256": "3a8e6a1d593d428841be7f3920336d0ebb08c6aa30566ac4112afae932dcd3af",
       "sourceTier": "shippable",
       "split": "test"
     }
@@ -83,9 +83,9 @@
   "releasePurpose": "fixture",
   "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v1",
   "sourceArchiveAliases": {
-    "fixture-compositor": "fixture-compositor",
-    "fixture-devmode-test": "fixture-devmode-test",
-    "fixture-devmode-validation": "fixture-devmode-validation"
+    "card-seg-j74w1": "card-seg-j74w1",
+    "card-seg-j74w1-q8yst": "card-seg-j74w1",
+    "fixture-compositor": "fixture-compositor"
   },
   "splitAssignment": {
     "method": "fixture-hand-assigned",

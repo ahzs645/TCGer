@@ -42,6 +42,7 @@ class SliceGeometryReleaseTests(unittest.TestCase):
             manifest = {
                 "splitAssignment": {"method": "fixture", "seed": 7},
                 "evaluationSessionDenylist": [],
+                "sourceArchiveAliases": {"fork": "canonical", "canonical": "canonical"},
                 "records": entries,
             }
             (source / "manifest.json").write_text(json.dumps(manifest))
@@ -54,6 +55,7 @@ class SliceGeometryReleaseTests(unittest.TestCase):
             )
             self.assertEqual([entry["split"] for entry in result["records"]], ["validation"])
             self.assertEqual(result["corpusHash"], corpus_hash(result))
+            self.assertEqual(result["sourceArchiveAliases"], manifest["sourceArchiveAliases"])
             self.assertTrue((output / "images/validation.jpg").is_file())
             self.assertFalse((output / "images/train.jpg").exists())
 

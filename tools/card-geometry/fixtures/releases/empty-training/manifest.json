@@ -1,5 +1,5 @@
 {
-  "corpusHash": "e1a79bdd1d491b2e10beb855a2e5bcf0815a29ff1a22a787a82006e2748fae00",
+  "corpusHash": "3c31f53924ed6fd71a2d28e573611113d9b99bd756248678be072e4003dd2aa4",
   "evaluationSessionDenylist": [
     "scan-session-20260829-200235"
   ],
@@ -12,6 +12,7 @@
   "releaseId": "empty-training-release",
   "releasePurpose": "training",
   "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v1",
+  "sourceArchiveAliases": {},
   "splitAssignment": {
     "method": "fixture-hand-assigned",
     "seed": 0

@@ -129,9 +129,26 @@ def instance_leakage_ids(record: dict[str, Any], key: str) -> list[str]:
     return sorted(values)
 
 
-def leakage_keys_from_record(record: dict[str, Any]) -> dict[str, Any]:
-    """Derive the manifest `leakageKeys` block from a record's own content."""
+def leakage_keys_from_record(
+    record: dict[str, Any], source_archive_aliases: dict[str, str] | None = None
+) -> dict[str, Any]:
+    """Derive leakage keys, resolving archives through a release's flat alias table.
+
+    Canonical IDs must map to themselves. Missing IDs and chained mappings are
+    errors, never independent archives by default. None is for assembling raw
+    entries only; release preflight always supplies the manifest's alias table.
+    """
     grouping = record.get("grouping", {})
+    archive_id = grouping.get("sourceArchiveId")
+    if source_archive_aliases is not None:
+        if not isinstance(archive_id, str) or archive_id not in source_archive_aliases:
+            raise ValueError(f"unmapped sourceArchiveId: {archive_id!r}")
+        canonical_id = source_archive_aliases[archive_id]
+        if source_archive_aliases.get(canonical_id) != canonical_id:
+            raise ValueError(
+                f"sourceArchiveId {archive_id!r} must map directly to a self-mapped canonical id: {canonical_id!r}"
+            )
+        archive_id = canonical_id
     source_asset_ids = set(instance_leakage_ids(record, "sourceAssetId"))
     synthetic = record.get("synthetic", {})
     if isinstance(synthetic, dict):
@@ -145,7 +162,7 @@ def leakage_keys_from_record(record: dict[str, Any]) -> dict[str, Any]:
             )
     keys: dict[str, Any] = {
         "sourceKind": record.get("source", {}).get("kind"),
-        "sourceArchiveId": grouping.get("sourceArchiveId"),
+        "sourceArchiveId": archive_id,
         "physicalCardIds": instance_leakage_ids(record, "physicalCardId"),
         "sourceAssetIds": sorted(source_asset_ids),
     }

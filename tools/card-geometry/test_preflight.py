@@ -23,6 +23,7 @@ from corpus_release import (  # noqa: E402
     POLICY_SCHEMA_FILE,
     RELEASES_DIR,
     corpus_hash,
+    leakage_keys_from_record,
     load_json,
     load_schema,
     make_validator,
@@ -319,11 +320,86 @@ class PreflightTests(unittest.TestCase):
             )
         )
 
+    def test_fork_alias_is_a_cross_split_leakage_key(self):
+        report = self.run_release("invalid-fork-archive-leakage")
+        self.assertEqual(report["failedChecks"], ["LEAKAGE_DISJOINT"])
+        leakage = next(check for check in report["checks"] if check["code"] == "LEAKAGE_DISJOINT")
+        self.assertEqual(leakage["details"]["leaks"], {
+            "sourceArchiveId:card-seg-j74w1": ["test", "validation"],
+        })
+
+    def test_unmapped_archive_fails_even_when_manifest_claims_a_known_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "unmapped"
+            shutil.copytree(RELEASES_DIR / "invalid-fork-archive-leakage", release)
+            manifest = load_json(release / "manifest.json")
+            del manifest["sourceArchiveAliases"]["card-seg-j74w1-q8yst"]
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(release / "manifest.json", manifest)
+            report = run_preflight(release, tooling_revision="test")
+        self.assertEqual(set(report["failedChecks"]), {"MANIFEST_RECORD_CONSISTENCY", "LEAKAGE_DISJOINT"})
+        self.assertEqual(report["readyFor"], "none")
+        leakage = next(check for check in report["checks"] if check["code"] == "LEAKAGE_DISJOINT")
+        self.assertIn("unmapped sourceArchiveId", leakage["details"]["archiveAliasErrors"]["fx-test-real-001"])
+
+    def test_raw_manifest_archive_cannot_hide_fork_leakage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "forged"
+            shutil.copytree(RELEASES_DIR / "invalid-fork-archive-leakage", release)
+            manifest = load_json(release / "manifest.json")
+            entry = next(item for item in manifest["records"] if item["split"] == "test")
+            entry["leakageKeys"]["sourceArchiveId"] = "card-seg-j74w1-q8yst"
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(release / "manifest.json", manifest)
+            report = run_preflight(release, tooling_revision="test")
+        self.assertEqual(set(report["failedChecks"]), {"MANIFEST_RECORD_CONSISTENCY", "LEAKAGE_DISJOINT"})
+
+    def test_alias_table_is_required_and_hash_bound(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "aliases"
+            shutil.copytree(RELEASES_DIR / "valid-fixture", release)
+            manifest = load_json(release / "manifest.json")
+            manifest["sourceArchiveAliases"]["additional-export"] = "fixture-devmode-validation"
+            write_json(release / "manifest.json", manifest)
+            self.assertEqual(run_preflight(release)["failedChecks"], ["CORPUS_HASH"])
+            del manifest["sourceArchiveAliases"]
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(release / "manifest.json", manifest)
+            self.assertIn("MANIFEST_SCHEMA", run_preflight(release)["failedChecks"])
+
+    def test_same_split_forks_are_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            release = Path(tmp) / "same-split"
+            shutil.copytree(RELEASES_DIR / "invalid-fork-archive-leakage", release)
+            manifest = load_json(release / "manifest.json")
+            for entry in manifest["records"]:
+                if entry["split"] == "validation":
+                    entry["split"] = "test"
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(release / "manifest.json", manifest)
+            report = run_preflight(release)
+        self.assertNotIn("LEAKAGE_DISJOINT", report["failedChecks"])
+        self.assertNotIn("MANIFEST_RECORD_CONSISTENCY", report["failedChecks"])
+
     def test_missing_release_is_unreadable(self):
         with tempfile.TemporaryDirectory() as tmp:
             report = run_preflight(Path(tmp) / "nowhere", tooling_revision="test")
         self.assertEqual(report["failedChecks"], ["MANIFEST_LOAD"])
         self.assertEqual(report["readyFor"], "none")
+
+
+class ArchiveAliasTests(unittest.TestCase):
+    def test_alias_resolution_preserves_independent_asset_keys(self):
+        record = {"grouping": {"sourceArchiveId": "fork"}, "instances": [{"sourceAssetId": "asset"}]}
+        keys = leakage_keys_from_record(record, {"fork": "canonical", "canonical": "canonical"})
+        self.assertEqual(keys["sourceArchiveId"], "canonical")
+        self.assertEqual(keys["sourceAssetIds"], ["asset"])
+        self.assertEqual(record["grouping"]["sourceArchiveId"], "fork")
+
+    def test_missing_chained_and_cyclic_aliases_are_rejected(self):
+        for aliases in ({}, {"fork": "canonical"}, {"fork": "other", "other": "canonical", "canonical": "canonical"}, {"fork": "other", "other": "fork"}):
+            with self.subTest(aliases=aliases), self.assertRaises(ValueError):
+                leakage_keys_from_record({"grouping": {"sourceArchiveId": "fork"}}, aliases)
 
 
 class PreflightCliTests(unittest.TestCase):

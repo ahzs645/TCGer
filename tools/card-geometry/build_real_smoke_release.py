@@ -37,6 +37,7 @@ from corpus_release import (  # noqa: E402
     RECORD_SCHEMA_ID,
     corpus_hash,
     leakage_keys_from_record,
+    load_json,
     load_schema,
     make_validator,
     pretty_json,
@@ -738,8 +739,22 @@ def build_release(
     devmode_sessions_root: Path | None = None,
     multi_instance_label_files: list[Path] | None = None,
     release_id: str = "real-geometry-ingestion-smoke-v1",
+    source_archive_aliases: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     _validate_archive_splits(archive_splits)
+    # Known archive identities are explicit. Additional archives/re-exports
+    # require a reviewed table; do not silently declare unknown sources unique.
+    canonical_fork = "coco:card-seg-j74w1.v3i.coco-segmentation"
+    aliases = dict(source_archive_aliases) if source_archive_aliases is not None else {
+        "coco:annotations.v7i.coco-segmentation": "coco:annotations.v7i.coco-segmentation",
+        canonical_fork: canonical_fork,
+        "coco:card-seg-j74w1-q8yst.v1i.coco-segmentation": canonical_fork,
+    }
+    for archive_name in archive_splits:
+        leakage_keys_from_record(
+            {"grouping": {"sourceArchiveId": _safe_id(f"coco:{Path(archive_name).stem}")}},
+            aliases,
+        )
     if output.exists() and any(output.iterdir()):
         raise FileExistsError(
             f"refusing to replace non-empty output directory: {output}"
@@ -796,6 +811,12 @@ def build_release(
         denylist.update(session_ids)
     if not entries:
         raise ValueError("no geometry records were produced")
+    for entry in entries:
+        record = load_json(output / entry["path"])
+        archive_id = record["grouping"]["sourceArchiveId"]
+        if archive_id.startswith("devmode:"):
+            aliases.setdefault(archive_id, archive_id)
+        entry["leakageKeys"] = leakage_keys_from_record(record, aliases)
     splits = {entry["split"] for entry in entries}
     policy = _smoke_policy(splits, bool(denylist))
     policy_text = pretty_json(policy)
@@ -811,6 +832,7 @@ def build_release(
         },
         "splitAssignment": {"method": "whole-source-archive-explicit-v1", "seed": 0},
         "evaluationSessionDenylist": sorted(denylist),
+        "sourceArchiveAliases": aliases,
         "records": sorted(entries, key=lambda entry: entry["recordId"]),
     }
     manifest["corpusHash"] = corpus_hash(manifest)
@@ -885,6 +907,10 @@ def main() -> int:
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--release-id", default="real-geometry-ingestion-smoke-v1")
+    parser.add_argument(
+        "--source-archive-aliases", type=Path,
+        help="JSON object mapping record sourceArchiveId values to canonical IDs; required for archives beyond the built-in TCGX and card-seg fork mapping",
+    )
     args = parser.parse_args()
     archive_splits = dict(args.archive_split or [(DEFAULT_TCGX_ARCHIVE, "test")])
     if args.max_records_per_archive is not None and args.max_records_per_archive < 1:
@@ -900,6 +926,7 @@ def main() -> int:
         devmode_sessions_root=args.devmode_sessions_root,
         multi_instance_label_files=args.multi_instance_labels,
         release_id=args.release_id,
+        source_archive_aliases=load_json(args.source_archive_aliases) if args.source_archive_aliases else None,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

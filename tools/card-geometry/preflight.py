@@ -378,7 +378,11 @@ def check_records(ctx: Context) -> None:
                 consistency_failures[record_id].append(
                     "recordId differs between manifest and record"
                 )
-            derived = leakage_keys_from_record(record)
+            try:
+                derived = leakage_keys_from_record(record, ctx.manifest["sourceArchiveAliases"])
+            except ValueError as error:
+                consistency_failures[record_id].append(str(error))
+                continue
             declared = entry["leakageKeys"]
             for key in (
                 "sourceKind",
@@ -503,9 +507,20 @@ def check_leakage(ctx: Context) -> None:
 
     # Disjointness across splits.
     seen: dict[tuple[str, str], set[str]] = defaultdict(set)
+    alias_errors: dict[str, str] = {}
+    aliases = ctx.manifest["sourceArchiveAliases"]
+    for archive_id, canonical_id in aliases.items():
+        if aliases.get(canonical_id) != canonical_id:
+            alias_errors[archive_id] = "alias must point directly to a self-mapped canonical id"
     for entry in ctx.manifest["records"]:
         split = entry["split"]
         keys = entry["leakageKeys"]
+        record = ctx.records.get(entry["recordId"])
+        if record is not None and ctx.record_valid.get(entry["recordId"]):
+            try:
+                keys = leakage_keys_from_record(record, aliases)
+            except ValueError as error:
+                alias_errors[entry["recordId"]] = str(error)
         seen[("sourceArchiveId", keys["sourceArchiveId"])].add(split)
         if keys.get("sessionId"):
             seen[("sessionId", keys["sessionId"])].add(split)
@@ -521,12 +536,13 @@ def check_leakage(ctx: Context) -> None:
         for (kind, value), splits in seen.items()
         if len(splits) > 1
     }
-    if leaks:
+    if leaks or alias_errors:
         ctx.add(
             "LEAKAGE_DISJOINT",
             FAIL,
-            f"{len(leaks)} leakage keys appear in more than one split",
+            f"{len(leaks)} leakage keys cross splits; {len(alias_errors)} archive mapping errors",
             leaks=leaks,
+            **({"archiveAliasErrors": alias_errors} if alias_errors else {}),
         )
     else:
         ctx.add("LEAKAGE_DISJOINT", PASS, "no leakage key is shared between splits")

@@ -66,6 +66,7 @@ def slice_release(*, source: Path, output: Path, split: str, release_id: str) ->
             "seed": int(source_manifest["splitAssignment"]["seed"]),
         },
         "evaluationSessionDenylist": list(source_manifest["evaluationSessionDenylist"]),
+        "sourceArchiveAliases": source_manifest["sourceArchiveAliases"],
         "records": selected,
     }
     manifest["corpusHash"] = corpus_hash(manifest)

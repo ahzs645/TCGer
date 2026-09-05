@@ -19,6 +19,7 @@ from corpus_release import (  # noqa: E402
     POLICY_SCHEMA_FILE,
     corpus_hash,
     load_json,
+    leakage_keys_from_record,
     load_schema,
     make_validator,
     pretty_json,
@@ -65,11 +66,20 @@ def combine(
     denylist: set[str] = set()
     seen_records: set[str] = set()
     seen_paths: set[str] = {"policy.json", "manifest.json"}
+    aliases: dict[str, str] = {}
+    for root in inputs:
+        for archive_id, canonical_id in load_json(root / "manifest.json")["sourceArchiveAliases"].items():
+            if archive_id in aliases and aliases[archive_id] != canonical_id:
+                raise ValueError(f"conflicting archive alias: {archive_id}")
+            aliases[archive_id] = canonical_id
     for root in sorted((path.resolve() for path in inputs), key=str):
         manifest = load_json(root / "manifest.json")
         denylist.update(manifest["evaluationSessionDenylist"])
         for original in manifest["records"]:
             entry = copy.deepcopy(original)
+            entry["leakageKeys"] = leakage_keys_from_record(
+                load_json(root / entry["path"]), aliases
+            )
             if entry.get("sourceTier") != "shippable":
                 raise ValueError(
                     f"{entry['recordId']} is not shippable: {entry.get('sourceTier')!r}"
@@ -102,6 +112,7 @@ def combine(
         },
         "splitAssignment": {"method": "combined-pinned-releases-v1", "seed": 0},
         "evaluationSessionDenylist": sorted(denylist),
+        "sourceArchiveAliases": aliases,
         "records": sorted(entries, key=lambda entry: entry["recordId"]),
     }
     manifest["corpusHash"] = corpus_hash(manifest)

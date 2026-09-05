@@ -795,6 +795,10 @@ def build_release(
     shutil.copyfile(card_manifest_path, provenance_dir / "card-assets.json")
     shutil.copyfile(background_manifest_path, provenance_dir / "background-assets.json")
 
+    archive_aliases = {
+        f"synthetic:{revision[:24]}:{split}": f"synthetic:{revision[:24]}:{split}"
+        for split in SPLITS
+    }
     entries = []
     counts = Counter()
     distractors_by_scene: dict[str, Counter[str]] = {
@@ -848,7 +852,7 @@ def build_release(
                     "split": split,
                     "sceneSlice": scene_slice,
                     "sourceTier": "shippable",
-                    "leakageKeys": leakage_keys_from_record(record),
+                    "leakageKeys": leakage_keys_from_record(record, archive_aliases),
                     "images": [{"path": image_rel, "sha256": sha256_bytes(image_bytes)}],
                 }
             )
@@ -878,6 +882,7 @@ def build_release(
         },
         "splitAssignment": {"method": "asset-manifest-preassigned-v1", "seed": int(config["generation"]["seedBase"])},
         "evaluationSessionDenylist": [],
+        "sourceArchiveAliases": archive_aliases,
         "records": sorted(entries, key=lambda entry: entry["recordId"]),
     }
     manifest["corpusHash"] = corpus_hash(manifest)

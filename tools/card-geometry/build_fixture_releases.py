@@ -289,6 +289,10 @@ def materialize(
     policy_text = pretty_json(release["policy"])
     (root / "policy.json").write_text(policy_text, encoding="utf-8")
 
+    aliases = release.get("sourceArchiveAliases", {
+        item["record"]["grouping"]["sourceArchiveId"]: item["record"]["grouping"]["sourceArchiveId"]
+        for item in release["records"]
+    })
     entries = []
     for item in release["records"]:
         record = copy.deepcopy(item["record"])
@@ -314,7 +318,7 @@ def materialize(
                 "split": item["split"],
                 "sceneSlice": item["sceneSlice"],
                 "sourceTier": item.get("sourceTier", "shippable"),
-                "leakageKeys": leakage_keys_from_record(record),
+                "leakageKeys": leakage_keys_from_record(record, aliases),
                 "images": [{"path": image_rel, "sha256": sha256_bytes(intended_image)}],
             }
         )
@@ -329,6 +333,7 @@ def materialize(
             "readinessPolicySha256": sha256_bytes(policy_text.encode("utf-8")),
         },
         "splitAssignment": release["splitAssignment"],
+        "sourceArchiveAliases": aliases,
         "evaluationSessionDenylist": release["evaluationSessionDenylist"],
         "records": entries,
     }
@@ -370,6 +375,18 @@ def build_invalid_image_hash(root: Path) -> None:
     materialize(root, release, image_bytes_override={"fx-validation-real-001": wrong})
 
 
+def build_invalid_fork_archive_leakage(root: Path) -> None:
+    release = base_release()
+    _record(release, "fx-validation-real-001")["grouping"]["sourceArchiveId"] = "card-seg-j74w1"
+    _record(release, "fx-test-real-001")["grouping"]["sourceArchiveId"] = "card-seg-j74w1-q8yst"
+    release["sourceArchiveAliases"] = {
+        item["record"]["grouping"]["sourceArchiveId"]: item["record"]["grouping"]["sourceArchiveId"]
+        for item in release["records"]
+    }
+    release["sourceArchiveAliases"]["card-seg-j74w1-q8yst"] = "card-seg-j74w1"
+    materialize(root, release)
+
+
 def build_invalid_corpus_hash(root: Path) -> None:
     materialize(
         root, base_release(), corpus_hash_override=sha256_bytes(b"not the corpus")
@@ -405,6 +422,7 @@ BUILDERS = {
     "valid-fixture": build_valid_fixture,
     "invalid-leakage": build_invalid_leakage,
     "invalid-source-archive-leakage": build_invalid_source_archive_leakage,
+    "invalid-fork-archive-leakage": build_invalid_fork_archive_leakage,
     "invalid-image-hash": build_invalid_image_hash,
     "invalid-corpus-hash": build_invalid_corpus_hash,
     "invalid-denylist": build_invalid_denylist,
@@ -418,6 +436,7 @@ EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
     "valid-fixture": frozenset(),
     "invalid-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-source-archive-leakage": frozenset({"LEAKAGE_DISJOINT"}),
+    "invalid-fork-archive-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-image-hash": frozenset({"IMAGE_HASH"}),
     "invalid-corpus-hash": frozenset({"CORPUS_HASH"}),
     "invalid-denylist": frozenset({"EVAL_DENYLIST"}),
@@ -429,6 +448,7 @@ EXPECTED_READY_FOR: dict[str, str] = {
     "valid-fixture": "tooling",
     "invalid-leakage": "none",
     "invalid-source-archive-leakage": "none",
+    "invalid-fork-archive-leakage": "none",
     "invalid-image-hash": "none",
     "invalid-corpus-hash": "none",
     "invalid-denylist": "none",

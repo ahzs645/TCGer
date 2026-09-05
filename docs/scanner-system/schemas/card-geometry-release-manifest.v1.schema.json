@@ -12,6 +12,7 @@
     "corpusHash",
     "readiness",
     "splitAssignment",
+    "sourceArchiveAliases",
     "evaluationSessionDenylist",
     "records"
   ],
@@ -49,6 +50,12 @@
         "method": { "type": "string", "minLength": 1, "maxLength": 160 },
         "seed": { "type": "integer", "minimum": 0 }
       }
+    },
+    "sourceArchiveAliases": {
+      "description": "Explicit flat mapping from every record's original sourceArchiveId (including forks and re-exports) to a canonical archive ID. Canonical IDs must also appear and map to themselves. No implicit identity fallback. Covered by corpusHash.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/id" }
     },
     "evaluationSessionDenylist": {
       "description": "Session ids frozen for evaluation. A record from one of these sessions may appear only in the `test` split.",
@@ -90,7 +97,7 @@
       }
     },
     "leakageKeys": {
-      "description": "Keys that must never be shared between splits. They duplicate values inside the record so leakage can be checked from the manifest alone, and the preflight verifies the duplicates agree with the record.",
+      "description": "Keys that must never be shared between splits. sourceArchiveId is the canonical ID resolved from the record through sourceArchiveAliases; other values duplicate the record. Preflight verifies these derived keys agree with the record.",
       "type": "object",
       "additionalProperties": false,
       "required": ["sourceKind", "sourceArchiveId", "physicalCardIds", "sourceAssetIds"],

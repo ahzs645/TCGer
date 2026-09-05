@@ -131,6 +131,32 @@ class RealReleaseAdapterTests(unittest.TestCase):
                     output=root / "release",
                 )
 
+    def test_new_export_requires_an_explicit_canonical_mapping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, _ = self._canonical_source(root)
+            row = json.loads(corpus.read_text())
+            archive_name = "tcgx-reexport.zip"
+            (raw / row["archive"]).rename(raw / archive_name)
+            row["archive"] = archive_name
+            corpus.write_text(json.dumps(row) + "\n")
+            args = dict(
+                canonical_corpus=corpus, raw_dir=raw,
+                archive_splits={archive_name: "test"}, devmode_sessions=[],
+                output=root / "release",
+            )
+            with self.assertRaisesRegex(ValueError, "unmapped sourceArchiveId"):
+                build_release(**args)
+            aliases = {
+                "coco:tcgx-reexport": "tcgx",
+                "tcgx": "tcgx",
+            }
+            build_release(**args, source_archive_aliases=aliases)
+            manifest = load_json(args["output"] / "manifest.json")
+            self.assertEqual(manifest["sourceArchiveAliases"], aliases)
+            self.assertEqual(manifest["records"][0]["leakageKeys"]["sourceArchiveId"], "tcgx")
+            self.assertEqual(run_preflight(args["output"])["failedChecks"], [])
+
     def test_devmode_fixed_quad_provenance_controls_metric_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

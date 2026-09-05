@@ -29,6 +29,28 @@ A corpus release is a directory with `manifest.json`
 (`card-geometry-corpus-record.v1`), and images. Split, scene slice, and
 leakage keys live in the manifest; the record schema is unchanged.
 
+`sourceArchiveAliases` is a required, hash-covered release table mapping every
+record's original archive ID to its canonical archive ID. Canonical IDs must
+map to themselves, and forks/re-exports must map directly to that same ID.
+There is no implicit identity fallback during preflight. Manifest
+`leakageKeys.sourceArchiveId` stores the resolved ID; records retain the original.
+The existing independent source-asset check still applies. For example:
+
+```json
+"sourceArchiveAliases": {
+  "card-seg-j74w1": "card-seg-j74w1",
+  "card-seg-j74w1-q8yst": "card-seg-j74w1"
+}
+```
+
+The real ingestion builder accepts `--source-archive-aliases PATH` for a reviewed
+JSON mapping; its built-in archive mappings cover TCGX and the known card-seg
+fork pair. Synthetic and Dev Mode archive IDs are generated from their known
+split/revision or session identity. Combining releases preserves aliases and
+rejects conflicting mappings; slicing preserves the table. Existing frozen
+releases without this field fail the updated schema and need a new release
+with reviewed aliases and a new hash, rather than edits to frozen bytes.
+
 `preflight.py` validates a release and writes one JSON report with a
 structured `checks` list. Check codes, in report order:
 
@@ -43,7 +65,7 @@ structured `checks` list. Check codes, in report order:
 | `IMAGE_HASH` | an image is missing, differs from its manifest or record hash, or a PNG's IHDR size differs from the record |
 | `MANIFEST_RECORD_CONSISTENCY` | manifest leakage keys or record ids disagree with record content |
 | `LEAKAGE_KEYS_PRESENT` | a record lacks a leakage key its source kind requires under the policy |
-| `LEAKAGE_DISJOINT` | a source archive, session, physical card, source asset, record hash, or image hash appears in more than one split |
+| `LEAKAGE_DISJOINT` | a canonical source archive, session, physical card, source asset, record hash, or image hash appears in more than one split, or an archive alias is unmapped or does not point directly to a self-mapped canonical ID |
 | `EVAL_DENYLIST` | a frozen evaluation session appears outside the `test` split |
 | `SPLIT_REAL_ONLY` | a synthetic record sits in a real-only split |
 | `SOURCE_TIER` | a policy-gated release has a missing or disallowed source tier; every training policy must activate this gate |
@@ -68,7 +90,7 @@ python3 tools/card-geometry/preflight.py \
 
 ### Fixture releases
 
-`fixtures/releases/` holds one valid `fixture`-purpose release, five
+`fixtures/releases/` holds one valid `fixture`-purpose release, seven
 single-defect releases that each fail exactly one check, and an empty
 `training`-purpose release that fails `READINESS_MINIMUMS`.
 `build_fixture_releases.py` regenerates them deterministically, and
