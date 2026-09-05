@@ -17,6 +17,31 @@ from decode_geometry_exports import (  # noqa: E402
 )
 
 
+def assert_results_close(test, actual, expected, tolerance=1e-6):
+    """Compare decoded results structurally, allowing float32 rounding drift.
+
+    The fixtures were decoded on one CPU architecture; sigmoid and other
+    float32 transcendental results can differ by an ulp elsewhere, so
+    floats compare within `tolerance` while every other value stays exact.
+    """
+    if isinstance(expected, dict):
+        test.assertIsInstance(actual, dict)
+        test.assertEqual(sorted(actual), sorted(expected))
+        for key in expected:
+            assert_results_close(test, actual[key], expected[key], tolerance)
+    elif isinstance(expected, list):
+        test.assertIsInstance(actual, list)
+        test.assertEqual(len(actual), len(expected))
+        for left, right in zip(actual, expected):
+            assert_results_close(test, left, right, tolerance)
+    elif isinstance(expected, float) or isinstance(actual, float):
+        test.assertIsInstance(actual, (int, float))
+        test.assertNotIsInstance(actual, bool)
+        test.assertAlmostEqual(float(actual), float(expected), delta=tolerance)
+    else:
+        test.assertEqual(actual, expected)
+
+
 class ModelRawFixturesTests(unittest.TestCase):
     def test_raw_tensors_hash_and_decode_to_expected_results(self):
         fixture_root = ROOT / "fixtures/model-raw"
@@ -56,7 +81,7 @@ class ModelRawFixturesTests(unittest.TestCase):
                                 "artifactSha256": manifest["modelArtifact"]["sha256"],
                             },
                         )
-                        self.assertEqual(actual, fixture["expectedResults"])
+                        assert_results_close(self, actual, fixture["expectedResults"])
                     elif manifest["candidate"] == "fastvit-t8-four-corner":
                         self.assertEqual(len(values), 2)
                         actual = decode_fastvit_four_corner(
@@ -67,7 +92,7 @@ class ModelRawFixturesTests(unittest.TestCase):
                                 "artifactSha256": manifest["modelArtifact"]["sha256"],
                             },
                         )
-                        self.assertEqual(actual, fixture["expectedResults"])
+                        assert_results_close(self, actual, fixture["expectedResults"])
                     elif manifest["candidate"] == "yolox-pose":
                         self.assertEqual(len(values), 15)
                         actual = decode_yolox_pose(
@@ -77,7 +102,7 @@ class ModelRawFixturesTests(unittest.TestCase):
                                 "artifactSha256": manifest["modelArtifact"]["sha256"],
                             },
                         )
-                        self.assertEqual(actual, fixture["expectedResults"])
+                        assert_results_close(self, actual, fixture["expectedResults"])
 
 
 if __name__ == "__main__":
