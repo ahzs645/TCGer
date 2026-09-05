@@ -375,6 +375,12 @@ def build_invalid_image_hash(root: Path) -> None:
     materialize(root, release, image_bytes_override={"fx-validation-real-001": wrong})
 
 
+def build_invalid_image_leakage(root: Path) -> None:
+    release = base_release()
+    release["records"][0]["rgb"] = release["records"][2]["rgb"]
+    materialize(root, release)
+
+
 def build_invalid_fork_archive_leakage(root: Path) -> None:
     release = base_release()
     _record(release, "fx-validation-real-001")["grouping"]["sourceArchiveId"] = "card-seg-j74w1"
@@ -418,7 +424,7 @@ def build_empty_training(root: Path) -> None:
     materialize(root, release)
 
 
-def _cross_release_fixture(root: Path, *, training: bool) -> None:
+def _cross_release_fixture(root: Path, *, training: bool, image_duplicate: bool = False) -> None:
     release = base_release()
     split = "train" if training else "test"
     release["releaseId"] = f"cross-release-fork-{split}"
@@ -429,6 +435,11 @@ def _cross_release_fixture(root: Path, *, training: bool) -> None:
     release["sourceArchiveAliases"] = {"card-seg-j74w1": "card-seg-j74w1"}
     if training:
         release["sourceArchiveAliases"]["card-seg-j74w1-q8yst"] = "card-seg-j74w1"
+    if image_duplicate:
+        release["releaseId"] = "cross-release-image-train"
+        item["record"]["grouping"]["sourceArchiveId"] = "fixture-independent-training"
+        release["sourceArchiveAliases"] = {"fixture-independent-training": "fixture-independent-training"}
+        item["rgb"] = base_release()["records"][2]["rgb"]
     policy = release["policy"]
     policy["requiredSplits"] = [split]
     for key in ("minimumRecordsPerSplit", "minimumInstancesPerSplit"):
@@ -447,14 +458,20 @@ def build_cross_release_fork_evaluation(root: Path) -> None:
     _cross_release_fixture(root, training=False)
 
 
+def build_cross_release_image_training(root: Path) -> None:
+    _cross_release_fixture(root, training=True, image_duplicate=True)
+
+
 BUILDERS = {
     "cross-release-fork-training": build_cross_release_fork_training,
     "cross-release-fork-evaluation": build_cross_release_fork_evaluation,
+    "cross-release-image-training": build_cross_release_image_training,
     "valid-fixture": build_valid_fixture,
     "invalid-leakage": build_invalid_leakage,
     "invalid-source-archive-leakage": build_invalid_source_archive_leakage,
     "invalid-fork-archive-leakage": build_invalid_fork_archive_leakage,
     "invalid-image-hash": build_invalid_image_hash,
+    "invalid-image-leakage": build_invalid_image_leakage,
     "invalid-corpus-hash": build_invalid_corpus_hash,
     "invalid-denylist": build_invalid_denylist,
     "invalid-record-schema": build_invalid_record_schema,
@@ -466,11 +483,13 @@ BUILDERS = {
 EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
     "cross-release-fork-training": frozenset(),
     "cross-release-fork-evaluation": frozenset(),
+    "cross-release-image-training": frozenset(),
     "valid-fixture": frozenset(),
     "invalid-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-source-archive-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-fork-archive-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-image-hash": frozenset({"IMAGE_HASH"}),
+    "invalid-image-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-corpus-hash": frozenset({"CORPUS_HASH"}),
     "invalid-denylist": frozenset({"EVAL_DENYLIST"}),
     "invalid-record-schema": frozenset({"RECORD_SCHEMA"}),
@@ -480,11 +499,13 @@ EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
 EXPECTED_READY_FOR: dict[str, str] = {
     "cross-release-fork-training": "tooling",
     "cross-release-fork-evaluation": "tooling",
+    "cross-release-image-training": "tooling",
     "valid-fixture": "tooling",
     "invalid-leakage": "none",
     "invalid-source-archive-leakage": "none",
     "invalid-fork-archive-leakage": "none",
     "invalid-image-hash": "none",
+    "invalid-image-leakage": "none",
     "invalid-corpus-hash": "none",
     "invalid-denylist": "none",
     "invalid-record-schema": "none",

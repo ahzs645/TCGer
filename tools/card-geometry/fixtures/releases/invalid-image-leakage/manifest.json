@@ -1,0 +1,94 @@
+{
+  "corpusHash": "2510a3136bfe33842d7e52f8767047f972858f2e69e52d2be1f15c4b0afa27ff",
+  "evaluationSessionDenylist": [
+    "scan-session-20260829-200235"
+  ],
+  "readiness": {
+    "readinessPolicyId": "fixture-minimums-v1",
+    "readinessPolicyPath": "policy.json",
+    "readinessPolicySha256": "37adb53e6fe2fcee157fa04d407ad18ae7ba3873d33170ea05cd5727165ca9c3"
+  },
+  "records": [
+    {
+      "images": [
+        {
+          "path": "images/fx-train-synthetic-001.png",
+          "sha256": "99a9aaa8bfef1ccfcd159653512726097fbd0b7bebe001fdf4b3946737c9d77b"
+        }
+      ],
+      "leakageKeys": {
+        "physicalCardIds": [],
+        "sourceArchiveId": "fixture-compositor",
+        "sourceAssetIds": [
+          "asset-0001",
+          "asset-0002"
+        ],
+        "sourceKind": "synthetic"
+      },
+      "path": "records/fx-train-synthetic-001.json",
+      "recordId": "fx-train-synthetic-001",
+      "sceneSlice": "duel_field",
+      "sha256": "82cc8d3b7a80f74b466853b2b1ba6b70086a1f35bf0122d0f733ea7602ce13eb",
+      "sourceTier": "shippable",
+      "split": "train"
+    },
+    {
+      "images": [
+        {
+          "path": "images/fx-validation-real-001.png",
+          "sha256": "902ba5533e135e516e2b8d7bea0493f4b12b3cf04cdfe74a2f779f014ef64b59"
+        }
+      ],
+      "leakageKeys": {
+        "physicalCardIds": [
+          "physical-card-100"
+        ],
+        "sessionId": "scan-session-20260901-100000",
+        "sourceArchiveId": "fixture-devmode-validation",
+        "sourceAssetIds": [],
+        "sourceKind": "real"
+      },
+      "path": "records/fx-validation-real-001.json",
+      "recordId": "fx-validation-real-001",
+      "sceneSlice": "single_handheld",
+      "sha256": "645b9c901b43c2a500b5abfe4411165e4a8a2876f686bf903a9f0e10fc8fd857",
+      "sourceTier": "shippable",
+      "split": "validation"
+    },
+    {
+      "images": [
+        {
+          "path": "images/fx-test-real-001.png",
+          "sha256": "99a9aaa8bfef1ccfcd159653512726097fbd0b7bebe001fdf4b3946737c9d77b"
+        }
+      ],
+      "leakageKeys": {
+        "physicalCardIds": [
+          "physical-card-200"
+        ],
+        "sessionId": "scan-session-20260829-200235",
+        "sourceArchiveId": "fixture-devmode-test",
+        "sourceAssetIds": [],
+        "sourceKind": "real"
+      },
+      "path": "records/fx-test-real-001.json",
+      "recordId": "fx-test-real-001",
+      "sceneSlice": "single_handheld",
+      "sha256": "cecea430431ea48f2626f2cbf09e15d8f26cc32cf63a34bcd674715f14123b4f",
+      "sourceTier": "shippable",
+      "split": "test"
+    }
+  ],
+  "releaseId": "fixture-release-v1",
+  "releasePurpose": "fixture",
+  "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v2",
+  "sourceArchiveAliases": {
+    "fixture-compositor": "fixture-compositor",
+    "fixture-devmode-test": "fixture-devmode-test",
+    "fixture-devmode-validation": "fixture-devmode-validation"
+  },
+  "splitAssignment": {
+    "method": "fixture-hand-assigned",
+    "seed": 0
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "allowedSourceTiers": [
+    "shippable"
+  ],
+  "description": "Minimums small enough for the checked-in fixture releases. A release bound to this policy can validate tooling but its purpose keeps it from ever being ready for training.",
+  "metricEligibleCornerSources": [
+    "human",
+    "synthetic"
+  ],
+  "minimumInstancesPerSplit": {
+    "train": 1
+  },
+  "minimumMetricEligibleInstances": {
+    "train": 0
+  },
+  "minimumRealEvaluationSessions": 0,
+  "minimumRecordsPerSplit": {
+    "train": 1
+  },
+  "policyId": "fixture-minimums-v1",
+  "realOnlySplits": [
+    "test"
+  ],
+  "requiredLeakageKeys": {
+    "real": [
+      "sessionId",
+      "physicalCardIds"
+    ],
+    "synthetic": [
+      "sourceAssetIds"
+    ]
+  },
+  "requiredSceneSlices": [],
+  "requiredSplits": [
+    "train"
+  ],
+  "schema": "https://tcger.app/schemas/card-geometry-readiness-policy/v1"
+}

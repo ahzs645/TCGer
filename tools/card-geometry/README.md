@@ -79,11 +79,22 @@ Before any training command, `run_card_geometry_hf_job.py` downloads and
 preflights every pinned evaluation release, even if no post-training evaluation
 command is configured. `CROSS_RELEASE_LEAKAGE_DISJOINT` compares all records in
 the training release (including its validation/test records) against each
-evaluation release for canonical archive, session, source-asset, and physical-card
-overlap. Alias knowledge is merged across releases; conflicting mappings fail
+evaluation release for canonical archive, session, source-asset, physical-card,
+and exact image SHA-256 overlap. Image hashes come from the manifest image entries
+whose actual file bytes have already passed preflight. Alias knowledge is merged across releases; conflicting mappings fail
 closed. The local job output includes `cross-release-leakage.json`. The fixture
 pair `cross-release-fork-training` / `cross-release-fork-evaluation` passes each
 release's own preflight but fails this cross-release gate.
+`cross-release-image-training` paired with `cross-release-fork-evaluation` also
+fails, solely on `imageSha256`: their image bytes match despite distinct,
+self-mapped archive IDs and independent provenance keys. `invalid-image-leakage`
+isolates the existing image-hash disjointness check across splits within a release.
+
+At round-two corpus assembly, a separate perceptual-hash audit can identify
+near-duplicates beyond exact byte equality. When writing the round-two experiment
+config, rename the manifest schema file to v2 and replace the legacy
+`frozenRealV3` / `syntheticDuelField` experiment keys. These naming changes remain
+deferred; frozen experiment pins and evaluation releases retain their current names.
 
 `preflight.py` validates a release and writes one JSON report with a
 structured `checks` list. Check codes, in report order:
@@ -124,7 +135,8 @@ python3 tools/card-geometry/preflight.py \
 
 ### Fixture releases
 
-`fixtures/releases/` holds one valid `fixture`-purpose release, seven
+`fixtures/releases/` holds a training-shaped valid `fixture`-purpose release,
+individually valid releases for cross-release leakage pairs,
 single-defect releases that each fail exactly one check, and an empty
 `training`-purpose release that fails `READINESS_MINIMUMS`.
 `build_fixture_releases.py` regenerates them deterministically, and

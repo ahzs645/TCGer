@@ -396,7 +396,8 @@ def check_cross_release_leakage(
 
     Merge alias knowledge before deriving keys, so a fork cannot become an
     independent archive just because it is described in a different release.
-    Contradictory alias declarations fail closed.
+    Contradictory alias declarations fail closed. Preflight-verified image
+    hashes also catch exact copies whose archive relationship is undeclared.
     """
     roots = {"training": training, **evaluations}
     manifests = {name: load_json(root / "manifest.json") for name, root in roots.items()}
@@ -412,6 +413,7 @@ def check_cross_release_leakage(
     for name, root in roots.items():
         keys: set[tuple[str, str]] = set()
         for entry in manifests[name]["records"]:
+            keys.update(("imageSha256", image["sha256"]) for image in entry["images"])
             derived = leakage_keys_from_record(load_json(root / entry["path"]), aliases)
             keys.add(("sourceArchiveId", derived["sourceArchiveId"]))
             if derived.get("sessionId"):

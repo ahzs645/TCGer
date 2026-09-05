@@ -302,6 +302,14 @@ class PreflightTests(unittest.TestCase):
             },
         )
 
+    def test_identical_images_across_splits_fail_without_archive_overlap(self):
+        report = self.run_release("invalid-image-leakage")
+        self.assertEqual(report["failedChecks"], ["LEAKAGE_DISJOINT"])
+        manifest = load_json(RELEASES_DIR / "invalid-image-leakage" / "manifest.json")
+        image_hash = manifest["records"][0]["images"][0]["sha256"]
+        leakage = next(check for check in report["checks"] if check["code"] == "LEAKAGE_DISJOINT")
+        self.assertEqual(leakage["details"]["leaks"], {f"imageSha256:{image_hash}": ["test", "train"]})
+
     def test_duplicate_manifest_records_cannot_inflate_readiness(self):
         with tempfile.TemporaryDirectory() as tmp:
             release = Path(tmp) / "duplicate-record"

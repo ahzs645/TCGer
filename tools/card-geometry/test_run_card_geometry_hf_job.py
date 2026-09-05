@@ -58,6 +58,20 @@ class CrossReleaseLeakageTests(unittest.TestCase):
         self.assertEqual(report["failedChecks"], ["CROSS_RELEASE_LEAKAGE_DISJOINT"])
         self.assertEqual(report["leaks"], {"real": ["sourceArchiveId:card-seg-j74w1"]})
 
+    def test_identical_image_in_independent_archive_leaks(self):
+        training = RELEASES_DIR / "cross-release-image-training"
+        train_manifest = load_json(training / "manifest.json")
+        eval_manifest = load_json(self.evaluation / "manifest.json")
+        train_image = train_manifest["records"][0]["images"][0]
+        eval_image = eval_manifest["records"][0]["images"][0]
+        self.assertEqual((training / train_image["path"]).read_bytes(), (self.evaluation / eval_image["path"]).read_bytes())
+        self.assertEqual(train_manifest["sourceArchiveAliases"], {"fixture-independent-training": "fixture-independent-training"})
+        self.assertTrue(set(train_manifest["sourceArchiveAliases"]).isdisjoint(eval_manifest["sourceArchiveAliases"]))
+        report = check_cross_release_leakage(training, {"real": self.evaluation})
+        self.assertEqual(report["failedChecks"], ["CROSS_RELEASE_LEAKAGE_DISJOINT"])
+        self.assertEqual(report["archiveAliasConflicts"], {})
+        self.assertEqual(report["leaks"], {"real": [f"imageSha256:{train_image['sha256']}"]})
+
     def test_conflicting_alias_knowledge_fails_closed(self):
         self._separate_archives()
         manifest = load_json(self.evaluation / "manifest.json")
@@ -133,16 +147,21 @@ class CrossReleaseLeakageTests(unittest.TestCase):
         resolved = resolve_config(load_json(FIXTURE))
         module = "run_card_geometry_hf_job"
         hub = types.SimpleNamespace(HfApi=lambda **kwargs: object(), snapshot_download=lambda **kwargs: None)
+        for training in (self.training, RELEASES_DIR / "cross-release-image-training"):
+            with self.subTest(training=training.name):
+                self._assert_training_blocked(resolved, module, hub, training)
+
+    def _assert_training_blocked(self, resolved, module, hub, training):
         with patch.dict(sys.modules, {"huggingface_hub": hub}), \
              patch(f"{module}._verify_local_artifacts"), \
              patch(f"{module}._hub_token", return_value="unused"), \
              patch(f"{module}._require_private_model_repo"), \
              patch(f"{module}._upload_json", return_value="fixture-commit"), \
-             patch(f"{module}._download_and_preflight", return_value=(self.training, {})), \
+             patch(f"{module}._download_and_preflight", return_value=(training, {})), \
              patch(f"{module}._download_evaluation_release", return_value=self.evaluation), \
              patch(f"{module}._run") as run:
             with self.assertRaisesRegex(RuntimeError, "CROSS_RELEASE_LEAKAGE_DISJOINT"):
-                execute(resolved, action="train", export_format=None, export_destination="private-model-repo", workdir=self.root / "job")
+                execute(resolved, action="train", export_format=None, export_destination="private-model-repo", workdir=self.root / f"job-{training.name}")
         run.assert_not_called()
 
 
