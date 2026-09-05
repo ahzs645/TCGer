@@ -27,6 +27,8 @@ class BuildSessionBackgroundManifestTests(unittest.TestCase):
             root = Path(temporary)
             sessions = root / "sessions"
             sessions.mkdir()
+            devmode = root / "devmode"
+            devmode.mkdir()
             selected = {}
             index = 0
             while len(selected) < 2:
@@ -62,6 +64,7 @@ class BuildSessionBackgroundManifestTests(unittest.TestCase):
             document = MODULE.build_manifest(
                 sessions_root=sessions,
                 release_manifest=release,
+                devmode_sessions_root=devmode,
                 train_count=1,
                 validation_count=1,
                 max_per_session=1,

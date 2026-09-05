@@ -16,7 +16,7 @@ sys.path.insert(0, str(PARENT))
 
 from corpus_release import pretty_json, sha256_file  # noqa: E402
 
-from compositor.compositor import ASSET_MANIFEST_SCHEMA, CompositorError  # noqa: E402
+from compositor.compositor import ASSET_MANIFEST_SCHEMA, CompositorError, load_assets  # noqa: E402
 
 
 def load_manifest(path: Path) -> dict[str, Any]:
@@ -35,6 +35,14 @@ def merge_manifests(inputs: list[Path], output: Path) -> dict[str, Any]:
     roles = {document.get("role") for _, document in loaded}
     if len(roles) != 1:
         raise CompositorError(f"input roles disagree: {sorted(str(role) for role in roles)}")
+    exclusions = None
+    if roles == {"background"}:
+        for path, document in loaded:
+            load_assets(path, "background")
+            if "sessionExclusions" in document:
+                if exclusions is not None and exclusions != document["sessionExclusions"]:
+                    raise CompositorError("background session exclusion inventories disagree")
+                exclusions = document["sessionExclusions"]
     output.mkdir(parents=True, exist_ok=True)
     assets_dir = output / "assets"
     assets_dir.mkdir()
@@ -66,6 +74,12 @@ def merge_manifests(inputs: list[Path], output: Path) -> dict[str, Any]:
         "role": roles.pop(),
         "assets": sorted(assets, key=lambda row: row["assetId"]),
     }
+    if exclusions is not None:
+        document["sessionExclusions"] = exclusions
+        document["reviewEvidenceInputs"] = [
+            {"manifestSha256": sha256_file(path), "evidence": value.get("reviewEvidence")}
+            for path, value in loaded
+        ]
     (output / "assets.json").write_text(pretty_json(document), encoding="utf-8")
     return document
 

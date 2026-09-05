@@ -189,6 +189,17 @@ def load_assets(path: Path, expected_role: str) -> list[Asset]:
         digest = sha256_file(asset_path)
         if digest != row["sha256"]:
             raise CompositorError(f"asset hash mismatch: {asset_id}")
+        provenance = row.get("provenance", {})
+        session = provenance.get("sourceSessionId")
+        if expected_role == "background" and (session or asset_id.startswith("capture-bg-")):
+            review = provenance.get("backgroundReview", {})
+            exclusions = document.get("sessionExclusions")
+            if (not session or not isinstance(exclusions, list) or session in exclusions
+                    or review.get("verdict") != "card-free"
+                    or not isinstance(review.get("reviewer"), str) or not review["reviewer"].strip()
+                    or review.get("cropSha256") != digest or review.get("sourceSessionId") != session
+                    or review.get("sessionExclusionsSha256") != sha256_bytes(canonical_json(exclusions))):
+                raise CompositorError(f"capture background lacks valid review or session exclusions: {asset_id}")
         with Image.open(asset_path) as image:
             width, height = image.size
             image.verify()

@@ -129,3 +129,37 @@ The first published run is pinned at dataset revision
 `544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393`.
 Its counts, Hub smoke, and baseline results are recorded in the
 [dated benchmark](../../../docs/scanner-system/benchmarks/2026-09-02-synthetic-card-geometry-smoke/README.md).
+
+## Capture background review
+
+`build_session_background_manifest.py` now emits **review candidates**, not
+training-ready capture backgrounds. Supply `--devmode-sessions-root` alongside
+`--release-manifest`; every session directory in that root is excluded, as are
+all sessions declared by evaluation records and the evaluation denylist. If
+candidate sessions are themselves Dev Mode sessions, none are eligible.
+
+Review the actual encoded crop files and record a JSON review document:
+
+```json
+{
+  "schema": "https://tcger.app/reviews/card-geometry-background/v1",
+  "reviews": [{
+    "assetId": "capture-bg-example",
+    "sourceSessionId": "eligible-capture-session",
+    "cropSha256": "SHA256_OF_REVIEWED_CROP_BYTES",
+    "reviewer": "REVIEWER_ID",
+    "verdict": "card-free"
+  }]
+}
+```
+
+Use `reject` for a crop that is unsuitable. A low detector score or clearance
+from detected boxes does not establish that a crop is card-free. Finalize with
+`review_background_manifest.py --candidates ... --reviews ...
+--evaluation-release ... --evaluation-corpus-hash ... --devmode-root ...
+--output ...`. The tool preflights the pinned evaluation release and records
+its corpus hash, the Dev Mode inventory hash, the complete exclusion list,
+reviewer and crop hash. Missing reviews, changed bytes and excluded sessions
+fail closed. Compositing and manifest merging reject capture crops without this
+review evidence. Existing procedural smoke textures have no capture session
+and remain separate from this capture-review requirement.

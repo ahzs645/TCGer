@@ -18,6 +18,7 @@ sys.path.insert(0, str(PARENT))
 from corpus_release import pretty_json, sha256_bytes, sha256_file  # noqa: E402
 
 from compositor.compositor import ASSET_MANIFEST_SCHEMA, CompositorError  # noqa: E402
+from compositor.review_background_manifest import excluded_sessions  # noqa: E402
 
 
 POSITIONS = (
@@ -124,6 +125,7 @@ def build_manifest(
     *,
     sessions_root: Path,
     release_manifest: Path,
+    devmode_sessions_root: Path,
     train_count: int,
     validation_count: int,
     max_per_session: int,
@@ -132,7 +134,7 @@ def build_manifest(
     if output.exists() and any(output.iterdir()):
         raise CompositorError(f"refusing to replace non-empty output: {output}")
     release = json.loads(release_manifest.read_text(encoding="utf-8"))
-    denylist = set(release.get("evaluationSessionDenylist", []))
+    denylist = set(excluded_sessions(release, devmode_sessions_root))
     if not denylist:
         raise CompositorError("release manifest has no evaluation session denylist")
     requested = {"train": train_count, "validation": validation_count}
@@ -225,6 +227,8 @@ def build_manifest(
     document = {
         "schema": ASSET_MANIFEST_SCHEMA,
         "role": "background",
+        "reviewStatus": "pending; finalize with review_background_manifest.py before compositing",
+        "sessionExclusions": sorted(denylist),
         "assets": sorted(assets, key=lambda row: row["assetId"]),
     }
     (output / "background-assets.json").write_text(pretty_json(document), encoding="utf-8")
@@ -235,6 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sessions-root", type=Path, required=True)
     parser.add_argument("--release-manifest", type=Path, required=True)
+    parser.add_argument("--devmode-sessions-root", type=Path, required=True)
     parser.add_argument("--train-count", type=int, default=80)
     parser.add_argument("--validation-count", type=int, default=20)
     parser.add_argument("--max-per-session", type=int, default=3)
@@ -244,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
         document = build_manifest(
             sessions_root=args.sessions_root,
             release_manifest=args.release_manifest,
+            devmode_sessions_root=args.devmode_sessions_root,
             train_count=args.train_count,
             validation_count=args.validation_count,
             max_per_session=args.max_per_session,
