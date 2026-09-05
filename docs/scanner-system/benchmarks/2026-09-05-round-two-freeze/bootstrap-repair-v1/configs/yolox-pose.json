@@ -1,0 +1,179 @@
+{
+  "bakeoffId": "shared-card-geometry-round-two-v1",
+  "candidate": "yolox-pose",
+  "corpus": {
+    "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "cabee73ac46a5901cc3060cfd17b7c63408bf66a",
+    "policyId": "training-minimums-v3",
+    "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+    "preflightReport": {
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    },
+    "releasePath": "geometry/releases/card-geometry-training-round-two-v1"
+  },
+  "deviations": [],
+  "evaluations": {
+    "frozenReal": {
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2"
+    },
+    "goldenFixtures": {
+      "path": "tools/card-geometry/fixtures/validation-nms.v1.json",
+      "sha256": "ec0f877af9d0f2afe4f6a76c7a4590c033fa0d35027815330adb24c540532168"
+    },
+    "recognitionModels": {
+      "games": {
+        "magic": {
+          "metadata": {
+            "path": "exports/magic/full/CardsIndexMetadata.json",
+            "sha256": "35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54"
+          },
+          "onnx": {
+            "path": "exports/magic/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "ebc725476ec2866cd054cd16ef9bcda257bbfdc5aa05326a79335abc4fdc0d3e"
+          },
+          "queryNormalization": "grey-world-autocontrast",
+          "strongThreshold": 0.7,
+          "vectors": {
+            "path": "exports/magic/full/CardsIndexVectors-arcface.bin",
+            "sha256": "4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8"
+          }
+        },
+        "pokemon": {
+          "metadata": {
+            "path": "exports/pokemon/full/CardsIndexMetadata.json",
+            "sha256": "5bcc886d58fca214800d366d080a438515d7820ffe03fcea7395496b5ef08117"
+          },
+          "onnx": {
+            "path": "exports/pokemon/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "bd7367284130639345efbe967e5e80b4aadf0ab5d5bc922968d2b06e497eea44"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/pokemon/full/CardsIndexVectors-arcface.bin",
+            "sha256": "d78e06b0909f39f57deab5c04c1bfb20671bf933f95033f143942e8cc388bdc3"
+          }
+        },
+        "yugioh": {
+          "metadata": {
+            "path": "exports/yugioh/full/CardsIndexMetadata.json",
+            "sha256": "0ab3fec12511b401244b1f80ac12ac432f10cdb2afdcfc59f7797568d50cca5e"
+          },
+          "onnx": {
+            "path": "exports/yugioh/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "b304bde2171d8ca4a824a4e0cab4bc22c3b31e425a8ba5e3ef91aab4ec6f9d58"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/yugioh/full/CardsIndexVectors-arcface.bin",
+            "sha256": "2de604679f08018e18fe3f3db188414add77fba51c6e8c52c4eb8b87cea8cbdd"
+          }
+        }
+      },
+      "modelRepo": "ahzs645/tcger-universal-arcface",
+      "modelRevision": "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
+    },
+    "recognitionReplay": {
+      "path": "docs/scanner-system/benchmarks/2026-09-02-shared-card-geometry/reports/device-geometry-outcomes.json",
+      "sha256": "05b56efb2ece661100fab8c935485174e5d59aae562704002e86349e008a5997"
+    },
+    "syntheticMultigame": {
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+    }
+  },
+  "execution": {
+    "checkpointRepo": "ahzs645/tcger-universal-arcface",
+    "checkpointRepoPrivate": true,
+    "containerImage": "pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806",
+    "evaluationCommand": [
+      "python",
+      "tools/card-geometry/evaluate_geometry_candidate.py",
+      "--candidate",
+      "yolox-pose"
+    ],
+    "gpuFlavor": "l4x1",
+    "privateExportCommands": {
+      "coreml": [
+        "python",
+        "tools/card-geometry/export_geometry_candidate.py",
+        "--candidate",
+        "yolox-pose",
+        "--format",
+        "coreml"
+      ],
+      "onnx": [
+        "python",
+        "tools/card-geometry/export_geometry_candidate.py",
+        "--candidate",
+        "yolox-pose",
+        "--format",
+        "onnx"
+      ]
+    },
+    "trainCommand": [
+      "python",
+      "tools/card-geometry/train_yolox_pose.py",
+      "--mmyolo-root",
+      "/work/mmyolo",
+      "--mmyolo-revision",
+      "8c4d9dc503dc8e327bec8147e8dc97124052f693",
+      "--base-url",
+      "https://download.openmmlab.com/mmyolo/v0/yolox/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco_20230210_134645-3a8dfbd7.pth",
+      "--base-sha256",
+      "3a8dfbd76b4493580449925f6cd01d1ae3b2b7425c6d1ed168dbe5282920c9b3"
+    ]
+  },
+  "fairness": {
+    "augmentationProfile": "canonical-corpus-baked-v1:no-runtime-augmentation",
+    "budget": {
+      "kind": "epochs",
+      "value": 50
+    },
+    "evaluationScript": {
+      "path": "tools/card-geometry/benchmark_geometry.py",
+      "sha256": "03d2595826f9c9dc5c3a6261c348045a1dea3f8e7efbe84f90e12df914b0b418"
+    },
+    "inputResolution": 640,
+    "realContextMarginPolicy": {
+      "application": "each-side",
+      "fraction": 0.15,
+      "kind": "fraction-of-long-side",
+      "rounding": "ceil"
+    },
+    "seedPolicy": {
+      "baseSeed": 20260905,
+      "derivation": "base-plus-repeat-index",
+      "repeatCount": 1
+    }
+  },
+  "framework": "mmyolo",
+  "licenseRoute": "permissive",
+  "measurements": {
+    "coremlOnnxParity": true,
+    "decoderCodeSize": true,
+    "exportedBytesPlatforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "geometryRealV3": true,
+    "geometrySyntheticDuelField": true,
+    "l4GpuHours": true,
+    "physicalLatencyPlatforms": [
+      "ios",
+      "android"
+    ],
+    "recognitionReplay": true
+  },
+  "schema": "https://tcger.app/schemas/card-geometry-experiment-config/v2",
+  "toolingRevision": "f9daf4a19a91b2a459ef531779aead6d531f1b18"
+}

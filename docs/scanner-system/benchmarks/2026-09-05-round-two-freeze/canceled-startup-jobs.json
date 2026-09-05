@@ -1,0 +1,37 @@
+{
+  "reason": "Bootstrap dependency drift; superseded before optimization.",
+  "jobs": [
+    {
+      "candidate": "yolo11n-pose",
+      "id": "6a9c64e5e686246ca69a4359",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    },
+    {
+      "candidate": "yolo11s-pose",
+      "id": "6a9c64f9259f8e97255e408d",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    },
+    {
+      "candidate": "yolox-pose",
+      "id": "6a9c6504259f8e97255e408f",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    },
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "id": "6a9c650e259f8e97255e4091",
+      "status": {
+        "stage": "CANCELED",
+        "message": null
+      }
+    }
+  ]
+}

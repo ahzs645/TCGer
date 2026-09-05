@@ -1,4 +1,6 @@
-# Round-two launch — 2026-09-05
+# Initial startup attempts — canceled
+
+These four startup attempts were canceled before optimization after dependency installation upgraded NumPy to 2.4.6. See [the bootstrap repair](bootstrap-repair-v1/) for the replacement launch. The original input and submission receipts below remain unchanged for audit.
 
 The four jobs below were submitted after the corpus and experiment freeze was pushed in commit `d63b4de8`. Each uses one L4 GPU, 50 epochs, seed 20260905, and a 12-hour limit. Expect several hours of execution once hardware is assigned; queue time is separate. Initial inspection showed all four scheduling, with YOLO11s pulling its container and the others waiting for hardware.
 
