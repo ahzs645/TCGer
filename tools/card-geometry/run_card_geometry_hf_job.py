@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import json
 import hashlib
 import os
 import shutil
@@ -585,6 +586,12 @@ def execute(
             ),
         }
     )
+    # Clear inherited values: only the hash-covered configuration may set this.
+    env.pop("TCGER_GEOMETRY_REAL_CONTEXT_POLICY", None)
+    if "realContextMarginPolicy" in resolved["fairness"]:
+        env["TCGER_GEOMETRY_REAL_CONTEXT_POLICY"] = json.dumps(
+            resolved["fairness"]["realContextMarginPolicy"], sort_keys=True
+        )
     resume_from = resolved["execution"].get("resumeFrom")
     if resume_from is not None:
         env.update(

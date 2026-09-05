@@ -24,6 +24,8 @@ from typing import Any
 from PIL import Image
 
 from train_yolo_pose import download_verified, load_json, padded_point, sha256_file
+from training_geometry import (MissingInstanceBox, context_margins, context_policy_from_environment,
+    has_corner_supervision, instance_box, validate_instance_boxes)
 
 
 VISIBILITY = {"visible": 2, "occluded": 1, "outsideFrame": 1}
@@ -195,8 +197,11 @@ def coco_annotation(
     margins: dict[str, int],
 ) -> dict[str, Any] | None:
     corners = instance.get("corners") or []
-    if len(corners) != 4 or any(not corner.get("coordinateKnown") for corner in corners):
-        return None
+    known = has_corner_supervision(instance)
+    if not known:
+        left, top, right, bottom = instance_box(instance)
+        corners = [{"point": {"x": x, "y": y}, "visibility": "visible"}
+                   for x, y in ((left, top), (right, top), (right, bottom), (left, bottom))]
     padded_width = width + margins["left"] + margins["right"]
     padded_height = height + margins["top"] + margins["bottom"]
     keypoints: list[float | int] = []
@@ -226,12 +231,13 @@ def coco_annotation(
         "bbox": [round(left, 6), round(top, 6), round(box_width, 6), round(box_height, 6)],
         "area": round(box_width * box_height, 6),
         "iscrowd": 0,
-        "num_keypoints": 4,
-        "keypoints": keypoints,
+        "num_keypoints": 4 if known else 0,
+        "keypoints": keypoints if known else [0] * 12,
     }
 
 
-def materialize_coco(release: Path, destination: Path) -> dict[str, Any]:
+def materialize_coco(release: Path, destination: Path,
+                     real_context_policy: dict[str, Any] | None = None) -> dict[str, Any]:
     manifest = load_json(release / "manifest.json")
     destination.mkdir(parents=True, exist_ok=False)
     annotations: dict[str, list[dict[str, Any]]] = {"train": [], "validation": []}
@@ -247,12 +253,12 @@ def materialize_coco(release: Path, destination: Path) -> dict[str, Any]:
         if split not in annotations:
             continue
         record = load_json(release / entry["path"])
-        if record["source"]["kind"] != "synthetic":
-            raise ValueError(f"{split} must be synthetic in v1: {entry['recordId']}")
-        margins = {
-            name: int(record["synthetic"]["contextMarginPixels"][name])
-            for name in ("left", "top", "right", "bottom")
-        }
+        margins = context_margins(record, real_context_policy)
+        try:
+            validate_instance_boxes(record["instances"])
+        except MissingInstanceBox:
+            counts[f"recordsSkippedMissingBox:{split}"] += 1
+            continue
         source = release / record["source"]["path"]
         with Image.open(source) as opened:
             image = opened.convert("RGB")
@@ -272,9 +278,6 @@ def materialize_coco(release: Path, destination: Path) -> dict[str, Any]:
             if row is not None:
                 rows.append(row)
                 next_annotation_id += 1
-        if not rows:
-            counts[f"recordsSkippedNoKnownCorners:{split}"] += 1
-            continue
         padded = Image.new("RGB", (padded_width, padded_height), (0, 0, 0))
         padded.paste(image, (margins["left"], margins["top"]))
         filename = f"{entry['recordId']}.jpg"
@@ -314,6 +317,7 @@ def materialize_coco(release: Path, destination: Path) -> dict[str, Any]:
         raise ValueError(f"materialized dataset is incomplete: {dict(counts)}")
     return {
         "corpusHash": manifest["corpusHash"],
+        "realContextMarginPolicy": real_context_policy,
         "counts": dict(sorted(counts.items())),
         "contextPadding": {
             "order": "source -> black context padding -> MMYOLO letterbox",
@@ -321,6 +325,13 @@ def materialize_coco(release: Path, destination: Path) -> dict[str, Any]:
             "cornerMapping": "(x*sourceWidth+left)/(sourceWidth+left+right)",
         },
     }
+
+
+def scaled_learning_rate(batch: int) -> float:
+    if batch <= 0:
+        raise ValueError("batch must be positive")
+    # This wrapper launches one process on one GPU; disable MMEngine autoscale.
+    return 0.004 * batch / 256
 
 
 def write_config(
@@ -338,7 +349,7 @@ def write_config(
     dict(type='Resize', scale=(640, 640), keep_ratio=True),
     dict(type='mmdet.Pad', pad_to_square=True,
          pad_val=dict(img=(114.0, 114.0, 114.0))),
-    dict(type='FilterAnnotations', by_keypoints=True, keep_empty=False),
+    dict(type='FilterAnnotations', by_box=True, by_keypoints=False, keep_empty=True),
     dict(type='PackDetInputs',
          meta_keys=('id', 'img_id', 'img_path', 'ori_shape', 'img_shape',
                     'scale_factor', 'flip_indices')),
@@ -364,7 +375,8 @@ def write_config(
                 "img_scale = (640, 640)",
                 f"shared_pipeline = {shared_pipeline}",
                 f"inference_pipeline = {inference_pipeline}",
-                "model = dict(bbox_head=dict(head_module=dict(num_keypoints=4), "
+                "model = dict(data_preprocessor=dict(batch_augments=None), "
+                "bbox_head=dict(head_module=dict(num_keypoints=4), "
                 "loss_pose=dict(_delete_=True, type='OksLoss', metainfo=metainfo_file, "
                 "loss_weight=30.0)), train_cfg=dict(assigner=dict("
                 "oks_calculator=dict(_delete_=True, type='OksLoss', "
@@ -389,16 +401,10 @@ def write_config(
                 "val_evaluator = dict(_delete_=True, type='mmpose.CocoMetric', "
                 "ann_file=data_root + 'annotations/validation.json', score_mode='bbox')",
                 "test_evaluator = val_evaluator",
-                # Pinned MMYOLO's YOLOXPoseHead dereferences the local cfg
-                # argument after its parent has replaced None only internally.
-                # That upstream bug makes the framework validation loop crash.
-                # MMEngine always runs validation at max_epochs regardless of
-                # val_interval, but still honors val_begin. Keep MMYOLO's
-                # validation objects structurally valid and place the entire
-                # redundant loop beyond this run. The shared frozen evaluator
-                # still runs immediately after training.
-                f"train_cfg = dict(max_epochs={epochs}, val_begin={epochs + 1}, "
-                f"val_interval={epochs + 1}, dynamic_intervals=None)",
+                f"train_cfg = dict(max_epochs={epochs}, val_begin=1, "
+                "val_interval=1, dynamic_intervals=None)",
+                f"optim_wrapper = dict(optimizer=dict(lr={scaled_learning_rate(batch)!r}))",
+                "auto_scale_lr = dict(enable=False, base_batch_size=256)",
                 "param_scheduler = [dict(type='CosineAnnealingLR', eta_min=0.00001, "
                 f"begin=0, end={epochs}, T_max={epochs}, by_epoch=True)]",
                 "custom_hooks = [dict(type='EMAHook', ema_type='ExpMomentumEMA', "
@@ -425,12 +431,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     seed = int(os.environ["TCGER_GEOMETRY_BASE_SEED"])
     if int(os.environ["TCGER_GEOMETRY_REPEAT_COUNT"]) != 1:
         raise ValueError("one Job invocation trains exactly one resolved repeat")
+    from yolox_validation_fix import repair_source
+
+    source_repair = repair_source(args.mmyolo_root)
+    (output / "mmyolo-source-repair.json").write_text(json.dumps(source_repair, indent=2) + "\n")
     resume_checkpoint, resume_epoch, resume_prefix = remote_resume_checkpoint()
     base_checkpoint = output / "base-yolox-pose.pth"
     if resume_checkpoint is None:
         download_verified(args.base_url, args.base_sha256, base_checkpoint)
     dataset = output / "coco-dataset"
-    materialization = materialize_coco(release, dataset)
+    materialization = materialize_coco(release, dataset, context_policy_from_environment())
     config = write_config(
         mmyolo_root=args.mmyolo_root,
         dataset=dataset,
@@ -471,7 +481,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "candidate": "yolox-pose",
         "experimentHash": os.environ["TCGER_GEOMETRY_EXPERIMENT_HASH"],
         "materialization": materialization,
-        "mmyolo": {"root": str(args.mmyolo_root), "revision": args.mmyolo_revision},
+        "mmyolo": {"root": str(args.mmyolo_root), "revision": args.mmyolo_revision, "sourceRepair": source_repair},
         "baseCheckpoint": {"url": args.base_url, "sha256": args.base_sha256},
         "resume": (
             None
@@ -492,6 +502,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "epochs": epochs,
             "inputResolution": int(os.environ["TCGER_GEOMETRY_INPUT_RESOLUTION"]),
             "batch": args.batch,
+            "learningRate": scaled_learning_rate(args.batch),
+            "learningRateScaling": {"referenceLearningRate": 0.004, "referenceBatch": 256, "worldSize": 1},
             "seed": seed,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
             "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",

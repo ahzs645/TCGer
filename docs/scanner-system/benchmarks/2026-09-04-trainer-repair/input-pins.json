@@ -1,0 +1,48 @@
+{
+  "repo": "ahzs645/tcger-universal-arcface",
+  "revision": "d28069964dd5f400dc58e046d4b1d249206d3cad",
+  "files": [
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "path": "geometry/fastvit-t8-four-corner/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/ec9dc61942f85be5a30bcba64543f1ea971e4a802856463d313ba9169dd37396/training-output/trainer-summary.json",
+      "sha256": null,
+      "size": 1487
+    },
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "path": "geometry/fastvit-t8-four-corner/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/ec9dc61942f85be5a30bcba64543f1ea971e4a802856463d313ba9169dd37396/training-output/training/repeat-0/best.pt",
+      "sha256": "def0355802c569854ff8c460c0939f7aadc7dc1c9a81fdc4d3f3b0351f584850",
+      "size": 19374334
+    },
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "path": "geometry/fastvit-t8-four-corner/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/ec9dc61942f85be5a30bcba64543f1ea971e4a802856463d313ba9169dd37396/training-output/training/repeat-0/history.json",
+      "sha256": null,
+      "size": 5230
+    },
+    {
+      "candidate": "yolox-pose",
+      "path": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/6579b982ffb4daabce421d947f0e2d3625cfcf63252c8f033b7d573fe7e0c658/training-output/trainer-summary.json",
+      "sha256": null,
+      "size": 2292
+    },
+    {
+      "candidate": "yolox-pose",
+      "path": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/6579b982ffb4daabce421d947f0e2d3625cfcf63252c8f033b7d573fe7e0c658/training-output/training/repeat-0/epoch_50.pth",
+      "sha256": "f515851d71a992f9cdc8244ed5b9eed819d99e5122e26df7c15edaa8b5991ace",
+      "size": 178501167
+    },
+    {
+      "candidate": "yolox-pose",
+      "path": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/6579b982ffb4daabce421d947f0e2d3625cfcf63252c8f033b7d573fe7e0c658/training-output/training/repeat-0/yolox-pose-card.py",
+      "sha256": null,
+      "size": 16358
+    },
+    {
+      "candidate": "yolox-pose",
+      "path": "geometry/yolox-pose/a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc/6579b982ffb4daabce421d947f0e2d3625cfcf63252c8f033b7d573fe7e0c658/training-output/yolox-pose-card.py",
+      "sha256": null,
+      "size": 3081
+    }
+  ]
+}

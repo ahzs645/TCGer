@@ -16,6 +16,10 @@ import numpy as np
 from PIL import Image
 
 from train_yolo_pose import load_json, sha256_file
+from training_geometry import (
+    MissingInstanceBox, context_margins, context_policy_from_environment,
+    has_corner_supervision, instance_box, validate_instance_boxes,
+)
 
 
 MODEL_NAME = "fastvit_t8.apple_in1k"
@@ -90,10 +94,17 @@ def build_targets(
     heatmap = np.zeros((1, output_size, output_size), dtype=np.float32)
     corners = np.zeros((8, output_size, output_size), dtype=np.float32)
     mask = np.zeros((1, output_size, output_size), dtype=np.float32)
+    negative_mask = np.ones_like(mask)
     geometry = letterbox_geometry(width, height, margins, resolution)
     for instance in instances:
         values = instance.get("corners") or []
-        if len(values) != 4 or any(not corner.get("coordinateKnown") for corner in values):
+        if not has_corner_supervision(instance):
+            left, top, right, bottom = instance_box(instance)
+            left, top = input_point({"x": left, "y": top}, width, height, margins, geometry, resolution)
+            right, bottom = input_point({"x": right, "y": bottom}, width, height, margins, geometry, resolution)
+            x0, y0 = max(0, math.floor(left * output_size)), max(0, math.floor(top * output_size))
+            x1, y1 = min(output_size, math.ceil(right * output_size)), min(output_size, math.ceil(bottom * output_size))
+            negative_mask[:, y0:y1, x0:x1] = 0
             continue
         points = [
             input_point(corner["point"], width, height, margins, geometry, resolution)
@@ -112,7 +123,7 @@ def build_targets(
         draw_gaussian(heatmap[0], (cell_x, cell_y), gaussian_radius(card_width, card_height))
         corners[:, cell_y, cell_x] = np.asarray(points, dtype=np.float32).reshape(-1)
         mask[0, cell_y, cell_x] = 1
-    return {"heatmap": heatmap, "corners": corners, "mask": mask}
+    return {"heatmap": heatmap, "corners": corners, "mask": mask, "negativeMask": negative_mask}
 
 
 def _release_entries(release: Path, split: str) -> list[dict[str, Any]]:
@@ -120,13 +131,26 @@ def _release_entries(release: Path, split: str) -> list[dict[str, Any]]:
     return [entry for entry in manifest["records"] if entry["split"] == split]
 
 
-def make_dataset(release: Path, split: str, resolution: int, seed: int):
+def make_dataset(release: Path, split: str, resolution: int, seed: int,
+                 real_context_policy: dict[str, Any] | None = None):
     import torch
     from torch.utils.data import Dataset
 
     class GeometryDataset(Dataset):
         def __init__(self) -> None:
-            self.entries = _release_entries(release, split)
+            self.entries = []
+            self.skipped_missing_box = []
+            for entry in _release_entries(release, split):
+                record = load_json(release / entry["path"])
+                context_margins(record, real_context_policy)
+                try:
+                    validate_instance_boxes(record["instances"])
+                except MissingInstanceBox:
+                    self.skipped_missing_box.append(entry["recordId"])
+                    continue
+                self.entries.append(entry)
+            if not self.entries:
+                raise ValueError(f"no usable records in {split}")
 
         def __len__(self) -> int:
             return len(self.entries)
@@ -134,16 +158,13 @@ def make_dataset(release: Path, split: str, resolution: int, seed: int):
         def __getitem__(self, index: int):
             entry = self.entries[index]
             record = load_json(release / entry["path"])
-            if record["source"]["kind"] != "synthetic":
-                raise ValueError(f"{split} must be synthetic: {entry['recordId']}")
-            margins = {
-                name: int(record["synthetic"]["contextMarginPixels"][name])
-                for name in ("left", "top", "right", "bottom")
-            }
+            margins = context_margins(record, real_context_policy)
             source = release / record["source"]["path"]
             with Image.open(source) as opened:
                 image = opened.convert("RGB")
             width, height = image.size
+            if (width, height) != (record["source"]["width"], record["source"]["height"]):
+                raise ValueError(f"image dimensions disagree with record: {entry['recordId']}")
             geometry = letterbox_geometry(width, height, margins, resolution)
             padded = Image.new(
                 "RGB",
@@ -191,13 +212,30 @@ def build_model(base_checkpoint: Path | None):
     import timm
     import torch.nn as nn
     from timm.models import load_checkpoint
+    from timm.models._features import FeatureListNet
 
     class FourCornerModel(nn.Module):
         def __init__(self) -> None:
             super().__init__()
-            self.backbone = timm.create_model(MODEL_NAME, pretrained=False, features_only=True)
+            self.checkpoint_load_report = None
             if base_checkpoint is not None:
-                load_checkpoint(self.backbone, str(base_checkpoint), strict=False)
+                # Load the classification checkpoint before timm flattens the
+                # feature module names (stem.0 -> stem_0, stages.0 -> stages_0).
+                # Loading directly into features_only with strict=False silently
+                # matched zero weights in the original trainer.
+                classifier = timm.create_model(MODEL_NAME, pretrained=False)
+                incompatible = load_checkpoint(classifier, str(base_checkpoint), strict=True)
+                self.checkpoint_load_report = {
+                    "checkpointSha256": sha256_file(base_checkpoint),
+                    "matchedKeys": sorted(classifier.state_dict()),
+                    "missingKeys": list(incompatible.missing_keys),
+                    "unexpectedKeys": list(incompatible.unexpected_keys),
+                    "loadOrder": "strict classification load before feature extraction",
+                }
+                self.backbone = FeatureListNet(classifier, out_indices=(0, 1, 2, 3), flatten_sequential=True)
+                self.checkpoint_load_report["retainedFeatureKeys"] = sorted(self.backbone.state_dict())
+            else:
+                self.backbone = timm.create_model(MODEL_NAME, pretrained=False, features_only=True)
             channels = self.backbone.feature_info.channels()[-1]
             self.decoder = nn.Sequential(
                 nn.Conv2d(channels, 256, 3, padding=1),
@@ -221,7 +259,7 @@ def build_model(base_checkpoint: Path | None):
     return FourCornerModel()
 
 
-def focal_loss(logits, targets):
+def focal_loss(logits, targets, negative_mask=None):
     import torch
 
     predictions = logits.sigmoid().clamp(1e-4, 1 - 1e-4)
@@ -230,6 +268,8 @@ def focal_loss(logits, targets):
     negative_weight = (1 - targets).pow(4)
     positive_loss = -torch.log(predictions) * (1 - predictions).pow(2) * positive
     negative_loss = -torch.log(1 - predictions) * predictions.pow(2) * negative_weight * negative
+    if negative_mask is not None:
+        negative_loss = negative_loss * negative_mask
     count = positive.sum().clamp(min=1)
     return (positive_loss.sum() + negative_loss.sum()) / count
 
@@ -247,7 +287,7 @@ def run_epoch(model, loader, optimizer, device: str) -> float:
         target = {name: value.to(device, non_blocking=True) for name, value in target.items()}
         with torch.set_grad_enabled(training):
             heatmap, corners = model(images)
-            heatmap_loss = focal_loss(heatmap, target["heatmap"])
+            heatmap_loss = focal_loss(heatmap, target["heatmap"], target["negativeMask"])
             mask = target["mask"].expand_as(corners)
             corner_loss = functional.smooth_l1_loss(
                 corners.sigmoid() * mask, target["corners"] * mask, reduction="sum"
@@ -289,8 +329,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     )
     if sha256_file(base) != args.base_sha256:
         raise ValueError("FastViT base checkpoint SHA-256 mismatch")
-    train_dataset = make_dataset(release, "train", resolution, seed)
-    validation_dataset = make_dataset(release, "validation", resolution, seed)
+    real_context_policy = context_policy_from_environment()
+    train_dataset = make_dataset(release, "train", resolution, seed, real_context_policy)
+    validation_dataset = make_dataset(release, "validation", resolution, seed, real_context_policy)
     generator = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(
         train_dataset,
@@ -312,11 +353,18 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     training_dir = output / "training" / "repeat-0"
     training_dir.mkdir(parents=True)
+    (training_dir / "checkpoint-load.json").write_text(
+        json.dumps(model.checkpoint_load_report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(json.dumps({"checkpointLoad": model.checkpoint_load_report}), flush=True)
     best_loss = math.inf
     history = []
     for epoch in range(epochs):
         train_loss = run_epoch(model, train_loader, optimizer, "cuda")
         validation_loss = run_epoch(model, validation_loader, None, "cuda")
+        learning_rate = optimizer.param_groups[0]["lr"]
+        if not math.isfinite(train_loss) or not math.isfinite(validation_loss):
+            raise RuntimeError(f"non-finite loss at epoch {epoch + 1}")
         scheduler.step()
         state = {
             "model": model.state_dict(),
@@ -329,10 +377,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         if validation_loss < best_loss:
             best_loss = validation_loss
             torch.save(state, training_dir / "best.pt")
-        history.append({"epoch": epoch + 1, "trainLoss": train_loss, "validationLoss": validation_loss})
-    (training_dir / "history.json").write_text(
-        json.dumps(history, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+        history.append({"epoch": epoch + 1, "trainLoss": train_loss, "validationLoss": validation_loss,
+                        "learningRate": learning_rate})
+        temporary = training_dir / "history.json.tmp"
+        temporary.write_text(json.dumps(history, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary.replace(training_dir / "history.json")
+        print(json.dumps(history[-1]), flush=True)
     summary = {
         "schema": "https://tcger.app/reports/fastvit-four-corner-training/v1",
         "candidate": "fastvit-t8-four-corner",
@@ -357,12 +407,16 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         },
         "counts": {"trainRecords": len(train_dataset), "validationRecords": len(validation_dataset)},
         "bestValidationLoss": best_loss,
+        "realContextMarginPolicy": real_context_policy,
+        "skippedMissingBox": {"train": train_dataset.skipped_missing_box,
+                              "validation": validation_dataset.skipped_missing_box},
         "artifacts": {
             name: {"path": str(path.relative_to(output)), "sha256": sha256_file(path)}
             for name, path in (
                 ("best", training_dir / "best.pt"),
                 ("last", training_dir / "last.pt"),
                 ("history", training_dir / "history.json"),
+                ("checkpointLoad", training_dir / "checkpoint-load.json"),
             )
         },
     }

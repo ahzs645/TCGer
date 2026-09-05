@@ -22,6 +22,11 @@ from typing import Any
 
 from PIL import Image
 
+from training_geometry import (
+    MissingInstanceBox, context_margins, context_policy_from_environment,
+    has_corner_supervision, instance_box, validate_instance_boxes,
+)
+
 
 VISIBILITY = {"visible": 2, "occluded": 1, "outsideFrame": 1}
 
@@ -55,9 +60,13 @@ def yolo_line(
     instance: dict[str, Any], width: int, height: int, margins: dict[str, int]
 ) -> str | None:
     corners = instance.get("corners") or []
-    if len(corners) != 4 or any(not corner.get("coordinateKnown") for corner in corners):
-        return None
-    keypoints = [padded_point(corner["point"], width, height, margins) for corner in corners]
+    known = has_corner_supervision(instance)
+    if known:
+        keypoints = [padded_point(corner["point"], width, height, margins) for corner in corners]
+    else:
+        left, top, right, bottom = instance_box(instance)
+        keypoints = [padded_point({"x": x, "y": y}, width, height, margins)
+                     for x, y in ((left, top), (right, bottom))]
     if any(not (0 <= x <= 1 and 0 <= y <= 1) for x, y in keypoints):
         raise ValueError(
             f"context margin does not contain {instance.get('instanceId', 'instance')}"
@@ -75,7 +84,9 @@ def yolo_line(
         right - left,
         bottom - top,
     ]
-    for corner, (x, y) in zip(corners, keypoints):
+    if not known:
+        values.extend([0, 0, 0] * 4)
+    for corner, (x, y) in zip(corners if known else [], keypoints):
         visibility = corner.get("visibility")
         if visibility not in VISIBILITY:
             raise ValueError(f"unsupported known-corner visibility: {visibility!r}")
@@ -85,7 +96,9 @@ def yolo_line(
     )
 
 
-def materialize_yolo(release: Path, destination: Path) -> dict[str, Any]:
+def materialize_yolo(
+    release: Path, destination: Path, real_context_policy: dict[str, Any] | None = None
+) -> dict[str, Any]:
     manifest = load_json(release / "manifest.json")
     counts: Counter[str] = Counter()
     destination.mkdir(parents=True, exist_ok=False)
@@ -97,12 +110,12 @@ def materialize_yolo(release: Path, destination: Path) -> dict[str, Any]:
         if split not in {"train", "validation"}:
             continue
         record = load_json(release / entry["path"])
-        if record["source"]["kind"] != "synthetic":
-            raise ValueError(f"{split} must be synthetic in v1: {entry['recordId']}")
-        margins = {
-            name: int(record["synthetic"]["contextMarginPixels"][name])
-            for name in ("left", "top", "right", "bottom")
-        }
+        margins = context_margins(record, real_context_policy)
+        try:
+            validate_instance_boxes(record["instances"])
+        except MissingInstanceBox:
+            counts[f"recordsSkippedMissingBox:{split}"] += 1
+            continue
         source = release / record["source"]["path"]
         with Image.open(source) as opened:
             image = opened.convert("RGB")
@@ -126,10 +139,6 @@ def materialize_yolo(release: Path, destination: Path) -> dict[str, Any]:
             if line is not None:
                 lines.append(line)
                 counts[f"instances:{split}"] += 1
-        if not lines:
-            image_target.unlink()
-            counts[f"recordsSkippedNoKnownCorners:{split}"] += 1
-            continue
         (destination / "labels" / split / f"{entry['recordId']}.txt").write_text(
             "\n".join(lines) + "\n", encoding="utf-8"
         )
@@ -147,6 +156,7 @@ def materialize_yolo(release: Path, destination: Path) -> dict[str, Any]:
         raise ValueError(f"materialized dataset is incomplete: {dict(counts)}")
     return {
         "corpusHash": manifest["corpusHash"],
+        "realContextMarginPolicy": real_context_policy,
         "counts": dict(sorted(counts.items())),
         "contextPadding": {
             "order": "source -> black context padding -> Ultralytics letterbox",
@@ -184,7 +194,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("one Job invocation trains exactly one resolved repeat")
 
     dataset = output / "yolo-dataset"
-    materialization = materialize_yolo(release, dataset)
+    materialization = materialize_yolo(release, dataset, context_policy_from_environment())
     base = output / f"base-{args.candidate}.pt"
     download_verified(args.base_url, args.base_sha256, base)
 

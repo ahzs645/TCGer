@@ -129,7 +129,8 @@ def candidate_result(
 
 
 class Predictor:
-    def __init__(self, candidate: str, output: Path, artifact_sha256: str, resolution: int) -> None:
+    def __init__(self, candidate: str, output: Path, artifact_sha256: str, resolution: int, device: str = "cuda") -> None:
+        self.device = device
         self.candidate = candidate
         self.output = output
         self.artifact_sha256 = artifact_sha256
@@ -145,7 +146,7 @@ class Predictor:
             from export_geometry_candidate import load_fastvit
 
             checkpoint = find_one(output, ("training/repeat-0/best.pt", "**/best.pt"))
-            self.model = load_fastvit(checkpoint).cuda()
+            self.model = load_fastvit(checkpoint).to(device)
             self.model.eval()
             self.torch = torch
         else:
@@ -153,7 +154,7 @@ class Predictor:
 
             checkpoint = find_one(output, ("training/repeat-0/*.pth", "**/*.pth"))
             config = find_one(output, ("yolox-pose-card.py", "**/yolox-pose-card.py"))
-            self.model = init_detector(str(config), str(checkpoint), device="cuda:0")
+            self.model = init_detector(str(config), str(checkpoint), device=device)
             configure_yolox_test(self.model)
 
     def predict_yolo(self, image: Image.Image, width: int, height: int) -> list[dict[str, Any]]:
@@ -204,7 +205,7 @@ class Predictor:
         pixels = (pixels - np.asarray([0.485, 0.456, 0.406])[:, None, None]) / np.asarray(
             [0.229, 0.224, 0.225]
         )[:, None, None]
-        tensor = torch.from_numpy(pixels.astype(np.float32)).unsqueeze(0).cuda()
+        tensor = torch.from_numpy(pixels.astype(np.float32)).unsqueeze(0).to(self.device)
         with torch.no_grad():
             heatmap_logits, corner_logits = self.model(tensor)
             heatmap = heatmap_logits.sigmoid()

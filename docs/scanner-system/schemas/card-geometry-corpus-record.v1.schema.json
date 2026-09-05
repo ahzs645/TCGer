@@ -194,6 +194,18 @@
         "side": { "enum": ["faceUp", "faceDown", "unknown"] },
         "container": { "enum": ["rawCard", "slab", "unknown"] },
         "visibleMask": { "$ref": "#/$defs/visibleMask" },
+        "box": {
+          "description": "Visible card bounding box in normalized source coordinates; supplies detection supervision when corners are unknown.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["left", "top", "right", "bottom"],
+          "properties": {
+            "left": { "type": "number", "minimum": 0, "maximum": 1 },
+            "top": { "type": "number", "minimum": 0, "maximum": 1 },
+            "right": { "type": "number", "minimum": 0, "maximum": 1 },
+            "bottom": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
         "occlusionOrder": { "type": "integer", "minimum": 0 },
         "physicalCardId": { "$ref": "#/$defs/id" },
         "sourceAssetId": { "$ref": "#/$defs/id" }

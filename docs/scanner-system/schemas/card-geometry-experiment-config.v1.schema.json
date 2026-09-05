@@ -132,6 +132,17 @@
           }
         },
         "augmentationProfile": { "$ref": "#/$defs/id" },
+        "realContextMarginPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "fraction", "rounding", "application"],
+          "properties": {
+            "kind": { "const": "fraction-of-long-side" },
+            "fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+            "rounding": { "const": "ceil" },
+            "application": { "const": "each-side" }
+          }
+        },
         "seedPolicy": {
           "type": "object",
           "additionalProperties": false,
