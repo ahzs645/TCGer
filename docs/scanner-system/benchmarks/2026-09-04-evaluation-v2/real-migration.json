@@ -1,0 +1,19 @@
+{
+  "imageBytesIdentical": true,
+  "imagesVerified": 600,
+  "immutableManifestPayloadSha256": "b40b5b0d1beef5a0db6d6da3bd0e1672bdce305115766855ef75ff13161b8f37",
+  "predecessor": {
+    "corpusHash": "7a75cc5ba2f0ac429136fa67f75b473e09c05f6edaee112bf0f5b1ba701a188a",
+    "releaseId": "real-geometry-evaluation-v6-full"
+  },
+  "preflightFailedChecks": [],
+  "recordBytesIdentical": true,
+  "recordsVerified": 600,
+  "sceneSlicesIdentical": true,
+  "schema": "https://tcger.app/reports/evaluation-release-migration/v1",
+  "splitsIdentical": true,
+  "successor": {
+    "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "releaseId": "real-geometry-evaluation-v6-full-aliases-v2"
+  }
+}

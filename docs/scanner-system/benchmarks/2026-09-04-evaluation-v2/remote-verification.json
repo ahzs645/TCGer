@@ -1,0 +1,20 @@
+{
+  "checks": {
+    "real-geometry-evaluation-v6-full-aliases-v2": {
+      "filesVerified": 1201,
+      "predecessorPath": "geometry/releases/real-geometry-evaluation-v6-full",
+      "recordImagePolicyBytesIdentical": true,
+      "successorPath": "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2"
+    },
+    "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2": {
+      "filesVerified": 2001,
+      "predecessorPath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1",
+      "recordImagePolicyBytesIdentical": true,
+      "successorPath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+    }
+  },
+  "comparison": "Exact relative path, Git blob ID, LFS SHA-256 and size for every record, image and policy file",
+  "datasetRepo": "ahzs645/tcger-scanner-images",
+  "predecessorRevision": "cd6ddd62c77d9597a3c94d168834e7a11d39cba4",
+  "successorRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2"
+}

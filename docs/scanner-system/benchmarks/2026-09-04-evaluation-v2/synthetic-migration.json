@@ -1,0 +1,19 @@
+{
+  "imageBytesIdentical": true,
+  "imagesVerified": 1000,
+  "immutableManifestPayloadSha256": "b4a84fdc81bc2a013c1f950bfbf9fd561843df37d8d57d969b0889276375f3b1",
+  "predecessor": {
+    "corpusHash": "bda45771be01d50bde130b6a68afe91ad509154df9aa26050f9cfdf30aad809a",
+    "releaseId": "synthetic-geometry-multigame-bakeoff-eval-v1"
+  },
+  "preflightFailedChecks": [],
+  "recordBytesIdentical": true,
+  "recordsVerified": 1000,
+  "sceneSlicesIdentical": true,
+  "schema": "https://tcger.app/reports/evaluation-release-migration/v1",
+  "splitsIdentical": true,
+  "successor": {
+    "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+    "releaseId": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+  }
+}

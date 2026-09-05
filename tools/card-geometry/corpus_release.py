@@ -27,7 +27,7 @@ MANIFEST_SCHEMA_FILE = "card-geometry-release-manifest.v1.schema.json"
 POLICY_SCHEMA_FILE = "card-geometry-readiness-policy.v1.schema.json"
 RECORD_SCHEMA_FILE = "card-geometry-corpus-record.v1.schema.json"
 
-MANIFEST_SCHEMA_ID = "https://tcger.app/schemas/card-geometry-release-manifest/v1"
+MANIFEST_SCHEMA_ID = "https://tcger.app/schemas/card-geometry-release-manifest/v2"
 POLICY_SCHEMA_ID = "https://tcger.app/schemas/card-geometry-readiness-policy/v1"
 RECORD_SCHEMA_ID = "https://tcger.app/schemas/card-geometry-corpus-record/v1"
 REPORT_SCHEMA_ID = "https://tcger.app/schemas/card-geometry-preflight-report/v1"

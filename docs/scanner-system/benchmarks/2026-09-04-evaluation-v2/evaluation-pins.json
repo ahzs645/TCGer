@@ -1,0 +1,14 @@
+{
+  "frozenRealV3": {
+    "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+    "releasePath": "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2"
+  },
+  "syntheticDuelField": {
+    "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+    "releasePath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+  }
+}

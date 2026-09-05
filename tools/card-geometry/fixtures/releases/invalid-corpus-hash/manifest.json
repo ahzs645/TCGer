@@ -81,7 +81,7 @@
   ],
   "releaseId": "fixture-release-v1",
   "releasePurpose": "fixture",
-  "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v1",
+  "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v2",
   "sourceArchiveAliases": {
     "fixture-compositor": "fixture-compositor",
     "fixture-devmode-test": "fixture-devmode-test",

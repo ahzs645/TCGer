@@ -1,0 +1,17 @@
+{
+  "datasetRepo": "ahzs645/tcger-scanner-images",
+  "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+  "releases": {
+    "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2": {
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "files": 1206,
+      "manifestSha256": "c7418b1331c5b16630f302cd62a64a847459a87ba1804b3123f1b2e7518ad879"
+    },
+    "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2": {
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "files": 2008,
+      "manifestSha256": "bcda571129b3d4d8b993ff4f0e9f60bc2eab8b1794ce714347be7aedcb4c723f"
+    }
+  },
+  "schema": "https://tcger.app/reports/card-geometry-release-publication/v1"
+}

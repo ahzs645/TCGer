@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tcger.app/schemas/card-geometry-release-manifest/v1",
-  "title": "TCGer CardGeometryReleaseManifest v1",
+  "$id": "https://tcger.app/schemas/card-geometry-release-manifest/v2",
+  "title": "TCGer CardGeometryReleaseManifest v2",
   "description": "One immutable card-geometry corpus release: every record and image with its hash, the split and leakage keys of each record, the readiness policy the release binds to, and the purpose the release may be used for. The manifest is the unit a preflight validates and a training job pins.",
   "type": "object",
   "additionalProperties": false,
@@ -18,9 +18,19 @@
   ],
   "properties": {
     "schema": {
-      "const": "https://tcger.app/schemas/card-geometry-release-manifest/v1"
+      "const": "https://tcger.app/schemas/card-geometry-release-manifest/v2"
     },
     "releaseId": { "$ref": "#/$defs/id" },
+    "supersedes": {
+      "description": "Predecessor identity for a verified metadata-only evaluation successor. Both hashes travel with benchmark reports.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseId", "corpusHash"],
+      "properties": {
+        "releaseId": { "$ref": "#/$defs/id" },
+        "corpusHash": { "$ref": "#/$defs/sha256" }
+      }
+    },
     "releasePurpose": {
       "description": "What this release may authorize. `fixture` and `smoke` releases exercise tooling only and can never make a preflight report `readyFor: training`, regardless of how small the bound readiness policy's minimums are.",
       "enum": ["fixture", "smoke", "training"]

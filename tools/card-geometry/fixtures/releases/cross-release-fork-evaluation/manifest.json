@@ -1,0 +1,46 @@
+{
+  "corpusHash": "5a819dca8813f08e2df1b50af47bed655d4c142350d119619a462d6ca627ff6b",
+  "evaluationSessionDenylist": [
+    "scan-session-20260829-200235"
+  ],
+  "readiness": {
+    "readinessPolicyId": "fixture-minimums-v1",
+    "readinessPolicyPath": "policy.json",
+    "readinessPolicySha256": "d82384bd18a3facb0faffa90a7ca35d686ad49e1ff3022e1d7038dcc5434ae0e"
+  },
+  "records": [
+    {
+      "images": [
+        {
+          "path": "images/fx-test-real-001.png",
+          "sha256": "99a9aaa8bfef1ccfcd159653512726097fbd0b7bebe001fdf4b3946737c9d77b"
+        }
+      ],
+      "leakageKeys": {
+        "physicalCardIds": [
+          "physical-card-200"
+        ],
+        "sessionId": "scan-session-20260829-200235",
+        "sourceArchiveId": "card-seg-j74w1",
+        "sourceAssetIds": [],
+        "sourceKind": "real"
+      },
+      "path": "records/fx-test-real-001.json",
+      "recordId": "fx-test-real-001",
+      "sceneSlice": "single_handheld",
+      "sha256": "bb68442e12a77f3ad3806870ec967d250de43863468786029261e9a47544634e",
+      "sourceTier": "shippable",
+      "split": "test"
+    }
+  ],
+  "releaseId": "cross-release-fork-test",
+  "releasePurpose": "fixture",
+  "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v2",
+  "sourceArchiveAliases": {
+    "card-seg-j74w1": "card-seg-j74w1"
+  },
+  "splitAssignment": {
+    "method": "fixture-hand-assigned",
+    "seed": 0
+  }
+}

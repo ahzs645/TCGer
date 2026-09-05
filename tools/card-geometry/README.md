@@ -24,7 +24,8 @@ Raw-tensor fixtures are model-specific and belong to the later export step.
 ## Corpus releases and the preflight
 
 A corpus release is a directory with `manifest.json`
-(`card-geometry-release-manifest.v1`), the readiness policy it binds to
+(`https://tcger.app/schemas/card-geometry-release-manifest/v2`, in the existing
+`card-geometry-release-manifest.v1.schema.json` file), the readiness policy it binds to
 (`card-geometry-readiness-policy.v1`), record files
 (`card-geometry-corpus-record.v1`), and images. Split, scene slice, and
 leakage keys live in the manifest; the record schema is unchanged.
@@ -50,6 +51,39 @@ split/revision or session identity. Combining releases preserves aliases and
 rejects conflicting mappings; slicing preserves the table. Existing frozen
 releases without this field fail the updated schema and need a new release
 with reviewed aliases and a new hash, rather than edits to frozen bytes.
+
+### Frozen evaluation successors
+
+`migrate_evaluation_release.py` creates a metadata-only v2 evaluation successor
+and verifies it against an explicitly pinned predecessor corpus hash. Records,
+image bytes and hashes, splits, scene slices, readiness policy, and all other
+evaluation payload fields must remain unchanged. The only manifest changes
+allowed are `schema`, `releaseId`, `supersedes`, `sourceArchiveAliases`, and
+`corpusHash`; the first three identify the schema migration and lineage.
+Aliases must be exact self-mappings of the predecessor archive IDs.
+
+```sh
+python3 tools/card-geometry/migrate_evaluation_release.py \
+  --predecessor /path/to/frozen-evaluation \
+  --successor /path/to/evaluation-aliases-v2 \
+  --expected-predecessor-hash PREDECESSOR_CORPUS_SHA256 \
+  --release-id evaluation-aliases-v2 \
+  --report /path/to/migration-report.json
+```
+
+Use `--verify-only` with both release roots and the predecessor pin to repeat
+the byte checks without creating a release. `benchmark_geometry.py` reports the
+successor `corpusHash`, `predecessorCorpusHash`, and full `supersedes` identity.
+
+Before any training command, `run_card_geometry_hf_job.py` downloads and
+preflights every pinned evaluation release, even if no post-training evaluation
+command is configured. `CROSS_RELEASE_LEAKAGE_DISJOINT` compares all records in
+the training release (including its validation/test records) against each
+evaluation release for canonical archive, session, source-asset, and physical-card
+overlap. Alias knowledge is merged across releases; conflicting mappings fail
+closed. The local job output includes `cross-release-leakage.json`. The fixture
+pair `cross-release-fork-training` / `cross-release-fork-evaluation` passes each
+release's own preflight but fails this cross-release gate.
 
 `preflight.py` validates a release and writes one JSON report with a
 structured `checks` list. Check codes, in report order:

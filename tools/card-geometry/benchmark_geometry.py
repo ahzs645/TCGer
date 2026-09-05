@@ -657,6 +657,8 @@ def benchmark(
     report = {
         "schema": REPORT_SCHEMA_ID,
         "corpusHash": manifest["corpusHash"],
+        "predecessorCorpusHash": manifest.get("supersedes", {}).get("corpusHash"),
+        "supersedes": manifest.get("supersedes"),
         "releaseId": manifest["releaseId"],
         "releasePurpose": manifest["releasePurpose"],
         "predictionsSha256": sha256_file(predictions_path),

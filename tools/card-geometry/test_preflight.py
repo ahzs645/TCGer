@@ -67,6 +67,13 @@ class ReleaseSchemaTests(unittest.TestCase):
             with self.subTest(policy=policy["policyId"]):
                 self.assertEqual(validation_errors(validator, policy), [])
 
+    def test_v2_manifest_rejects_v1_schema_identity(self):
+        schema = load_schema(MANIFEST_SCHEMA_FILE)
+        self.assertEqual(schema["$id"], "https://tcger.app/schemas/card-geometry-release-manifest/v2")
+        manifest = load_json(RELEASES_DIR / "valid-fixture" / "manifest.json")
+        manifest["schema"] = "https://tcger.app/schemas/card-geometry-release-manifest/v1"
+        self.assertTrue(validation_errors(make_validator(schema), manifest))
+
     def test_manifest_schema_rejects_parent_traversal_paths(self):
         validator = make_validator(load_schema(MANIFEST_SCHEMA_FILE))
         manifest = load_json(RELEASES_DIR / "valid-fixture" / "manifest.json")

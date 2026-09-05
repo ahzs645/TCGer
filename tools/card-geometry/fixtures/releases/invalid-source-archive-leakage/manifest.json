@@ -1,5 +1,5 @@
 {
-  "corpusHash": "7c448fb73dd34375629e1dca6efa99984154865a58347369850115eb29b7fc32",
+  "corpusHash": "b6d480239f12f651caed102ff736d208a4cb6031b1ed2e77a0a3adc6874a68d4",
   "evaluationSessionDenylist": [
     "scan-session-20260829-200235"
   ],
@@ -81,7 +81,7 @@
   ],
   "releaseId": "fixture-release-v1",
   "releasePurpose": "fixture",
-  "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v1",
+  "schema": "https://tcger.app/schemas/card-geometry-release-manifest/v2",
   "sourceArchiveAliases": {
     "fixture-compositor": "fixture-compositor",
     "fixture-devmode-validation": "fixture-devmode-validation"

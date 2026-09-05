@@ -33,6 +33,7 @@ from corpus_release import (
     REPOSITORY,
     SCHEMAS_DIR,
     canonical_json,
+    leakage_keys_from_record,
     load_json,
     make_validator,
     pretty_json,
@@ -382,7 +383,69 @@ def _download_evaluation_release(
     destination = work / "evaluations" / name
     destination.parent.mkdir(parents=True, exist_ok=True)
     materialize_downloaded_release(source, destination)
+    report = run_preflight(destination, expectations=Expectations(corpus_hash=release["corpusHash"]))
+    if report["failedChecks"]:
+        raise RuntimeError(f"pinned {name} evaluation preflight failed: {report['failedChecks']}")
     return destination
+
+
+def check_cross_release_leakage(
+    training: Path, evaluations: dict[str, Path]
+) -> dict[str, Any]:
+    """Compare all records in preflighted releases, including held-out records.
+
+    Merge alias knowledge before deriving keys, so a fork cannot become an
+    independent archive just because it is described in a different release.
+    Contradictory alias declarations fail closed.
+    """
+    roots = {"training": training, **evaluations}
+    manifests = {name: load_json(root / "manifest.json") for name, root in roots.items()}
+    aliases: dict[str, str] = {}
+    conflicts: dict[str, list[str]] = {}
+    for manifest in manifests.values():
+        for alias, canonical in manifest["sourceArchiveAliases"].items():
+            if alias in aliases and aliases[alias] != canonical:
+                conflicts[alias] = sorted({aliases[alias], canonical})
+            else:
+                aliases[alias] = canonical
+    keys_by_release: dict[str, set[tuple[str, str]]] = {}
+    for name, root in roots.items():
+        keys: set[tuple[str, str]] = set()
+        for entry in manifests[name]["records"]:
+            derived = leakage_keys_from_record(load_json(root / entry["path"]), aliases)
+            keys.add(("sourceArchiveId", derived["sourceArchiveId"]))
+            if derived.get("sessionId"):
+                keys.add(("sessionId", derived["sessionId"]))
+            for kind in ("sourceAssetId", "physicalCardId"):
+                keys.update((kind, value) for value in derived[f"{kind}s"])
+        keys_by_release[name] = keys
+    leaks = {
+        name: sorted(f"{kind}:{value}" for kind, value in keys_by_release["training"] & keys_by_release[name])
+        for name in evaluations
+    }
+    return {
+        "schema": "https://tcger.app/reports/card-geometry-cross-release-leakage/v1",
+        "failedChecks": ["CROSS_RELEASE_LEAKAGE_DISJOINT"] if conflicts or any(leaks.values()) else [],
+        "corpusHashes": {name: manifest["corpusHash"] for name, manifest in manifests.items()},
+        "archiveAliasConflicts": conflicts,
+        "leaks": leaks,
+    }
+
+
+def prepare_training_evaluations(
+    resolved: dict[str, Any], training: Path, token: str, work: Path, output: Path
+) -> dict[str, Path]:
+    """Gate every training command, even when no post-training scorer is set."""
+    evaluations = {
+        name: _download_evaluation_release(spec, token, work, name)
+        for name, spec in resolved["evaluations"].items()
+        if isinstance(spec, dict) and "releasePath" in spec
+    }
+    report = check_cross_release_leakage(training, evaluations)
+    (output / "cross-release-leakage.json").write_text(pretty_json(report), encoding="utf-8")
+    if report["failedChecks"]:
+        raise RuntimeError(f"CROSS_RELEASE_LEAKAGE_DISJOINT failed: {report['leaks']}; aliases={report['archiveAliasConflicts']}")
+    return evaluations
 
 
 def _download_recognition_models(resolved: dict[str, Any], token: str, work: Path) -> Path:
@@ -534,6 +597,7 @@ def execute(
     started = time.monotonic()
     if action == "train":
         release, preflight = _download_and_preflight(resolved, token, work)
+        evaluation_roots = prepare_training_evaluations(resolved, release, token, work, output)
         env["TCGER_GEOMETRY_RELEASE_ROOT"] = str(release)
         preflight_oid = _upload_json(
             api,
@@ -561,15 +625,8 @@ def execute(
 
     _run(command, env=env)
     if action == "train" and resolved["execution"].get("evaluationCommand"):
-        real = _download_evaluation_release(
-            resolved["evaluations"]["frozenRealV3"], token, work, "real-v3"
-        )
-        synthetic = _download_evaluation_release(
-            resolved["evaluations"]["syntheticDuelField"],
-            token,
-            work,
-            "synthetic-duel-field",
-        )
+        real = evaluation_roots["frozenRealV3"]
+        synthetic = evaluation_roots["syntheticDuelField"]
         env["TCGER_GEOMETRY_EVAL_REAL_ROOT"] = str(real)
         env["TCGER_GEOMETRY_EVAL_REAL_HASH"] = resolved["evaluations"][
             "frozenRealV3"

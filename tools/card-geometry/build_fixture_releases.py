@@ -418,7 +418,38 @@ def build_empty_training(root: Path) -> None:
     materialize(root, release)
 
 
+def _cross_release_fixture(root: Path, *, training: bool) -> None:
+    release = base_release()
+    split = "train" if training else "test"
+    release["releaseId"] = f"cross-release-fork-{split}"
+    release["records"] = [release["records"][1 if training else 2]]
+    item = release["records"][0]
+    item["split"] = split
+    item["record"]["grouping"]["sourceArchiveId"] = "card-seg-j74w1-q8yst" if training else "card-seg-j74w1"
+    release["sourceArchiveAliases"] = {"card-seg-j74w1": "card-seg-j74w1"}
+    if training:
+        release["sourceArchiveAliases"]["card-seg-j74w1-q8yst"] = "card-seg-j74w1"
+    policy = release["policy"]
+    policy["requiredSplits"] = [split]
+    for key in ("minimumRecordsPerSplit", "minimumInstancesPerSplit"):
+        policy[key] = {split: 1}
+    policy["minimumMetricEligibleInstances"] = {split: 0}
+    policy["requiredSceneSlices"] = []
+    policy["minimumRealEvaluationSessions"] = 0
+    materialize(root, release)
+
+
+def build_cross_release_fork_training(root: Path) -> None:
+    _cross_release_fixture(root, training=True)
+
+
+def build_cross_release_fork_evaluation(root: Path) -> None:
+    _cross_release_fixture(root, training=False)
+
+
 BUILDERS = {
+    "cross-release-fork-training": build_cross_release_fork_training,
+    "cross-release-fork-evaluation": build_cross_release_fork_evaluation,
     "valid-fixture": build_valid_fixture,
     "invalid-leakage": build_invalid_leakage,
     "invalid-source-archive-leakage": build_invalid_source_archive_leakage,
@@ -433,6 +464,8 @@ BUILDERS = {
 # The exact set of preflight check codes each release must fail. A release that
 # fails anything else, or fails to fail these, breaks the suite.
 EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
+    "cross-release-fork-training": frozenset(),
+    "cross-release-fork-evaluation": frozenset(),
     "valid-fixture": frozenset(),
     "invalid-leakage": frozenset({"LEAKAGE_DISJOINT"}),
     "invalid-source-archive-leakage": frozenset({"LEAKAGE_DISJOINT"}),
@@ -445,6 +478,8 @@ EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
 }
 
 EXPECTED_READY_FOR: dict[str, str] = {
+    "cross-release-fork-training": "tooling",
+    "cross-release-fork-evaluation": "tooling",
     "valid-fixture": "tooling",
     "invalid-leakage": "none",
     "invalid-source-archive-leakage": "none",

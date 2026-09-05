@@ -1,0 +1,64 @@
+{
+  "grouping": {
+    "sessionId": "scan-session-20260829-200235",
+    "sourceArchiveId": "card-seg-j74w1"
+  },
+  "instances": [
+    {
+      "container": "unknown",
+      "corners": [
+        {
+          "coordinateKnown": true,
+          "cornerSource": "human",
+          "point": {
+            "x": 0.25,
+            "y": 0.05
+          },
+          "visibility": "visible"
+        },
+        {
+          "coordinateKnown": true,
+          "cornerSource": "human",
+          "point": {
+            "x": 0.75,
+            "y": 0.05
+          },
+          "visibility": "visible"
+        },
+        {
+          "coordinateKnown": true,
+          "cornerSource": "human",
+          "point": {
+            "x": 0.75,
+            "y": 0.95
+          },
+          "visibility": "visible"
+        },
+        {
+          "coordinateKnown": true,
+          "cornerSource": "human",
+          "point": {
+            "x": 0.25,
+            "y": 0.95
+          },
+          "visibility": "visible"
+        }
+      ],
+      "detectionClass": "card",
+      "instanceId": "card-0",
+      "occlusionOrder": 0,
+      "orientationKnown": false,
+      "physicalCardId": "physical-card-200",
+      "side": "faceUp"
+    }
+  ],
+  "recordId": "fx-test-real-001",
+  "schema": "https://tcger.app/schemas/card-geometry-corpus-record/v1",
+  "source": {
+    "height": 8,
+    "kind": "real",
+    "path": "images/fx-test-real-001.png",
+    "sha256": "99a9aaa8bfef1ccfcd159653512726097fbd0b7bebe001fdf4b3946737c9d77b",
+    "width": 8
+  }
+}

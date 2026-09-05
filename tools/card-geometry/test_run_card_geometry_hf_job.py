@@ -1,18 +1,26 @@
 import copy
 import json
+import shutil
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from corpus_release import (  # noqa: E402
+    RELEASES_DIR,
+    corpus_hash,
+    leakage_keys_from_record,
     load_json,
     load_schema,
     make_validator,
     validation_errors,
+    sha256_file,
+    write_json,
 )
 from run_card_geometry_hf_job import (  # noqa: E402
     CONFIG_SCHEMA_FILE,
@@ -20,6 +28,7 @@ from run_card_geometry_hf_job import (  # noqa: E402
     PublicationBlocked,
     assert_export_allowed,
     checkpoint_prefix,
+    check_cross_release_leakage,
     descriptor,
     execute,
     experiment_hash,
@@ -27,9 +36,115 @@ from run_card_geometry_hf_job import (  # noqa: E402
     fairness_hash,
     materialize_downloaded_release,
     resolve_config,
+    prepare_training_evaluations,
+    _download_evaluation_release,
 )
 
 FIXTURE = ROOT / "fixtures" / "experiment-config.evaluation-only.v1.json"
+
+
+class CrossReleaseLeakageTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.training = self.root / "training"
+        self.evaluation = self.root / "evaluation"
+        shutil.copytree(RELEASES_DIR / "cross-release-fork-training", self.training)
+        shutil.copytree(RELEASES_DIR / "cross-release-fork-evaluation", self.evaluation)
+
+    def test_fork_in_training_leaks_against_evaluation_parent(self):
+        report = check_cross_release_leakage(self.training, {"real": self.evaluation})
+        self.assertEqual(report["failedChecks"], ["CROSS_RELEASE_LEAKAGE_DISJOINT"])
+        self.assertEqual(report["leaks"], {"real": ["sourceArchiveId:card-seg-j74w1"]})
+
+    def test_conflicting_alias_knowledge_fails_closed(self):
+        self._separate_archives()
+        manifest = load_json(self.evaluation / "manifest.json")
+        manifest["sourceArchiveAliases"]["card-seg-j74w1-q8yst"] = "card-seg-j74w1"
+        write_json(self.evaluation / "manifest.json", manifest)
+        self._refresh(self.evaluation)
+        report = check_cross_release_leakage(self.training, {"real": self.evaluation})
+        self.assertEqual(report["failedChecks"], ["CROSS_RELEASE_LEAKAGE_DISJOINT"])
+        self.assertIn("card-seg-j74w1-q8yst", report["archiveAliasConflicts"])
+
+    def test_download_preflight_enforces_evaluation_hash_pin(self):
+        hub = types.SimpleNamespace(snapshot_download=lambda **kwargs: str(self.root))
+        spec = {"datasetRepo": "fixture/repo", "datasetRevision": "a" * 40, "releasePath": "evaluation", "corpusHash": "0" * 64}
+        with patch.dict(sys.modules, {"huggingface_hub": hub}):
+            with self.assertRaisesRegex(RuntimeError, "CORPUS_HASH"):
+                _download_evaluation_release(spec, "unused", self.root / "job", "real")
+
+    def _separate_archives(self):
+        manifest = load_json(self.training / "manifest.json")
+        manifest["sourceArchiveAliases"]["card-seg-j74w1-q8yst"] = "independent-training"
+        manifest["sourceArchiveAliases"]["independent-training"] = "independent-training"
+        write_json(self.training / "manifest.json", manifest)
+        self._refresh(self.training)
+
+    def _refresh(self, root):
+        manifest = load_json(root / "manifest.json")
+        for entry in manifest["records"]:
+            record = load_json(root / entry["path"])
+            entry["sha256"] = sha256_file(root / entry["path"])
+            entry["leakageKeys"] = leakage_keys_from_record(record, manifest["sourceArchiveAliases"])
+        manifest["corpusHash"] = corpus_hash(manifest)
+        write_json(root / "manifest.json", manifest)
+
+    def test_other_leakage_keys_are_independent_of_archive_id(self):
+        self._separate_archives()
+        self.assertEqual(check_cross_release_leakage(self.training, {"real": self.evaluation})["failedChecks"], [])
+        for key in ("sessionId", "sourceAssetId", "physicalCardId"):
+            saved = []
+            for root in (self.training, self.evaluation):
+                manifest = load_json(root / "manifest.json")
+                path = root / manifest["records"][0]["path"]
+                saved.append((path, path.read_bytes()))
+                record = load_json(path)
+                if key == "sessionId":
+                    record["grouping"][key] = "shared"
+                else:
+                    record["instances"][0][key] = "shared"
+                write_json(path, record)
+                self._refresh(root)
+            with self.subTest(key=key):
+                report = check_cross_release_leakage(self.training, {"real": self.evaluation})
+                self.assertEqual(report["leaks"]["real"], [f"{key}:shared"])
+            for path, content in saved:
+                path.write_bytes(content)
+            self._refresh(self.training)
+            self._refresh(self.evaluation)
+
+    def test_all_pinned_releases_checked_without_evaluation_command(self):
+        self._separate_archives()
+        resolved = resolve_config(load_json(FIXTURE))
+        self.assertNotIn("evaluationCommand", resolved["execution"])
+        spec = resolved["evaluations"]["frozenRealV3"]
+        resolved["evaluations"]["thirdEvaluation"] = spec
+        output = self.root / "output"
+        output.mkdir()
+        with patch("run_card_geometry_hf_job._download_evaluation_release", return_value=self.evaluation) as download:
+            roots = prepare_training_evaluations(resolved, self.training, "unused", self.root, output)
+        self.assertEqual(set(roots), {"frozenRealV3", "syntheticDuelField", "thirdEvaluation"})
+        self.assertEqual(download.call_count, 3)
+        self.assertEqual(load_json(output / "cross-release-leakage.json")["failedChecks"], [])
+
+    def test_leakage_blocks_train_command(self):
+        resolved = resolve_config(load_json(FIXTURE))
+        module = "run_card_geometry_hf_job"
+        hub = types.SimpleNamespace(HfApi=lambda **kwargs: object(), snapshot_download=lambda **kwargs: None)
+        with patch.dict(sys.modules, {"huggingface_hub": hub}), \
+             patch(f"{module}._verify_local_artifacts"), \
+             patch(f"{module}._hub_token", return_value="unused"), \
+             patch(f"{module}._require_private_model_repo"), \
+             patch(f"{module}._upload_json", return_value="fixture-commit"), \
+             patch(f"{module}._download_and_preflight", return_value=(self.training, {})), \
+             patch(f"{module}._download_evaluation_release", return_value=self.evaluation), \
+             patch(f"{module}._run") as run:
+            with self.assertRaisesRegex(RuntimeError, "CROSS_RELEASE_LEAKAGE_DISJOINT"):
+                execute(resolved, action="train", export_format=None, export_destination="private-model-repo", workdir=self.root / "job")
+        run.assert_not_called()
+
 
 
 class CandidateExperimentConfigTests(unittest.TestCase):
