@@ -145,6 +145,34 @@ class BuildGeometryBakeoffReportTests(unittest.TestCase):
             self.assertTrue(report["candidates"][0]["productionReady"])
             self.assertEqual(report["candidates"][0]["decoder"]["production"]["lines"], 2)
 
+    def test_separates_optimization_and_recovery_gpu_time(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate = self.write_candidate(Path(temporary) / "winner", "winner", 1)
+            candidate.update(
+                {
+                    "jobId": "artifact-job",
+                    "optimizationJobId": "training-job",
+                    "optimizationElapsedSeconds": 7200,
+                    "recoveryRuns": [
+                        {"jobId": "recovery-1", "elapsedSeconds": 900, "status": "error"},
+                        {
+                            "jobId": "artifact-job",
+                            "elapsedSeconds": 1800,
+                            "status": "completed",
+                        },
+                    ],
+                }
+            )
+            report = build(self.spec(Path(temporary), [candidate]))
+            training = report["candidates"][0]["training"]
+            self.assertEqual(training["optimizationJobId"], "training-job")
+            self.assertEqual(training["optimizationL4GpuHours"], 2)
+            self.assertEqual(training["recoveryL4GpuHours"], 0.75)
+            self.assertEqual(training["l4GpuHours"], 2.75)
+            markdown = render_markdown(report)
+            self.assertIn("Train L4 h", markdown)
+            self.assertIn("Recovery L4 h", markdown)
+
     def test_recommends_shipping_none_when_real_recall_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             candidate = self.write_candidate(Path(temporary) / "loser", "loser", 0.5)

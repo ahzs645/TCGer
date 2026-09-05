@@ -178,6 +178,15 @@ def candidate_row(
     corner = real["cornerError"]["overall"]["normalized"]
     outside_p50 = outside_frame_p50(real)
     recognition_counts = recognition["counts"]
+    optimization_seconds = float(
+        candidate.get("optimizationElapsedSeconds", run["elapsedSeconds"])
+    )
+    recovery_runs = candidate.get("recoveryRuns", [])
+    if optimization_seconds < 0:
+        raise ValueError("optimizationElapsedSeconds must be non-negative")
+    if any(float(item["elapsedSeconds"]) < 0 for item in recovery_runs):
+        raise ValueError("recovery run elapsedSeconds must be non-negative")
+    recovery_seconds = sum(float(item["elapsedSeconds"]) for item in recovery_runs)
     checks = {
         "realRecallAt05": detection["recall@0.5"] >= budgets["realRecallAt05Minimum"],
         "realRecallAt075": detection["recall@0.75"] >= budgets["realRecallAt075Minimum"],
@@ -227,8 +236,16 @@ def candidate_row(
         "deviations": config["deviations"],
         "training": {
             "jobId": candidate.get("jobId"),
-            "elapsedSeconds": run["elapsedSeconds"],
-            "l4GpuHours": run["elapsedSeconds"] / 3600,
+            "optimizationJobId": candidate.get(
+                "optimizationJobId", candidate.get("jobId")
+            ),
+            "reportedArtifactRunElapsedSeconds": run["elapsedSeconds"],
+            "optimizationElapsedSeconds": optimization_seconds,
+            "recoveryRuns": recovery_runs,
+            "recoveryElapsedSeconds": recovery_seconds,
+            "optimizationL4GpuHours": optimization_seconds / 3600,
+            "recoveryL4GpuHours": recovery_seconds / 3600,
+            "l4GpuHours": (optimization_seconds + recovery_seconds) / 3600,
             "attemptNotes": candidate.get("attemptNotes", []),
         },
         "real": {
@@ -364,8 +381,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Results",
         "",
-        "| Candidate | License route | Real R@.5 | Real R@.75 | Corner p50 | p90 | p95 | Outside p50 | Synthetic R@.75 | Correct / wrong / abstain | ONNX MB | Core ML MB | Min parity cosine | L4 h | Production ready |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- |",
+        "| Candidate | License route | Real R@.5 | Real R@.75 | Corner p50 | p90 | p95 | Outside p50 | Synthetic R@.75 | Correct / wrong / abstain | ONNX MB | Core ML MB | Min parity cosine | Train L4 h | Recovery L4 h | Total L4 h | Production ready |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for row in report["candidates"]:
         export = row["export"]
@@ -387,6 +404,8 @@ def render_markdown(report: dict[str, Any]) -> str:
                     _megabytes(None if export is None else export["onnxBytes"]),
                     _megabytes(None if export is None else export["coremlBytes"]),
                     _number(None if export is None else export["minimumCosine"], 6),
+                    _number(row["training"]["optimizationL4GpuHours"], 2),
+                    _number(row["training"]["recoveryL4GpuHours"], 2),
                     _number(row["training"]["l4GpuHours"], 2),
                     "yes" if row["productionReady"] else "no",
                 )
