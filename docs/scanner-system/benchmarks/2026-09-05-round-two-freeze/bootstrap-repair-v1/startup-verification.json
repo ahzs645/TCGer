@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-09-05T19:01:37.650071+00:00",
+  "inputCommit": "bea82c5183ce00108a3b555b4291c08ee08a8f2d",
+  "jobs": [
+    {
+      "candidate": "yolo11n-pose",
+      "inspectedStage": "RUNNING",
+      "jobId": "6a9c6665e686246ca69a4373",
+      "numpyRuntimePin": "1.26.4",
+      "observedLogLine": "NUMPY_RUNTIME_PIN_OK 1.26.4",
+      "pinnedBundleAndConfigDownloaded": true,
+      "startupLogSha256": "b32d84bebae2073be35561b01645dcb58d7dd97c5653d2e6e3111b211c15579e",
+      "trainingOrEvaluationResultObserved": false
+    },
+    {
+      "candidate": "yolo11s-pose",
+      "inspectedStage": "RUNNING",
+      "jobId": "6a9c6670e686246ca69a4377",
+      "numpyRuntimePin": "1.26.4",
+      "observedLogLine": "NUMPY_RUNTIME_PIN_OK 1.26.4",
+      "pinnedBundleAndConfigDownloaded": true,
+      "startupLogSha256": "cb51b04fdac759572ce558e88bf6999c18edb7419f8e4c6836f40728a3d87fd2",
+      "trainingOrEvaluationResultObserved": false
+    },
+    {
+      "candidate": "yolox-pose",
+      "inspectedStage": "RUNNING",
+      "jobId": "6a9c667be686246ca69a437a",
+      "numpyRuntimePin": "1.26.4",
+      "observedLogLine": "NUMPY_RUNTIME_PIN_OK 1.26.4",
+      "pinnedBundleAndConfigDownloaded": true,
+      "startupLogSha256": "d9f841d1d03d5ba1da25e00c4fa8cd799434b1f00bdba055b68c25ad033e3e3f",
+      "trainingOrEvaluationResultObserved": false
+    },
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "inspectedStage": "RUNNING",
+      "jobId": "6a9c6687e686246ca69a437c",
+      "numpyRuntimePin": "1.26.4",
+      "observedLogLine": "NUMPY_RUNTIME_PIN_OK 1.26.4",
+      "pinnedBundleAndConfigDownloaded": true,
+      "startupLogSha256": "72800c6b1197d0d3d5eab1aee65be8cf30a9034112de33b8dc5afb3b4774e4c7",
+      "trainingOrEvaluationResultObserved": false
+    }
+  ],
+  "scope": "Startup and dependency verification only. Cloud jobs perform fresh corpus preflight and cross-release gates before optimization, then automatic evaluations after training."
+}
