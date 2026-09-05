@@ -1,0 +1,148 @@
+{
+  "authorization": "Four 50-epoch round-two training jobs followed by the pinned geometry benchmarks and recognition replay. No asset-store publication.",
+  "configFiles": {
+    "fastvit-t8-four-corner": {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/configs/fastvit-t8-four-corner.json",
+      "path": "geometry/bakeoffs/df28e20ce4dfbb910fbd6115743d0641798cc368/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/fastvit-t8-four-corner.json",
+      "sha256": "bf3211b346d544f12665712496418d5461eacc21323286a2ff8f01bc214cd75d"
+    },
+    "yolo11n-pose": {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/configs/yolo11n-pose.json",
+      "path": "geometry/bakeoffs/df28e20ce4dfbb910fbd6115743d0641798cc368/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/yolo11n-pose.json",
+      "sha256": "9e23e34704fe0d410c6480ca59a8479722384564910ac62ab32c53ad2354d723"
+    },
+    "yolo11s-pose": {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/configs/yolo11s-pose.json",
+      "path": "geometry/bakeoffs/df28e20ce4dfbb910fbd6115743d0641798cc368/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/yolo11s-pose.json",
+      "sha256": "9bd0651ae0901649fad77dae59f8d8caf25a764096fbf3b104a9648e006cce7d"
+    },
+    "yolox-pose": {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/configs/yolox-pose.json",
+      "path": "geometry/bakeoffs/df28e20ce4dfbb910fbd6115743d0641798cc368/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/yolox-pose.json",
+      "sha256": "25f7dee890ed7ba7d0ee6d01506c28b12d5ae9a21e7c3fa2891fecac608c52cb"
+    }
+  },
+  "corpus": {
+    "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "cabee73ac46a5901cc3060cfd17b7c63408bf66a",
+    "policyId": "training-minimums-v3",
+    "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+    "preflightReport": {
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    },
+    "releasePath": "geometry/releases/card-geometry-training-round-two-v1"
+  },
+  "evaluations": {
+    "real": {
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2"
+    },
+    "synthetic": {
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+    }
+  },
+  "evidenceSha256": {
+    "README.md": "398b136361c75cabf291352765b74385e95b46e2356d00b14dc35548f43db67b",
+    "configs/fastvit-t8-four-corner.json": "bf3211b346d544f12665712496418d5461eacc21323286a2ff8f01bc214cd75d",
+    "configs/yolo11n-pose.json": "9e23e34704fe0d410c6480ca59a8479722384564910ac62ab32c53ad2354d723",
+    "configs/yolo11s-pose.json": "9bd0651ae0901649fad77dae59f8d8caf25a764096fbf3b104a9648e006cce7d",
+    "configs/yolox-pose.json": "25f7dee890ed7ba7d0ee6d01506c28b12d5ae9a21e7c3fa2891fecac608c52cb",
+    "corpus-summary.json": "1583536b5fe8a7ccaa622024d23a7cacffd8e81f73e225dc3cc5b7c142be62da",
+    "cross-release-leakage.json": "a15766109c00836232a8f982e5ee8ab3a1b9d16a1fc80702e669e48f26cfb86e",
+    "dataset-publication.json": "68a103ccc3fb260398d242dd31ba7c6c3bce69df2bdfac19dbbb1b635c469c83",
+    "ingestion-check.json": "a2afd0d451c2daa96c2fb658cdaffec0086086795b505a79881d9b3cc208821a",
+    "near-duplicates/audit.json": "53348346ea58df7da999f76f66790e9426e0fd9c38cfa300c580e3e5f7d2bb12",
+    "near-duplicates/review-decisions.json": "649275e5a9f204c2c51d5335f551a7d19cb28b5ab9cebe6752182b367ef24822",
+    "near-duplicates/review-pairs.jsonl": "6feb00d3e8501939e89eea5da0199a94f48e8f1a9f07a1f0ced245aeca35bdd4",
+    "near-duplicates/review-sheet-1.jpg": "dd260ce2475549d78ee0b1556ebdc1fc407b3d903eba727638784f4d7360d3bb",
+    "near-duplicates/review-sheet-2.jpg": "bb55169d31166e6cd80ba8edaa71e346fd19648f2848e8259c64d4f65354931d",
+    "near-duplicates/review-sheet-3.jpg": "de802af7b79bab45f3209a8f0680875a1efbb01ac2ac4533d3e696d33b7f36a7",
+    "near-duplicates/review-sheet-4.jpg": "01bb413241b71fa3e950f75293b2ae66a75f53f09cc10e166c10b3bd1fb0c1bb",
+    "preflight-report.json": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d",
+    "synthetic-build-summary.json": "4856f4a48b84fc711ffc573ef64bdd347a22f15391421de054026790eaa18d91"
+  },
+  "experiments": {
+    "fastvit-t8-four-corner": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "fastvit-t8-four-corner",
+      "checkpointPrefix": "geometry/fastvit-t8-four-corner/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/8c0365e1bcbccb70152d0428cde2dbeaddad6386a44e4cdfdd841e7d46199770",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "8c0365e1bcbccb70152d0428cde2dbeaddad6386a44e4cdfdd841e7d46199770",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "tcger-pytorch",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "8c0365e1bcbccb70152d0428cde2dbeaddad6386a44e4cdfdd841e7d46199770",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolo11n-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolo11n-pose",
+      "checkpointPrefix": "geometry/yolo11n-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/6b56048fb82edc9f7d17e23fb5d95f6c911cc227e84d5c848181bb66e063ccd2",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "6b56048fb82edc9f7d17e23fb5d95f6c911cc227e84d5c848181bb66e063ccd2",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "6b56048fb82edc9f7d17e23fb5d95f6c911cc227e84d5c848181bb66e063ccd2",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolo11s-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolo11s-pose",
+      "checkpointPrefix": "geometry/yolo11s-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/a2b8fc098644ec8e8385aac0bda3d03c21cd3bae2b1a9296afe54f2031e0a422",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "a2b8fc098644ec8e8385aac0bda3d03c21cd3bae2b1a9296afe54f2031e0a422",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "a2b8fc098644ec8e8385aac0bda3d03c21cd3bae2b1a9296afe54f2031e0a422",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolox-pose": {
+      "bakeoffId": "shared-card-geometry-round-two-v1",
+      "candidate": "yolox-pose",
+      "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4e1ce146def418977d84092dd28575458d9ce97f7e2b674ff227c473093d3264",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "4e1ce146def418977d84092dd28575458d9ce97f7e2b674ff227c473093d3264",
+      "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+      "framework": "mmyolo",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "4e1ce146def418977d84092dd28575458d9ce97f7e2b674ff227c473093d3264",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "launchStatus": "not-submitted",
+  "preflight": {
+    "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/preflight-report.json",
+    "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+    "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+  },
+  "schema": "https://tcger.app/reports/card-geometry-round-two-freeze/v1",
+  "testEvidence": {
+    "compositorTests": 14,
+    "geometryTests": 217,
+    "ruff": "pass",
+    "ruffVersion": "0.15.8"
+  },
+  "tooling": {
+    "localPath": ".artifacts/card-geometry/round-two-tooling.tar.gz",
+    "path": "geometry/tooling/df28e20ce4dfbb910fbd6115743d0641798cc368/card-geometry-tooling.tar.gz",
+    "sha256": "0ccc19894ccf7c1a1e9d9ba053b67eb4e2de1882c5188d5f205373124c0fb5b7"
+  },
+  "toolingRevision": "df28e20ce4dfbb910fbd6115743d0641798cc368"
+}

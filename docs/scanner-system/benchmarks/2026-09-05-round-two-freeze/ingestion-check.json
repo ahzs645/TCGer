@@ -1,0 +1,36 @@
+{
+  "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+  "fastvitAllRecordTargetsFinite": true,
+  "fastvitImageAndTargetSampleCount": 14,
+  "fastvitMissingBoxSkips": 0,
+  "fastvitSampledRecordIds": [
+    "coco-0001809889362d0c60dc30e323fff8da7a645260ab542dde461f26b7d59c2a15",
+    "coco-000ef0db261977d38a6b7296a61e925c0c8ef99c07528a9ac2f0d3b7cf7d0229",
+    "coco-0056c9ed1a5376c36447c6f0f0886c3c3276dce396dbb5748ea4d93baddad430",
+    "coco-005ff234dd856fd0d5d2bfb099409f3b4e0100dcdaa0bd9cec566eacf205d9de",
+    "coco-007f7c61db9b61813f5d1c14b9a077f678e3d230aafe86f0f4c8c9170ce4048c",
+    "coco-0087f2fc1dca0873d4c7bccff44aa0950d04ff26fe3324415e8b50d293e23477",
+    "coco-008c9b23a890bb8b5f9b8dc7d10c7dd8060e718833eea58ed8a7dd9256624e70",
+    "coco-013a142fac43d7c65d23e69d44295781c20ee3571cdd51e1bb1778ddd0666bb4",
+    "coco-01e3fe9195322fbbe55994a4b94c61921447e31dd8875a3b6cbc0c530f5861f1",
+    "syn-train-binder_page-00171a1adf3139c2-16eb314c415bd3d7",
+    "coco-002faf7947b5133bc565365998a631a5dfa8a912079b439ea798f06b6fccc3a5",
+    "coco-005bf58faa595ea07ff51d3ca0443de7c0135528e5af3f943cc3e45ee9c4145d",
+    "coco-01cba12de30f14e5fcabe1b4be71c5083831bcda26c54d958e776c6cdbd79572",
+    "syn-validation-binder_page-040b965e80d2d276-4d4400582de00ef7"
+  ],
+  "realContextMarginPolicy": {
+    "application": "each-side",
+    "fraction": 0.15,
+    "kind": "fraction-of-long-side",
+    "rounding": "ceil"
+  },
+  "sampling": "one decoded image per canonical archive and split; label and target tensors checked for every record",
+  "yoloLabelCounts": {
+    "boxOnlyRetained": 5856,
+    "knownQuadRetained": 39316,
+    "records": 15744,
+    "records:train": 13465,
+    "records:validation": 2279
+  }
+}

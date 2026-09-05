@@ -1,0 +1,64 @@
+{
+  "assetManifestSha256": {
+    "backgrounds": "71d31e1ac762696a01a99729386a66bec661af1eb497e25c67413edccac3d177",
+    "cards": "880405a8ecd7faeffc17d68dfb5f919e9ebe83bde0fe578a9020b91b17613c40"
+  },
+  "compositorGitSha": "83927306ce0faaabf92e403f41a9825324a0c875",
+  "compositorRevision": "72f13599b126c75acb284abd18b34e3b3ad851a41628c71f004daa7102fca310",
+  "corpusHash": "7dc313a7a322f7907555a99fd2271a101f7eca99af620287e97f288b38373d7f",
+  "counts": {
+    "instances": 36521,
+    "records": 10000,
+    "scene:binder_page": 1650,
+    "scene:duel_field": 3350,
+    "scene:single_handheld": 1700,
+    "scene:single_handheld_distractor_free": 350,
+    "scene:steep_playmat": 2950,
+    "split:train": 9000,
+    "split:validation": 1000,
+    "visibility:occluded": 12619,
+    "visibility:outsideFrame": 8929,
+    "visibility:visible": 124536
+  },
+  "distractorPrevalenceBySceneSlice": {
+    "binder_page": {
+      "distractorCount": 4986,
+      "meanDistractorsPerRecord": 3.021818181818182,
+      "recordPrevalence": 1.0,
+      "records": 1650,
+      "recordsWithDistractors": 1650
+    },
+    "duel_field": {
+      "distractorCount": 10061,
+      "meanDistractorsPerRecord": 3.0032835820895523,
+      "recordPrevalence": 1.0,
+      "records": 3350,
+      "recordsWithDistractors": 3350
+    },
+    "single_handheld": {
+      "distractorCount": 5082,
+      "meanDistractorsPerRecord": 2.989411764705882,
+      "recordPrevalence": 1.0,
+      "records": 1700,
+      "recordsWithDistractors": 1700
+    },
+    "single_handheld_distractor_free": {
+      "distractorCount": 0,
+      "meanDistractorsPerRecord": 0.0,
+      "recordPrevalence": 0.0,
+      "records": 350,
+      "recordsWithDistractors": 0
+    },
+    "steep_playmat": {
+      "distractorCount": 8869,
+      "meanDistractorsPerRecord": 3.0064406779661015,
+      "recordPrevalence": 1.0,
+      "records": 2950,
+      "recordsWithDistractors": 2950
+    }
+  },
+  "releaseId": "synthetic-geometry-round-two-v1",
+  "releasePurpose": "smoke",
+  "resolvedConfigSha256": "50e311854f91c020cf379b8493332f570dfae815bb544db15eae69a0b47f3507",
+  "schema": "https://tcger.app/reports/card-geometry-compositor-build/v1"
+}
