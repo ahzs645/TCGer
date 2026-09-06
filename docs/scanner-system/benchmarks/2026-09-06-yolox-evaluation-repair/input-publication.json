@@ -1,0 +1,59 @@
+{
+  "evaluationCommand": [
+    "python",
+    "tools/card-geometry/rerun_geometry_evaluation.py",
+    "--training-config",
+    "/work/experiment.json",
+    "--source-revision",
+    "9caa473da8ee42edef32c9aeaca407d7b2c59875",
+    "--checkpoint-sha256",
+    "0e377102d98e597502fad94f8ce6a1d37b70b4ef8c2dc4d09afcea4992bc8d7d",
+    "--model-config-sha256",
+    "d6ed97cb6bbfeae6ec911acadaa85c188883cab15d7df58559fc7a24be4096cf",
+    "--tooling-revision",
+    "6a96e1982e97d50520dd38fb25fb03a272755960",
+    "--mmyolo-root",
+    "/work/mmyolo",
+    "--workdir",
+    "/work/yolox-evaluation-restart"
+  ],
+  "files": [
+    {
+      "localPath": ".artifacts/card-geometry/yolox-evaluation-repair-tooling.tar.gz",
+      "path": "geometry/tooling/6a96e1982e97d50520dd38fb25fb03a272755960/card-geometry-tooling.tar.gz",
+      "sha256": "ad57c2661c04d68409c23b325bd72e7bc6371d5ebc558b6a1a5162dc84960536"
+    },
+    {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/yolox-validation-repair-v2/configs/yolox-pose.json",
+      "path": "geometry/bakeoffs/d8b617072a928a8cc6da69c32ae8336419f07a0e/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/yolox-pose.json",
+      "sha256": "dbae59909f5be37e78709c133c16b4f6817edf016e09c7360d26912777b6b019"
+    },
+    {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/preflight-report.json",
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    }
+  ],
+  "inputCommit": "87b7e8b2e24b9fe83b0d8b7ea579f8921df463d8",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "jobCommandSha256": "6d60457b6c4d5e3241e09934cbf3a10195a20b89ee5a19805e1a9dff1236a6fc",
+  "testEvidence": {
+    "geometryTests": 225,
+    "ruff": "pass"
+  },
+  "toolingRevision": "6a96e1982e97d50520dd38fb25fb03a272755960",
+  "trainingExperiment": {
+    "bakeoffId": "shared-card-geometry-round-two-v1",
+    "candidate": "yolox-pose",
+    "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+    "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+    "experimentHash": "c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+    "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+    "framework": "mmyolo",
+    "licenseRoute": "permissive",
+    "policyId": "training-minimums-v3",
+    "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+    "resolvedConfigSha256": "c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118",
+    "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+  }
+}
