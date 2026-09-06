@@ -1,0 +1,30 @@
+{
+  "freezeCommit": "fb82ddbf",
+  "job": {
+    "id": "6a9d257ae686246ca69a5254",
+    "url": "https://huggingface.co/jobs/ahzs645/6a9d257ae686246ca69a5254",
+    "created_at": "2026-09-06T08:34:02.257Z",
+    "docker_image": "pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806",
+    "arguments": [],
+    "environment_variable_names": [],
+    "secret_names": [
+      "0"
+    ],
+    "flavor": "l4x1",
+    "status": {
+      "stage": "SCHEDULING",
+      "message": null
+    },
+    "owner": {
+      "id": "684cda58d7e0d83496c9b780",
+      "name": "ahzs645",
+      "type": "user"
+    },
+    "created_by": {
+      "id": "684cda58d7e0d83496c9b780",
+      "name": "ahzs645"
+    },
+    "labels": {},
+    "timeout_seconds": 1800
+  }
+}
