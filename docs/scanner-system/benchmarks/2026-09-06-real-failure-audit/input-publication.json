@@ -1,0 +1,42 @@
+{
+  "artifactPrefix": "geometry/diagnostics/real-failure-audit/c7df7f4a09ad52c89ea50ad87ddc22f01de2e99d",
+  "commandHashes": {
+    "yolo11s-pose": "17c572d166ab521ed5a44ea54fe85bb4c05842ff00b94723b06b11fcd51f8516",
+    "yolox-pose": "4dc708bd41fdec25e29b896b72dfc3b9970d43687851d0e82c78502b96f5ccd9"
+  },
+  "files": [
+    {
+      "localPath": ".artifacts/card-geometry/failure-audit-tooling.tar.gz",
+      "path": "geometry/tooling/c7df7f4a09ad52c89ea50ad87ddc22f01de2e99d/card-geometry-tooling.tar.gz",
+      "sha256": "d0f5290c64c18ec9612254d570fe76876bcf93a13bf88275768ea4b9e9b0c223"
+    },
+    {
+      "localPath": ".artifacts/card-geometry/failure-audit-inputs.tar.gz",
+      "path": "geometry/diagnostics/real-failure-audit/c7df7f4a09ad52c89ea50ad87ddc22f01de2e99d/inputs.tar.gz",
+      "sha256": "cb5c75921ec0fba40766724a69a04e8762375261b9d25e49be46b34f93c2d087"
+    },
+    {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/preflight-report.json",
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    },
+    {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-06-yolox-loss-repair/yolox-pose.json",
+      "path": "geometry/repair-runs/ac20f7956d722cbca9928fc3eef9311bc1d736c3/yolox-pose.json",
+      "sha256": "c1394f129f8e0add2f789d70b3b2296bc553373a1d93ddf86c8bb10334d6bb73"
+    },
+    {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/bootstrap-repair-v1/configs/yolo11s-pose.json",
+      "path": "geometry/bakeoffs/f9daf4a19a91b2a459ef531779aead6d531f1b18/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/yolo11s-pose.json",
+      "sha256": "9df816606ebf72ae6d6e34f32067b130430a1dbc8aac9fef34ae95140ce2945b"
+    }
+  ],
+  "inputCommit": "626d5df0ccc7fa0e2553a3859863dfaf0e26825c",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "selection": {
+    "evaluation": "all 600 records, frozen baseline only",
+    "validation": "first eight SHA256(recordId) records per source-kind/archive/scene/has-known-corners group",
+    "validationColorIntervention": "YOLO11s only; RGB array vs BGR array; no held-out intervention"
+  },
+  "toolingRevision": "c7df7f4a09ad52c89ea50ad87ddc22f01de2e99d"
+}
