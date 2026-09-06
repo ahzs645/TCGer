@@ -1,0 +1,13 @@
+{
+  "stepsPerArm": 800,
+  "reason": "Post-80-step convergence check: replacement restores gradients but has not yet produced accepted quads.",
+  "originalResultCommit": "28c16c9f55a466c3e26fe4926ed126f37c37e2bd",
+  "originalResultSha256": "55aeaf6a7b3602ba67253120c4057ab80b7feef43ff2768648285c8d97b163b4",
+  "inputPublication": "input-publication.json",
+  "changesFromOriginal": [
+    "steps per arm: 80 to 800",
+    "result destination: steps-800 subdirectory"
+  ],
+  "commandSha256": "9d60d2c9f4467bd7bcf33446fcb0911d05c4d79189e1f507b73afa5c236213b9",
+  "artifactPrefix": "geometry/diagnostics/yolox-corner-learning/584f9f9bfac2b2fdc762d469a11390f1f8477db1/steps-800"
+}
