@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Card model comparison</title>
+    <link rel="stylesheet" href="/review.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <small>TCGer · Geometry review</small>
+        <h1>Compare the card outlines</h1>
+      </div>
+      <div id="progress"></div>
+      <a href="/api/export" download="card-reviews.json">Export reviews ↓</a>
+    </header>
+    <nav>
+      <label
+        >Review set
+        <select id="scope">
+          <option value="evaluation">Real evaluation</option>
+          <option value="validation">Validation samples</option>
+          <option value="training-labels">Training label review</option>
+          <option value="all">All images</option>
+        </select></label
+      ><label
+        >Scene
+        <select id="filter-scene">
+          <option value="all">All scenes</option>
+        </select></label
+      ><label><input type="checkbox" id="unreviewed" />Unreviewed only</label
+      ><button id="previous">← Previous</button
+      ><select id="sample" aria-label="Image"></select
+      ><button id="next">Next →</button>
+    </nav>
+    <div class="intro">
+      <span id="record"></span>
+      <p>
+        Compare the two outlines and crops. Choose the better result below. If
+        both are wrong, draw or adjust the four corners.
+        <strong>Saved reviews are separate from the frozen dataset.</strong>
+      </p>
+    </div>
+    <main>
+      <div class="comparison">
+        <section class="model" data-model="yolox-pose">
+          <h2>YOLOX-Pose <span class="count"></span></h2>
+          <canvas class="image" aria-label="YOLOX predictions"></canvas>
+          <div class="model-controls">
+            <select class="stage" aria-label="YOLOX output stage">
+              <option value="accepted">Final outlines</option>
+              <option value="raw">Raw outlines</option>
+              <option value="native">Detection boxes</option></select
+            ><select class="card" aria-label="YOLOX selected card"></select
+            ><button class="copy">Edit this outline ↓</button>
+          </div>
+          <div class="details"></div>
+          <div class="crop-row">
+            <canvas class="crop" width="180" height="250"></canvas>
+            <p class="recognition"></p>
+          </div>
+        </section>
+        <section class="model" data-model="yolo11s-pose">
+          <h2>YOLO11s-Pose <span class="count"></span></h2>
+          <canvas class="image" aria-label="YOLO11s predictions"></canvas>
+          <div class="model-controls">
+            <select class="stage" aria-label="YOLO11s output stage">
+              <option value="accepted">Final outlines</option>
+              <option value="raw">Raw outlines</option>
+              <option value="native">Detection boxes</option></select
+            ><select class="card" aria-label="YOLO11s selected card"></select
+            ><button class="copy">Edit this outline ↓</button>
+          </div>
+          <div class="details"></div>
+          <div class="crop-row">
+            <canvas class="crop" width="180" height="250"></canvas>
+            <p class="recognition"></p>
+          </div>
+        </section>
+      </div>
+      <div class="legend">
+        <label
+          ><input id="show-labels" type="checkbox" />Show existing labels</label
+        ><span
+          >Green: known corners · Amber: mask / box label · Blue: model · Pink:
+          selected outline</span
+        ><span
+          >Crop previews preserve the model's corner order. Recognition text is
+          the saved frame result, not a new score for the selected crop.</span
+        >
+      </div>
+      <section class="edit-section">
+        <div>
+          <h2>Your corrected outlines <small>Optional</small></h2>
+          <div class="edit-controls">
+            <button id="add">+ Draw four corners</button
+            ><select id="edit-card" aria-label="Corrected card"></select
+            ><button id="delete">Delete selected</button
+            ><button id="undo">Undo edit</button
+            ><button id="discard">Discard draft</button
+            ><button id="copy-labels">Copy known label corners</button>
+          </div>
+          <p id="draw-hint">
+            Add a card, then click TL → TR → BR → BL. Drag a corner to refine
+            it. Use 1–4 to select a corner; arrow keys nudge.
+          </p>
+          <canvas
+            id="editor"
+            tabindex="0"
+            aria-label="Four-corner correction editor"
+          ></canvas>
+        </div>
+        <aside>
+          <strong>Corner zoom</strong
+          ><canvas id="zoom" width="220" height="220"></canvas
+          ><strong>Corrected crop</strong
+          ><canvas id="edit-crop" width="180" height="250"></canvas>
+        </aside>
+      </section>
+      <section class="decision">
+        <h2>Your comparison</h2>
+        <div id="choices">
+          <label
+            ><input type="radio" name="winner" value="yolox-pose" />YOLOX
+            better</label
+          ><label
+            ><input type="radio" name="winner" value="yolo11s-pose" />YOLO11s
+            better</label
+          ><label
+            ><input type="radio" name="winner" value="tie" />Both good /
+            tie</label
+          ><label
+            ><input type="radio" name="winner" value="neither" />Neither
+            good</label
+          ><label
+            ><input type="radio" name="winner" value="unsure" />Not sure</label
+          ><label
+            ><input type="radio" name="winner" value="labels-only" />Label
+            review only</label
+          >
+        </div>
+        <fieldset id="issues"><legend>What needs fixing?</legend></fieldset>
+        <div class="fields">
+          <label
+            >Actual scene
+            <select id="scene"></select></label
+          ><label
+            >Reviewer
+            <input
+              id="reviewer"
+              placeholder="Your name"
+              maxlength="120"
+              autocomplete="name" /></label
+          ><label class="notes"
+            >Notes
+            <textarea
+              id="notes"
+              placeholder="For example: detects the slab instead of the card; misses the bottom row…"
+              maxlength="10000"
+            ></textarea>
+          </label>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span id="status" role="status">Loading…</span
+      ><button id="save">Save review</button
+      ><button class="primary" id="save-next">Save & next →</button>
+    </footer>
+    <script src="/geometry.js"></script>
+    <script src="/review.js"></script>
+  </body>
+</html>

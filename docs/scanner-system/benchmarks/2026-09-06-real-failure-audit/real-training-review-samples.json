@@ -1,0 +1,194 @@
+[
+  {
+    "instances": 8,
+    "known": 0,
+    "path": "records/coco-5a6e4d4c7b62cf348f4ca8e66aa70a50d6ccdd3324688a918ff0472083e71636.json",
+    "recordId": "coco-5a6e4d4c7b62cf348f4ca8e66aa70a50d6ccdd3324688a918ff0472083e71636",
+    "sourceArchive": "coco:carddetection-hegxe.v7i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 0,
+    "path": "records/coco-25c513d7af87491aba68620ca3cb9cca482b85eff37edca506e37a44cf8b3fc6.json",
+    "recordId": "coco-25c513d7af87491aba68620ca3cb9cca482b85eff37edca506e37a44cf8b3fc6",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 6,
+    "known": 0,
+    "path": "records/coco-3210406c6f56db51c81f3da80b7ff546dd94e72b49b533d9bca5d67cc436ad86.json",
+    "recordId": "coco-3210406c6f56db51c81f3da80b7ff546dd94e72b49b533d9bca5d67cc436ad86",
+    "sourceArchive": "coco:pk-detect.v3i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 9,
+    "known": 0,
+    "path": "records/coco-15102206619f6e744e04b0e6ac8b1f9ac3bb4a299708e453c7941d963dd8f71b.json",
+    "recordId": "coco-15102206619f6e744e04b0e6ac8b1f9ac3bb4a299708e453c7941d963dd8f71b",
+    "sourceArchive": "coco:pk-detect.v3i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 11,
+    "known": 0,
+    "path": "records/coco-4fbf97e524ddd050803d2bd846dd13e8fe8e41d2457f63c454a5abfac9642b1d.json",
+    "recordId": "coco-4fbf97e524ddd050803d2bd846dd13e8fe8e41d2457f63c454a5abfac9642b1d",
+    "sourceArchive": "coco:carddetection-hegxe.v7i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 2,
+    "path": "records/coco-84aec779aa58dc6e653e5523fe8105d35d4d4ceaa13e8b9ddbecaad3fa6e469b.json",
+    "recordId": "coco-84aec779aa58dc6e653e5523fe8105d35d4d4ceaa13e8b9ddbecaad3fa6e469b",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 3,
+    "known": 0,
+    "path": "records/coco-4ab112ceb79eb88adb9fdeb576fea565e704eecb305c026bc4349cf3672e82a5.json",
+    "recordId": "coco-4ab112ceb79eb88adb9fdeb576fea565e704eecb305c026bc4349cf3672e82a5",
+    "sourceArchive": "coco:carddetection-hegxe.v7i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 8,
+    "known": 0,
+    "path": "records/coco-9794bdce004e1c04e9a40977dea3f05708775b46b8b92f616a8bd60eaef2c3db.json",
+    "recordId": "coco-9794bdce004e1c04e9a40977dea3f05708775b46b8b92f616a8bd60eaef2c3db",
+    "sourceArchive": "coco:pokemon-card-outliner.v1i.coco-yolo",
+    "split": "train"
+  },
+  {
+    "instances": 6,
+    "known": 0,
+    "path": "records/coco-0de3bb42f0ba386a8a4d0a730545f89cb038683aab20f3c0bf00321674e60bd3.json",
+    "recordId": "coco-0de3bb42f0ba386a8a4d0a730545f89cb038683aab20f3c0bf00321674e60bd3",
+    "sourceArchive": "coco:pk-detect.v3i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 3,
+    "known": 0,
+    "path": "records/coco-7bf07ec8b04184aa68ba243bf14bdfff8993bc4be2fc41f05dbb834958eb85f1.json",
+    "recordId": "coco-7bf07ec8b04184aa68ba243bf14bdfff8993bc4be2fc41f05dbb834958eb85f1",
+    "sourceArchive": "coco:mtg-scanner-bughx.v4i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 5,
+    "known": 0,
+    "path": "records/coco-0ec0cb01f6a7bb6ab3e1cd35c887d9b705ed4e43468f0e9175be5b5a842ecb12.json",
+    "recordId": "coco-0ec0cb01f6a7bb6ab3e1cd35c887d9b705ed4e43468f0e9175be5b5a842ecb12",
+    "sourceArchive": "coco:pk-detect.v3i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 2,
+    "path": "records/coco-927747d233fb59ff34f217a99b1f1aa38ce607fb33f112e512f4505371c2dccf.json",
+    "recordId": "coco-927747d233fb59ff34f217a99b1f1aa38ce607fb33f112e512f4505371c2dccf",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 2,
+    "path": "records/coco-9f3dbcc23c7722c34bc0bf89c01adde3a96599e3b757452486d9caf70bbe6238.json",
+    "recordId": "coco-9f3dbcc23c7722c34bc0bf89c01adde3a96599e3b757452486d9caf70bbe6238",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 2,
+    "path": "records/coco-90dc589e81c9e60bba71df7fc9f3743271cd7d77302edbd6af00c23cf4fb0e63.json",
+    "recordId": "coco-90dc589e81c9e60bba71df7fc9f3743271cd7d77302edbd6af00c23cf4fb0e63",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 4,
+    "known": 0,
+    "path": "records/coco-0a91c9aaa6bfad49d4f1a5250ef1ecc2005041f87caca75994144001f14ad1fb.json",
+    "recordId": "coco-0a91c9aaa6bfad49d4f1a5250ef1ecc2005041f87caca75994144001f14ad1fb",
+    "sourceArchive": "coco:pk-detect.v3i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 9,
+    "known": 0,
+    "path": "records/coco-3fa0062ffbe16aa5a2af124b34f0794f2514af5becd299048f82637c12e955cd.json",
+    "recordId": "coco-3fa0062ffbe16aa5a2af124b34f0794f2514af5becd299048f82637c12e955cd",
+    "sourceArchive": "coco:pokemon-card-outliner.v1i.coco-yolo",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 1,
+    "path": "records/coco-52c5ef32618ed96e0245234813151e78679435209f4dd325974d010ab58a67dc.json",
+    "recordId": "coco-52c5ef32618ed96e0245234813151e78679435209f4dd325974d010ab58a67dc",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 6,
+    "known": 0,
+    "path": "records/coco-8e8a20d1f369d7b05ce68de9dcc653ffcfbbc29e6714fbe6b838406f4a23becf.json",
+    "recordId": "coco-8e8a20d1f369d7b05ce68de9dcc653ffcfbbc29e6714fbe6b838406f4a23becf",
+    "sourceArchive": "coco:pokefolio.v1i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 1,
+    "path": "records/coco-38a3d4f3d29b3b08d9228a7765efd45190f914d7a1f6f0c8f19fcdf200b808ea.json",
+    "recordId": "coco-38a3d4f3d29b3b08d9228a7765efd45190f914d7a1f6f0c8f19fcdf200b808ea",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 2,
+    "path": "records/coco-178a1bec452775dd5bbbc98aeaa31342d347c9f1853a3624d3a0e077d4399ff7.json",
+    "recordId": "coco-178a1bec452775dd5bbbc98aeaa31342d347c9f1853a3624d3a0e077d4399ff7",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 3,
+    "known": 1,
+    "path": "records/coco-0c13ba8dba1aef2f9d9d45c7d5ba7afefc1244434321b3142bda9d3f0f1d2917.json",
+    "recordId": "coco-0c13ba8dba1aef2f9d9d45c7d5ba7afefc1244434321b3142bda9d3f0f1d2917",
+    "sourceArchive": "coco:card-detector-wmbbb.v8i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 2,
+    "path": "records/coco-1b643002eda1122935028f9dd30d2c01b7caed66c01eb2befed926db9c2568d7.json",
+    "recordId": "coco-1b643002eda1122935028f9dd30d2c01b7caed66c01eb2befed926db9c2568d7",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  },
+  {
+    "instances": 13,
+    "known": 0,
+    "path": "records/coco-12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a.json",
+    "recordId": "coco-12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+    "sourceArchive": "coco:carddetection-hegxe.v7i.coco",
+    "split": "train"
+  },
+  {
+    "instances": 2,
+    "known": 1,
+    "path": "records/coco-50826b0933eb9ad3a81f2898e0b44700999a0b141d30b06ff6854806db413ad1.json",
+    "recordId": "coco-50826b0933eb9ad3a81f2898e0b44700999a0b141d30b06ff6854806db413ad1",
+    "sourceArchive": "coco:card-scanner-seg.v3i.coco-segmentation",
+    "split": "train"
+  }
+]

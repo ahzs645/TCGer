@@ -1,0 +1,19 @@
+{
+  "yolox-pose": {
+    "resultCommit": "538ef66e60e2e773e1fa07553fef6b59f74e8cc7",
+    "rawReportSha256": "c1b75a71d061e1b4a4afa06ddbd7d10a524cf185ca3851e11f916b525a742f25",
+    "evaluationRecords": 600,
+    "exactAcceptedPredictionParityRecords": 600,
+    "colorParity": null
+  },
+  "yolo11s-pose": {
+    "resultCommit": "5e707d3125dd93a9cc340e52182ea4e8730dd10d",
+    "rawReportSha256": "4ff7f76493bd41889e1c293a3338f6ea22fd9b4dc0878abfb92d3988ac4f14b8",
+    "evaluationRecords": 600,
+    "exactAcceptedPredictionParityRecords": 600,
+    "colorParity": {
+      "pilBgrPredictionParityPassed": true,
+      "recordId": "coco-8370531ed30dadc164573654dc8526d6d4c982e294ef27eddb0f922932a03c28"
+    }
+  }
+}
