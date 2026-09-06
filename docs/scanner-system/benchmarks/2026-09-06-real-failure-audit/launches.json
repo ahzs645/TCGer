@@ -1,0 +1,78 @@
+[
+  {
+    "operation": "run",
+    "outcome": {
+      "kind": "job",
+      "job": {
+        "id": "6a9dea44e686246ca69a6bfb",
+        "url": "https://huggingface.co/jobs/ahzs645/6a9dea44e686246ca69a6bfb",
+        "created_at": "2026-09-06T22:33:40.361Z",
+        "docker_image": "pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806",
+        "arguments": [],
+        "environment_variable_names": [],
+        "secret_names": [
+          "0"
+        ],
+        "flavor": "l4x1",
+        "status": {
+          "stage": "SCHEDULING",
+          "message": null
+        },
+        "owner": {
+          "id": "684cda58d7e0d83496c9b780",
+          "name": "ahzs645",
+          "type": "user"
+        },
+        "created_by": {
+          "id": "684cda58d7e0d83496c9b780",
+          "name": "ahzs645"
+        },
+        "labels": {},
+        "timeout_seconds": 2700
+      },
+      "logs": [],
+      "logs_finished": false,
+      "logs_truncated": true
+    },
+    "total_results": 1,
+    "results_shared": 1
+  },
+  {
+    "operation": "run",
+    "outcome": {
+      "kind": "job",
+      "job": {
+        "id": "6a9dea4f259f8e97255e8917",
+        "url": "https://huggingface.co/jobs/ahzs645/6a9dea4f259f8e97255e8917",
+        "created_at": "2026-09-06T22:33:51.479Z",
+        "docker_image": "pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee",
+        "arguments": [],
+        "environment_variable_names": [],
+        "secret_names": [
+          "0"
+        ],
+        "flavor": "l4x1",
+        "status": {
+          "stage": "SCHEDULING",
+          "message": null
+        },
+        "owner": {
+          "id": "684cda58d7e0d83496c9b780",
+          "name": "ahzs645",
+          "type": "user"
+        },
+        "created_by": {
+          "id": "684cda58d7e0d83496c9b780",
+          "name": "ahzs645"
+        },
+        "labels": {},
+        "timeout_seconds": 2700
+      },
+      "logs": [],
+      "logs_finished": false,
+      "logs_truncated": true
+    },
+    "total_results": 1,
+    "results_shared": 1
+  }
+]
