@@ -98,9 +98,18 @@ def run(root: Path, mmyolo_root: Path):
     validate_resume_checkpoint(mmyolo_root, config_path,
                                root/'training'/'epoch_1.pth', root)
     resume_validation=json.loads((root/'resume-validation.json').read_text())
+    from mmcv.transforms import Compose
+    from mmdet.apis import inference_detector
+    from evaluate_geometry_candidate import yolox_array_pipeline, as_numpy
+    import numpy as np
+    runner.model.cfg = cfg
+    raw_predictions = inference_detector(runner.model, np.zeros((120, 160, 3), dtype=np.uint8),
+        test_pipeline=Compose(yolox_array_pipeline(cfg.inference_pipeline)))
+    assert np.isfinite(as_numpy(raw_predictions.pred_instances.keypoints)).all()
     report={'diagnosticOnly':True,'sourceRepair':repair,'materialization':materialization,
             'retainedInstancesPerImage':counts,'boxOnlyBatchLosses':box_losses,
             'validation':validation,'resumeValidation':resume_validation,
+            'rawArrayInferencePassed':True,
             'learningRate':cfg.optim_wrapper.optimizer.lr,
             'validationBegin':cfg.train_cfg.val_begin,'validationInterval':cfg.train_cfg.val_interval,
             'batchAugments':cfg.model.data_preprocessor.batch_augments}

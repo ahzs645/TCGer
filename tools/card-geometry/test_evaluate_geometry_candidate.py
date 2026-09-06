@@ -15,10 +15,22 @@ from evaluate_geometry_candidate import (
     configure_yolox_test,
     padded_image,
     source_point,
+    yolox_array_pipeline,
 )
 
 
 class EvaluateGeometryCandidateTests(unittest.TestCase):
+    def test_array_pipeline_retains_transforms_without_mutating_labeled_metadata(self):
+        pipeline = [dict(type='LoadImageFromFile', to_float32=True),
+                    dict(type='Resize', scale=(640, 640), keep_ratio=True),
+                    dict(type='PackDetInputs', meta_keys=('id', 'img_id', 'scale_factor'))]
+        original = copy.deepcopy(pipeline)
+        raw = yolox_array_pipeline(pipeline)
+        self.assertEqual(pipeline, original)
+        self.assertEqual(raw[0], dict(type='mmdet.LoadImageFromNDArray', to_float32=True))
+        self.assertEqual(raw[1], pipeline[1])
+        self.assertEqual(raw[-1]['meta_keys'], ('img_id', 'scale_factor'))
+
     def test_as_numpy_accepts_arrays_and_tensor_protocol(self):
         array = np.asarray([[1.0, 2.0]], dtype=np.float32)
         self.assertIs(as_numpy(array), array)

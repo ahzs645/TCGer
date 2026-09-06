@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import copy
 import json
 import os
 import subprocess
@@ -43,6 +44,22 @@ class AttributeDict(dict):
             return self[name]
         except KeyError as error:
             raise AttributeError(name) from error
+
+
+def yolox_array_pipeline(pipeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Adapt a copied pipeline for arrays that have no annotation sample ID.
+
+    Keep `id` in the labeled evaluator's pipeline. MMDetection supplies img_id
+    for raw arrays, but no annotation id; the portable benchmark owns record IDs.
+    """
+    pipeline = copy.deepcopy(pipeline)
+    if pipeline[0]['type'] != 'LoadImageFromFile':
+        raise ValueError('unexpected YOLOX inference image loader')
+    pipeline[0]['type'] = 'mmdet.LoadImageFromNDArray'
+    for step in pipeline:
+        if step['type'] == 'PackDetInputs':
+            step['meta_keys'] = tuple(key for key in step['meta_keys'] if key != 'id')
+    return pipeline
 
 
 def configure_yolox_test(model: Any) -> AttributeDict:
@@ -154,12 +171,14 @@ class Predictor:
             self.model.eval()
             self.torch = torch
         else:
+            from mmcv.transforms import Compose
             from mmdet.apis import init_detector
 
             checkpoint = verified(find_one(output, ("training/repeat-0/*.pth", "**/*.pth")))
             config = find_one(output, ("yolox-pose-card.py", "**/yolox-pose-card.py"))
             self.model = init_detector(str(config), str(checkpoint), device=device)
             configure_yolox_test(self.model)
+            self.yolox_pipeline = Compose(yolox_array_pipeline(self.model.cfg.inference_pipeline))
 
     def predict_yolo(self, image: Image.Image, width: int, height: int) -> list[dict[str, Any]]:
         result = self.model.predict(
@@ -237,7 +256,7 @@ class Predictor:
     def predict_yolox(self, image: Image.Image, width: int, height: int) -> list[dict[str, Any]]:
         from mmdet.apis import inference_detector
 
-        result = inference_detector(self.model, np.asarray(image))
+        result = inference_detector(self.model, np.asarray(image), test_pipeline=self.yolox_pipeline)
         predictions = result.pred_instances
         if not hasattr(predictions, "keypoints"):
             return []
