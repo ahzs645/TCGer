@@ -1,0 +1,67 @@
+{
+  "configFiles": {
+    "yolox-pose": {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-06-yolox-loss-repair/yolox-pose.json",
+      "path": "geometry/repair-runs/ac20f7956d722cbca9928fc3eef9311bc1d736c3/yolox-pose.json",
+      "sha256": "c1394f129f8e0add2f789d70b3b2296bc553373a1d93ddf86c8bb10334d6bb73"
+    }
+  },
+  "corpus": {
+    "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "cabee73ac46a5901cc3060cfd17b7c63408bf66a",
+    "policyId": "training-minimums-v3",
+    "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+    "preflightReport": {
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    },
+    "releasePath": "geometry/releases/card-geometry-training-round-two-v1"
+  },
+  "executionOrder": [
+    "mixed-precision runtime fixture and file/array color parity",
+    "training and cross-release preflight",
+    "50-epoch training",
+    "persist checkpoints",
+    "self-evaluate all training records and require one match",
+    "pinned real and synthetic benchmarks",
+    "recognition replay",
+    "persist final reports"
+  ],
+  "experiments": {
+    "yolox-pose": {
+      "bakeoffId": "card-geometry-yolox-loss-repair-v1",
+      "candidate": "yolox-pose",
+      "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "experimentHash": "08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2",
+      "fairnessHash": "207664bfa5e9af2f6aea880e5795f182677d091eee683c59161dcfc42eeccdf0",
+      "framework": "mmyolo",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v3",
+      "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+      "resolvedConfigSha256": "08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "initialization": {
+    "mode": "fresh-from-pinned-original-base",
+    "optimizerState": "fresh",
+    "seed": 20260905
+  },
+  "localVerification": {
+    "geometryTestsPassed": 234,
+    "ruff": "clean"
+  },
+  "preflight": {
+    "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/preflight-report.json",
+    "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+    "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+  },
+  "tooling": {
+    "localPath": ".artifacts/card-geometry/yolox-loss-repair-tooling.tar.gz",
+    "path": "geometry/tooling/ac20f7956d722cbca9928fc3eef9311bc1d736c3/card-geometry-tooling.tar.gz",
+    "sha256": "33b341ec4eb7e32f69cd374a8728dd024908d67252a82ee2eb296391c07d7198"
+  },
+  "toolingRevision": "ac20f7956d722cbca9928fc3eef9311bc1d736c3"
+}
