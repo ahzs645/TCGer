@@ -13,3 +13,11 @@ Experiment hash: `08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963
 Fairness hash: `207664bfa5e9af2f6aea880e5795f182677d091eee683c59161dcfc42eeccdf0`.
 
 No settings will be selected from this follow-up's held-out results. Passing execution checks will be reported separately from model accuracy. Any later export or device measurement remains separate from this training/self-evaluation/benchmark sequence.
+
+## Launch and runtime evidence
+
+[Job 6a9d91e8259f8e97255e75af](https://huggingface.co/jobs/ahzs645/6a9d91e8259f8e97255e75af) was submitted on one L4 with a 12-hour limit. The [published input receipt](input-publication.json), [exact job command](job-command.json) and [launch receipt](launch-report.json) preserve its execution lineage.
+
+The [runtime fixture report](runtime-validation.json), captured from this job's `TCGER_RUNTIME_EVIDENCE` log, passes the integrated normalized-loss mixed-precision path, the separate `tools/test.py` validation process, raw-array inference and exact colored-image file/array preprocessing parity. Its box-only batch has corner loss exactly zero while retaining finite box/objectness losses. This one-step fixture is an execution check, not an accuracy result.
+
+Full-corpus training, train-split self-evaluation and benchmark results are pending.
