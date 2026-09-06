@@ -1,0 +1,21 @@
+{
+  "action": "train",
+  "bakeoffId": "card-geometry-yolox-loss-repair-v1",
+  "candidate": "yolox-pose",
+  "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2",
+  "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+  "elapsedSeconds": 21296.575759,
+  "experimentHash": "08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2",
+  "exportDestination": "private-model-repo",
+  "exportFormat": null,
+  "fairnessHash": "207664bfa5e9af2f6aea880e5795f182677d091eee683c59161dcfc42eeccdf0",
+  "framework": "mmyolo",
+  "licenseRoute": "permissive",
+  "policyId": "training-minimums-v3",
+  "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+  "preflightCommit": "59e164d25de91dc21103c8e5d8288863a33af7f5",
+  "resolvedConfigCommit": "75aea8e8db993bc948d0954203c27c8e51b49a64",
+  "resolvedConfigSha256": "08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2",
+  "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1",
+  "wrapperElapsedHours": 5.915715488
+}

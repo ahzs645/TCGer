@@ -1,0 +1,19 @@
+{
+  "jobId": "6a9d91e8259f8e97255e75af",
+  "jobStatus": "COMPLETED",
+  "modelRepo": "ahzs645/tcger-universal-arcface",
+  "resultRevision": "a6dc39fbf3c4dde47402a9b0ca28124330dd3507",
+  "checkpointSha256": "8ee7d280b65e438742f4d7a2c3684c3f00701b0204361a16616b836fedf4f41c",
+  "files": {
+    "run-train.json": "6e2cbd1896809669b09236e6931960af1deb610238dddb27857e0ba00a20494b",
+    "trainer-summary.json": "21c99f33548063a6236a71270c731acff1661787ba7073fe271c3550827f8595",
+    "evaluation-summary.json": "df6343f76f1340bec61e8c0af011e1d27f0e17f401a6fae4e4857736c26228cc",
+    "real-v3.benchmark.json": "bba9ed1d86bb2f05fc7d5f7d19192ae8f87b8214d471a43c81d9aeec9d115f76",
+    "synthetic-duel-field.benchmark.json": "8468139a4bbdf010ff76924cc13477725b226150478cb54153a853679b0d86f1",
+    "recognition-replay.json": "1a248c84bfff0fa7b2f1facd012e60f3124f685329d14f557ceef6060229c8ea"
+  },
+  "trainingSelfEvaluationGatePassed": true,
+  "expectedBenchmarkRecordCountsVerified": true,
+  "pinnedCorpusHashesVerified": true,
+  "benchmarkAndReplayReportHashesVerified": true
+}
