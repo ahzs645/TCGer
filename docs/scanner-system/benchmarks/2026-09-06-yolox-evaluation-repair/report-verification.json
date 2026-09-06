@@ -1,0 +1,18 @@
+[
+  {
+    "release": "real-geometry-evaluation-v6-full-aliases-v2",
+    "records": 600,
+    "acceptedQuads": 0,
+    "artifactHashesVerified": true,
+    "recordCoverageExact": true,
+    "bothCorpusHashesVerified": true
+  },
+  {
+    "release": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2",
+    "records": 1000,
+    "acceptedQuads": 0,
+    "artifactHashesVerified": true,
+    "recordCoverageExact": true,
+    "bothCorpusHashesVerified": true
+  }
+]

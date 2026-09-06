@@ -1,0 +1,80 @@
+{
+  "batchAugments": null,
+  "boxOnlyBatchLosses": {
+    "loss": 33.23472595214844,
+    "loss_bbox": 0.707978367805481,
+    "loss_cls": 0.004721361678093672,
+    "loss_kpt": 30.0,
+    "loss_obj": 0.5614529252052307,
+    "loss_vis": 1.9605724811553955
+  },
+  "diagnosticOnly": true,
+  "learningRate": 0.00025,
+  "materialization": {
+    "contextPadding": {
+      "cornerMapping": "(x*sourceWidth+left)/(sourceWidth+left+right)",
+      "fillRgb": [
+        0,
+        0,
+        0
+      ],
+      "order": "source -> black context padding -> MMYOLO letterbox"
+    },
+    "corpusHash": "fixture-only",
+    "counts": {
+      "instances:train": 5,
+      "instances:validation": 5,
+      "records:train": 4,
+      "records:validation": 4
+    },
+    "realContextMarginPolicy": {
+      "application": "each-side",
+      "fraction": 0.125,
+      "kind": "fraction-of-long-side",
+      "rounding": "ceil"
+    }
+  },
+  "rawArrayInferencePassed": true,
+  "resumeValidation": {
+    "checkpointSha256": "02342a5187815b775556060b6067698ceb49c897284f1ef3b9967ab788cf9713",
+    "command": [
+      "/opt/conda/bin/python",
+      "/work/mmyolo/tools/test.py",
+      "/work/yolox-evaluation-fixture/yolox-pose-card.py",
+      "/work/yolox-evaluation-fixture/training/epoch_1.pth",
+      "--work-dir",
+      "/work/yolox-evaluation-fixture/resume-validation"
+    ],
+    "fullValidationPassed": true
+  },
+  "retainedInstancesPerImage": [
+    1,
+    1,
+    2,
+    1
+  ],
+  "sourceRepair": {
+    "changes": [
+      "bind missing local cfg to self.test_cfg",
+      "clamp visibility-loss denominator for box-only batches",
+      "preserve all pre-NMS keypoint candidates and select exactly the returned boxes"
+    ],
+    "originalSha256": "701ccb1c2e7bebc4e56848ce181ded2710d5b007c783bc78bbea52142a992af3",
+    "path": "mmyolo/models/dense_heads/yolox_pose_head.py",
+    "repairedSha256": "9b2cb9e6bac72d87ab42924ababe984ba0783cda3ddaba4b3a3165c1df42b186"
+  },
+  "validation": {
+    "coco/AP": 0.0,
+    "coco/AP (L)": -1.0,
+    "coco/AP (M)": 0.0,
+    "coco/AP .5": 0.0,
+    "coco/AP .75": 0.0,
+    "coco/AR": 0.0,
+    "coco/AR (L)": -1.0,
+    "coco/AR (M)": 0.0,
+    "coco/AR .5": 0.0,
+    "coco/AR .75": 0.0
+  },
+  "validationBegin": 1,
+  "validationInterval": 1
+}

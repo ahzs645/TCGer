@@ -1,0 +1,8 @@
+{
+  "jobId": "6a9cea2ce686246ca69a4e6c",
+  "repo": "ahzs645/tcger-universal-arcface",
+  "revision": "79efef73131b4c8323bca20322d5d4ae5b67e6df",
+  "path": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118/evaluation-reruns/6a96e1982e97d50520dd38fb25fb03a272755960/raw-output-diagnostic.json",
+  "sha256": "28b0401b7da00ee4a9193b8e8a5098dd54607f4832e029ecc26ee633225e5f0b",
+  "commandSha256": "acfd154bcf6a910db684710a81d98e53fc39c0df217356978c085084d806bf5d"
+}

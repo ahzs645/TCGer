@@ -1,0 +1,39 @@
+{
+  "repo": "ahzs645/tcger-universal-arcface",
+  "revision": "55ad75224ad1d7c90e5931e5dfda601226a248f4",
+  "prefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/c9bfaa144ceebe71ec70cc4978e3ce560413957fb5f1ad9e8f66f7113c0c9118/evaluation-reruns/6a96e1982e97d50520dd38fb25fb03a272755960",
+  "files": {
+    "evaluation-restart-report.json": {
+      "sha256": "81e1f2cc6025a89c8d2bcc5470e218d20323fd5a47da33bb7a7d5b879dd3ee70",
+      "bytes": 7055
+    },
+    "lineage.json": {
+      "sha256": "a7db4efd6a4934c20867e7727356d5224eb817d17836ff3dd497acc335d147cb",
+      "bytes": 5155
+    },
+    "evaluation/evaluation-summary.json": {
+      "sha256": "6907117c69eafbc7920e31e2cdcc07e5dbde49969707dfcc9c760ebbad493f6b",
+      "bytes": 1270
+    },
+    "evaluation/real-v3.benchmark.json": {
+      "sha256": "47e899342cedbf285e6726a3bd3339b2a5a7f928c7725f9925f8cd2a52b9405d",
+      "bytes": 12863
+    },
+    "evaluation/synthetic-duel-field.benchmark.json": {
+      "sha256": "dc8556577474b0082b76a093869807f4c788d771b6e0f03296304ece075e5a32",
+      "bytes": 13041
+    },
+    "evaluation/recognition-replay.json": {
+      "sha256": "ed0bbfc1aaea8888a42180b76f6f8d7c634ae934ad2c03d27b4788699264d17a",
+      "bytes": 18480
+    },
+    "evaluation/real-v3.predictions.jsonl": {
+      "sha256": "2a77cd6229435de9e9e7ce2a6f3b2d35c86aeb1a828cbdda50f5149c785c390a",
+      "bytes": 73678
+    },
+    "evaluation/synthetic-duel-field.predictions.jsonl": {
+      "sha256": "405473bca16a885e72900531628a3ef5b934db0bbd41847f58f49a8de9892f41",
+      "bytes": 118850
+    }
+  }
+}
