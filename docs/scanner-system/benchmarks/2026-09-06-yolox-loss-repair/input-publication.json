@@ -1,0 +1,23 @@
+{
+  "experimentHash": "08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2",
+  "files": [
+    {
+      "localPath": ".artifacts/card-geometry/yolox-loss-repair-tooling.tar.gz",
+      "path": "geometry/tooling/ac20f7956d722cbca9928fc3eef9311bc1d736c3/card-geometry-tooling.tar.gz",
+      "sha256": "33b341ec4eb7e32f69cd374a8728dd024908d67252a82ee2eb296391c07d7198"
+    },
+    {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-05-round-two-freeze/preflight-report.json",
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    },
+    {
+      "localPath": "docs/scanner-system/benchmarks/2026-09-06-yolox-loss-repair/yolox-pose.json",
+      "path": "geometry/repair-runs/ac20f7956d722cbca9928fc3eef9311bc1d736c3/yolox-pose.json",
+      "sha256": "c1394f129f8e0add2f789d70b3b2296bc553373a1d93ddf86c8bb10334d6bb73"
+    }
+  ],
+  "inputCommit": "de941f663d2290aeb33b738cef0b0393b4c2e2ef",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "jobCommandSha256": "35d4dc426d8931716ae7e105ce81327a71ed19af20f75ffe3390868e38933f8b"
+}
