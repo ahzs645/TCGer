@@ -336,8 +336,18 @@ def scaled_learning_rate(batch: int) -> float:
 
 
 def write_config(
-    *, mmyolo_root: Path, dataset: Path, output: Path, epochs: int, batch: int, workers: int, seed: int
+    *, mmyolo_root: Path, dataset: Path, output: Path, epochs: int, batch: int, workers: int, seed: int,
+    corner_loss: dict[str, Any] | None = None,
 ) -> Path:
+    corner_loss = corner_loss or {"kind": "oks-v1", "lossWeight": 30.0}
+    if (set(corner_loss) != {"kind", "lossWeight"}
+            or corner_loss["kind"] not in {"oks-v1", "normalized-l1-v1"}
+            or corner_loss["lossWeight"] != 30.0):
+        raise ValueError("unsupported YOLOX corner loss specification")
+    normalized = corner_loss["kind"] == "normalized-l1-v1"
+    loss_config = ("loss_pose=dict(_delete_=True, type='NormalizedCornerLoss', loss_weight=30.0)"
+                   if normalized else "loss_pose=dict(_delete_=True, type='OksLoss', "
+                   "metainfo=metainfo_file, loss_weight=30.0)")
     base = mmyolo_root / "configs/yolox/pose/yolox-pose_s_8xb32-300e-rtmdet-hyp_coco.py"
     if not base.is_file():
         raise ValueError(f"pinned MMYOLO checkout lacks YOLOX-Pose config: {base}")
@@ -368,6 +378,8 @@ def write_config(
         "\n".join(
             [
                 f"_base_ = {str(base)!r}",
+                ("custom_imports = dict(imports=['yolox_corner_loss_registry'], allow_failed_imports=False)"
+                 if normalized else "# Original OKS objective; no custom loss import"),
                 f"data_root = {str(dataset.resolve()) + '/'!r}",
                 f"metainfo_file = {METAINFO_FILE!r}",
                 "metainfo = dict(from_file=metainfo_file)",
@@ -378,8 +390,7 @@ def write_config(
                 f"inference_pipeline = {inference_pipeline}",
                 "model = dict(data_preprocessor=dict(batch_augments=None), "
                 "bbox_head=dict(head_module=dict(num_keypoints=4), "
-                "loss_pose=dict(_delete_=True, type='OksLoss', metainfo=metainfo_file, "
-                "loss_weight=30.0)), train_cfg=dict(assigner=dict("
+                f"{loss_config}), train_cfg=dict(assigner=dict("
                 "oks_calculator=dict(_delete_=True, type='OksLoss', "
                 "metainfo=metainfo_file))), test_cfg=dict(yolox_style=True, "
                 "multi_label=True, score_thr=0.01, max_per_img=300, "
@@ -437,6 +448,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     source_repair = repair_source(args.mmyolo_root)
     (output / "mmyolo-source-repair.json").write_text(json.dumps(source_repair, indent=2) + "\n")
     resume_checkpoint, resume_epoch, resume_prefix = remote_resume_checkpoint()
+    corner_loss = json.loads(os.environ.get("TCGER_GEOMETRY_YOLOX_CORNER_LOSS",
+                                          '{"kind":"oks-v1","lossWeight":30.0}'))
+    if resume_checkpoint is not None and corner_loss["kind"] != "oks-v1":
+        raise ValueError("loss-repair runs require fresh initialization, not optimizer resume")
     base_checkpoint = output / "base-yolox-pose.pth"
     if resume_checkpoint is None:
         download_verified(args.base_url, args.base_sha256, base_checkpoint)
@@ -450,6 +465,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         batch=args.batch,
         workers=args.workers,
         seed=seed,
+        corner_loss=corner_loss,
     )
     work_dir = output / "training" / "repeat-0"
     if resume_checkpoint is not None:
@@ -468,7 +484,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     persistence = CheckpointPersistence(work_dir)
     persistence_thread = threading.Thread(target=persistence.run, daemon=True)
     persistence_thread.start()
-    process = subprocess.Popen(command)
+    process = subprocess.Popen(command, env=yolox_subprocess_environment())
     returncode = process.wait()
     persistence.stop.set()
     persistence_thread.join()
@@ -501,6 +517,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "errors": dict(sorted(persistence.errors.items())),
         },
         "training": {
+            "cornerLoss": corner_loss,
             "epochs": epochs,
             "inputResolution": int(os.environ["TCGER_GEOMETRY_INPUT_RESOLUTION"]),
             "batch": args.batch,
@@ -525,12 +542,19 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
+def yolox_subprocess_environment() -> dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(Path(__file__).resolve().parent),
+                                                     env.get("PYTHONPATH"))))
+    return env
+
+
 def validate_resume_checkpoint(mmyolo_root: Path, config: Path, checkpoint: Path, output: Path) -> None:
     """Require a full validation pass before resuming optimizer steps."""
     command = [sys.executable, str(mmyolo_root / "tools/test.py"), str(config),
                str(checkpoint), "--work-dir", str(output / "resume-validation")]
     print("YOLOX_RESUME_VALIDATION_START", flush=True)
-    subprocess.run(command, check=True)
+    subprocess.run(command, check=True, env=yolox_subprocess_environment())
     (output / "resume-validation.json").write_text(json.dumps({
         "checkpointSha256": sha256_file(checkpoint), "command": command,
         "fullValidationPassed": True,

@@ -146,6 +146,17 @@ def resolve_config(raw: dict[str, Any], *, pipeline_smoke: bool = False) -> dict
             f"{resolved['candidate']} uses the permissive publication route"
         )
 
+    corner_loss = resolved["fairness"].get("yoloxCornerLoss")
+    self_evaluation = resolved["fairness"].get("trainingSelfEvaluation")
+    if (corner_loss or self_evaluation) and resolved["candidate"] != "yolox-pose":
+        raise ConfigurationError("loss repair and automatic train self-evaluation currently require yolox-pose")
+    if self_evaluation and resolved['fairness']['budget']['kind'] != 'epochs':
+        raise ConfigurationError('train self-evaluation requires a final epoch checkpoint')
+    if corner_loss and corner_loss["kind"] == "normalized-l1-v1":
+        if not self_evaluation or not resolved["execution"].get("evaluationCommand"):
+            raise ConfigurationError("normalized YOLOX loss requires train self-evaluation before benchmarking")
+        if resolved["execution"].get("resumeFrom"):
+            raise ConfigurationError("loss-repair runs require fresh initialization, not optimizer resume")
     resume_from = resolved["execution"].get("resumeFrom")
     if resume_from is not None:
         if resolved["candidate"] != "yolox-pose":
@@ -518,6 +529,28 @@ def _upload_json(api: Any, repo_id: str, path: str, value: Any, message: str) ->
     return str(oid)
 
 
+def run_training_self_evaluation(resolved: dict[str, Any], release: Path,
+                                 output: Path, env: dict[str, str]) -> None:
+    spec = resolved['fairness']['trainingSelfEvaluation']
+    epoch = resolved['fairness']['budget']['value']
+    checkpoint = output / 'training' / 'repeat-0' / f'epoch_{epoch}.pth'
+    print('TRAIN_SELF_EVALUATION_START', flush=True)
+    _run([sys.executable, str(Path(__file__).with_name('self_evaluate_training_split.py')),
+          '--release', str(release), '--output', str(output), '--candidate', resolved['candidate'],
+          '--checkpoint', str(checkpoint), '--checkpoint-sha256', sha256_file(checkpoint),
+          '--corpus-hash', resolved['corpus']['corpusHash'], '--all-training-records',
+          '--minimum-matches', str(spec['minimumMatches'])], env=env)
+    report = load_json(output / 'train-self-evaluation.json')
+    expected_count = sum(e['split'] == 'train' for e in load_json(release / 'manifest.json')['records'])
+    if (report.get('gate', {}).get('failedChecks') != []
+            or report.get('checkpointSha256') != sha256_file(checkpoint)
+            or report.get('sourceCorpusHash') != resolved['corpus']['corpusHash']
+            or report.get('selection', {}).get('records') != expected_count
+            or not report.get('selection', {}).get('allTrainingRecords')):
+        raise RuntimeError('TRAIN_SELF_EVALUATION evidence failed verification')
+    print('TRAIN_SELF_EVALUATION_PASSED', flush=True)
+
+
 def execute(
     resolved: dict[str, Any],
     *,
@@ -564,6 +597,17 @@ def execute(
 
     output = work / "output"
     output.mkdir()
+    if action == 'train' and resolved['fairness'].get('yoloxCornerLoss', {}).get('kind') == 'normalized-l1-v1':
+        evidence_path = Path(os.environ.get('TCGER_GEOMETRY_RUNTIME_VALIDATION_REPORT',
+                                           '/work/yolox-runtime-validation/runtime-validation.json'))
+        evidence = load_json(evidence_path)
+        if (evidence.get('cornerLoss') != resolved['fairness']['yoloxCornerLoss']
+                or not evidence.get('rawArrayInferencePassed')
+                or not evidence.get('fileArrayColorParityPassed')
+                or evidence.get('optimizerWrapper') != 'AmpOptimWrapper'
+                or not evidence.get('resumeValidation', {}).get('fullValidationPassed')):
+            raise RuntimeError('YOLOX loss-repair runtime fixture evidence failed')
+        shutil.copy2(evidence_path, output / 'runtime-validation.json')
     env = os.environ.copy()
     env.update(
         {
@@ -597,6 +641,11 @@ def execute(
         env["TCGER_GEOMETRY_REAL_CONTEXT_POLICY"] = json.dumps(
             resolved["fairness"]["realContextMarginPolicy"], sort_keys=True
         )
+    env.pop("TCGER_GEOMETRY_YOLOX_CORNER_LOSS", None)
+    if "yoloxCornerLoss" in resolved["fairness"]:
+        env["TCGER_GEOMETRY_YOLOX_CORNER_LOSS"] = json.dumps(resolved["fairness"]["yoloxCornerLoss"], sort_keys=True)
+    for key in ("PREFIX", "SHA256", "EPOCH", "JOB_ID"):
+        env.pop(f"TCGER_GEOMETRY_RESUME_{key}", None)
     resume_from = resolved["execution"].get("resumeFrom")
     if resume_from is not None:
         env.update(
@@ -645,6 +694,14 @@ def execute(
             folder_path=str(output), path_in_repo=f"{prefix}/training-output",
             repo_id=checkpoint_repo, repo_type="model",
         )
+        if resolved["fairness"].get("trainingSelfEvaluation"):
+            try:
+                run_training_self_evaluation(resolved, release, output, env)
+            finally:
+                # Retain the diagnostic even when its gate blocks held-out scoring.
+                api.upload_folder(folder_path=str(output), path_in_repo=f"{prefix}/training-output",
+                                  repo_id=checkpoint_repo, repo_type="model",
+                                  allow_patterns=["train-self-*"])
         real_key = "frozenReal" if "frozenReal" in evaluation_roots else "frozenRealV3"
         synthetic_key = "syntheticMultigame" if "syntheticMultigame" in evaluation_roots else "syntheticDuelField"
         real = evaluation_roots[real_key]

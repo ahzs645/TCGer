@@ -213,6 +213,14 @@ class TrainYoloxPoseTests(unittest.TestCase):
             self.assertIn("dataset=dict(_delete_=True, type='PoseCocoDataset'", config)
             self.assertNotIn("Mosaic", config)
             self.assertNotIn("RandomFlip", config)
+            repaired = MODULE.write_config(mmyolo_root=checkout,dataset=dataset,output=output,
+                epochs=50,batch=16,workers=8,seed=20260903,
+                corner_loss={'kind':'normalized-l1-v1','lossWeight':30.0}).read_text()
+            resolved = {}
+            exec(compile(repaired,'<repaired-config>','exec'),resolved)
+            self.assertEqual(resolved['model']['bbox_head']['loss_pose']['type'],'NormalizedCornerLoss')
+            self.assertEqual(resolved['model']['train_cfg']['assigner']['oks_calculator']['type'],'OksLoss')
+            self.assertEqual(resolved['custom_imports']['imports'],['yolox_corner_loss_registry'])
 
 
 if __name__ == "__main__":

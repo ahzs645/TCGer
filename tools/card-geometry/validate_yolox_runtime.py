@@ -43,7 +43,7 @@ def generate_fixture(root: Path):
     (root/'manifest.json').write_text(json.dumps({'diagnosticFixture':True,'corpusHash':'fixture-only','records':entries}))
 
 
-def run(root: Path, mmyolo_root: Path):
+def run(root: Path, mmyolo_root: Path, corner_loss: dict | None = None):
     # Patch before any framework import can cache the original head bytecode.
     repair=repair_source(mmyolo_root)
     from mmengine.config import Config
@@ -61,8 +61,12 @@ def run(root: Path, mmyolo_root: Path):
     generate_fixture(root/'fixture')
     materialization=materialize_coco(root/'fixture',root/'coco',POLICY)
     config_path=write_config(mmyolo_root=mmyolo_root,dataset=root/'coco',output=root,
-                            epochs=1,batch=16,workers=0,seed=20260904)
+                            epochs=1,batch=16,workers=0,seed=20260904,corner_loss=corner_loss)
     cfg=Config.fromfile(config_path)
+    if corner_loss and corner_loss['kind'] == 'normalized-l1-v1':
+        # Match tools/train.py --amp, which the full wrapper always uses.
+        cfg.optim_wrapper.type = 'AmpOptimWrapper'
+        cfg.optim_wrapper.loss_scale = 'dynamic'
     for name in ('train_dataloader','val_dataloader','test_dataloader'):
         cfg[name].persistent_workers=False
     cfg.default_hooks.logger.interval=1
@@ -74,6 +78,9 @@ def run(root: Path, mmyolo_root: Path):
     # Persist runtime overrides for the independent test.py subprocess too.
     cfg.dump(config_path)
     runner=Runner.from_cfg(cfg)
+    if corner_loss and corner_loss['kind'] == 'normalized-l1-v1':
+        from yolox_corner_loss import NormalizedCornerLoss
+        assert isinstance(runner.model.bbox_head.loss_pose, NormalizedCornerLoss)
     runner.train()
     # A separate wholly unknown batch exercises the zero-visible-keypoint path.
     dataset=runner.train_dataloader.dataset
@@ -106,10 +113,22 @@ def run(root: Path, mmyolo_root: Path):
     raw_predictions = inference_detector(runner.model, np.zeros((120, 160, 3), dtype=np.uint8),
         test_pipeline=Compose(yolox_array_pipeline(cfg.inference_pipeline)))
     assert np.isfinite(as_numpy(raw_predictions.pred_instances.keypoints)).all()
+    # Compare complete preprocessing of a colored fixture through file and array loaders.
+    image_path = root/'coco/images/train/train-1.jpg'
+    file_pipeline = copy.deepcopy(cfg.inference_pipeline)
+    file_pipeline[-1]['meta_keys'] = tuple(k for k in file_pipeline[-1]['meta_keys'] if k != 'id')
+    from PIL import Image as PILImage
+    rgb = np.asarray(PILImage.open(image_path).convert('RGB'))
+    file_input = Compose(file_pipeline)(dict(img_path=str(image_path),img_id=1))['inputs']
+    array_input = Compose(yolox_array_pipeline(cfg.inference_pipeline))(
+        dict(img=rgb[:,:,::-1].copy(),img_id=1))['inputs']
+    torch.testing.assert_close(file_input,array_input,rtol=0,atol=0)
     report={'diagnosticOnly':True,'sourceRepair':repair,'materialization':materialization,
             'retainedInstancesPerImage':counts,'boxOnlyBatchLosses':box_losses,
             'validation':validation,'resumeValidation':resume_validation,
             'rawArrayInferencePassed':True,
+            'fileArrayColorParityPassed':True,'optimizerWrapper':cfg.optim_wrapper.type,
+            'cornerLoss':corner_loss or {'kind':'oks-v1','lossWeight':30.0},
             'learningRate':cfg.optim_wrapper.optimizer.lr,
             'validationBegin':cfg.train_cfg.val_begin,'validationInterval':cfg.train_cfg.val_interval,
             'batchAugments':cfg.model.data_preprocessor.batch_augments}
@@ -122,5 +141,8 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--mmyolo-root',type=Path,required=True)
+    parser.add_argument('--experiment-config',type=Path)
     args=parser.parse_args()
-    run(args.output,args.mmyolo_root)
+    loss = (json.loads(args.experiment_config.read_text())['fairness'].get('yoloxCornerLoss')
+            if args.experiment_config else None)
+    run(args.output,args.mmyolo_root,loss)

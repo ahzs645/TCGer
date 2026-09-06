@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tcger.app/schemas/card-geometry-experiment-config/v2",
-  "title": "TCGer card-geometry experiment config v1",
+  "title": "TCGer card-geometry experiment config v2",
   "description": "A fully resolved, hashable training and evaluation configuration for one candidate in the shared geometry licensing bake-off.",
   "type": "object",
   "additionalProperties": false,
@@ -281,6 +281,42 @@
               "$ref": "#/$defs/sha256"
             }
           }
+        },
+        "yoloxCornerLoss": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "lossWeight"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "oks-v1",
+                "normalized-l1-v1"
+              ]
+            },
+            "lossWeight": {
+              "const": 30.0
+            }
+          }
+        },
+        "trainingSelfEvaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selection",
+            "minimumMatches"
+          ],
+          "properties": {
+            "selection": {
+              "const": "all-training-records"
+            },
+            "minimumMatches": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     },
@@ -378,7 +414,8 @@
               "framework-internal-validation",
               "training-resume-lineage",
               "input-resolution",
-              "corpus-release"
+              "corpus-release",
+              "training-objective"
             ]
           },
           "candidateValue": {},

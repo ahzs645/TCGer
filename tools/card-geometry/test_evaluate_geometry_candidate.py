@@ -1,6 +1,8 @@
 import copy
 import tempfile
 import unittest
+import sys
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,10 +18,23 @@ from evaluate_geometry_candidate import (
     padded_image,
     source_point,
     yolox_array_pipeline,
+    Predictor,
 )
 
 
 class EvaluateGeometryCandidateTests(unittest.TestCase):
+    def test_yolox_converts_pil_rgb_to_file_loader_bgr(self):
+        observed = []
+        def infer(model, pixels, **kwargs):
+            observed.append(pixels.copy())
+            return SimpleNamespace(pred_instances=SimpleNamespace())
+        predictor = Predictor.__new__(Predictor)
+        predictor.model = object()
+        predictor.yolox_pipeline = object()
+        with patch.dict(sys.modules, {'mmdet.apis':SimpleNamespace(inference_detector=infer)}):
+            self.assertEqual(predictor.predict_yolox(Image.new('RGB',(2,2),(10,20,200)),2,2),[])
+        np.testing.assert_array_equal(observed[0][0,0],[200,20,10])
+
     def test_array_pipeline_retains_transforms_without_mutating_labeled_metadata(self):
         pipeline = [dict(type='LoadImageFromFile', to_float32=True),
                     dict(type='Resize', scale=(640, 640), keep_ratio=True),

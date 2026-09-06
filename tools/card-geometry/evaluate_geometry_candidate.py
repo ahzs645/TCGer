@@ -256,7 +256,9 @@ class Predictor:
     def predict_yolox(self, image: Image.Image, width: int, height: int) -> list[dict[str, Any]]:
         from mmdet.apis import inference_detector
 
-        result = inference_detector(self.model, np.asarray(image), test_pipeline=self.yolox_pipeline)
+        # MMDetection's file loader emits BGR. Match it for PIL RGB inputs.
+        result = inference_detector(self.model, np.asarray(image)[:, :, ::-1].copy(),
+                                    test_pipeline=self.yolox_pipeline)
         predictions = result.pred_instances
         if not hasattr(predictions, "keypoints"):
             return []

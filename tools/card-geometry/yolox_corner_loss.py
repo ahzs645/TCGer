@@ -1,4 +1,4 @@
-"""Non-saturating coordinate objective for diagnostic YOLOX repair runs.
+"""Non-saturating coordinate objective for explicitly configured YOLOX runs.
 
 This module does not alter the frozen OksLoss experiment. Targets are normalized
 by the box diagonal so the coordinate objective is independent of image scale.

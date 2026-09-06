@@ -424,7 +424,8 @@ Path('/work/preflight-report.json').write_bytes(preflight.read_bytes())
     if candidate == "yolox-pose" and action == "train":
         shell.append(
             "python tools/card-geometry/validate_yolox_runtime.py "
-            "--mmyolo-root /work/mmyolo --output /work/yolox-runtime-validation"
+            "--mmyolo-root /work/mmyolo --output /work/yolox-runtime-validation "
+            "--experiment-config /work/experiment.json"
         )
     shell.append(
         "python tools/card-geometry/run_card_geometry_hf_job.py "

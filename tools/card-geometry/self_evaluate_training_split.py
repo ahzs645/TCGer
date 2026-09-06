@@ -19,10 +19,10 @@ import evaluate_geometry_candidate as inference
 from benchmark_geometry import Truth, _truth_geometry, _geometry_source, evaluate
 from corpus_release import canonical_json, sha256_bytes, corpus_hash
 from train_yolo_pose import load_json, sha256_file
-from training_geometry import context_margins
+from training_geometry import context_margins, context_policy_from_environment
 
 
-def select_entries(manifest: dict, per_scene: int) -> list[dict]:
+def select_entries(manifest: dict, per_scene: int | None) -> list[dict]:
     groups = defaultdict(list)
     for entry in manifest['records']:
         if entry['split'] == 'train':
@@ -33,7 +33,8 @@ def select_entries(manifest: dict, per_scene: int) -> list[dict]:
 
 def run(release: Path, output: Path, candidate: str, checkpoint: Path,
         checkpoint_sha256: str, expected_corpus_hash: str, device: str,
-        per_scene: int = 32) -> dict:
+        per_scene: int | None = 32, real_context_policy: dict | None = None,
+        minimum_matches: int | None = None) -> dict:
     manifest = load_json(release/'manifest.json')
     if manifest['corpusHash'] != expected_corpus_hash or corpus_hash(manifest) != expected_corpus_hash:
         raise ValueError('historical corpus hash mismatch')
@@ -57,9 +58,7 @@ def run(release: Path, output: Path, candidate: str, checkpoint: Path,
             image_path=release/record['source']['path']
             if sha256_file(image_path) != record['source']['sha256']:
                 raise ValueError('training image hash mismatch')
-            if record['source']['kind'] != 'synthetic':
-                raise ValueError('historical diagnostic currently supports synthetic training records only')
-            margins=context_margins(record,None)
+            margins=context_margins(record,real_context_policy)
             inference.CONTEXT_MARGIN=margins
             image,width,height=inference.padded_image(image_path)
             # Reproduce the exact JPEG materialization used by the trainers.
@@ -77,6 +76,8 @@ def run(release: Path, output: Path, candidate: str, checkpoint: Path,
                                     width,height,instance,_truth_geometry(instance),_geometry_source(instance)))
             identities.append({'recordId':entry['recordId'],'recordSha256':entry['sha256'],
                                'imageSha256':record['source']['sha256'],'contextMargins':margins})
+            if len(identities) % 250 == 0:
+                print(f'TRAIN_SELF_EVALUATION_PROGRESS={len(identities)}/{len(entries)}',flush=True)
     finally:
         inference.CONTEXT_MARGIN=original_margin
     policy=load_json(policy_path)
@@ -84,15 +85,28 @@ def run(release: Path, output: Path, candidate: str, checkpoint: Path,
     report={'schema':'https://tcger.app/reports/historical-train-split-diagnostic/v1',
             'diagnosticOnly':True,'candidate':candidate,'sourceCorpusHash':expected_corpus_hash,
             'checkpointSha256':checkpoint_sha256,'device':device,
+            'realContextMarginPolicy':real_context_policy,
             'selection':{'split':'train','perScene':per_scene,'ordering':'sha256(recordId)',
+                         'allTrainingRecords':per_scene is None,
                          'records':len(entries),'sampleHash':sha256_bytes(canonical_json(identities))},
             'inputHashes':identities,'metrics':metrics}
+    if minimum_matches is not None:
+        report['gate'] = training_match_gate(metrics, minimum_matches)
     output.mkdir(parents=True,exist_ok=True)
     (output/'train-self-evaluation.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
     with (output/'train-self-predictions.jsonl').open('w') as handle:
         for record_id,results in predictions.items():
             handle.write(json.dumps({'recordId':record_id,'localizerId':candidate,'results':results})+'\n')
+    if report.get('gate', {}).get('failedChecks'):
+        raise ValueError('TRAIN_SELF_EVALUATION failed: insufficient matched training instances')
     return report
+
+
+def training_match_gate(metrics: dict, minimum_matches: int) -> dict:
+    matches = metrics['detection']['overall']['matches']
+    return {'minimumMatches':minimum_matches,'matches':matches,
+            'failedChecks':[] if matches >= minimum_matches else ['TRAIN_SELF_EVALUATION'],
+            'meaning':'Nonzero fitting sanity check; not a held-out quality or deployment gate'}
 
 
 def main():
@@ -105,11 +119,16 @@ def main():
     parser.add_argument('--corpus-hash',required=True)
     parser.add_argument('--device',default='cuda')
     parser.add_argument('--per-scene',type=int,default=32)
+    parser.add_argument('--all-training-records',action='store_true')
+    parser.add_argument('--minimum-matches',type=int)
     args=parser.parse_args()
     if args.per_scene < 1:
         parser.error('--per-scene must be positive')
+    if args.minimum_matches is not None and args.minimum_matches < 1:
+        parser.error('--minimum-matches must be positive')
     report=run(args.release,args.output,args.candidate,args.checkpoint,args.checkpoint_sha256,
-               args.corpus_hash,args.device,args.per_scene)
+               args.corpus_hash,args.device,None if args.all_training_records else args.per_scene,
+               context_policy_from_environment(),args.minimum_matches)
     print(json.dumps({'selection':report['selection'],'detection':report['metrics']['detection']},sort_keys=True))
 
 
