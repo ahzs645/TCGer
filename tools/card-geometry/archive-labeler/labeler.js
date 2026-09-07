@@ -25,8 +25,20 @@ function seedBox(key) {
   const b = state.frame.instances.find((i) => String(i.sourceAnnotationIndex) === key).seedBox;
   return [[b.left, b.top], [b.right, b.top], [b.right, b.bottom], [b.left, b.bottom]];
 }
+// Direction the printed top points in the photo (quarter turns clockwise from
+// image-up). The printed top-left of a card whose top points right is the
+// image top-right corner of its box, and so on.
+function direction() { return Number($("#direction").value) || 0; }
+function rotateOrder(quad, turns) {
+  const k = ((turns % 4) + 4) % 4;
+  return quad.slice(k).concat(quad.slice(0, k));
+}
+function rotateLabel(t, turns) {
+  t.corners = rotateOrder(t.corners, turns);
+  t.cornerVisibility = rotateOrder(t.cornerVisibility, turns);
+}
 function seeded(key) {
-  return { corners: seedBox(key), cornerVisibility: ["visible", "visible", "visible", "visible"], orientationKnown: true, status: "seeded" };
+  return { corners: rotateOrder(seedBox(key), direction()), cornerVisibility: ["visible", "visible", "visible", "visible"], orientationKnown: true, status: "seeded" };
 }
 function isLabel(t) { return t && (t.skip || t.status === "edited" || t.status === "confirmed"); }
 function frameGeom(canvas) {
@@ -95,7 +107,22 @@ function draw() {
     zc.drawImage(state.image, p[0] * state.image.width - 32, p[1] * state.image.height - 32, 64, 64, 0, 0, z.width, z.height);
     zc.strokeStyle = "#ffc465"; zc.beginPath(); zc.moveTo(100, 110); zc.lineTo(120, 110); zc.moveTo(110, 100); zc.lineTo(110, 120); zc.stroke();
   }
-  hint(); targetList();
+  hint(); targetList(); drawStrip();
+}
+function drawStrip() {
+  const strip = $("#strip");
+  strip.replaceChildren(...state.keys.map((key, i) => {
+    const t = state.targets[key], c = document.createElement("canvas");
+    c.width = 60; c.height = 84;
+    c.className = (i === state.active ? "active " : "") + (t.skip ? "skip" : t.status);
+    c.title = `Card ${i + 1} · ${t.skip ? "skipped" : t.status === "seeded" ? "untouched" : "labeled"} · click to select`;
+    if (!t.skip) preview(c, t.corners);
+    const ctx = c.getContext("2d");
+    ctx.font = "bold 11px system-ui"; ctx.fillStyle = "#fff"; ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+    ctx.strokeText(String(i + 1), 3, 12); ctx.fillText(String(i + 1), 3, 12);
+    c.onclick = () => selectTarget(i);
+    return c;
+  }));
 }
 function hint() {
   const t = activeLabel(), n = state.active + 1;
@@ -123,13 +150,14 @@ function targetList() {
   $("#target").replaceChildren(...state.keys.map((key, i) => new Option(`Card ${i + 1}`, i)));
   $("#target").value = String(state.active);
   const done = state.keys.filter((k) => isLabel(state.targets[k])).length;
-  $("#record").textContent = `${state.frame.sceneSlice} · ${state.frame.sourceArchiveId} · ${state.frame.recordId.slice(-16)} · ${done}/${state.keys.length} cards done`;
+  $("#done").textContent = `${done}/${state.keys.length} cards done`;
+  $("#frame").title = `${state.frame.sceneSlice} · ${state.frame.sourceArchiveId} · ${state.frame.recordId}`;
 }
 function snapshot() { state.undo.push(clone(state.targets)); if (state.undo.length > 60) state.undo.shift(); }
 function dirty() {
   state.dirty = true;
   status("Unsaved changes · Save frame when ready");
-  localStorage.setItem(`archive-draft:${state.frame.recordId}`, JSON.stringify({ targets: state.targets, revision: state.frame.label?.revision || 0, notes: $("#notes").value }));
+  localStorage.setItem(`archive-draft:${state.frame.recordId}`, JSON.stringify({ targets: state.targets, revision: state.frame.label?.revision || 0, notes: $("#notes").value, direction: direction() }));
 }
 function changed() { dirty(); draw(); }
 function selectTarget(i) { state.active = Math.max(0, Math.min(state.keys.length - 1, i)); state.corner = 0; state.pending = null; draw(); }
@@ -141,6 +169,17 @@ function nextPending() {
   selectTarget((state.active + 1) % state.keys.length);
 }
 function startDraw() { state.pending = state.pending ? null : []; state.corner = 0; draw(); $("#editor").focus(); }
+function rotateActive() {
+  const t = activeLabel();
+  if (!t?.corners || t.skip) return;
+  snapshot(); rotateLabel(t, 1); state.corner = 0; changed();
+}
+function applyDirection() {
+  // Re-seed every untouched box in the newly chosen orientation.
+  snapshot();
+  for (const key of state.keys) if (state.targets[key].status === "seeded") state.targets[key] = seeded(key);
+  changed();
+}
 function accept() {
   const t = activeLabel();
   if (!t || t.skip || t.status !== "seeded") return;
@@ -244,6 +283,7 @@ $("#editor").onkeydown = (e) => {
   if (key === "d") { e.preventDefault(); startDraw(); return; }
   if (key === "b") { e.preventDefault(); snapshot(); state.targets[activeKey()] = seeded(activeKey()); state.pending = null; changed(); return; }
   if (key === "c") { e.preventDefault(); accept(); return; }
+  if (key === "r") { e.preventDefault(); rotateActive(); return; }
   if (key === "n") { e.preventDefault(); nextPending(); return; }
   if (key === "s") { e.preventDefault(); $("#skip").focus(); return; }
   if (key === "o") {
@@ -277,6 +317,10 @@ $("#editor").onkeydown = (e) => {
 $("#draw").onclick = startDraw;
 $("#seed").onclick = () => { snapshot(); state.targets[activeKey()] = seeded(activeKey()); state.pending = null; changed(); $("#editor").focus(); };
 $("#accept").onclick = accept;
+$("#rotate").onclick = rotateActive;
+$("#direction").onchange = () => { if (state.frame) applyDirection(); };
+$("#help").onclick = () => { const panel = $("#help-panel"); panel.hidden = !panel.hidden; $("#help").setAttribute("aria-expanded", String(!panel.hidden)); };
+document.addEventListener("pointerdown", (e) => { if (!$("#help-panel").hidden && !e.target.closest("#help-panel, #help")) $("#help-panel").hidden = true; });
 $("#clear").onclick = () => { const t = activeLabel(); if (!t || t.status === "seeded") return; snapshot(); state.targets[activeKey()] = seeded(activeKey()); state.pending = null; changed(); };
 $("#skip").onchange = () => {
   const reason = $("#skip").value; $("#skip").value = "";
@@ -304,19 +348,20 @@ async function load(id) {
   try {
     status("Loading image…");
     const frame = await api(`/api/frame/${id}`), image = new Image();
-    image.src = `/image/${id}`;
-    await image.decode();
+    // The load event, unlike decode(), also completes in a background tab.
+    await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(Error("Image failed to load")); image.src = `/image/${id}`; });
     state.frame = frame; state.image = image; state.view = { scale: 1, tx: 0, ty: 0 };
     const c = document.createElement("canvas"); c.width = image.width; c.height = image.height;
     c.getContext("2d").drawImage(image, 0, 0);
     state.pixels = c.getContext("2d").getImageData(0, 0, c.width, c.height);
     state.keys = frame.instances.map((i) => String(i.sourceAnnotationIndex));
+    $("#direction").value = String(frame.label?.direction ?? localStorage.getItem("archive-labeler-direction") ?? 0);
     state.targets = loadTargets(frame.label?.targets);
     $("#notes").value = frame.label?.notes || "";
     if (frame.label?.reviewer) $("#reviewer").value = frame.label.reviewer;
     state.pending = null; state.undo = []; state.dirty = false; state.corner = 0;
     const draft = JSON.parse(localStorage.getItem(`archive-draft:${id}`) || "null");
-    if (draft && draft.revision === (frame.label?.revision || 0)) { state.targets = loadTargets(draft.targets); $("#notes").value = draft.notes || ""; state.dirty = true; }
+    if (draft && draft.revision === (frame.label?.revision || 0)) { $("#direction").value = String(draft.direction ?? direction()); state.targets = loadTargets(draft.targets); $("#notes").value = draft.notes || ""; state.dirty = true; }
     const firstPending = state.keys.findIndex((k) => !isLabel(state.targets[k]));
     state.active = firstPending >= 0 ? firstPending : 0;
     $("#frame").value = id;
@@ -334,7 +379,7 @@ function filter() {
   $("main").hidden = !state.filtered.length;
   $("#save").disabled = !state.filtered.length; $("#save-next").disabled = !state.filtered.length;
   if (state.filtered.length) load(state.filtered.some((f) => f.id === state.frame?.recordId) ? state.frame.recordId : state.filtered[0].id);
-  else { state.frame = null; state.image = null; state.dirty = false; $("#record").textContent = "Nothing left in this selection"; status("All frames in this selection are complete."); }
+  else { state.frame = null; state.image = null; state.dirty = false; $("#done").textContent = ""; status("All frames in this selection are complete."); }
 }
 function navigate(delta) {
   if (state.busy || !canLeave()) return;
@@ -356,7 +401,8 @@ async function save(next) {
   state.busy = true;
   try {
     const r = await api(`/api/label/${state.frame.recordId}`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reviewer: $("#reviewer").value, notes: $("#notes").value, targets: payloadTargets(), revision: state.frame.label?.revision || 0 }) });
+      body: JSON.stringify({ reviewer: $("#reviewer").value, notes: $("#notes").value, targets: payloadTargets(), revision: state.frame.label?.revision || 0, direction: direction() }) });
+    localStorage.setItem("archive-labeler-direction", String(direction()));
     state.frame.label = r; state.dirty = false;
     localStorage.removeItem(`archive-draft:${r.recordId}`);
     localStorage.setItem("archive-labeler-reviewer", r.reviewer);

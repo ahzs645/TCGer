@@ -21,12 +21,12 @@ Every queued card starts as a dashed amber outline seeded from its box, with han
 
 1. **Drag any handle** onto the real card corner. Scroll to zoom around the cursor, drag empty space to pan, double-click or **0** to reset. Keys **1–4** pick a corner of the selected card, arrows nudge by one pixel (Shift for five).
 2. If a box already sits on the card edges, press **C** (Accept box) instead of touching it.
-3. For a rotated or tricky card press **D** and click **TL → TR → BR → BL** of the *printed* card, so an upside-down card starts at its printed top-left. **B** resets a card to its box.
+3. Orientation matters: corner 1 must be the *printed* top-left. Set **Printed top points** once per page (up, right, down, left) and every untouched box is seeded in that order; press **R** to rotate one card's corner order a quarter turn. The strip of rectified thumbnails under the photo shows every card as the label would crop it, so a wrong direction shows up as a sideways or upside-down thumbnail. For a skewed card press **D** and click **TL → TR → BR → BL** of the printed card. **B** resets a card to its box. Untick **Orientation certain** if you cannot tell which corner is the printed top-left.
 4. **O** marks the selected corner hidden by another card. Corners beyond the photo edge are marked outsideFrame automatically.
 5. **S** skips a card you cannot label honestly (mostly hidden, cut off, not a card, unsure). Skipped cards keep their box-only supervision.
 6. **N** jumps to the next unlabeled card; **Enter** or **Save & next** saves the page. A page saved with untouched cards is kept as incomplete and shows again.
 
-Green outlines with a ✓ are labeled, dashed amber ones are still pending, grey ones are skipped, pink is selected. Enter your name once as reviewer; it is stored with every save. Unsaved edits are kept as a browser draft per frame.
+Green outlines with a ✓ are labeled, dashed amber ones are still pending, grey ones are skipped, pink is selected. The **? Help** button in the header repeats the key list. Enter your name once as reviewer; it is stored with every save, together with the page's printed-top direction. Unsaved edits are kept as a browser draft per frame.
 
 ## Rules the server enforces
 

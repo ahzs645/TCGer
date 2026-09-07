@@ -33,7 +33,7 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; pa
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 #hint { min-height: 20px; margin: 8px 0; color: #ffc465; font-size: 14px; }
 #editor {
-  width: 100%; height: calc(100vh - 330px); min-height: 520px; background: #080c13; border-radius: 10px; outline: none; touch-action: none;
+  width: 100%; height: calc(100vh - 360px); min-height: 480px; background: #080c13; border-radius: 10px; outline: none; touch-action: none;
 }
 #editor:focus { box-shadow: 0 0 0 2px #2f6fed; }
 aside { display: flex; flex-direction: column; gap: 10px; }
@@ -52,3 +52,14 @@ footer {
 #status { flex: 1; color: #9dacbf; }
 #status.error { color: #ff8a8a; }
 #progress { font-size: 14px; color: #c7d0dd; }
+
+.header-actions { display: flex; gap: 10px; align-items: center; }
+#help-panel { position: absolute; right: 30px; top: 70px; z-index: 5; max-width: 560px; background: #1d2736; border: 1px solid #3a4862; border-radius: 10px; padding: 12px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; line-height: 1.5; color: #c7d0dd; }
+#help-panel p { margin: 0; }
+header { position: relative; }
+.done-count { margin-left: auto; color: #9dacbf; font-size: 13px; }
+.strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; min-height: 96px; }
+.strip canvas { width: 60px; height: 84px; border-radius: 4px; border: 2px solid transparent; background: #080c13; cursor: pointer; flex: none; }
+.strip canvas.active { border-color: #ff91d4; }
+.strip canvas.seeded { opacity: .75; }
+.strip canvas.skip { opacity: .3; }

@@ -13,7 +13,29 @@
         <h1>Label the four corners of each card</h1>
       </div>
       <div id="progress"></div>
-      <a href="/api/export" download="archive-corner-labels.json">Export sidecar ↓</a>
+      <div class="header-actions">
+        <button id="help" type="button" aria-expanded="false" title="How to label">? Help</button>
+        <a href="/api/export" download="archive-corner-labels.json">Export sidecar ↓</a>
+      </div>
+      <div id="help-panel" hidden>
+        <p>
+          Every queued card starts as a dashed amber outline you can move:
+          <strong>drag any handle</strong> onto the real corner. Scroll to zoom,
+          drag empty space to pan, double-click or <kbd>0</kbd> to reset. If a
+          box already fits, press <kbd>C</kbd> to accept it. <kbd>R</kbd>
+          rotates a card's corner order by a quarter turn; set <em>Printed top
+          points</em> once per page so seeded boxes start with the right
+          orientation, and check the thumbnails below the photo: every card
+          should appear upright there. For a skewed card press <kbd>D</kbd> and
+          click <strong>TL → TR → BR → BL</strong> of the printed card.
+          <kbd>O</kbd> marks a corner hidden by another card; corners beyond the
+          photo edge are marked automatically. <kbd>S</kbd> skips a card you
+          cannot label. <kbd>N</kbd> next card, <kbd>1–4</kbd> pick a corner,
+          arrows nudge (Shift ×5), <kbd>Enter</kbd> saves and moves on.
+          Untouched boxes are never saved as labels; nothing here changes the
+          dataset.
+        </p>
+      </div>
     </header>
     <nav>
       <label>Layout
@@ -28,20 +50,6 @@
       ><select id="frame" aria-label="Frame"></select
       ><button id="next">Next →</button>
     </nav>
-    <div class="intro">
-      <span id="record"></span>
-      <p>
-        Every queued card starts as a dashed amber outline you can move:
-        <strong>drag any handle</strong> onto the real corner. Scroll to zoom,
-        drag empty space to pan, double-click or <kbd>0</kbd> to reset. If a
-        box already fits, press <kbd>C</kbd> to accept it. For a rotated card
-        press <kbd>D</kbd> and click <strong>TL → TR → BR → BL</strong> of the
-        printed card. <kbd>O</kbd> marks a corner hidden by another card;
-        corners beyond the photo edge are marked automatically. <kbd>S</kbd>
-        skips a card you cannot label. Untouched boxes are never saved as
-        labels; nothing here changes the dataset.
-      </p>
-    </div>
     <main>
       <section class="workspace">
         <div class="toolbar">
@@ -57,17 +65,25 @@
             <option value="not-a-card">Not a card</option>
             <option value="unsure">Not sure</option></select
           ><button id="undo">Undo</button
-          ><label><input type="checkbox" id="orientation" checked />Printed top-left is first corner</label>
+          ><button id="rotate" title="Rotate this card's corner order a quarter turn">Rotate (R)</button
+          ><label title="Direction the printed top of the cards points in this photo; applied to every untouched box">Printed top points
+            <select id="direction">
+              <option value="0">↑ up</option>
+              <option value="1">→ right</option>
+              <option value="2">↓ down</option>
+              <option value="3">← left</option></select></label
+          ><label title="Uncheck if you cannot tell which corner is the printed top-left"><input type="checkbox" id="orientation" checked />Orientation certain</label
+          ><span id="done" class="done-count"></span>
         </div>
         <p id="hint"></p>
         <canvas id="editor" tabindex="0" aria-label="Corner editor"></canvas>
+        <div id="strip" class="strip" aria-label="Rectified cards on this page"></div>
       </section>
       <aside>
         <strong>Corner zoom</strong><canvas id="zoom" width="220" height="220"></canvas>
         <strong>Rectified card</strong><canvas id="crop" width="180" height="250"></canvas>
         <div class="legend">
-          <span>Amber dashed: untouched box · Green ✓: labeled · Grey: skipped · Pink: selected</span>
-          <span>Keys: N next card · C accept · 1–4 select corner · arrows nudge (Shift ×5) · scroll zoom · Enter save & next</span>
+          <span>Amber dashed: untouched · Green ✓: labeled · Grey: skipped · Pink: selected</span>
         </div>
         <label>Reviewer
           <input id="reviewer" placeholder="Your name" maxlength="120" autocomplete="name" /></label>

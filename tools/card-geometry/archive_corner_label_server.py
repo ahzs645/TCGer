@@ -111,7 +111,10 @@ def validate_save(frame, payload):
         labeled[key] = {"corners": [[float(x), float(y)] for x, y in quad],
                         "cornerVisibility": list(visibility), "orientationKnown": orientation}
     complete = all(str(t["sourceAnnotationIndex"]) in labeled for t in frame["instances"])
-    return {"reviewer": reviewer.strip(), "notes": notes, "targets": labeled, "complete": complete}
+    direction = payload.get("direction", 0)
+    if direction not in (0, 1, 2, 3):
+        raise ValueError("direction must be 0, 1, 2 or 3 quarter turns")
+    return {"reviewer": reviewer.strip(), "notes": notes, "targets": labeled, "complete": complete, "direction": direction}
 
 
 class Store:
