@@ -57,9 +57,6 @@ struct GameStoreView: View {
                             includeSealedProducts: environmentStore.sealedProductsEnabled,
                             packageManifest: package.manifest,
                             isGameEnabled: environmentStore.isGameEnabled(package.game),
-                            onActivated: { game in
-                                Task { await environmentStore.activateInstalledGame(game) }
-                            },
                             onRemoved: removeOfficialPackageData
                         )
                     }

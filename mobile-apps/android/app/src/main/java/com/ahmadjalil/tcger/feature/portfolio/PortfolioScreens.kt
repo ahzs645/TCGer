@@ -93,11 +93,11 @@ fun PricesScreen(
         contentPadding = featurePadding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { FeatureHeader("Prices", "Stored prices work offline; refresh uses live server quotes") { refresh(true) } }
+        item { FeatureHeader("Prices", "Saved prices work offline; refresh checks your configured providers") { refresh(true) } }
         portfolio?.let { result ->
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MetricCard("Portfolio", formatPortfolioMoney(result.totalValue, result.cards.firstOrNull()?.currency ?: displayCurrency), Modifier.weight(1f))
+                    MetricCard("Portfolio", result.totalsByCurrency.entries.joinToString(" + ") { (currency, value) -> com.ahmadjalil.tcger.domain.CurrencyDisplay.format(value, destination = currency) }.ifEmpty { formatPortfolioMoney(0.0, "USD") }, Modifier.weight(1f))
                     MetricCard("Tracked", result.cards.size.toString(), Modifier.weight(1f))
                     MetricCard("Copies", result.cards.sumOf(TrackedCard::quantity).toString(), Modifier.weight(1f))
                 }
@@ -120,7 +120,7 @@ fun PricesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            "${formatPortfolioMoney(result.costCoverage.untrackedMarketValue, displayCurrency)} value lacks cost basis",
+                            "${com.ahmadjalil.tcger.domain.CurrencyDisplay.format(result.costCoverage.untrackedMarketValue, destination = displayCurrency)} value lacks cost basis",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -194,7 +194,7 @@ fun AnalyticsScreen(
         snapshot?.let { data ->
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MetricCard("Value", formatPortfolioMoney(data.history.currentValue, displayCurrency), Modifier.weight(1f))
+                    MetricCard("Value", com.ahmadjalil.tcger.domain.CurrencyDisplay.format(data.history.currentValue, destination = displayCurrency), Modifier.weight(1f))
                     MetricCard(period.title, signedPercent(data.history.changePercent), Modifier.weight(1f))
                     MetricCard("Cards", data.breakdown.byGame.sumOf(GameValue::cardCount).toString(), Modifier.weight(1f))
                 }
@@ -281,7 +281,7 @@ fun AnalyticsScreen(
 } }
 
 @Composable private fun AnalyticsBar(label: String, value: Double, max: Double, currency: String) = Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-    Row(Modifier.fillMaxWidth()) { Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall); Text(formatPortfolioMoney(value, currency), style = MaterialTheme.typography.bodySmall) }
+    Row(Modifier.fillMaxWidth()) { Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall); Text(com.ahmadjalil.tcger.domain.CurrencyDisplay.format(value, destination = currency), style = MaterialTheme.typography.bodySmall) }
     LinearProgressIndicator(progress = { if (max <= 0) 0f else (value / max).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
 }
 
@@ -290,9 +290,9 @@ fun AnalyticsScreen(
     LinearProgressIndicator(progress = { if (max <= 0) 0f else value.toFloat() / max }, modifier = Modifier.fillMaxWidth())
 }
 
-@Composable private fun MoverRow(mover: PriceMover, currency: String) { Row(Modifier.fillMaxWidth()) { Column(Modifier.weight(1f)) { Text(mover.name, fontWeight = FontWeight.Medium); Text(mover.tcg, style = MaterialTheme.typography.bodySmall) }; Column(horizontalAlignment = Alignment.End) { Text(formatPortfolioMoney(mover.currentPrice, currency)); Text(signedPercent(mover.percentChange), color = if (mover.percentChange >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) } }; HorizontalDivider() }
+@Composable private fun MoverRow(mover: PriceMover, currency: String) { Row(Modifier.fillMaxWidth()) { Column(Modifier.weight(1f)) { Text(mover.name, fontWeight = FontWeight.Medium); Text(mover.tcg, style = MaterialTheme.typography.bodySmall) }; Column(horizontalAlignment = Alignment.End) { Text(com.ahmadjalil.tcger.domain.CurrencyDisplay.format(mover.currentPrice, destination = currency)); Text(signedPercent(mover.percentChange), color = if (mover.percentChange >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) } }; HorizontalDivider() }
 
-@Composable private fun TopCardRow(card: TopCard, currency: String) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { AsyncImage(card.imageUrl, null, Modifier.size(40.dp)); Spacer(Modifier.size(10.dp)); Column(Modifier.weight(1f)) { Text(card.name, fontWeight = FontWeight.Medium); Text(card.tcg, style = MaterialTheme.typography.bodySmall) }; Text(formatPortfolioMoney(card.value, currency)) }; HorizontalDivider() }
+@Composable private fun TopCardRow(card: TopCard, currency: String) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { AsyncImage(card.imageUrl, null, Modifier.size(40.dp)); Spacer(Modifier.size(10.dp)); Column(Modifier.weight(1f)) { Text(card.name, fontWeight = FontWeight.Medium); Text(card.tcg, style = MaterialTheme.typography.bodySmall) }; Text(com.ahmadjalil.tcger.domain.CurrencyDisplay.format(card.value, destination = currency)) }; HorizontalDivider() }
 
 @Composable private fun WarningCard(message: String) = Card(Modifier.fillMaxWidth()) { Text(message, Modifier.padding(14.dp), color = MaterialTheme.colorScheme.error) }
 @Composable private fun EmptyCard(title: String, message: String) = Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp)) { Text(title, fontWeight = FontWeight.Bold); Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) } }

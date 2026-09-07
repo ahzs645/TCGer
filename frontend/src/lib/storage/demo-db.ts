@@ -241,6 +241,7 @@ class DexieDemoPersistence implements DemoPersistence {
     // Memory first, unconditionally: the in-memory view must stay correct even
     // when the write below never reaches disk, or a caller that re-reads
     // `snapshot()` would see its own change vanish.
+    this.revision += 1;
     this.state = { ...(this.state ?? {}), ...slices };
 
     if (this.storageAbandoned) return; // memory-only session; nothing to schedule
@@ -254,7 +255,42 @@ class DexieDemoPersistence implements DemoPersistence {
     this.scheduleFlush(COMMIT_COALESCE_MS);
   }
 
+  private revision = 0;
+
+  async commitDurably(changes: Partial<PersistedDemoState>, recovery?: Partial<PersistedDemoState>): Promise<void> {
+    await this.hydrated;
+    const operation = this.writeChain.then(async () => {
+      this.cancelFlush();
+      const db = this.db;
+      if (!db || this.storageAbandoned) throw new Error("Browser storage is unavailable; nothing was imported.");
+      const revision = this.revision;
+      const combined = { ...(this.pending ?? {}), ...changes };
+      try {
+        await db.transaction("rw", db.records, db.meta, async () => {
+          if (recovery) await db.meta.put({ key: "backupRecovery", value: recovery });
+          await db.records.bulkPut(toRecordRows(combined));
+          await db.meta.put({ key: META_SCHEMA_VERSION_KEY, value: DEMO_SCHEMA_VERSION });
+          if (this.revision !== revision) throw new Error("Local data changed during import. Finish editing and retry the backup.");
+        });
+        this.pending = null;
+        this.state = { ...(this.state ?? {}), ...combined };
+      } catch (error) {
+        if (this.pending) this.scheduleFlush(COMMIT_COALESCE_MS);
+        throw error;
+      }
+    });
+    this.writeChain = operation.catch(() => {});
+    return operation;
+  }
+
+  async readRecovery(): Promise<Partial<PersistedDemoState> | null> {
+    await this.hydrated;
+    if (!this.db) throw new Error("Browser storage is unavailable");
+    return (await this.db.meta.get("backupRecovery"))?.value as Partial<PersistedDemoState> ?? null;
+  }
+
   clear(): Promise<void> {
+    this.revision += 1;
     // Drop buffered writes before anything else: a flush that fires after the
     // wipe would resurrect exactly the state the caller asked to destroy.
     this.cancelFlush();

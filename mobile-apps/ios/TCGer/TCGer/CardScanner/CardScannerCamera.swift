@@ -4,10 +4,18 @@ import CoreMedia
 import QuartzCore
 import SwiftUI
 
+struct ScannerCameraOption: Identifiable, Equatable, Sendable {
+    let id: String
+    let displayName: String
+    let systemImage: String
+}
+
 final class CardScannerCameraController: NSObject, ObservableObject {
     @Published private(set) var isTorchAvailable = false
     @Published private(set) var isTorchEnabled = false
     @Published private(set) var isPhotoCaptureReady = false
+    @Published private(set) var availableCameras: [ScannerCameraOption] = []
+    @Published private(set) var selectedCameraID: String?
 
     private let sessionQueue = DispatchQueue(label: "card.scanner.session.queue")
     // AVCaptureSession and its outputs are intentionally created on
@@ -20,6 +28,11 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private let videoOutputQueue = DispatchQueue(label: "card.scanner.video.queue")
     private var isConfigured = false
     private var videoDevice: AVCaptureDevice?
+    private var preferredCameraID = UserDefaults.standard.string(
+        forKey: CardScannerCameraController.cameraDefaultsKey
+    )
+
+    private static let cameraDefaultsKey = "cardScanner.selectedCameraID"
 
     /// The preview layer renders straight from the capture device, so ANY
     /// device-level frame-rate cap shows up on screen — as a choppy
@@ -140,8 +153,12 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
 
+        let cameras = Self.rearCameras()
+        let device = cameras.first { $0.uniqueID == preferredCameraID }
+            ?? cameras.first { $0.deviceType == .builtInWideAngleCamera }
+            ?? cameras.first
         guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            let device,
             let deviceInput = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(deviceInput)
         else {
@@ -152,6 +169,8 @@ final class CardScannerCameraController: NSObject, ObservableObject {
 
         session.addInput(deviceInput)
         videoDevice = device
+        preferredCameraID = device.uniqueID
+        publishCameraState(cameras: cameras, selectedID: device.uniqueID)
         publishTorchState(available: device.hasTorch, enabled: device.torchMode == .on)
 
         if session.canAddOutput(photoOutput) {
@@ -171,11 +190,7 @@ final class CardScannerCameraController: NSObject, ObservableObject {
             // supported still dimensions. Binder pockets need the native
             // sensor pixels so title/footer OCR is not working from an
             // upscaled ~5 px glyph band.
-            if let largestDimensions = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height)
-            }) {
-                photoOutput.maxPhotoDimensions = largestDimensions
-            }
+            configurePhotoDimensions(photoOutput, for: device)
         }
 
         videoOutput.alwaysDiscardsLateVideoFrames = true
@@ -195,6 +210,83 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         session.commitConfiguration()
         isConfigured = true
         publishPhotoCaptureReady(photoOutput.connection(with: .video) != nil)
+    }
+
+    func selectCamera(id: String) {
+        sessionQueue.async { [weak self] in
+            self?.selectCameraOnSessionQueue(id: id)
+        }
+    }
+
+    private func selectCameraOnSessionQueue(id: String) {
+        guard videoDevice?.uniqueID != id,
+              let session,
+              let nextDevice = Self.rearCameras().first(where: { $0.uniqueID == id }),
+              let nextInput = try? AVCaptureDeviceInput(device: nextDevice)
+        else { return }
+
+        setTorchEnabledOnSessionQueue(false)
+        let previousInputs = session.inputs
+        session.beginConfiguration()
+        previousInputs.forEach(session.removeInput)
+        guard session.canAddInput(nextInput) else {
+            previousInputs.filter(session.canAddInput).forEach(session.addInput)
+            session.commitConfiguration()
+            return
+        }
+        session.addInput(nextInput)
+        videoDevice = nextDevice
+        if let photoOutput {
+            configurePhotoDimensions(photoOutput, for: nextDevice)
+        }
+        session.commitConfiguration()
+
+        preferredCameraID = id
+        UserDefaults.standard.set(id, forKey: Self.cameraDefaultsKey)
+        publishCameraState(cameras: Self.rearCameras(), selectedID: id)
+        publishTorchState(available: nextDevice.hasTorch, enabled: false)
+        publishPhotoCaptureReady(photoOutput?.connection(with: .video) != nil)
+    }
+
+    private func configurePhotoDimensions(_ output: AVCapturePhotoOutput, for device: AVCaptureDevice) {
+        if let largestDimensions = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
+            Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height)
+        }) {
+            output.maxPhotoDimensions = largestDimensions
+        }
+    }
+
+    private static func rearCameras() -> [AVCaptureDevice] {
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [
+                .builtInUltraWideCamera,
+                .builtInWideAngleCamera,
+                .builtInTelephotoCamera
+            ],
+            mediaType: .video,
+            position: .back
+        )
+        return discovery.devices.sorted { cameraSortOrder($0) < cameraSortOrder($1) }
+    }
+
+    private static func cameraSortOrder(_ device: AVCaptureDevice) -> Int {
+        switch device.deviceType {
+        case .builtInUltraWideCamera: return 0
+        case .builtInWideAngleCamera: return 1
+        case .builtInTelephotoCamera: return 2
+        default: return 3
+        }
+    }
+
+    nonisolated private static func cameraOption(_ device: AVCaptureDevice) -> ScannerCameraOption {
+        switch device.deviceType {
+        case .builtInUltraWideCamera:
+            return ScannerCameraOption(id: device.uniqueID, displayName: "Ultra Wide", systemImage: "0.5.circle")
+        case .builtInTelephotoCamera:
+            return ScannerCameraOption(id: device.uniqueID, displayName: "Telephoto", systemImage: "2.circle")
+        default:
+            return ScannerCameraOption(id: device.uniqueID, displayName: "Main Camera", systemImage: "1.circle")
+        }
     }
 
     func startRunning() {
@@ -348,6 +440,14 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private func publishPhotoCaptureReady(_ ready: Bool) {
         DispatchQueue.main.async { [weak self] in
             self?.isPhotoCaptureReady = ready
+        }
+    }
+
+    private func publishCameraState(cameras: [AVCaptureDevice], selectedID: String) {
+        let options = cameras.map(Self.cameraOption)
+        DispatchQueue.main.async { [weak self] in
+            self?.availableCameras = options
+            self?.selectedCameraID = selectedID
         }
     }
 }

@@ -99,6 +99,22 @@ class ScannerAssetStore internal constructor(
         fetcher = ScannerAssetFetcher(::fetchScannerAsset),
     )
 
+    @Volatile private var packageSources: Map<String, Pair<String, com.ahmadjalil.tcger.data.gamepackage.GamePackageAsset>> = emptyMap()
+    val availableDownloadGames: List<String> get() = (supportedDownloadGames + packageSources.keys).distinct()
+    fun setGamePackages(packages: List<com.ahmadjalil.tcger.data.gamepackage.InstalledGamePackage>) {
+        packageSources = packages.filter { it.manifest.scanner?.android != null }
+            .groupBy { it.manifest.game.id }.filterValues { it.size == 1 }.mapValues { (_, entries) ->
+                val source = entries.single(); val asset = source.manifest.scanner!!.android!!.manifest
+                val url = java.net.URI(source.sourceUrl).resolve(asset.url).toString()
+                require(url.startsWith("https://"))
+                url to asset
+            }
+    }
+    private fun manifestUrl(game: String) = packageSources[game]?.first ?: "${remoteBaseURL.trimEnd('/')}/$game/manifest.json"
+    private fun verifyPackageManifest(game: String, file: File) {
+        packageSources[game]?.second?.let { asset -> verifyFile(file, ScannerAssetManifestFile("manifest.json", asset.bytes, asset.sha256), "manifest") }
+    }
+
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val mutableStatuses = MutableStateFlow<Map<String, ScannerAssetInstallStatus>>(emptyMap())
     val statuses: StateFlow<Map<String, ScannerAssetInstallStatus>> = mutableStatuses.asStateFlow()
@@ -108,7 +124,7 @@ class ScannerAssetStore internal constructor(
     init {
         require(remoteBaseURL.startsWith("https://")) { "Scanner asset base URL must use HTTPS" }
         root.mkdirs()
-        val installed = supportedDownloadGames.mapNotNull { game ->
+        val installed = (supportedDownloadGames + root.listFiles().orEmpty().filter { it.isDirectory && it.name.matches(Regex("^[a-z0-9][a-z0-9-]{0,63}$")) }.map { it.name }).distinct().mapNotNull { game ->
             readInstalledManifest(game)?.let { game to ScannerAssetInstallStatus.Installed(it) }
         }.toMap()
         mutableStatuses.value = installed
@@ -130,11 +146,12 @@ class ScannerAssetStore internal constructor(
 
     suspend fun refreshManifest(game: String): ScannerAssetManifest {
         val normalized = normalizeScannerGame(game)
-        require(normalized in supportedDownloadGames) { "No downloadable Android scanner is published for $game" }
-        val manifestURL = "${remoteBaseURL.trimEnd('/')}/$normalized/manifest.json"
+        require(normalized in availableDownloadGames || normalized in mutableStatuses.value) { "No downloadable Android scanner is published for $game" }
+        val manifestURL = manifestUrl(normalized)
         val temporary = File(root, ".manifest-${normalized}-${UUID.randomUUID()}.json")
         return try {
             fetcher.fetch(manifestURL, temporary) { }
+            verifyPackageManifest(normalized, temporary)
             val manifest = json.decodeFromString<ScannerAssetManifest>(temporary.readText())
             validateManifest(manifest, normalized)
             updateRemoteManifest(normalized, manifest)
@@ -152,7 +169,7 @@ class ScannerAssetStore internal constructor(
 
     suspend fun install(game: String) {
         val normalized = normalizeScannerGame(game)
-        require(normalized in supportedDownloadGames) { "No downloadable Android scanner is published for $game" }
+        require(normalized in availableDownloadGames || normalized in mutableStatuses.value) { "No downloadable Android scanner is published for $game" }
         updateStatus(normalized, ScannerAssetInstallStatus.Installing(0L, 0L))
         runCatching { installValidated(normalized) }
             .onSuccess { updateStatus(normalized, ScannerAssetInstallStatus.Installed(it)) }
@@ -169,18 +186,19 @@ class ScannerAssetStore internal constructor(
 
     fun remove(game: String) {
         val normalized = normalizeScannerGame(game)
-        require(normalized in supportedDownloadGames) { "No downloadable Android scanner exists for $game" }
+        require(normalized in availableDownloadGames || normalized in mutableStatuses.value) { "No downloadable Android scanner exists for $game" }
         gameDirectory(normalized).deleteRecursively()
         updateStatus(normalized, ScannerAssetInstallStatus.NotInstalled)
     }
 
     private suspend fun installValidated(game: String): ScannerAssetManifest = withContext(Dispatchers.IO) {
-        val manifestURL = "${remoteBaseURL.trimEnd('/')}/$game/manifest.json"
+        val manifestURL = manifestUrl(game)
         val staging = File(gameDirectory(game), ".staging-${UUID.randomUUID()}")
         staging.mkdirs()
         try {
             val manifestFile = File(staging, "remote-manifest.json")
             fetcher.fetch(manifestURL, manifestFile) { }
+            verifyPackageManifest(game, manifestFile)
             val manifest = json.decodeFromString<ScannerAssetManifest>(manifestFile.readText())
             validateManifest(manifest, game)
             updateRemoteManifest(game, manifest)
@@ -195,7 +213,7 @@ class ScannerAssetStore internal constructor(
             files.forEach { (descriptor, localName, label) ->
                 val destination = File(staging, localName)
                 var assetProgress = 0L
-                fetcher.fetch(resolveManifestAssetURL(manifestURL, descriptor.file), destination) { downloaded ->
+                fetcher.fetch(if (packageSources.containsKey(game)) URL(URL(manifestURL), descriptor.file).toString().also { require(it.startsWith("https://") && descriptor.file.split('/').none { it == ".." }) } else resolveManifestAssetURL(manifestURL, descriptor.file), destination) { downloaded ->
                     assetProgress = downloaded
                     updateStatus(
                         game,

@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import com.ahmadjalil.tcger.domain.AccentChoice
 import com.ahmadjalil.tcger.domain.ThemeMode
@@ -23,18 +24,26 @@ fun TCGerTheme(themeMode: ThemeMode, accent: AccentChoice, content: @Composable 
     val context = LocalContext.current
     val seed = accent.color
     val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && accent == AccentChoice.BLUE -> {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && accent == AccentChoice.SYSTEM -> {
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        dark -> darkColorScheme(primary = seed, secondary = seed.copy(alpha = 0.78f))
-        else -> lightColorScheme(primary = seed, secondary = seed.copy(alpha = 0.78f))
+        dark -> darkColorScheme(primary = lerp(seed, Color.White, 0.60f), onPrimary = Color(0xFF151515),
+            primaryContainer = lerp(seed, Color.Black, 0.55f), onPrimaryContainer = Color.White,
+            secondary = lerp(seed, Color.White, 0.65f), onSecondary = Color(0xFF151515),
+            secondaryContainer = lerp(seed, Color.Black, 0.65f), onSecondaryContainer = Color.White,
+            tertiary = lerp(seed, Color.White, 0.7f), onTertiary = Color(0xFF151515))
+        else -> lightColorScheme(primary = seed, onPrimary = Color.White,
+            primaryContainer = lerp(seed, Color.White, 0.88f), onPrimaryContainer = Color(0xFF151515),
+            secondary = seed, onSecondary = Color.White,
+            secondaryContainer = lerp(seed, Color.White, 0.92f), onSecondaryContainer = Color(0xFF151515),
+            tertiary = seed, onTertiary = Color.White)
     }
     MaterialTheme(colorScheme = colors, content = content)
 }
 
 val AccentChoice.color: Color
     get() = when (this) {
-        AccentChoice.BLUE -> Color(0xFF315DA8)
+        AccentChoice.SYSTEM, AccentChoice.BLUE -> Color(0xFF315DA8)
         AccentChoice.GREEN -> Color(0xFF247A55)
         AccentChoice.ORANGE -> Color(0xFFA65216)
         AccentChoice.PURPLE -> Color(0xFF7046A1)

@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -174,7 +176,7 @@ export function SetBrowser() {
     const effectiveProgress = searchOverridesProgress ? "all" : progress;
     return (setsQuery.data ?? [])
       .filter((set) => {
-        if (!enabledGames[set.tcg]) return false;
+        if ((enabledGames as Record<string, boolean>)[set.tcg] === false) return false;
         if (game !== "all" && set.tcg !== game) return false;
         if (year !== "all" && releaseYear(set.releaseDate) !== Number(year)) {
           return false;
@@ -327,7 +329,7 @@ export function SetBrowser() {
                     value={value}
                     disabled={!enabledGames[value]}
                   >
-                    {GAME_LABELS[value]}
+                    {gameLabel(value)}
                   </SelectItem>
                 ))}
             </SelectContent>
@@ -464,7 +466,7 @@ export function SetBrowser() {
         <section key={tcg} className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-heading font-semibold">
-              {GAME_LABELS[tcg]}
+              {gameLabel(tcg)}
             </h2>
             <Badge variant="secondary">
               {sets.length} {sets.length === 1 ? "set" : "sets"}

@@ -71,11 +71,7 @@ final class CardScannerCoordinator: @unchecked Sendable {
         includeBundledTestFallbacks: Bool = false
     ) -> CardScannerCoordinator {
         var strategies: [ScanStrategy] = [BackendHashScannerStrategy()]
-        let downloadableModes: [(TCGGame, ScanMode)] = [
-            (.pokemon, .pokemon),
-            (.magic, .mtg),
-            (.yugioh, .yugioh),
-        ]
+        let downloadableModes = ScannerAssetStore.downloadableGames.map { ($0, ScanMode.game($0)) }
         for (game, mode) in downloadableModes {
             guard let runtime = ScannerAssetStore.shared.runtime(for: game) else { continue }
             strategies.append(BoardCardEmbeddingScannerStrategy(

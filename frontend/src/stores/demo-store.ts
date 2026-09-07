@@ -1,3 +1,4 @@
+import { gameLabel } from "@/lib/utils";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { DEMO_CARDS, type DemoCard } from "@/lib/data/demo-cards";
@@ -139,6 +140,7 @@ export interface DemoWishlistCard {
 }
 
 interface DemoCopyInput {
+  tags?: CollectionCardCopy["tags"];
   condition?: string;
   language?: string;
   notes?: string;
@@ -312,9 +314,8 @@ const localDb = new LocalPortableDb(initialSnapshot());
 /**
  * Publish the collection rows and the read model derived from them.
  *
- * `cardData` is carried across the rebuild from the previous nested cards:
- * catalog enrichment writes it and the collection's row model does not carry
- * it, so losing it here would drop card art on the next mutation.
+ * Printing rows retain catalog metadata across moves and reloads. The previous
+ * nested cards remain a fallback for older in-memory snapshots.
  */
 let derivedBinders: DemoBinder[] = EMPTY_BINDERS;
 
@@ -887,6 +888,7 @@ function isPlausibleSlice(slice: DemoSlice, value: unknown): boolean {
     case "tags":
     case "collectionHistory":
       return Array.isArray(value);
+    case "portableSections":
     case "profile":
     case "preferences":
     case "settings":
@@ -1015,9 +1017,11 @@ function createDefaultDemoPersistence(): MaybeSyncPersistence {
 }
 
 /** The persisted slices as they are before anything is stored or seeded. */
+const EMPTY_PORTABLE_SECTIONS: Record<string, unknown> = {};
 function initialPersistedState(): PersistedDemoState {
   const portfolio = seedPortfolio();
   return {
+    portableSections: EMPTY_PORTABLE_SECTIONS,
     initialized: false,
     profile: DEFAULT_DEMO_PROFILE,
     preferences: DEFAULT_DEMO_PREFERENCES,
@@ -1316,6 +1320,7 @@ function resetDemoState(): void {
 /* ------------------------------------------------------------------ */
 
 interface DemoState {
+  portableSections: Record<string, unknown>;
   initialized: boolean;
   profile: DemoProfile;
   preferences: UserPreferences;
@@ -1469,6 +1474,7 @@ interface DemoState {
 /* ------------------------------------------------------------------ */
 
 export const useDemoStore = create<DemoState>()((set, get) => ({
+  portableSections: EMPTY_PORTABLE_SECTIONS,
   initialized: false,
   profile: DEFAULT_DEMO_PROFILE,
   preferences: DEFAULT_DEMO_PREFERENCES,
@@ -1575,10 +1581,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     );
     if (!matches.size) return 0;
 
-    // The collection's card art lives on the nested read model rather than in
-    // rows (`CardRow` has no `cardData`), so enrichment edits the read model
-    // and `derivedBinders` is re-pointed at it — otherwise the next collection
-    // mutation would rebuild from rows through a stale index and drop the art.
+    // Store enriched metadata on the printing row so edits, moves, and reloads retain it.
     const enrichedBinders = get().binders.map((binder) => ({
       ...binder,
       cards: binder.cards.map((card) => {
@@ -1594,8 +1597,15 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
         };
       }),
     }));
+    await localDb.transaction(["cards"], async () => {
+      const enrichedRows = toPortableRows(enrichedBinders).cards;
+      for (const row of localDb.snapshot().cards) {
+        const enriched = enrichedRows.find((candidate) => candidate.tcg === row.tcg && candidate.externalId === row.externalId);
+        if (enriched?.cardData) await localDb.patch("cards", row._id, { cardData: enriched.cardData });
+      }
+    });
     derivedBinders = enrichedBinders;
-    set({ binders: enrichedBinders });
+    publishCollection();
 
     // Wishlist cards *are* rows, so their enrichment is a write to storage.
     const now = Date.now();
@@ -2019,6 +2029,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
         tcg: card.tcg,
         externalId: details?.cardData?.externalId ?? card.id,
         printingKey: details?.cardData?.printingKey,
+        cardData: details?.cardData ? { ...details.cardData } : undefined,
         name: details?.cardData?.name ?? card.name,
         setCode: details?.cardData?.setCode ?? card.setCode,
         setName: details?.cardData?.setName ?? card.setName,
@@ -2029,6 +2040,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
         language: details?.cardData?.language,
       },
       quantity,
+      embeddedTags: details?.copy?.tags,
       fields: {
         condition: details?.copy?.condition ?? "Near Mint",
         language: details?.copy?.language,
@@ -2058,11 +2070,28 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
 
   updateCardInBinder: async (binderId, cardOrCopyId, updates) => {
     try {
+      const original = await localDb.get("collectionEntries", cardOrCopyId);
+      if (!original || original.binderId !== binderId) throw new Error("Card not found");
+      const shouldUpdateTags = updates.tags !== undefined || updates.newTags !== undefined;
+      const tags = (updates.tags ?? []).map((id) => {
+        const tag = get().tags.find((candidate) => candidate.id === id);
+        if (!tag) throw new Error("Tag not found");
+        return tag;
+      });
+      const newTags: DemoTag[] = [];
+      for (const input of updates.newTags ?? []) {
+        const existing = [...get().tags, ...newTags].find((tag) => tag.label.toLowerCase() === input.label.toLowerCase());
+        const tag = existing ?? { id: uid(), label: input.label.trim(), colorHex: (input.colorHex ?? "cccccc").replace(/^#/, ""), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        if (!existing) newTags.push(tag);
+        tags.push(tag);
+      }
       const entry = await updateEntry(localDb, {
         userId: LOCAL_USER_ID,
         entryId: cardOrCopyId,
         updates: updates as UpdateFields,
+        embeddedTags: shouldUpdateTags ? Array.from(new Map(tags.map((tag) => [tag.id, tag])).values()) : undefined,
       });
+      if (newTags.length) set({ tags: [...get().tags, ...newTags] });
       const binders = publishCollection();
       const binder = binders.find(
         (candidate) => candidate.id === entry.binderId,
@@ -2443,7 +2472,7 @@ function gameBreakdown(binders: DemoBinder[]): DemoGameBreakdownEntry[] {
   }
   return GAME_ORDER.map((tcg) => ({
     tcg,
-    game: GAME_LABELS[tcg],
+    game: gameLabel(tcg),
     color: gameColor(tcg),
     cards: acc.get(tcg)?.cards ?? 0,
     value: Math.round((acc.get(tcg)?.value ?? 0) * 100) / 100,
@@ -2529,4 +2558,33 @@ export function useDemoRarityBreakdown(): DemoRarityBreakdownEntry[] {
       ),
     ),
   );
+}
+
+/** A backup must reach IndexedDB before its imported read models become visible. */
+export async function commitDemoBackup(patch: Partial<PersistedDemoState>, saveRecovery = true, expected?: Partial<PersistedDemoState>): Promise<void> {
+  await whenDemoStoreHydrated();
+  if (!persistence.commitDurably) throw new Error("Durable browser storage is unavailable");
+  const current = useDemoStore.getState();
+  const before = Object.fromEntries(DEMO_SLICES.map(key => [key, current[key]])) as Partial<PersistedDemoState>;
+  if (expected && DEMO_SLICES.some(key => expected[key] !== before[key])) throw new Error("Local data changed while preparing this import. Retry to include those edits.");
+  await persistence.commitDurably(patch, saveRecovery ? before : undefined);
+  const rows = { ...localDb.snapshot() };
+  if (patch.collectionRows) { overlayRows(rows, patch.collectionRows, COLLECTION_TABLES); patch.binders = toDemoBinders(patch.collectionRows); derivedBinders = patch.binders; }
+  if (patch.wishlistRows) { overlayRows(rows, patch.wishlistRows, WISHLIST_TABLES); patch.wishlists = toDemoWishlists(patch.wishlistRows); }
+  if (patch.deckRows) { overlayRows(rows, patch.deckRows, DECK_TABLES); patch.decks = toDemoDecks(patch.deckRows); }
+  if (patch.tradeRows) { overlayRows(rows, patch.tradeRows, TRADE_TABLES); patch.trades = toDemoTrades(patch.tradeRows); }
+  if (patch.sealedRows) { overlayRows(rows, patch.sealedRows, SEALED_TABLES); patch.sealed = toDemoSealed(patch.sealedRows); }
+  localDb.load(rows);
+  applyToStore(patch);
+  for (const key of DEMO_SLICES) writeSlice(persistBaseline, key, useDemoStore.getState()[key]);
+}
+export async function restoreDemoBackup(): Promise<void> {
+  const previous = await persistence.readRecovery?.();
+  if (!previous) throw new Error("No recovery point is available");
+  await commitDemoBackup(previous);
+}
+export async function demoBackupSnapshot(): Promise<Partial<PersistedDemoState>> {
+  await whenDemoStoreHydrated();
+  const current = useDemoStore.getState();
+  return Object.fromEntries(DEMO_SLICES.map(key => [key, current[key]])) as Partial<PersistedDemoState>;
 }

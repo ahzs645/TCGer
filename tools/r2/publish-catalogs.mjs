@@ -42,7 +42,7 @@ function usage() {
   npm run assets:r2:publish-catalogs -- [--bucket tcger-assets] [--prefix catalogs] [--data-dir data/catalog] [--require-games pokemon,magic,...] [--pokemon-vectors] [--wrangler] [--allow-unsigned] [--check] [--dry-run]
 
 Options:
-  --pokemon-vectors  Publish imported Pokémon SVG artwork.
+  --pokemon-vectors  Publish imported Pokémon SVG artwork and PNG fallbacks.
   --wrangler         Publish with the current Wrangler login instead of S3 keys.
   --allow-unsigned   Permit unsigned package manifests (development only).
   --check            Validate a signed release without uploading anything.
@@ -186,17 +186,21 @@ async function main() {
   if (publishPokemonVectors) {
     for (const artworkDirectory of POKEMON_ARTWORK_DIRECTORIES) {
       const artworkFiles = (await readdir(artworkDirectory.directory))
-        .filter((filename) => filename.endsWith(".svg"))
+        .filter(
+          (filename) => filename.endsWith(".svg") || filename.endsWith(".png"),
+        )
         .sort();
       for (const filename of artworkFiles) {
         const contents = await readFile(
           resolve(artworkDirectory.directory, filename),
         );
         const sha256 = createHash("sha256").update(contents).digest("hex");
-        const contentType = "image/svg+xml";
+        const contentType = filename.endsWith(".svg")
+          ? "image/svg+xml"
+          : "image/png";
         const key = `${prefix}/${artworkDirectory.keyPrefix}/${filename}`;
         uploads.push({
-          game: "pokemon-vector",
+          game: "pokemon-artwork",
           key,
           rawBytes: contents.byteLength,
           transferBytes: contents.byteLength,
@@ -211,7 +215,7 @@ async function main() {
           await artworkObjectMatches(client, bucket, key, sha256, contentType)
         ) {
           console.log(
-            JSON.stringify({ action: "skip", game: "pokemon-vector", key }),
+            JSON.stringify({ action: "skip", game: "pokemon-artwork", key }),
           );
           continue;
         }
@@ -228,7 +232,7 @@ async function main() {
             }),
           );
         console.log(
-          JSON.stringify({ action: "upload", game: "pokemon-vector", key }),
+          JSON.stringify({ action: "upload", game: "pokemon-artwork", key }),
         );
       }
     }

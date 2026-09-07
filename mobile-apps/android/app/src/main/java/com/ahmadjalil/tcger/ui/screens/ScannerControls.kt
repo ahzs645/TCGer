@@ -66,6 +66,11 @@ import com.ahmadjalil.tcger.data.scanner.ScannerTriggerMode
 import com.ahmadjalil.tcger.data.scanner.scannerLanguages
 import com.ahmadjalil.tcger.generated.ParityControlIDs
 
+internal data class ScannerCameraOption(
+    val id: String,
+    val displayName: String,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ScannerOptionsSheet(
@@ -73,6 +78,9 @@ internal fun ScannerOptionsSheet(
     capabilities: AndroidScannerCapabilities,
     game: String,
     isProcessing: Boolean,
+    cameraOptions: List<ScannerCameraOption>,
+    selectedCameraId: String?,
+    onCameraSelected: (String) -> Unit,
     onOptionsChanged: (ScannerSessionOptions) -> Unit,
     onPickPhoto: () -> Unit,
     onPickPhotos: () -> Unit,
@@ -89,6 +97,21 @@ internal fun ScannerOptionsSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item { SheetTitle("Scanner Options") }
+            if (cameraOptions.size > 1) {
+                item {
+                    OptionSection("Camera") {
+                        cameraOptions.forEach { camera ->
+                            RadioOption(
+                                title = camera.displayName,
+                                detail = "Use this rear camera for the current scan session.",
+                                selected = selectedCameraId == camera.id,
+                                enabled = !isProcessing,
+                                testTag = null,
+                            ) { onCameraSelected(camera.id) }
+                        }
+                    }
+                }
+            }
             item {
                 OptionSection("Capture") {
                     ChoiceChips(

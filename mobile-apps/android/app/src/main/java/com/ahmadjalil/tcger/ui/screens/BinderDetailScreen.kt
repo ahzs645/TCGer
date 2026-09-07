@@ -1,5 +1,6 @@
 package com.ahmadjalil.tcger.ui.screens
 
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,8 +28,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +55,8 @@ import com.ahmadjalil.tcger.domain.BinderInput
 import com.ahmadjalil.tcger.domain.BinderShareLink
 import com.ahmadjalil.tcger.R
 import coil.compose.AsyncImage
+import com.ahmadjalil.tcger.domain.*
+import androidx.compose.material3.Checkbox
 import java.net.URI
 import kotlinx.coroutines.launch
 
@@ -54,16 +69,37 @@ fun BinderDetailScreen(
     currency: String,
     shareSiteUrl: String,
     onBack: () -> Unit,
+    onAddCard: () -> Unit,
+    onScan: () -> Unit,
     onRemove: (String, String) -> Unit,
+    binders: List<Binder>,
+    local: Boolean,
+    onSaveCopy: suspend (OwnedCard, CollectionEdit, String, Int) -> Unit,
+    onSellCopy: suspend (OwnedCard, com.ahmadjalil.tcger.feature.settingsparity.CreateFinanceTransaction, Boolean) -> Unit,
+    onBulk: suspend (List<OwnedCard>, String?, String?, Boolean) -> Unit,
     onUpdate: (String, BinderInput) -> Unit,
     onLoadShareLinks: suspend (String) -> List<BinderShareLink>,
     onCreateShareLink: suspend (String, String) -> BinderShareLink,
     onRevokeShareLink: suspend (String, String) -> Unit,
+    canEdit: Boolean = true,
 ) {
     if (binder == null) {
         EmptyPane("Binder unavailable", "It may have been removed or is still loading.")
         return
     }
+    var editedCopyId by rememberSaveable(binder.id) { mutableStateOf<String?>(null) }
+    val editedCopy = binder.cards.firstOrNull { it.id == editedCopyId }
+    var pendingDelete by rememberSaveable(binder.id) { mutableStateOf<String?>(null) }
+    var query by rememberSaveable(binder.id) { mutableStateOf("") }
+    var condition by rememberSaveable(binder.id) { mutableStateOf<String?>(null) }
+    var tag by rememberSaveable(binder.id) { mutableStateOf<String?>(null) }
+    var sort by rememberSaveable(binder.id) { mutableStateOf(BinderSort.NAME) }
+    var grid by rememberSaveable { mutableStateOf(false) }
+    var filtering by rememberSaveable { mutableStateOf(false) }
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    val visibleCards = remember(binder.cards, query, condition, tag, sort) { browseCopies(binder.cards, query, condition, tag, sort) }
+    var selected by remember(binder.id) { mutableStateOf<Set<String>>(emptySet()) }
+    var bulk by remember { mutableStateOf(false) }
     var editing by remember(binder.id) { mutableStateOf(false) }
     var sharing by remember(binder.id) { mutableStateOf(false) }
     Column(
@@ -104,30 +140,75 @@ fun BinderDetailScreen(
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            IconButton(onClick = { editing = true }) {
+            if (canEdit) IconButton(onClick = { editing = true }) {
                 Icon(Icons.Default.Edit, stringResource(R.string.edit_binder))
             }
-            IconButton(onClick = { sharing = true }) {
+            if (!local && canEdit) IconButton(onClick = { sharing = true }) {
                 Icon(Icons.Default.Link, "Manage share links")
             }
         }
-        if (binder.cards.isEmpty()) EmptyPane("This binder is empty", "Use Search to find a card, then add it to this binder.")
-        else LazyColumn(
-            Modifier.fillMaxSize().padding(top = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-        ) {
-            items(binder.cards, key = { it.id }) { owned ->
-                CatalogCardRow(owned.card, showCardNumbers = showCardNumbers) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("×${owned.quantity}", fontWeight = FontWeight.Bold)
-                        IconButton(onClick = { onRemove(binder.id, owned.id) }) {
-                            Icon(Icons.Default.Delete, "Remove ${owned.card.name}")
+        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search this binder") })
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { FilterChip(filtering || condition != null || tag != null, { filtering = !filtering }, { Text("Filter & sort") }) }
+            item { FilterChip(grid, { grid = !grid }, { Text(if (grid) "Grid" else "List") }) }
+            if (canEdit) item { FilterChip(selecting, { selecting = !selecting; if (!selecting) selected = emptySet() }, { Text("Select copies") }) }
+            if (canEdit) item { TextButton(onClick = onAddCard) { Text("Add card") } }
+            if (canEdit) item { TextButton(onClick = onScan) { Text("Scan") } }
+        }
+        if (selected.isNotEmpty()) androidx.compose.foundation.lazy.LazyRow {
+            item { TextButton(onClick = { bulk = true }) { Text("Edit ${selected.size} selected") } }
+            item { TextButton(onClick = { selected = visibleCards.map { it.id }.toSet() }) { Text("Select visible") } }
+            item { TextButton(onClick = { selected = emptySet() }) { Text("Clear selection") } }
+        }
+        if (binder.cards.isEmpty()) EmptyPane("This binder is empty", "Add a card from search or scan your first card.")
+        else if (visibleCards.isEmpty()) {
+            EmptyPane("No matching copies", "Try another name or clear your filters.")
+            TextButton(onClick = { query = ""; condition = null; tag = null }) { Text("Clear filters") }
+        } else {
+            Text("${visibleCards.size} of ${binder.cards.size} copies", style = MaterialTheme.typography.labelMedium)
+            LazyVerticalGrid(columns = if (grid) GridCells.Adaptive(160.dp) else GridCells.Fixed(1),
+                modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                items(visibleCards, key = { it.id }) { owned ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.clickable(enabled = canEdit) { if (selecting) selected = if (owned.id in selected) selected - owned.id else selected + owned.id else editedCopyId = owned.id }.padding(12.dp)) {
+                            if (grid) {
+                                CardArtwork(owned.card, Modifier.fillMaxWidth().aspectRatio(0.716f))
+                                Text(owned.card.name, fontWeight = FontWeight.SemiBold)
+                            } else Row(verticalAlignment = Alignment.CenterVertically) {
+                                CardArtwork(owned.card, Modifier.size(52.dp, 72.dp))
+                                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                    Text(owned.card.name, style = MaterialTheme.typography.titleSmall)
+                                    Text(listOfNotNull(owned.card.setName, owned.card.collectorNumber.takeIf { showCardNumbers }).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+                                    Text(listOfNotNull(owned.condition, owned.details.language).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                if (selecting) Checkbox(owned.id in selected, { selected = if (it) selected + owned.id else selected - owned.id }, modifier = Modifier.semantics { contentDescription = "Select ${owned.card.name}, ${owned.condition.orEmpty()} copy" })
+                                Text("×${owned.quantity}" + if (showPricing && owned.price != null) " · ${owned.price.asCurrency(currency)}" else "", modifier = Modifier.weight(1f))
+                                if (!selecting && canEdit) IconButton(onClick = { pendingDelete = owned.id }) { Icon(Icons.Default.Delete, "Remove ${owned.card.name}") }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+    if (filtering) AlertDialog(onDismissRequest = { filtering = false }, title = { Text("Filter & sort") },
+        text = { Column {
+            ChoiceField("Sort by", sort.name, BinderSort.entries.map { it.name to it.label }) { sort = BinderSort.valueOf(it) }
+            ChoiceField("Condition", condition.orEmpty(), listOf("" to "All conditions") + binder.cards.mapNotNull { it.condition }.distinct().sorted().map { it to it }) { condition = it.ifBlank { null } }
+            ChoiceField("Tag", tag.orEmpty(), listOf("" to "All tags") + binder.cards.flatMap { it.details.tags }.map { it.label }.distinct().sorted().map { it to it }) { tag = it.ifBlank { null } }
+        } }, confirmButton = { TextButton(onClick = { filtering = false }) { Text("Done") } }, dismissButton = { TextButton(onClick = { condition = null; tag = null; sort = BinderSort.NAME }) { Text("Reset") } })
+    pendingDelete?.let { id -> AlertDialog(onDismissRequest = { pendingDelete = null }, title = { Text("Remove this copy?") },
+        text = { Text("${binder.cards.firstOrNull { it.id == id }?.card?.name.orEmpty()} will be removed from this binder.") },
+        confirmButton = { TextButton(onClick = { onRemove(binder.id, id); selected = selected - id; pendingDelete = null }) { Text("Remove") } },
+        dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel") } }) }
+
+    editedCopy?.let { copy -> CollectionCopyEditor(copy, binders, local, { editedCopyId = null },
+        onSave = { edit, target, extra -> onSaveCopy(copy, edit, target, extra) },
+        onSell = { amount, remove -> onSellCopy(copy, amount, remove) }) }
+    if (bulk) CollectionBulkEditor(binder.cards.filter { it.id in selected }, binders, { bulk = false; selected = emptySet() }) { condition, target, delete ->
+        onBulk(binder.cards.filter { it.id in selected }, condition, target, delete)
     }
 
     if (editing) BinderEditorDialog(

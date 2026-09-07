@@ -1,0 +1,2028 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "game-package-manifest.v2",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "https://tcger.app/schemas/game-package-manifest/v2"
+    },
+    "packageId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "packageVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "update": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "manifestUrl": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "releaseNotes": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "sequence"
+      ],
+      "additionalProperties": false
+    },
+    "game": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "shortName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        },
+        "accentColor": {
+          "type": "string",
+          "pattern": "^#[0-9a-f]{6}$"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "publisher": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        },
+        "signingKey": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "algorithm": {
+              "const": "ed25519"
+            },
+            "publicKey": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+/]{43}=$"
+            }
+          },
+          "required": [
+            "id",
+            "algorithm",
+            "publicKey"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "signature": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "const": "ed25519"
+        },
+        "keyId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "required": [
+        "algorithm",
+        "keyId",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "catalog": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "tcger-catalog-v1"
+        },
+        "asset": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "bytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 536870912
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "mediaType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "url",
+            "bytes",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "cardCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "setCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "schema",
+        "asset",
+        "cardCount"
+      ],
+      "additionalProperties": false
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 96,
+                "pattern": "^(id|name|setCode|collectorNumber|rarity|artist|type|category|releasedAt|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$"
+              },
+              "help": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "type": {
+                "const": "select"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 200
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "property",
+              "type",
+              "options"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 96,
+                "pattern": "^(id|name|setCode|collectorNumber|rarity|artist|type|category|releasedAt|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$"
+              },
+              "help": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "type": {
+                "const": "multiSelect"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 200
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "property",
+              "type",
+              "options"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 96,
+                "pattern": "^(id|name|setCode|collectorNumber|rarity|artist|type|category|releasedAt|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$"
+              },
+              "help": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "type": {
+                "const": "numberRange"
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "step": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "property",
+              "type",
+              "min",
+              "max"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 96,
+                "pattern": "^(id|name|setCode|collectorNumber|rarity|artist|type|category|releasedAt|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$"
+              },
+              "help": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "type": {
+                "const": "boolean"
+              },
+              "trueLabel": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "falseLabel": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "property",
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 96,
+                "pattern": "^(id|name|setCode|collectorNumber|rarity|artist|type|category|releasedAt|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$"
+              },
+              "help": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "type": {
+                "const": "text"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "contains",
+                  "equals"
+                ],
+                "default": "contains"
+              },
+              "maxLength": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 200,
+                "default": 80
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "property",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "maxItems": 24,
+      "default": []
+    },
+    "definition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "shortLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "maxItems": 12
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "physical": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 16
+        },
+        "presentation": {
+          "type": "object",
+          "properties": {
+            "symbols": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "rarity",
+                      "resource",
+                      "type"
+                    ]
+                  },
+                  "imageUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "kind",
+                  "imageUrl"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 1000
+            },
+            "accentColor": {
+              "type": "string",
+              "pattern": "^#[0-9a-f]{6}$"
+            },
+            "iconUrl": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "cardBackUrl": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "deckRules": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "defaultFormat": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "formats": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "zones": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "min": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        },
+                        "max": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        },
+                        "eligibility": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "property": {
+                                "type": "string",
+                                "pattern": "^(name|rarity|supertype|baseExternalId|printingKey|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$"
+                              },
+                              "values": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                "minItems": 1,
+                                "maxItems": 200
+                              }
+                            },
+                            "required": [
+                              "property",
+                              "values"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 16
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label",
+                        "min",
+                        "max"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 16
+                  },
+                  "defaultZone": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                  },
+                  "maxCopies": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "copyIdentity": {
+                    "type": "string",
+                    "enum": [
+                      "baseExternalId",
+                      "name"
+                    ],
+                    "default": "baseExternalId"
+                  },
+                  "copyLimitExceptions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "when": {
+                          "type": "object",
+                          "properties": {
+                            "property": {
+                              "type": "string",
+                              "pattern": "^(name|rarity|supertype|baseExternalId|printingKey|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$"
+                            },
+                            "values": {
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              },
+                              "minItems": 1,
+                              "maxItems": 200
+                            }
+                          },
+                          "required": [
+                            "property",
+                            "values"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "maxCopies": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        }
+                      },
+                      "required": [
+                        "when",
+                        "maxCopies"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32
+                  },
+                  "requireLegality": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "zones",
+                  "defaultZone"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 32
+            }
+          },
+          "required": [
+            "version",
+            "defaultFormat",
+            "formats"
+          ],
+          "additionalProperties": false
+        },
+        "printings": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "selection": {
+              "type": "string",
+              "enum": [
+                "printing",
+                "functional"
+              ]
+            },
+            "finishes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "foil": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "code",
+                  "label",
+                  "foil"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 200
+            }
+          },
+          "required": [
+            "version",
+            "selection",
+            "finishes"
+          ],
+          "additionalProperties": false
+        },
+        "interfaces": {
+          "type": "object",
+          "properties": {
+            "search": {
+              "type": "boolean",
+              "default": true
+            },
+            "collection": {
+              "type": "boolean",
+              "default": true
+            },
+            "sets": {
+              "type": "boolean",
+              "default": true
+            },
+            "wishlists": {
+              "type": "boolean",
+              "default": true
+            },
+            "decks": {
+              "type": "boolean",
+              "default": false
+            },
+            "pricing": {
+              "type": "boolean",
+              "default": false
+            },
+            "sealedProducts": {
+              "type": "boolean",
+              "default": false
+            },
+            "scanner": {
+              "type": "boolean",
+              "default": false
+            },
+            "packOpening": {
+              "type": "boolean",
+              "default": false
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000,
+                    "default": 1
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 32,
+              "default": []
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "collection": {
+          "type": "object",
+          "properties": {
+            "identityModes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "enum": [
+                      "consolidated",
+                      "collector"
+                    ]
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "key": {
+                    "type": "string",
+                    "enum": [
+                      "baseExternalId",
+                      "printingKey"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "description",
+                  "key"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 2
+            },
+            "defaultIdentityMode": {
+              "type": "string",
+              "enum": [
+                "consolidated",
+                "collector"
+              ]
+            },
+            "facets": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "select"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            }
+                          },
+                          "required": [
+                            "value",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "maxItems": 200
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "multiSelect"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            }
+                          },
+                          "required": [
+                            "value",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "maxItems": 200
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "numberRange"
+                      },
+                      "min": {
+                        "type": "number"
+                      },
+                      "max": {
+                        "type": "number"
+                      },
+                      "step": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type",
+                      "min",
+                      "max"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "boolean"
+                      },
+                      "trueLabel": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "falseLabel": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "text"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "contains",
+                          "equals"
+                        ],
+                        "default": "contains"
+                      },
+                      "maxLength": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 200,
+                        "default": 80
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "maxItems": 24
+            }
+          },
+          "required": [
+            "identityModes",
+            "defaultIdentityMode",
+            "facets"
+          ],
+          "additionalProperties": false
+        },
+        "search": {
+          "type": "object",
+          "properties": {
+            "facets": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "select"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            }
+                          },
+                          "required": [
+                            "value",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "maxItems": 200
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "multiSelect"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            }
+                          },
+                          "required": [
+                            "value",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "maxItems": 200
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "numberRange"
+                      },
+                      "min": {
+                        "type": "number"
+                      },
+                      "max": {
+                        "type": "number"
+                      },
+                      "step": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type",
+                      "min",
+                      "max"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "boolean"
+                      },
+                      "trueLabel": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "falseLabel": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z0-9][a-z0-9-]*$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "property": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 96,
+                        "pattern": "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$"
+                      },
+                      "help": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "type": {
+                        "const": "text"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "contains",
+                          "equals"
+                        ],
+                        "default": "contains"
+                      },
+                      "maxLength": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 200,
+                        "default": 80
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "property",
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "maxItems": 24
+            }
+          },
+          "required": [
+            "facets"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "collection",
+        "search"
+      ],
+      "additionalProperties": false
+    },
+    "scanner": {
+      "type": "object",
+      "properties": {
+        "web": {
+          "type": "object",
+          "properties": {
+            "runtime": {
+              "type": "string",
+              "enum": [
+                "tcger-arcface-v1"
+              ]
+            },
+            "manifest": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "bytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 536870912
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "mediaType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "url",
+                "bytes",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "runtime",
+            "manifest"
+          ],
+          "additionalProperties": false
+        },
+        "ios": {
+          "type": "object",
+          "properties": {
+            "runtime": {
+              "type": "string",
+              "enum": [
+                "tcger-arcface-v1"
+              ]
+            },
+            "manifest": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "bytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 536870912
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "mediaType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "url",
+                "bytes",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "runtime",
+            "manifest"
+          ],
+          "additionalProperties": false
+        },
+        "android": {
+          "type": "object",
+          "properties": {
+            "runtime": {
+              "type": "string",
+              "enum": [
+                "tcger-arcface-v1"
+              ]
+            },
+            "manifest": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "bytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 536870912
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "mediaType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "url",
+                "bytes",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "runtime",
+            "manifest"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "pricing": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "tcger-price-snapshot-v1"
+        },
+        "asset": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "bytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 536870912
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "mediaType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "url",
+            "bytes",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema",
+        "asset"
+      ],
+      "additionalProperties": false
+    },
+    "offlinePacks": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "tcger-pack-library-v1"
+        },
+        "manifest": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "bytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 536870912
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "mediaType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "url",
+            "bytes",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema",
+        "manifest"
+      ],
+      "additionalProperties": false
+    },
+    "sealedProducts": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "tcger-sealed-catalog-v1"
+        },
+        "asset": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "bytes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 536870912
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "mediaType": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "url",
+            "bytes",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "productCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "schema",
+        "asset",
+        "productCount"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema",
+    "packageVersion",
+    "publishedAt",
+    "game",
+    "publisher",
+    "catalog"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "definition"
+        ],
+        "properties": {
+          "definition": {
+            "required": [
+              "interfaces"
+            ],
+            "properties": {
+              "interfaces": {
+                "required": [
+                  "decks"
+                ],
+                "properties": {
+                  "decks": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "definition": {
+            "required": [
+              "deckRules"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "definition"
+        ],
+        "properties": {
+          "definition": {
+            "required": [
+              "interfaces"
+            ],
+            "properties": {
+              "interfaces": {
+                "required": [
+                  "pricing"
+                ],
+                "properties": {
+                  "pricing": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "definition"
+        ],
+        "properties": {
+          "definition": {
+            "required": [
+              "interfaces"
+            ],
+            "properties": {
+              "interfaces": {
+                "required": [
+                  "scanner"
+                ],
+                "properties": {
+                  "scanner": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "scanner"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "definition"
+        ],
+        "properties": {
+          "definition": {
+            "required": [
+              "interfaces"
+            ],
+            "properties": {
+              "interfaces": {
+                "required": [
+                  "packOpening"
+                ],
+                "properties": {
+                  "packOpening": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "offlinePacks"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "definition"
+        ],
+        "properties": {
+          "definition": {
+            "required": [
+              "interfaces"
+            ],
+            "properties": {
+              "interfaces": {
+                "required": [
+                  "sealedProducts"
+                ],
+                "properties": {
+                  "sealedProducts": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "sealedProducts"
+        ]
+      }
+    }
+  ]
+}

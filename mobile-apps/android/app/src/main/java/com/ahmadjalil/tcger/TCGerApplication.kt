@@ -22,6 +22,7 @@ class TCGerApplication : Application() {
         val gamePackages = GamePackageStore(this, BuildConfig.CATALOG_BASE_URL)
         container = AppContainer(
             preferences = preferences,
+            currencyRates = com.ahmadjalil.tcger.data.preferences.CurrencyRates(this),
             scannerAssets = scannerAssets,
             gamePackages = gamePackages,
             repository = DefaultTCGerRepository(
@@ -38,6 +39,7 @@ class TCGerApplication : Application() {
 
 data class AppContainer(
     val preferences: PreferencesStore,
+    val currencyRates: com.ahmadjalil.tcger.data.preferences.CurrencyRates,
     val scannerAssets: ScannerAssetStore,
     val gamePackages: GamePackageStore,
     val repository: TCGerRepository,

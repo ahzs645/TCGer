@@ -29,12 +29,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,32 +77,22 @@ fun SettingsScreen(
     onGameStore: () -> Unit = {},
     onInstallGameFromUrl: () -> Unit = {},
 ) {
+    var section by rememberSaveable { mutableStateOf<String?>(null) }
+    var resetAppearance by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var serverDialog by remember { mutableStateOf(false) }
     var signInDialog by remember { mutableStateOf(false) }
     var showingLibraryOperations by remember { mutableStateOf(false) }
     var transferMessage by remember { mutableStateOf<String?>(null) }
-    var pendingExport by remember { mutableStateOf("") }
+    var confirmErase by remember { mutableStateOf(false) }
+    var confirmRecovery by remember { mutableStateOf(false) }
+    val transferScope = rememberCoroutineScope()
     val cacheManager = remember(context) { AppCacheManager(context) }
     val scannerOptionsStore = remember(context) { ScannerOptionsStore(context) }
     var scannerOptions by remember { mutableStateOf(scannerOptionsStore.load()) }
     var cacheBytes by remember { mutableStateOf(cacheManager.sizeBytes()) }
-    val exportDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(pendingExport) }
-                ?: error("Could not open the selected file")
-        }.onSuccess { transferMessage = "Export saved." }
-            .onFailure { transferMessage = it.message }
-    }
-    val importBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                ?: error("Could not read the selected backup")
-        }.onSuccess(viewModel::importPortableBackup)
-            .onFailure { transferMessage = it.message }
-    }
+    if (confirmErase) AlertDialog(onDismissRequest = { confirmErase = false }, title = { Text("Erase all local cards and binders?") }, text = { Text("Your local cards and binders will be removed. Wishlists, sealed inventory, transactions and your server data are kept. A recovery point is saved first.") }, confirmButton = { TextButton(onClick = { confirmErase = false; viewModel.eraseLocalCardsAndBinders() }) { Text("Erase local cards") } }, dismissButton = { TextButton(onClick = { confirmErase = false }) { Text("Cancel") } })
+    if (confirmRecovery) AlertDialog(onDismissRequest = { confirmRecovery = false }, title = { Text("Restore recovery point?") }, text = { Text("This replaces your current collection data with the snapshot saved before the last import.") }, confirmButton = { TextButton(onClick = { confirmRecovery = false; viewModel.restoreLatestRecoveryPoint() }) { Text("Restore") } }, dismissButton = { TextButton(onClick = { confirmRecovery = false }) { Text("Cancel") } })
     val games = (state.gamePackages.official.map { it.game.id } + state.preferences.enabledGames)
         .distinct()
         .sorted()
@@ -132,6 +127,28 @@ fun SettingsScreen(
         state.scannerSupportedGames.forEach(viewModel::refreshScannerAssets)
     }
 
+    if (section == null) {
+        LazyColumn(Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.SETTINGS_BROWSE)),
+            contentPadding = PaddingValues(16.dp, contentPadding.calculateTopPadding() + 20.dp, 16.dp, contentPadding.calculateBottomPadding() + 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { ScreenTitle("Settings", "Make TCGer yours") }
+            listOf(
+                "Account & connection" to if (state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE) "On this device" else state.preferences.username ?: "Finish server setup",
+                "Appearance" to "Theme, colors and navigation",
+                "Collection display" to "Pricing, card numbers and ${state.preferences.currency}",
+                "Games" to "${state.preferences.enabledGames.size} games enabled · downloads and libraries",
+                "Security" to if (state.preferences.biometricLockEnabled) "Device unlock required" else "App lock is off",
+                "Scanner" to "Offline models and recognition options",
+                "Data & storage" to "Backups, import, recovery and history",
+                "About" to "Version, support and privacy",
+            ).forEach { (title, summary) -> item {
+                Card(onClick = { section = title }, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(18.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            } }
+        }
+        return
+    }
+    androidx.activity.compose.BackHandler { section = null }
     LazyColumn(
         Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.SETTINGS_BROWSE)),
         contentPadding = PaddingValues(
@@ -142,8 +159,8 @@ fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { ScreenTitle("Settings", "Preferences and app configuration") }
-        item {
+        item { TextButton(onClick = { section = null }) { Text("Back to Settings") }; ScreenTitle(section.orEmpty()) }
+        if (section == "Account & connection") item {
             SettingsSection("Data source") {
                 ChoiceRow(
                     selected = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE,
@@ -160,6 +177,12 @@ fun SettingsScreen(
                     onClick = { serverDialog = true },
                 )
                 if (state.preferences.dataSourceMode == DataSourceMode.SERVER) {
+                    if (state.serverSetupRequired) {
+                        Text("This server needs its first administrator. Create an account or sign in, then finish setup.")
+                        if (state.preferences.isSignedIn) TextButton(onClick = { transferScope.launch { runCatching { viewModel.finishAdminSetup() }.onFailure { transferMessage = it.message } } }) { Text("Finish administrator setup") }
+                    }
+                    if (state.publicCollections && !state.preferences.isSignedIn) Text("Public collection browsing is available. Sign in to make changes.")
+                    transferMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         if (state.preferences.isSignedIn) {
                             Text("Signed in as ${state.preferences.username}", Modifier.align(Alignment.CenterVertically))
@@ -169,8 +192,8 @@ fun SettingsScreen(
                         }
                         TextButton(onClick = { serverDialog = true }) { Text("Change server") }
                     }
-                    if (state.preferences.isSignedIn) {
-                        FilledTonalButton(onClick = onServerDebugCaptures, modifier = Modifier.fillMaxWidth()) {
+                    if (state.preferences.isSignedIn && state.isAdmin) {
+                        if (com.ahmadjalil.tcger.data.scanner.ScannerDeveloperAccessStore(context).isUnlocked()) FilledTonalButton(onClick = onServerDebugCaptures, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.BugReport, contentDescription = null)
                             Text("Server scan debug captures", Modifier.padding(start = 8.dp))
                         }
@@ -181,7 +204,8 @@ fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (section == "Account & connection") item { AccountManagementPanel(state, viewModel) }
+        if (section == "Appearance") item {
             SettingsSection("Appearance") {
                 Text("Theme", fontWeight = FontWeight.Medium)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -199,7 +223,7 @@ fun SettingsScreen(
                         FilterChip(
                             selected = state.preferences.accent == accent,
                             onClick = { viewModel.setAccent(accent) },
-                            label = { Text(accent.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                            label = { Text(if (accent == AccentChoice.SYSTEM) "System colors" else accent.name.lowercase().replaceFirstChar { it.uppercase() }) },
                         )
                     }
                 }
@@ -211,7 +235,7 @@ fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (section == "Collection display") item {
             SettingsSection("Collection display") {
                 SwitchRow("Show pricing", "Display estimated card and binder values", state.preferences.showPricing, viewModel::setShowPricing)
                 SwitchRow(
@@ -220,21 +244,15 @@ fun SettingsScreen(
                     state.preferences.showCardNumbers,
                     viewModel::setShowCardNumbers,
                 )
-                Text("Currency", fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("USD", "CAD", "EUR", "GBP").forEach { currency ->
-                        AssistChip(onClick = { viewModel.setCurrency(currency) }, label = {
-                            Text(if (state.preferences.currency == currency) "✓ $currency" else currency)
-                        })
-                    }
-                }
+                CurrencySettingsPanel(state.preferences.currency, viewModel)
                 FilledTonalButton(onClick = onPricingSources, modifier = Modifier.fillMaxWidth()) {
                     Text("Pricing sources")
                 }
             }
         }
-        item {
+        if (section == "Games") item {
             SettingsSection("Games") {
+                SwitchRow("Sealed products", "Show sealed inventory and its product catalog", state.preferences.sealedProductsEnabled, viewModel::setSealedProductsEnabled)
                 games.forEach { game ->
                     SwitchRow(
                         game.displayGame(),
@@ -269,7 +287,7 @@ fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (section == "Security") item {
             SettingsSection("Security") {
                 SwitchRow(
                     "Require device unlock",
@@ -279,7 +297,7 @@ fun SettingsScreen(
                 ) { if (biometricAvailable) viewModel.setBiometricLockEnabled(it) }
             }
         }
-        item {
+        if (section == "Scanner") item {
             SettingsSection("Offline scanner models") {
                 SwitchRow(
                     "Use OCR for difficult scans",
@@ -364,7 +382,7 @@ fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (section == "Games") item {
             CommunityGamePackagesSection(
                 state.gamePackages,
                 viewModel,
@@ -372,7 +390,7 @@ fun SettingsScreen(
                 onInstallFromUrl = onInstallGameFromUrl,
             )
         }
-        item {
+        if (section == "Data & storage") item {
             SettingsSection("Data & storage") {
                 FilledTonalButton(onClick = viewModel::refresh, modifier = Modifier.fillMaxWidth()) {
                     Text(if (state.preferences.dataSourceMode == DataSourceMode.SERVER) "Sync with server now" else "Refresh on-device data")
@@ -388,26 +406,9 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Clear offline cache") }
-                FilledTonalButton(
-                    onClick = {
-                        pendingExport = CollectionBackupJson.encode(
-                            CollectionBackupJson.create(state.binders, state.wishlists, state.sealedInventory),
-                        )
-                        exportDocument.launch("tcger-backup.json")
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Export complete JSON backup") }
-                FilledTonalButton(
-                    onClick = {
-                        pendingExport = CollectionBackupJson.collectionCsv(state.binders)
-                        exportDocument.launch("tcger-collection.csv")
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Export collection CSV") }
-                FilledTonalButton(
-                    onClick = { importBackup.launch(arrayOf("application/json", "text/json", "text/plain")) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import JSON backup") }
+                BackupTransferPanel(state, viewModel)
+                if (state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE) TextButton(onClick = { confirmErase = true }) { Text("Erase local cards & binders", color = MaterialTheme.colorScheme.error) }
+                OutlinedButton(onClick = { confirmRecovery = true }) { Text("Restore previous collection data") }
                 FilledTonalButton(onClick = onFinanceHistory, modifier = Modifier.fillMaxWidth()) {
                     Text("Purchase, sale & trade history")
                 }
@@ -416,7 +417,7 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Library operations") }
                 Text(
-                    "Imports merge into the current data. Existing records are not erased.",
+                    "Includes collections, copy details, wishlists, sealed inventory, transactions, codes, folders, preferences and saved binder photos. Extra platform sections are retained. Scanner recordings export separately. Imports merge by stable IDs and create a recovery point.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -425,15 +426,19 @@ fun SettingsScreen(
                 }
             }
         }
-        item {
-            Text(
-                "Android parity build · Collection, catalog, scanner, sealed, social, and analytics",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (section == "About") item {
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            Text("TCGer ${com.ahmadjalil.tcger.BuildConfig.VERSION_NAME} (${com.ahmadjalil.tcger.BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.titleMedium)
+            TextButton(onClick = { uriHandler.openUri("https://tcger.ahmadjalil.com/support/") }) { Text("Support") }
+            TextButton(onClick = { uriHandler.openUri("https://tcger.ahmadjalil.com/privacy/") }) { Text("Privacy policy") }
         }
+        if (section == "Appearance") item { OutlinedButton(onClick = { resetAppearance = true }) { Text("Reset display & navigation preferences") } }
+
     }
 
+    if (resetAppearance) AlertDialog(onDismissRequest = { resetAppearance = false }, title = { Text("Reset display preferences?") },
+        text = { Text("Restore theme, accent, currency, card display and navigation defaults. Your collection, games and connection will be kept.") },
+        confirmButton = { TextButton(onClick = { viewModel.resetDisplayPreferences(); resetAppearance = false }) { Text("Reset") } }, dismissButton = { TextButton(onClick = { resetAppearance = false }) { Text("Cancel") } })
     if (serverDialog) {
         ServerDialog(
             initialUrl = state.preferences.serverUrl,

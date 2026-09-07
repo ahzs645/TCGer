@@ -181,7 +181,7 @@ describe('Bulk Add validation and atomicity', () => {
         throw error;
       }
     });
-    (ensureCardForCollection as jest.Mock).mockResolvedValue({});
+    (ensureCardForCollection as jest.Mock).mockImplementation(async (_tx, id) => ({ id }));
     (syncCollectionTags as jest.Mock).mockImplementation(
       async (_tx, _userId, entryId: string) => {
         if (entryId === 'entry-2') {

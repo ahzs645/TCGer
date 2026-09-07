@@ -17,6 +17,10 @@ export const GAME_LABELS = {
 
 export type SupportedGame = keyof typeof GAME_LABELS;
 
+export function gameLabel(game: string): string {
+  return Object.prototype.hasOwnProperty.call(GAME_LABELS, game) ? GAME_LABELS[game as SupportedGame] : game.replace(/-/g, " ");
+}
+
 const CARD_BACK_IMAGES: Record<string, string> = {
   pokemon: "/card-backs/pokemon.png",
   magic: "/card-backs/magic.png",

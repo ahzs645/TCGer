@@ -185,6 +185,7 @@ function looksLikeDemoState(value: Record<string, unknown>): boolean {
  * protects.
  */
 const SLICE_READERS: Record<DemoSlice, (value: unknown) => unknown> = {
+  portableSections: readObject,
   profile: readProfile,
   preferences: readPreferences,
   tags: readArray,

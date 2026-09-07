@@ -1,5 +1,7 @@
 # Extensible game-package framework
 
+**Current authoring guide (2026-09-05):** [Adding a future game](../src/content/docs/adding-games/index.md) documents the implemented v2 capabilities on separate pages. The proposal and dated status below are historical; use the authoring guide and [manifest reference](game-package-manifest.md) for current contracts and limitations.
+
 **Implementation status (2026-08-27):** the direct-URL, catalog-first portion
 is implemented as [`GamePackageManifest` v1](game-package-manifest.md), with a
 normative JSON Schema and TypeScript, Swift, and Kotlin validators. Unknown

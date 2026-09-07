@@ -34,7 +34,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function isTcg(value: unknown): value is TcgCode {
-  return typeof value === "string" && TCGS.includes(value as TcgCode);
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
 }
 
 function isStatus(value: unknown): value is Status {

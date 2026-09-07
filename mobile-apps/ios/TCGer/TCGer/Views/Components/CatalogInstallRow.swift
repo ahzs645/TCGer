@@ -6,7 +6,6 @@ struct CatalogInstallRow: View {
     let includeSealedProducts: Bool
     let packageManifest: GamePackageManifest?
     let isGameEnabled: Bool
-    let onActivated: ((TCGGame) -> Void)?
     let onRemoved: ((TCGGame) -> Void)?
 
     @State private var errorMessage: String?
@@ -19,7 +18,6 @@ struct CatalogInstallRow: View {
         includeSealedProducts: Bool = false,
         packageManifest: GamePackageManifest? = nil,
         isGameEnabled: Bool = true,
-        onActivated: ((TCGGame) -> Void)? = nil,
         onRemoved: ((TCGGame) -> Void)? = nil
     ) {
         self.game = game
@@ -27,7 +25,6 @@ struct CatalogInstallRow: View {
         self.includeSealedProducts = includeSealedProducts
         self.packageManifest = packageManifest
         self.isGameEnabled = isGameEnabled
-        self.onActivated = onActivated
         self.onRemoved = onRemoved
     }
 
@@ -95,6 +92,7 @@ struct CatalogInstallRow: View {
                         showingRemoveConfirmation = true
                     }
                     .buttonStyle(.bordered)
+                    .tint(.red)
                     .controlSize(.small)
                     .accessibilityLabel("Delete \(displayName) package")
                 }
@@ -174,9 +172,6 @@ struct CatalogInstallRow: View {
             if needsSealedInstall {
                 return .button(title: "Add Products")
             }
-            if !isGameEnabled {
-                return .button(title: "Use Game")
-            }
             return nil
         }
     }
@@ -215,12 +210,10 @@ struct CatalogInstallRow: View {
         switch catalogStore.installState(for: game) {
         case .notInstalled:
             return "Not installed"
-        case .installed(let version):
-            if needsCatalogUpdate { return "Version \(version) installed • update available" }
+        case .installed:
+            if needsCatalogUpdate { return "Installed • update available" }
             if needsSealedInstall { return "Cards installed • sealed products not installed" }
-            return includeSealedProducts && catalogStore.isSealedAvailable(game)
-                ? "Cards and sealed products installed"
-                : "Version \(version) installed"
+            return "Installed"
         }
     }
 
@@ -248,7 +241,6 @@ struct CatalogInstallRow: View {
                 if includeSealedProducts, catalogStore.isSealedAvailable(game) {
                     try await catalogStore.installSealed(game)
                 }
-                onActivated?(game)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -256,13 +248,6 @@ struct CatalogInstallRow: View {
     }
 
     private func performPrimaryAction() {
-        if !isGameEnabled,
-           case .installed = catalogStore.installState(for: game),
-           !needsCatalogUpdate,
-           !needsSealedInstall {
-            onActivated?(game)
-            return
-        }
         install()
     }
 

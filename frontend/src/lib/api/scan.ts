@@ -274,6 +274,7 @@ export async function scanCardImageApi(params: {
   token: string;
   tcg?: TcgCode | "all";
   setCodeHint?: string;
+  scanEngine?: "phash" | "embedding";
   saveDebugCapture?: boolean;
   captureSource?: string;
   captureNotes?: string;
@@ -289,6 +290,7 @@ export async function scanCardImageApi(params: {
   } = params;
   const formData = new FormData();
   formData.append("image", file);
+  if (params.scanEngine) formData.append("scanEngine", params.scanEngine);
   if (saveDebugCapture) {
     formData.append("saveDebugCapture", "1");
   }

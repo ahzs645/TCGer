@@ -49,6 +49,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import com.ahmadjalil.tcger.TCGerApplication
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -233,10 +235,10 @@ fun DeckDetailScreen(
                     }
                 }
             }
-            deckZones.forEach { zone ->
+            (value.rules?.formats?.find { it.id == (value.format ?: value.rules.defaultFormat) }?.zones?.map { it.id } ?: deckZones).forEach { zone ->
                 val cards = value.cards.filter { it.zone == zone }
                 if (cards.isNotEmpty()) {
-                    item { Text("${zone.gameLabel()} · ${cards.sumOf(DeckCard::quantity)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                    item { Text("${value.rules?.formats?.find { it.id == (value.format ?: value.rules.defaultFormat) }?.zones?.find { it.id == zone }?.label ?: zone.gameLabel()} · ${cards.sumOf(DeckCard::quantity)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                     items(cards, key = { it.id }) { card ->
                         Card(Modifier.fillMaxWidth().clickable { editingCard = card }) {
                             Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -261,10 +263,10 @@ fun DeckDetailScreen(
             DeckUpdate(draft.name.trim(), draft.description.clean(), draft.format.clean(), draft.colorHex.clean(), draft.isPublic),
         ) { if (it) editingDeck = false }
     }
-    if (addingCard && deck != null) DeckCardDialog(deck.tcg, null, { addingCard = false }) { draft ->
+    if (addingCard && deck != null) DeckCardDialog(deck.tcg, null, deck.rules?.formats?.find { it.id == (deck.format ?: deck.rules.defaultFormat) }?.let { format -> listOf(format.defaultZone) + format.zones.map { it.id }.filter { it != format.defaultZone } } ?: deckZones, { addingCard = false }) { draft ->
         controller.addDeckCard(deckId, draft) { if (it) addingCard = false }
     }
-    editingCard?.let { card -> DeckCardDialog(card.tcg, card, { editingCard = null }) { draft ->
+    editingCard?.let { card -> DeckCardDialog(card.tcg, card, deck?.rules?.formats?.find { it.id == (deck?.format ?: deck?.rules?.defaultFormat) }?.zones?.map { it.id } ?: deckZones, { editingCard = null }) { draft ->
         controller.updateDeckCard(deckId, card.id, DeckCardUpdate(draft.quantity, draft.zone, card.isCommander, draft.zone == "side")) {
             if (it) editingCard = null
         }
@@ -294,6 +296,10 @@ private fun DeckValidationCard(validation: DeckValidation) {
 
 @Composable
 private fun DeckEditorDialog(initial: Deck?, onDismiss: () -> Unit, onConfirm: (DeckDraft) -> Unit) {
+    val store = (LocalContext.current.applicationContext as TCGerApplication).container.gamePackages
+    val packageState by store.state.collectAsStateWithLifecycle()
+    val gameRules = packageState.installed.filter { it.manifest.definition?.deckRules != null }.associate { it.manifest.game.id to it.manifest.definition!!.deckRules!! }
+    val availableGames = (supportedDeckGames + gameRules.keys).distinct()
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
     var description by remember(initial?.id) { mutableStateOf(initial?.description.orEmpty()) }
     var game by remember(initial?.id) { mutableStateOf(initial?.tcg ?: "pokemon") }
@@ -308,7 +314,7 @@ private fun DeckEditorDialog(initial: Deck?, onDismiss: () -> Unit, onConfirm: (
                 OutlinedTextField(description, { description = it }, Modifier.fillMaxWidth(), label = { Text("Description") }, minLines = 2)
                 if (initial == null) {
                     Text("Game", fontWeight = FontWeight.SemiBold)
-                    supportedDeckGames.chunked(3).forEach { row ->
+                    availableGames.chunked(3).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { row.forEach { item ->
                             FilterChip(selected = game == item, onClick = { game = item }, label = { Text(item.gameLabel()) })
                         } }
@@ -320,7 +326,7 @@ private fun DeckEditorDialog(initial: Deck?, onDismiss: () -> Unit, onConfirm: (
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(DeckDraft(name, description, game, format, initial?.colorHex, isPublic)) }, enabled = name.isNotBlank()) { Text(if (initial == null) "Create" else "Save") } },
+        confirmButton = { TextButton(onClick = { onConfirm(DeckDraft(name, description, game, format.ifBlank { gameRules[game]?.defaultFormat.orEmpty() }, initial?.colorHex, isPublic, initial?.rules ?: gameRules[game])) }, enabled = name.isNotBlank()) { Text(if (initial == null) "Create" else "Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -363,27 +369,39 @@ private fun DeckImportDialog(onDismiss: () -> Unit, onConfirm: (DeckImportReques
 }
 
 @Composable
-private fun DeckCardDialog(game: String, initial: DeckCard?, onDismiss: () -> Unit, onConfirm: (DeckCardDraft) -> Unit) {
+private fun DeckCardDialog(game: String, initial: DeckCard?, zones: List<String> = deckZones, onDismiss: () -> Unit, onConfirm: (DeckCardDraft) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val packageStore = (context.applicationContext as com.ahmadjalil.tcger.TCGerApplication).container.gamePackages
+    var packageCards by remember(game) { mutableStateOf<List<com.ahmadjalil.tcger.data.gamepackage.CommunityCatalogCard>>(emptyList()) }
+    var selected by remember { mutableStateOf<com.ahmadjalil.tcger.data.gamepackage.CommunityCatalogCard?>(null) }
+    LaunchedEffect(game) { packageCards = packageStore.state.value.installed.filter { it.manifest.game.id == game }.flatMap { packageStore.cards(it.id) } }
     var externalId by remember(initial?.id) { mutableStateOf(initial?.externalId.orEmpty()) }
     var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
     var quantity by remember(initial?.id) { mutableIntStateOf(initial?.quantity ?: 1) }
-    var zone by remember(initial?.id) { mutableStateOf(initial?.zone ?: "main") }
+    var zone by remember(initial?.id) { mutableStateOf(initial?.zone ?: zones.first()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "Add card" else "Edit card") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (initial == null) {
+                    if (packageCards.isNotEmpty()) {
+                        OutlinedTextField(name, { name = it; selected = null; externalId = "" }, Modifier.fillMaxWidth(), label = { Text("Search cards") })
+                        if (name.isNotBlank() && selected == null) packageCards.filter { it.name.contains(name, true) }.take(8).forEach { card ->
+                            TextButton(onClick = { selected = card; externalId = card.id; name = card.name }) { Text("${card.name} · ${card.collectorNumber.orEmpty()}") }
+                        }
+                    } else {
                     OutlinedTextField(externalId, { externalId = it }, Modifier.fillMaxWidth(), label = { Text("Catalog card ID") }, singleLine = true)
                     OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text("Card name") }, singleLine = true)
+                    }
                 } else Text(initial.name, fontWeight = FontWeight.SemiBold)
                 OutlinedTextField(quantity.toString(), { quantity = it.toIntOrNull()?.coerceIn(1, 999) ?: quantity }, Modifier.fillMaxWidth(), label = { Text("Quantity") }, singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    deckZones.forEach { item -> FilterChip(zone == item, { zone = item }, { Text(item.gameLabel()) }) }
+                    zones.forEach { item -> FilterChip(zone == item, { zone = item }, { Text(item.gameLabel()) }) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(DeckCardDraft(externalId, game, name, quantity, zone)) }, enabled = initial != null || (externalId.isNotBlank() && name.isNotBlank())) { Text(if (initial == null) "Add" else "Save") } },
+        confirmButton = { TextButton(onClick = { onConfirm(DeckCardDraft(externalId, game, name, quantity, zone, cardData = selected?.let { card -> (kotlinx.serialization.json.Json.encodeToJsonElement(com.ahmadjalil.tcger.data.gamepackage.CommunityCatalogCard.serializer(), card) as kotlinx.serialization.json.JsonObject).toMap() })) }, enabled = initial != null || (externalId.isNotBlank() && name.isNotBlank())) { Text(if (initial == null) "Add" else "Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

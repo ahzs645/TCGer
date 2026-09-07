@@ -51,13 +51,15 @@ struct CardEditorDraft {
     }
 
     func normalizedValues(for card: Card) -> CardCopyEditorValues {
-        let variant = variant
+        var variant = variant
+        let finish = PokemonFinishOption.options(for: card).first { $0.code == finishCode }
+        variant.finishLabel = finish?.label ?? variant.finishLabel
         return CardCopyEditorValues(
             quantity: quantity,
             condition: condition.nonemptyEditorValue,
             language: language.nonemptyEditorValue,
             notes: notes.nonemptyEditorValue,
-            isFoil: card.tcg.lowercased() == TCGGame.pokemon.rawValue ? variant.isFoil : isFoil,
+            isFoil: finish?.foil ?? (card.tcg.lowercased() == TCGGame.pokemon.rawValue ? variant.isFoil : isFoil),
             isSigned: isSigned,
             isAltered: isAltered,
             variant: variant,
@@ -121,6 +123,8 @@ struct CardCopyEditorSections: View {
             isPeelOff: $draft.isPeelOff
         )
 
+        GamePackagePriceView(card: card, finishCode: draft.finishCode.nonemptyEditorValue, condition: draft.condition.nonemptyEditorValue, language: draft.language.nonemptyEditorValue)
+
         CardEditorGradingSection(
             company: $draft.gradingCompany,
             score: $draft.gradingScore,
@@ -180,19 +184,21 @@ struct CardEditorAttributesSection: View {
 
     var body: some View {
         Section {
-            if card.tcg.lowercased() == TCGGame.pokemon.rawValue {
+            if !finishOptions.isEmpty {
                 Picker("Finish", selection: $finishCode) {
                     Text("Not specified").tag("")
                     ForEach(finishOptions) { finish in
                         Text(finish.label).tag(finish.code)
                     }
                 }
+            }
+            if card.tcg.lowercased() == TCGGame.pokemon.rawValue {
                 TextField("Edition (e.g. 1st Edition)", text: $edition)
                 TextField("Stamp (e.g. Prerelease, Staff)", text: $stamp)
                 Toggle("Sealed promo", isOn: $isSealedPromo)
                 Toggle("Oversized", isOn: $isOversized)
                 Toggle("Peel-off", isOn: $isPeelOff)
-            } else {
+            } else if card.gamePresentation?.printings == nil || finishCode.isEmpty {
                 Toggle(isOn: $isFoil) {
                     Label("Foil", systemImage: "sparkles")
                 }

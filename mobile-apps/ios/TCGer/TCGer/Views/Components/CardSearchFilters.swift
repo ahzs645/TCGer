@@ -120,6 +120,7 @@ struct CardSearchFilterState: Equatable {
         case .onepiece, .dragonball: return "power"
         case .lorcana: return "cost"
         case .all: return nil
+            default: return nil
         }
     }
 
@@ -131,6 +132,7 @@ struct CardSearchFilterState: Equatable {
         case .onepiece, .dragonball: return "Power"
         case .lorcana: return "Cost"
         case .all: return nil
+            default: return nil
         }
     }
 
@@ -144,6 +146,7 @@ struct CardSearchFilterState: Equatable {
         case .dragonball: keys = ["skill", "effect"]
         case .pokemon: keys = ["rules", "attacks", "abilities"]
         case .all: keys = ["oracle_text", "desc", "effect", "body_text", "skill", "rules"]
+            default: keys = ["rules", "text", "effect", "desc"]
         }
         return keys.flatMap { card.attributeStrings(for: $0) }
     }
@@ -157,11 +160,31 @@ struct CardSearchFilterState: Equatable {
     }
 }
 
+func cardSearchSetIDs(
+    in cards: [Card],
+    matching filters: CardSearchFilterState,
+    game: TCGGame
+) -> Set<String> {
+    var filtersWithoutSet = filters
+    filtersWithoutSet.set = nil
+
+    return Set(cards.compactMap { card in
+        guard (game == .all || card.tcg.caseInsensitiveCompare(game.rawValue) == .orderedSame),
+              filtersWithoutSet.matches(card, game: game),
+              let code = card.setCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !code.isEmpty else {
+            return nil
+        }
+        return "\(card.tcg.lowercased())::\(code.lowercased())"
+    })
+}
+
 struct CardSearchFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
 
     let resultCards: [Card]
+    let hasSearched: Bool
     let onApply: (TCGGame, CardSearchFilterState) -> Void
 
     @State private var draftGame: TCGGame
@@ -176,9 +199,11 @@ struct CardSearchFilterSheet: View {
         game: TCGGame,
         filters: CardSearchFilterState,
         resultCards: [Card],
+        hasSearched: Bool,
         onApply: @escaping (TCGGame, CardSearchFilterState) -> Void
     ) {
         self.resultCards = resultCards
+        self.hasSearched = hasSearched
         self.onApply = onApply
         _draftGame = State(initialValue: game)
         _draftFilters = State(initialValue: filters)
@@ -186,10 +211,16 @@ struct CardSearchFilterSheet: View {
 
     private var availableSets: [TcgSet] {
         let enabledGames = Set(environmentStore.enabledGames.map(\.rawValue))
+        let resultSetIDs = cardSearchSetIDs(
+            in: resultCards,
+            matching: draftFilters,
+            game: draftGame
+        )
         return sets
             .filter { set in
-                enabledGames.contains(set.tcg.lowercased()) &&
-                (draftGame == .all || set.tcg.caseInsensitiveCompare(draftGame.rawValue) == .orderedSame)
+                guard enabledGames.contains(set.tcg.lowercased()) else { return false }
+                guard hasSearched else { return true }
+                return resultSetIDs.contains(set.focusID) || draftFilters.set?.focusID == set.focusID
             }
             .sorted {
                 let leftDate = $0.releaseDate ?? $0.releaseYear.map { "\($0)-12-31" } ?? ""
@@ -248,7 +279,7 @@ struct CardSearchFilterSheet: View {
                     Section("Game") {
                         Picker("Game", selection: $draftGame) {
                             ForEach(environmentStore.gamePickerGames) { game in
-                                Label(game.shortName, systemImage: game.systemIconName)
+                                GameLabel(game: game)
                                     .tag(game)
                             }
                         }
@@ -276,7 +307,10 @@ struct CardSearchFilterSheet: View {
                             CardSearchSetPicker(
                                 sets: availableSets,
                                 selection: $draftFilters.set,
-                                showsGameSectionHeaders: environmentStore.shouldShowGamePicker
+                                gameSelection: $draftGame,
+                                games: environmentStore.gamePickerGames,
+                                showsGameControls: environmentStore.shouldShowGamePicker,
+                                isLimitedToSearchResults: hasSearched
                             )
                         } label: {
                             LabeledContent("Set") {
@@ -353,9 +387,6 @@ struct CardSearchFilterSheet: View {
             .navigationTitle("Search Filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Reset") {
                         draftFilters = CardSearchFilterState()
@@ -449,16 +480,20 @@ private struct CardSearchSetPicker: View {
     @Environment(\.dismiss) private var dismiss
     let sets: [TcgSet]
     @Binding var selection: TcgSet?
-    let showsGameSectionHeaders: Bool
+    @Binding var gameSelection: TCGGame
+    let games: [TCGGame]
+    let showsGameControls: Bool
+    let isLimitedToSearchResults: Bool
     @State private var searchText = ""
 
     private var filteredSets: [TcgSet] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return sets }
         return sets.filter {
-            $0.name.localizedCaseInsensitiveContains(query) ||
-                $0.code.localizedCaseInsensitiveContains(query) ||
-                $0.tcgDisplayName.localizedCaseInsensitiveContains(query)
+            (gameSelection == .all || $0.tcg.caseInsensitiveCompare(gameSelection.rawValue) == .orderedSame) &&
+                (query.isEmpty ||
+                    $0.name.localizedCaseInsensitiveContains(query) ||
+                    $0.code.localizedCaseInsensitiveContains(query) ||
+                    $0.tcgDisplayName.localizedCaseInsensitiveContains(query))
         }
     }
 
@@ -469,13 +504,26 @@ private struct CardSearchSetPicker: View {
 
     var body: some View {
         List {
+            if showsGameControls {
+                GamePickerPills(selection: $gameSelection, games: games)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+
             Section {
                 Button {
                     selection = nil
                     dismiss()
                 } label: {
-                    selectionRow(title: "Any Set", subtitle: "All expansions", isSelected: selection == nil)
+                    selectionRow(
+                        set: nil,
+                        title: "Any Set",
+                        subtitle: isLimitedToSearchResults ? "All sets in this search" : "All expansions",
+                        isSelected: selection == nil
+                    )
                 }
+                .buttonStyle(.plain)
             }
 
             ForEach(groupedSets, id: \.0) { tcg, gameSets in
@@ -486,6 +534,7 @@ private struct CardSearchSetPicker: View {
                             dismiss()
                         } label: {
                             selectionRow(
+                                set: set,
                                 title: set.name,
                                 subtitle: [
                                     set.code.uppercased(),
@@ -494,10 +543,19 @@ private struct CardSearchSetPicker: View {
                                 isSelected: selection?.id == set.id
                             )
                         }
+                        .buttonStyle(.plain)
                     }
                 } header: {
-                    if showsGameSectionHeaders {
-                        Text(TCGGame(rawValue: tcg)?.displayName ?? tcg.capitalized)
+                    if showsGameControls {
+                        if let game = TCGGame(rawValue: tcg.lowercased()) {
+                            HStack(spacing: 6) {
+                                TCGGameIcon(game: game, size: 14)
+                                    .foregroundStyle(game.brandColor)
+                                Text(game.displayName)
+                            }
+                        } else {
+                            Text(tcg.capitalized)
+                        }
                     }
                 }
             }
@@ -516,19 +574,30 @@ private struct CardSearchSetPicker: View {
         }
     }
 
-    private func selectionRow(title: String, subtitle: String, isSelected: Bool) -> some View {
-        HStack {
+    private func selectionRow(
+        set: TcgSet?,
+        title: String,
+        subtitle: String,
+        isSelected: Bool
+    ) -> some View {
+        HStack(spacing: 12) {
+            if let set {
+                SetArtworkView(set: set, size: 28, showsFallback: false)
+                    .frame(width: 32, height: 32)
+            }
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.primary)
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
             }
             Spacer()
             if isSelected {
                 Image(systemName: "checkmark")
                     .fontWeight(.semibold)
+                    .foregroundStyle(Color.accentColor)
             }
         }
         .contentShape(Rectangle())
@@ -567,6 +636,7 @@ enum CardSearchFacetKind: String {
         case .yugioh: return .monsterType
         case .lorcana: return .ink
         case .all: return nil
+            default: return nil
         }
     }
 
@@ -606,6 +676,7 @@ enum CardSearchFacetKind: String {
             return card.attributeStrings(for: "type")
         case .all, .none:
             return [card.supertype].compactMap { $0 }
+            default: return [card.supertype].compactMap { $0 }
         }
     }
 

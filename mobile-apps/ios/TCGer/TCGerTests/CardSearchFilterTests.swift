@@ -126,7 +126,65 @@ final class CardSearchFilterTests: XCTestCase {
         XCTAssertEqual(card.pokemonPrint?.finishes, ["normal"])
     }
 
+    func testSetChoicesComeFromResultsAfterOtherFilters() {
+        let matchingPokemonCard = makeCard(
+            id: "pokemon-match",
+            tcg: "pokemon",
+            setCode: "ME05",
+            rarity: "Ultra Rare"
+        )
+        let filteredOutPokemonCard = makeCard(
+            id: "pokemon-other",
+            tcg: "pokemon",
+            setCode: "ME04",
+            rarity: "Common"
+        )
+        let magicCard = makeCard(
+            id: "magic-match",
+            tcg: "magic",
+            setCode: "FIN",
+            rarity: "Ultra Rare"
+        )
+        let filters = CardSearchFilterState(rarity: "Ultra Rare")
+
+        XCTAssertEqual(
+            cardSearchSetIDs(
+                in: [matchingPokemonCard, filteredOutPokemonCard, magicCard],
+                matching: filters,
+                game: .pokemon
+            ),
+            ["pokemon::me05"]
+        )
+    }
+
+    func testCurrentSetDoesNotLimitAvailableSetChoices() {
+        let selectedSet = TcgSet(
+            code: "ME05",
+            name: "Mega Evolution",
+            tcg: "pokemon",
+            releaseDate: nil,
+            totalCards: nil,
+            standardCards: nil,
+            iconUrl: nil,
+            logoUrl: nil
+        )
+        let filters = CardSearchFilterState(set: selectedSet)
+
+        XCTAssertEqual(
+            cardSearchSetIDs(
+                in: [
+                    makeCard(id: "first", tcg: "pokemon", setCode: "ME05"),
+                    makeCard(id: "second", tcg: "pokemon", setCode: "SV08")
+                ],
+                matching: filters,
+                game: .pokemon
+            ),
+            ["pokemon::me05", "pokemon::sv08"]
+        )
+    }
+
     private func makeCard(
+        id: String = "test-card",
         tcg: String,
         setCode: String? = nil,
         rarity: String? = nil,
@@ -136,7 +194,7 @@ final class CardSearchFilterTests: XCTestCase {
         attributes: [String: JSONValue]? = nil
     ) -> Card {
         Card(
-            id: "test-card",
+            id: id,
             name: "Test Card",
             tcg: tcg,
             setCode: setCode,

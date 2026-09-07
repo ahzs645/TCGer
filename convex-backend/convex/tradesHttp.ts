@@ -42,7 +42,7 @@ function parseCardList(value: unknown, required: boolean): TradeCardInput[] | nu
     const quantity = card.quantity === undefined ? 1 : card.quantity;
     if (
       typeof card.externalId !== "string" || !card.externalId ||
-      typeof card.tcg !== "string" || !TCG_CODES.has(card.tcg as TcgCode) ||
+      typeof card.tcg !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(card.tcg) ||
       typeof card.name !== "string" || !card.name ||
       (card.collectionEntryId !== undefined && typeof card.collectionEntryId !== "string") ||
       typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 ||

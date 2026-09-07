@@ -1332,6 +1332,7 @@ final class CatalogStore: ObservableObject {
             return URL(string: "https://images.ygoprodeck.com/images/\(directory)/\(konamiId).jpg")
         case .onepiece, .lorcana, .dragonball, .all:
             return nil
+            default: return nil
         }
     }
 
@@ -1547,6 +1548,7 @@ extension TCGGame {
         case .lorcana: return "LorcanaCardBack"
         case .dragonball: return "DragonBallCardBack"
         case .all: return nil
+            default: return nil
         }
     }
 }

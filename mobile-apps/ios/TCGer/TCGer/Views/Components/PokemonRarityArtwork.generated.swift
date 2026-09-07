@@ -2,32 +2,63 @@
 import Foundation
 
 struct PokemonRarityArtworkAsset: Equatable {
-    let vectorFilename: String
+    let assetName: String
+    let fallbackFilename: String
 }
 
 enum PokemonRarityArtworkCatalog {
     static func artwork(for rarity: String) -> PokemonRarityArtworkAsset? {
         switch rarity.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "amazing rare":
-            return PokemonRarityArtworkAsset(vectorFilename: "amazing-rare.836e292370c47b8f.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityAmazingRare",
+                fallbackFilename: "amazing-rare.4a876821ba5bd97b.png"
+            )
         case "common":
-            return PokemonRarityArtworkAsset(vectorFilename: "common.2b7fcc0607f1c064.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityCommon",
+                fallbackFilename: "common.af7e4bfde3168935.png"
+            )
         case "uncommon":
-            return PokemonRarityArtworkAsset(vectorFilename: "uncommon.371e5b180b55f4cc.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityUncommon",
+                fallbackFilename: "uncommon.713182708480c351.png"
+            )
         case "rare":
-            return PokemonRarityArtworkAsset(vectorFilename: "rare.8a6867507251dba0.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityRare",
+                fallbackFilename: "rare.df6ff2f19f0a9e6e.png"
+            )
         case "holo rare":
-            return PokemonRarityArtworkAsset(vectorFilename: "rare-holo.aab14d7ee57de99c.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityRareHolo",
+                fallbackFilename: "rare-holo.df6ff2f19f0a9e6e.png"
+            )
         case "rare holo":
-            return PokemonRarityArtworkAsset(vectorFilename: "rare-holo.aab14d7ee57de99c.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityRareHolo",
+                fallbackFilename: "rare-holo.df6ff2f19f0a9e6e.png"
+            )
         case "shiny rare":
-            return PokemonRarityArtworkAsset(vectorFilename: "shiny-rare.3c897980286fa765.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityShinyRare",
+                fallbackFilename: "shiny-rare.df6ff2f19f0a9e6e.png"
+            )
         case "shiny ultra rare":
-            return PokemonRarityArtworkAsset(vectorFilename: "shiny-ultra-rare.ff4a91c850802de4.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityShinyUltraRare",
+                fallbackFilename: "shiny-ultra-rare.4987458b44840d91.png"
+            )
         case "ultra rare":
-            return PokemonRarityArtworkAsset(vectorFilename: "ultra-rare.7d1e866dc5030fa7.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityUltraRare",
+                fallbackFilename: "ultra-rare.4987458b44840d91.png"
+            )
         case "promo":
-            return PokemonRarityArtworkAsset(vectorFilename: "promo.bd2c7eb45121f553.svg")
+            return PokemonRarityArtworkAsset(
+                assetName: "PokemonRarityPromo",
+                fallbackFilename: "promo.a1ea66277389c18b.png"
+            )
         default:
             return nil
         }

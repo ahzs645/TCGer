@@ -86,6 +86,8 @@ export interface CollectionEntryRow extends PortableRow {
   certNumber?: string;
   storageLocation?: string;
   imageUrls?: string[];
+  /** Local storage embeds tags; hosted runtimes use their tag assignment tables. */
+  tags?: Array<{ id: string; label: string; colorHex: string }>;
   createdAt: number;
   updatedAt: number;
 }
@@ -106,6 +108,8 @@ export interface CardRow extends PortableRow {
   releasedAt?: string;
   createdAt: number;
   updatedAt: number;
+  /** Full catalog metadata retained by local collection storage. */
+  cardData?: Record<string, unknown>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -196,6 +200,7 @@ export interface WishlistRuleRow extends PortableRow {
 /* ------------------------------------------------------------------ */
 
 export interface DeckRow extends PortableRow {
+  rules?: import("./game-capabilities").GameDeckRules;
   userId: string;
   name: string;
   description?: string;
@@ -220,7 +225,8 @@ export interface DeckCardRow extends PortableRow {
   tcg?: string;
   name: string;
   quantity: number;
-  zone?: "main" | "extra" | "side";
+  zone?: string;
+  cardData?: Record<string, unknown>;
   isCommander?: boolean;
   isSideboard?: boolean;
   imageUrl?: string;

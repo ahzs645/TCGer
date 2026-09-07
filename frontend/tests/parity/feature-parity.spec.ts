@@ -64,7 +64,9 @@ test(
     await expect(
       page.getByRole("heading", { name: "Card Explorer" }),
     ).toBeVisible();
-    await expect(page.getByRole("textbox").first()).toBeVisible();
+    await page.getByLabel("Keyword", { exact: true }).fill("Pikachu");
+    await page.getByRole("button", { name: "Search cards", exact: true }).click();
+    await expect(page.getByText("Pikachu", { exact: true }).first()).toBeVisible();
   },
 );
 

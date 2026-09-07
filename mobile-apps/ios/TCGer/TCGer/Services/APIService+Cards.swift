@@ -50,6 +50,11 @@ extension APIService {
         query: String,
         game: TCGGame = .all
     ) async throws -> CardSearchResponse {
+        let packages = GamePackageStore.shared.installed.filter { $0.manifest.game.id == game.rawValue }
+        if !packages.isEmpty {
+            let cards = try packages.flatMap { try GamePackageStore.shared.search(packageId: $0.id, query: query) }
+            return CardSearchResponse(cards: cards, total: cards.count)
+        }
         if config.isOnDevice {
             await prepareLocalCatalog(for: game)
             let response = await LocalStore.shared.searchCardsAsync(query: query, game: game)
@@ -219,8 +224,16 @@ extension APIService {
         config: ServerConfiguration,
         token: String,
         tcg: String,
-        cardId: String
+        cardId: String,
+        packageId: String? = nil
     ) async throws -> [Card] {
+        let packages = GamePackageStore.shared.installed.filter { $0.manifest.game.id == tcg && (packageId == nil || $0.id == packageId) }
+        for package in (packageId != nil || packages.count == 1 ? packages : []) {
+            let catalog = try GamePackageStore.shared.cards(for: package)
+            if let original = catalog.first(where: { $0.id == cardId }) {
+                return catalog.filter { ($0.baseExternalId ?? $0.id) == (original.baseExternalId ?? original.id) }.map { $0.card(gameId: tcg) }
+            }
+        }
         if config.isOnDevice {
             if let game = TCGGame(rawValue: tcg) {
                 await prepareLocalCatalog(for: game)

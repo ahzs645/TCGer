@@ -1,3 +1,4 @@
+import { gameDeckRulesSchema, validateGameDeck } from "@tcg/api-types";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -10,23 +11,12 @@ import { currentClassicalBanlist } from "./banlists";
 import { normalizeYugiohName } from "./lib/yugiohBanlist";
 
 type ReaderCtx = QueryCtx | MutationCtx;
-type DeckZone = "main" | "extra" | "side";
+type DeckZone = string;
 type CardData = Record<string, any>;
 
-const tcgCodeValidator = v.union(
-  v.literal("yugioh"),
-  v.literal("magic"),
-  v.literal("pokemon"),
-  v.literal("onepiece"),
-  v.literal("lorcana"),
-  v.literal("dragonball"),
-);
+const tcgCodeValidator = v.string();
 
-const deckZoneValidator = v.union(
-  v.literal("main"),
-  v.literal("extra"),
-  v.literal("side"),
-);
+const deckZoneValidator = v.string();
 
 const cardDataValidator = v.record(v.string(), v.any());
 
@@ -47,6 +37,7 @@ const deckCardValidator = v.object({
 });
 
 const deckValidator = v.object({
+  rules: v.optional(v.any()),
   id: v.string(),
   name: v.string(),
   description: v.optional(v.string()),
@@ -93,6 +84,7 @@ const violationValidator = v.object({
 });
 
 const validationResultValidator = v.object({
+  status: v.optional(v.string()),
   valid: v.boolean(),
   errors: v.array(v.string()),
   warnings: v.array(v.string()),
@@ -195,6 +187,7 @@ async function hydrateDeck(ctx: ReaderCtx, deck: Doc<"decks">) {
     description: deck.description,
     tcg: deck.tcg,
     format: deck.format,
+    rules: deck.rules,
     colorHex: deck.colorHex,
     isPublic: deck.isPublic,
     cards: sortedCards.map(toCardResponse),
@@ -323,6 +316,7 @@ export const get = internalQuery({
 
 export const create = internalMutation({
   args: {
+    rules: v.optional(v.any()),
     subject: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
@@ -347,6 +341,7 @@ export const create = internalMutation({
       name: args.name,
       description: args.description,
       tcg: args.tcg,
+      rules: args.rules === undefined ? undefined : gameDeckRulesSchema.parse(args.rules),
       format: args.format,
       colorHex: args.colorHex,
       isPublic: args.isPublic ?? false,
@@ -456,14 +451,16 @@ export const addCard = internalMutation({
         message: "externalId, tcg, and name are required",
       });
     }
+    if (args.tcg !== deck.tcg) throw new ConvexError({ code: "BAD_REQUEST", message: "Card belongs to another game" });
     const quantity = positiveInteger(args.quantity ?? 1, "quantity");
+    const deckFormat = deck.rules ? gameDeckRulesSchema.parse(deck.rules).formats.find(f => f.id === (deck.format ?? deck.rules.defaultFormat)) : undefined;
     const zone =
       args.zone ??
       (deck.tcg === "yugioh"
         ? inferYugiohZone(args)
         : args.isSideboard
           ? "side"
-          : "main");
+          : deckFormat?.defaultZone ?? "main");
     const existing = await ctx.db
       .query("deckCards")
       .withIndex("by_deck_and_external_id_and_zone", (q) =>
@@ -1048,6 +1045,7 @@ export const validate = internalQuery({
     const deck = await requireDeckForUser(ctx, args.deckId, viewer._id);
     const hydrated = await hydrateDeck(ctx, deck);
     const format = args.format || deck.format;
+    if (deck.rules) return validateGameDeck(deck.tcg, hydrated.cards, gameDeckRulesSchema.parse(deck.rules), format);
     let result;
     if (deck.tcg === "magic")
       result = validateMagic(hydrated.cards, format || "standard");
@@ -1057,9 +1055,10 @@ export const validate = internalQuery({
       result = validatePokemon(hydrated.cards, format || "standard");
     else {
       result = {
-        valid: true,
+        valid: false,
+        status: "unsupported",
         errors: [],
-        warnings: [`Unknown TCG "${deck.tcg}"`],
+        warnings: [`No deck rules are installed for "${deck.tcg}".`],
       };
     }
 

@@ -69,6 +69,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
             }
             .popover(isPresented: $showingOptions, arrowEdge: .top) {
                 ScannerOptionsPopover(
+                    cameraController: cameraController,
                     triggerMode: $triggerMode,
                     selectedEngine: $selectedEngine,
                     automaticallyShowResults: $automaticallyShowResults,
@@ -174,6 +175,7 @@ struct ScannerCameraToolbar<LeadingContent: View>: View {
 private struct ScannerOptionsPopover: View {
     @Environment(\.dismiss) private var dismiss
 
+    @ObservedObject var cameraController: CardScannerCameraController
     @Binding var triggerMode: ScannerTriggerMode
     @Binding var selectedEngine: ScanEnginePreference
     @Binding var automaticallyShowResults: Bool
@@ -262,6 +264,28 @@ private struct ScannerOptionsPopover: View {
                             }
                         } icon: {
                             Image(systemName: "iphone.and.arrow.forward")
+                        }
+                    }
+                }
+
+                if cameraController.availableCameras.count > 1 {
+                    Section("Camera") {
+                        ForEach(cameraController.availableCameras) { camera in
+                            Button {
+                                cameraController.selectCamera(id: camera.id)
+                            } label: {
+                                HStack {
+                                    Label(camera.displayName, systemImage: camera.systemImage)
+                                    Spacer()
+                                    if cameraController.selectedCameraID == camera.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                            .disabled(isProcessing)
+                            .accessibilityAddTraits(
+                                cameraController.selectedCameraID == camera.id ? .isSelected : []
+                            )
                         }
                     }
                 }

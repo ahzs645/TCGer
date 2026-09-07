@@ -4,6 +4,7 @@
  */
 
 import {
+  commitDemoBackup,
   useDemoStore,
   whenDemoStoreHydrated,
   type DemoBinder,
@@ -569,6 +570,8 @@ const DEMO_TRANSACTIONS: TransactionResponse[] = [
 let demoTransactionsMemory: TransactionResponse[] | null = null;
 
 function getDemoTransactions(): TransactionResponse[] {
+  const imported = useDemoStore.getState().portableSections.transactions;
+  if (Array.isArray(imported)) return imported as TransactionResponse[];
   if (typeof localStorage === "undefined") {
     return demoTransactionsMemory ?? DEMO_TRANSACTIONS;
   }
@@ -583,6 +586,7 @@ function getDemoTransactions(): TransactionResponse[] {
 }
 
 function setDemoTransactions(transactions: TransactionResponse[]) {
+  useDemoStore.setState(state => ({ portableSections: { ...state.portableSections, transactions } }));
   if (typeof localStorage === "undefined") {
     demoTransactionsMemory = transactions;
     return;
@@ -1292,6 +1296,38 @@ export async function handleDemoRequest(
   // ── Auth ────────────────────────────────────────────────────────
   if (segments[0] === "auth") {
     return handleAuth(method, segments.slice(1), body);
+  }
+
+  if (segments[0] === "collections" && segments[2] === "pages") {
+    store().init();
+    const binderId = segments[1]!;
+    if (!store().binders.some(binder => binder.id === binderId)) return json({ message: "Binder not found" }, 404);
+    const sections = store().portableSections;
+    const pages = (sections.binderPages ?? []) as Array<Record<string, any>>;
+    if (method === "GET" && segments.length === 3) return json(pages.filter(page => page.binderId === binderId).map(page => ({ ...page, imageUrl: (sections.binderPageImages as Record<string, string> | undefined)?.[page.id] ? `data:image/jpeg;base64,${(sections.binderPageImages as Record<string, string>)[page.id]}` : page.imageUrl })));
+    const pageNumber = Number(segments[3]);
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > 10000) return json({ message: "Invalid page number" }, 400);
+    const existing = pages.find(page => page.binderId === binderId && page.pageNumber === pageNumber);
+    const now = new Date().toISOString();
+    if (method === "PUT" && segments.length === 4) {
+      const { upsertBinderPageSchema } = await import("@tcg/api-types");
+      const parsed = upsertBinderPageSchema.safeParse(body);
+      if (!parsed.success) return json({ message: "Invalid binder page" }, 400);
+      const page = { ...existing, ...parsed.data, id: existing?.id ?? crypto.randomUUID(), binderId, revision: (existing?.revision ?? 0) + 1, capturedAt: parsed.data.capturedAt ?? now, createdAt: existing?.createdAt ?? now, updatedAt: now };
+      await commitDemoBackup({ portableSections: { ...sections, binderPages: [...pages.filter(item => item.id !== page.id), page] } }, false);
+      return json(page);
+    }
+    if (method === "POST" && segments[4] === "image" && existing && body instanceof FormData) {
+      const image = body.get("image");
+      if (!(image instanceof Blob) || !image.type.startsWith("image/")) return json({ message: "Choose an image" }, 400);
+      let binary = ""; const bytes = new Uint8Array(await image.arrayBuffer());
+      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i,i+8192));
+      const encoded = btoa(binary);
+      const page: Record<string, any> = { ...existing, imageUrl: `data:${image.type};base64,${encoded}`, updatedAt: now };
+      await commitDemoBackup({ portableSections: { ...sections, binderPages: pages.map(item => item.id === page.id ? page : item), binderPageImages: { ...((sections.binderPageImages ?? {}) as object), [page.id]: encoded } } }, false);
+      return json(page);
+    }
+    return json({ message: "Page not found" }, 404);
   }
 
   // ── Collections / Binders ───────────────────────────────────────
@@ -2276,7 +2312,7 @@ async function handleAddCard(
 ): Promise<Response> {
   const data = body as AddCardInput;
   const demoCard: DemoOwnedCard | null =
-    DEMO_CARDS.find((c) => c.id === data.cardId) ||
+    DEMO_CARDS.find((c) => c.id === data.cardId && (!data.cardData || c.tcg === data.cardData.tcg)) ||
     (data.cardData
       ? {
           id: data.cardData.externalId || data.cardId,
@@ -2299,6 +2335,10 @@ async function handleAddCard(
     await store().addCardToBinder(targetBinder, demoCard, data.quantity ?? 1, {
       cardData: data.cardData,
       copy: {
+        tags: [
+          ...(data.tags ?? []).flatMap((id) => store().tags.filter((tag) => tag.id === id)),
+          ...(data.newTags ?? []).map((tag) => store().addTag(tag)),
+        ],
         condition: data.condition,
         language: data.language,
         notes: data.notes,

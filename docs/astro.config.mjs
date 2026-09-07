@@ -26,6 +26,23 @@ export default defineConfig({
           ]
         },
         {
+          label: 'Adding Games',
+          items: [
+            { label: 'Start Here', link: '/adding-games/' },
+            { label: 'Catalogs and Identity', link: '/adding-games/catalogs/' },
+            { label: 'Search and Collections', link: '/adding-games/search-and-collections/' },
+            { label: 'Deck Rules', link: '/adding-games/decks/' },
+            { label: 'Printings and Finishes', link: '/adding-games/printings-and-finishes/' },
+            { label: 'Format Legality', link: '/adding-games/legality/' },
+            { label: 'Symbols and Presentation', link: '/adding-games/symbols/' },
+            { label: 'Price Snapshots', link: '/adding-games/pricing/' },
+            { label: 'Pack Opening', link: '/adding-games/packs/' },
+            { label: 'Scanning', link: '/adding-games/scanning/' },
+            { label: 'Sealed Products', link: '/adding-games/sealed-products/' },
+            { label: 'Publishing and Validation', link: '/adding-games/publishing/' }
+          ]
+        },
+        {
           label: 'Reference',
           items: [
             { label: 'API Guide', link: API_DOCS_URL },

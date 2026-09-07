@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   Repeat2,
@@ -75,7 +77,7 @@ const STATUS_CONFIG: Record<
 };
 
 function tcgLabel(tcg: string): string {
-  return GAME_LABELS[tcg as SupportedGame] ?? tcg;
+  return gameLabel(tcg as SupportedGame) ?? tcg;
 }
 
 export default function TradesPage() {

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <exclude domain="file" path="scanner-attempt-images/" />
+        <exclude domain="file" path="datastore/tcger_preferences.preferences_pb" />
+        <exclude domain="sharedpref" path="personal_pricing.xml" />
     <exclude domain="file" path="scanner-recordings/" />
 </full-backup-content>

@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SealedInventoryEntity::class,
         SealedOpeningEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class TCGerDatabase : RoomDatabase() {
@@ -57,10 +57,31 @@ abstract class TCGerDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE wishlists ADD COLUMN rulesJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE owned_cards ADD COLUMN acquisitionPrice REAL")
+                db.execSQL("ALTER TABLE owned_cards ADD COLUMN detailsJson TEXT NOT NULL DEFAULT '{}'")
+                db.execSQL("DROP INDEX IF EXISTS index_wishlist_cards_externalId_wishlistId")
+                db.execSQL("CREATE UNIQUE INDEX index_wishlist_cards_tcg_externalId_wishlistId ON wishlist_cards (tcg, externalId, wishlistId)")
+                // Keep the original ID for existing references, and create identities for the remaining copies.
+                val stacks = mutableListOf<Pair<String, Int>>()
+                db.query("SELECT id, quantity FROM owned_cards WHERE quantity > 1").use { cursor ->
+                    while (cursor.moveToNext()) stacks += cursor.getString(0) to cursor.getInt(1)
+                }
+                stacks.forEach { (id, quantity) ->
+                    db.execSQL("UPDATE owned_cards SET quantity = 1 WHERE id = ?", arrayOf(id))
+                    repeat(quantity - 1) {
+                        db.execSQL("INSERT INTO owned_cards SELECT ?, binderId, externalId, name, tcg, setCode, setName, rarity, collectorNumber, imageUrl, 1, condition, price, createdAt, acquisitionPrice, detailsJson FROM owned_cards WHERE id = ?", arrayOf(java.util.UUID.randomUUID().toString(), id))
+                    }
+                }
+            }
+        }
+
         fun create(context: Context): TCGerDatabase = Room.databaseBuilder(
             context,
             TCGerDatabase::class.java,
             "tcger.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
     }
 }

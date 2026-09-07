@@ -40,7 +40,7 @@ describe("collection CSV import parser", () => {
     );
   });
 
-  test.each(["onepiece", "lorcana", "dragonball"] as const)(
+  test.each(["onepiece", "lorcana", "dragonball", "star-garden"] as const)(
     "accepts %s collection rows",
     (tcg) => {
       const preview = previewCollectionImport(

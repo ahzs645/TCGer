@@ -7,16 +7,11 @@ import {
 } from "./lib/auditValidators";
 
 const binderKind = v.union(v.literal("binder"), v.literal("library"));
-const tcgCode = v.union(
-  v.literal("yugioh"),
-  v.literal("magic"),
-  v.literal("pokemon"),
-  v.literal("onepiece"),
-  v.literal("lorcana"),
-  v.literal("dragonball")
-);
+const tcgCode = v.string();
 
 export default defineSchema({
+  backupStates: defineTable({ userId: v.id("users"), sectionsStorageId: v.id("_storage"), recoveryStorageId: v.id("_storage"), updatedAt: v.number() }).index("by_user", ["userId"]),
+  backupMappings: defineTable({ userId: v.id("users"), source: v.string(), target: v.string() }).index("by_user_source", ["userId", "source"]).index("by_user", ["userId"]),
   users: defineTable({
     authSubject: v.string(),
     email: v.optional(v.string()),
@@ -751,6 +746,7 @@ export default defineSchema({
 
   // Decks (convex-native)
   decks: defineTable({
+    rules: v.optional(v.any()),
     userId: v.id("users"),
     name: v.string(),
     description: v.optional(v.string()),
@@ -770,7 +766,7 @@ export default defineSchema({
     tcg: v.string(),
     name: v.string(),
     quantity: v.number(),
-    zone: v.union(v.literal("main"), v.literal("extra"), v.literal("side")),
+    zone: v.string(),
     isCommander: v.boolean(),
     isSideboard: v.boolean(),
     imageUrl: v.optional(v.string()),

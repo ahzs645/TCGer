@@ -11,7 +11,7 @@ class SettingsParityFeatureTest {
     @Test fun `local price catalog only advertises usable providers`() {
         val catalog = localPriceSources()
         assertEquals("automatic", catalog.defaultSource)
-        assertEquals(listOf("automatic", "scryfall"), catalog.sources.map(PriceSourceOption::id))
+        assertEquals(listOf("automatic", "justtcg", "scryfall"), catalog.sources.map(PriceSourceOption::id))
         assertEquals(listOf("magic"), catalog.sources.single { it.id == "scryfall" }.games)
     }
 

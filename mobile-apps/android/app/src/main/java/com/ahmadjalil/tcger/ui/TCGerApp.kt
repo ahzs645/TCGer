@@ -4,6 +4,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
@@ -128,7 +132,7 @@ private val PARITY_BOTTOM_NAVIGATION_ITEMS = listOf(
 
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
-fun TCGerApp(container: AppContainer) {
+fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsumed: () -> Unit = {}) {
     val viewModel: AppViewModel = viewModel(factory = AppViewModel.factory(container))
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -142,18 +146,12 @@ fun TCGerApp(container: AppContainer) {
         val navController = rememberNavController()
         val backStack by navController.currentBackStackEntryAsState()
         val route = backStack?.destination?.route
-        val shouldInstallGame = !ParityTestMode.isEnabled && needsGameInstallation(
-            state.preferences.enabledGames,
-            state.gamePackages.installed.size,
-        )
-        if (shouldInstallGame) {
-            GameInstallationScreen(
-                state = state.gamePackages,
-                enabledGames = state.preferences.enabledGames,
-                onRefresh = viewModel::refreshOfficialGamePackages,
-                onEnable = viewModel::installOfficialGamePackage,
-                onInstall = viewModel::installGamePackage,
-            )
+        if (!state.preferencesLoaded) {
+            com.ahmadjalil.tcger.ui.screens.LoadingPane()
+            return@TCGerTheme
+        }
+        if (!state.preferences.setupComplete && !ParityTestMode.isEnabled) {
+            com.ahmadjalil.tcger.ui.screens.GettingStartedScreen(state, viewModel)
             return@TCGerTheme
         }
         val pokedexCatalogIds = remember(
@@ -182,13 +180,19 @@ fun TCGerApp(container: AppContainer) {
             state.preferences.visibleBottomNavigationItems
                 .ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
         }
-        val visibleDestinations = requestedDestinations.filter { destination ->
-            destination != BottomNavigationItem.POKEDEX || supportsPokedex
-        }.ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
-        val navigationLayout = BottomNavigationLayout(visibleDestinations)
+        val availableDestinations = BottomNavigationItem.entries.filter {
+            it.isAvailable(state.preferences.dataSourceMode == DataSourceMode.SERVER && state.preferences.isSignedIn, supportsPokedex, state.preferences.sealedProductsEnabled) &&
+                it.isSupportedBy(state.serverFeatures)
+        }
+        val visibleDestinations = requestedDestinations.filter { it in availableDestinations }
+            .ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val wideLayout = configuration.screenWidthDp >= 600
+        val alwaysShowNavigationLabels = configuration.fontScale < 1.5f
+        val navigationLayout = BottomNavigationLayout(visibleDestinations, if (!wideLayout && !alwaysShowNavigationLabels) 4 else 5)
         val primaryDestinations = navigationLayout.primaryItems
         val overflowDestinations = navigationLayout.overflowItems
-        val topLevel = route == MORE_ROUTE || visibleDestinations.any { it.route == route }
+        val topLevel = route == MORE_ROUTE || availableDestinations.any { it.route == route }
         var pendingPackSession by remember { mutableStateOf<PackOpeningPullSession?>(null) }
         var pendingWishlistPull by remember { mutableStateOf<PackOpeningPull?>(null) }
         var selectedPackBinderId by remember { mutableStateOf<String?>(null) }
@@ -259,6 +263,7 @@ fun TCGerApp(container: AppContainer) {
             DefaultPortfolioRepository(
                 PortfolioConnection(connectedServerUrl, state.preferences.authToken),
                 priceSourceResolver = pricingSourceStore::resolvedSource,
+                localPricing = com.ahmadjalil.tcger.feature.settingsparity.PersonalPricingClient(com.ahmadjalil.tcger.feature.settingsparity.PersonalPricingStore(context), pricingSourceStore::resolvedSource)::refresh,
             )
         }
         val financeRepository = remember(context, settingsConnection) {
@@ -288,8 +293,7 @@ fun TCGerApp(container: AppContainer) {
         }
 
         fun openCatalogCard(card: CatalogParityCard) {
-            viewModel.setSearchQuery(card.name)
-            navController.navigate(BottomNavigationItem.SEARCH.route)
+            viewModel.openCatalogCard(card.toDomainCard())
         }
 
         fun navigateTo(destination: BottomNavigationItem) {
@@ -300,9 +304,9 @@ fun TCGerApp(container: AppContainer) {
             }
         }
 
-        LaunchedEffect(visibleDestinations, route, supportsPokedex) {
+        LaunchedEffect(availableDestinations, route) {
             val currentDestination = BottomNavigationItem.entries.firstOrNull { it.route == route }
-            if (currentDestination != null && currentDestination !in visibleDestinations) {
+            if (currentDestination != null && currentDestination !in availableDestinations) {
                 val fallback = if (currentDestination == BottomNavigationItem.POKEDEX && !supportsPokedex) {
                     BottomNavigationItem.SETTINGS
                 } else {
@@ -312,11 +316,33 @@ fun TCGerApp(container: AppContainer) {
             }
         }
 
+        LaunchedEffect(pendingLink, state.preferences.setupComplete) {
+            pendingLink?.let { raw ->
+                parseAppLink(raw)?.let { link ->
+                    link.query?.let(viewModel::setSearchQuery)
+                    navController.navigate(link.route) { launchSingleTop = true }
+                }
+                onLinkConsumed()
+            }
+        }
+
+        state.previewCard?.let { card ->
+            com.ahmadjalil.tcger.ui.screens.CatalogCardDetailDialog(card, state, viewModel)
+        }
+
+        Box {
+        if (wideLayout && topLevel) NavigationRail {
+            primaryDestinations.forEach { destination ->
+                val label = stringResource(destination.labelRes)
+                NavigationRailItem(selected = route == destination.route, onClick = { navigateTo(destination) }, icon = { Icon(destination.icon, label) }, label = { Text(label) })
+            }
+            if (navigationLayout.usesOverflow) NavigationRailItem(selected = route == MORE_ROUTE, onClick = { navController.navigate(MORE_ROUTE) }, icon = { Icon(Icons.Default.Menu, "More") }, label = { Text("More") })
+        }
         Scaffold(
-            modifier = Modifier.semantics { testTagsAsResourceId = true },
+            modifier = Modifier.padding(start = if (wideLayout && topLevel) 96.dp else 0.dp).semantics { testTagsAsResourceId = true },
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                if (topLevel) {
+                if (topLevel && !wideLayout) {
                     NavigationBar {
                         primaryDestinations.forEach { destination ->
                             val label = stringResource(destination.labelRes)
@@ -325,7 +351,8 @@ fun TCGerApp(container: AppContainer) {
                                 selected = route == destination.route,
                                 onClick = { navigateTo(destination) },
                                 icon = { Icon(destination.icon, contentDescription = label) },
-                                label = { Text(label) },
+                                label = { Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                                alwaysShowLabel = alwaysShowNavigationLabels,
                             )
                         }
                         if (navigationLayout.usesOverflow) {
@@ -341,7 +368,8 @@ fun TCGerApp(container: AppContainer) {
                                     }
                                 },
                                 icon = { Icon(Icons.Default.Menu, contentDescription = moreLabel) },
-                                label = { Text(moreLabel) },
+                                label = { Text(moreLabel, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                                alwaysShowLabel = alwaysShowNavigationLabels,
                             )
                         }
                     }
@@ -357,6 +385,9 @@ fun TCGerApp(container: AppContainer) {
                         onScan = { navController.navigate("scanner") },
                         onOpenPacks = { navController.navigate("pack-opening") },
                         onBinder = { id -> navController.navigate("binder/$id") },
+                        onCreateBinder = { navController.navigate(BottomNavigationItem.COLLECTIONS.route) },
+                        onGameStore = { navController.navigate(GAME_STORE_ROUTE) },
+                        onSettings = { navController.navigate(BottomNavigationItem.SETTINGS.route) },
                     )
                 }
                 composable(BottomNavigationItem.COLLECTIONS.route) {
@@ -364,6 +395,7 @@ fun TCGerApp(container: AppContainer) {
                         state = state,
                         contentPadding = padding,
                         onCreate = viewModel::createBinder,
+                        canEdit = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE || state.preferences.isSignedIn,
                         onDelete = viewModel::deleteBinder,
                         onOpen = { id -> navController.navigate("binder/$id") },
                     )
@@ -538,6 +570,7 @@ fun TCGerApp(container: AppContainer) {
                     PricingSourceSettingsScreen(
                         repository = pricingSourceRepository,
                         preferenceStore = pricingSourceStore,
+                        local = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE,
                         enabledGames = state.preferences.enabledGames.sorted(),
                         contentPadding = padding,
                     )
@@ -631,6 +664,22 @@ fun TCGerApp(container: AppContainer) {
                         currency = state.preferences.currency,
                         shareSiteUrl = state.preferences.serverUrl,
                         onBack = navController::popBackStack,
+                        binders = state.binders,
+                        local = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE,
+                        onAddCard = { navController.navigate(BottomNavigationItem.SEARCH.route) },
+                        onScan = { navController.navigate(BottomNavigationItem.SCAN.route) },
+                        canEdit = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE || state.preferences.isSignedIn,
+                        onSaveCopy = viewModel::saveCopy,
+                        onBulk = viewModel::bulkEdit,
+                        onSellCopy = { copy, transaction, remove ->
+                            financeRepository.create(transaction)
+                            if (remove) {
+                                try { viewModel.bulkEdit(listOf(copy), null, null, true) }
+                                catch (error: Exception) {
+                                    android.widget.Toast.makeText(context, "Sale saved. The copy could not be removed; remove it from the binder after checking Finance history.", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            } else viewModel.refresh()
+                        },
                         onRemove = viewModel::removeCard,
                         onUpdate = viewModel::updateBinder,
                         onLoadShareLinks = viewModel::getBinderShareLinks,
@@ -640,6 +689,7 @@ fun TCGerApp(container: AppContainer) {
                 }
                 composable("wishlist/{wishlistId}", arguments = listOf(navArgument("wishlistId") { type = NavType.StringType })) { entry ->
                     WishlistDetailScreen(
+                        viewModel = viewModel,
                         wishlist = state.wishlists.firstOrNull { it.id == entry.arguments?.getString("wishlistId") },
                         contentPadding = padding,
                         showCardNumbers = state.preferences.showCardNumbers,
@@ -650,6 +700,8 @@ fun TCGerApp(container: AppContainer) {
                     )
                 }
             }
+        }
+
         }
 
         state.message?.let { message ->

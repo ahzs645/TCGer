@@ -40,6 +40,7 @@ private enum class WishlistOwnershipFilter(val label: String) { ALL("All"), OWNE
 @Composable
 fun WishlistDetailScreen(
     wishlist: Wishlist?,
+    viewModel: com.ahmadjalil.tcger.ui.AppViewModel,
     contentPadding: PaddingValues,
     showCardNumbers: Boolean,
     onBack: () -> Unit,
@@ -102,6 +103,7 @@ fun WishlistDetailScreen(
             Icon(Icons.Default.Add, null)
             Text(" Add cards")
         }
+        WishlistRulesPanel(wishlist, viewModel)
         if (wishlist.cards.isNotEmpty()) {
             OutlinedTextField(
                 value = query,

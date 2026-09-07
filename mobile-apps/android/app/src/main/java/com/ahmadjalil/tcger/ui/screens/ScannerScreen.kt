@@ -5,10 +5,13 @@ import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.CameraController
@@ -16,6 +19,7 @@ import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +44,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.FlashlightOff
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -51,6 +56,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -68,6 +74,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -80,9 +88,11 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Observer
 import androidx.camera.core.TorchState
+import coil.compose.AsyncImage
 import com.ahmadjalil.tcger.ParityTestMode
 import com.ahmadjalil.tcger.domain.CardScanSource
 import com.ahmadjalil.tcger.domain.CardScanResult
+import com.ahmadjalil.tcger.domain.CardScanCandidate
 import com.ahmadjalil.tcger.domain.CatalogCard
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerCapabilities
 import com.ahmadjalil.tcger.data.scanner.AndroidScannerRequest
@@ -148,6 +158,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -270,8 +281,18 @@ fun ScannerScreen(
     val activeDevSessionId = remember { "dev-${UUID.randomUUID()}" }
     var recorderVersion by remember { mutableStateOf(0) }
     var showingOptions by remember { mutableStateOf(false) }
+    val cameraOptions = remember(context) { discoverScannerCameras(context.getSystemService(CameraManager::class.java)) }
+    var selectedCameraId by rememberSaveable(cameraOptions) {
+        mutableStateOf(cameraOptions.firstOrNull { it.displayName.startsWith("Main Camera") }?.id ?: cameraOptions.firstOrNull()?.id)
+    }
     var showingDebug by remember { mutableStateOf(false) }
     var showingResult by remember { mutableStateOf(false) }
+    var showingManualMatchSearch by remember { mutableStateOf(false) }
+    var manualMatchQuery by remember { mutableStateOf("") }
+    var manualMatchResults by remember { mutableStateOf<List<CatalogCard>>(emptyList()) }
+    var manualMatchSearching by remember { mutableStateOf(false) }
+    var manualMatchError by remember { mutableStateOf<String?>(null) }
+    var latestResultSessionEntryIDs by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showingSessionReview by remember { mutableStateOf(false) }
     var pendingSessionBinder by remember { mutableStateOf(false) }
     var importedRecording by remember { mutableStateOf<ImportedScannerRecording?>(null) }
@@ -373,6 +394,30 @@ fun ScannerScreen(
                 }.onFailure { ioMessage = it.message ?: "Could not sync the scan to the shared session." }
             }
         }
+    }
+
+    fun applyManualMatch(card: CatalogCard) {
+        val source = result?.source ?: CardScanSource.ON_DEVICE_TEXT
+        val candidate = CardScanCandidate(card = card, confidence = 1.0)
+        val retained = sessionEntries.filterNot { it.id in latestResultSessionEntryIDs }
+        val created = ScannerSessionEntry.from(candidate, source)
+        updateSession(retained + created)
+        latestResultSessionEntryIDs = setOf(created.id)
+        fetchSessionPrices(listOf(created))
+        syncSharedSession(listOf(created))
+        viewModel.selectScannerMatch(card)
+        showingManualMatchSearch = false
+    }
+
+    fun openManualMatchSearch() {
+        manualMatchQuery = result?.recognizedText
+            ?.lineSequence()
+            ?.firstOrNull()
+            ?.trim()
+            .orEmpty()
+        manualMatchResults = emptyList()
+        manualMatchError = null
+        showingManualMatchSearch = true
     }
 
     fun updateOptions(updated: ScannerSessionOptions) {
@@ -790,6 +835,7 @@ fun ScannerScreen(
         result ?: return@LaunchedEffect
         if (!awaitingScannerResult) return@LaunchedEffect
         awaitingScannerResult = false
+        latestResultSessionEntryIDs = emptySet()
         val top = result.candidates.firstOrNull()
         val request = lastSharedRequest
         lastSharedRequest = null
@@ -862,6 +908,7 @@ fun ScannerScreen(
             consensusUpdate = update
             if (update.confirmed && top != null) {
                 val created = addToSession(listOf(top), result.source)
+                latestResultSessionEntryIDs = created.map(ScannerSessionEntry::id).toSet()
                 fetchSessionPrices(created)
                 syncSharedSession(created)
                 automaticRearmGate.accepted(top.card.id)
@@ -875,6 +922,7 @@ fun ScannerScreen(
             consensusUpdate = null
             val sessionCandidates = if (lastCaptureSource == "bulk-photo-library") result.candidates else listOfNotNull(top)
             val created = addToSession(sessionCandidates, result.source)
+            latestResultSessionEntryIDs = created.map(ScannerSessionEntry::id).toSet()
             fetchSessionPrices(created)
             syncSharedSession(created)
             showingResult = options.automaticallyShowResults || ParityTestMode.isEnabled
@@ -1045,6 +1093,7 @@ fun ScannerScreen(
                     acceptCapturedImage(bytes, if (automatic) "automatic-camera" else "camera", automatic)
                 },
                 fastCapture = options.performance[ScannerPerformanceOption.FAST_CAPTURE] ?: true,
+                selectedCameraId = selectedCameraId,
                 automaticCapture = scannerGameSelectionResolved &&
                     options.captureMode == ScannerCaptureMode.CARD &&
                     options.triggerMode == ScannerTriggerMode.AUTOMATIC,
@@ -1103,6 +1152,7 @@ fun ScannerScreen(
                 liveGeometry = liveGeometry,
             )
         } else {
+            val topCandidate = result.candidates.firstOrNull()
             LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
@@ -1136,7 +1186,34 @@ fun ScannerScreen(
                         )
                     }
                 }
-                items(result.candidates, key = { it.card.id }) { candidate ->
+                if (topCandidate != null) {
+                    item {
+                        ScannerMatchComparison(
+                            captured = lastSourceBitmap,
+                            candidate = topCandidate,
+                            showCardNumbers = state.preferences.showCardNumbers,
+                            onChangeMatch = ::openManualMatchSearch,
+                            onAdd = { pendingCard = topCandidate.card },
+                        )
+                    }
+                } else {
+                    item {
+                        Button(
+                            onClick = ::openManualMatchSearch,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Find Match")
+                        }
+                    }
+                }
+                if (result.candidates.size > 1) {
+                    item {
+                        Text("Other possible matches", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                items(result.candidates.drop(1), key = { it.card.id }) { candidate ->
                     CatalogCardRow(candidate.card, showCardNumbers = state.preferences.showCardNumbers) {
                         Column(horizontalAlignment = Alignment.End) {
                             candidate.confidence?.let {
@@ -1144,8 +1221,8 @@ fun ScannerScreen(
                             }
                             TextButton(
                                 modifier = Modifier.testTag(ParityControlIDs.ACTION_SCANNER_ADD),
-                                onClick = { pendingCard = candidate.card },
-                            ) { Text("Add") }
+                                onClick = { applyManualMatch(candidate.card) },
+                            ) { Text("Use Match") }
                         }
                     }
                 }
@@ -1161,17 +1238,41 @@ fun ScannerScreen(
                     }
                 }
                 item {
-                    OutlinedButton(
-                        modifier = Modifier.fillMaxWidth().testTag(ParityControlIDs.ACTION_SCANNER_RESCAN),
-                        onClick = {
-                            automaticRearmGate.next()
-                            automaticCaptureNeedsRearm = false
-                            autoConsensus.reset()
-                            consensusUpdate = null
-                            showingResult = false
-                            viewModel.resetScanner()
-                        },
-                    ) { Text("Scan another card") }
+                    if (topCandidate != null) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    updateSession(sessionEntries.filterNot { it.id in latestResultSessionEntryIDs })
+                                    latestResultSessionEntryIDs = emptySet()
+                                    showingResult = false
+                                    viewModel.resetScanner()
+                                },
+                            ) { Text("Discard") }
+                            Button(
+                                modifier = Modifier.weight(1f),
+                                onClick = { showingResult = false },
+                            ) { Text("Keep Match") }
+                        }
+                    }
+                    if (topCandidate == null) {
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth().testTag(ParityControlIDs.ACTION_SCANNER_RESCAN),
+                            onClick = {
+                                updateSession(sessionEntries.filterNot { it.id in latestResultSessionEntryIDs })
+                                latestResultSessionEntryIDs = emptySet()
+                                automaticRearmGate.next()
+                                automaticCaptureNeedsRearm = false
+                                autoConsensus.reset()
+                                consensusUpdate = null
+                                showingResult = false
+                                viewModel.resetScanner()
+                            },
+                        ) { Text("Scan Again") }
+                    }
                 }
             }
         }
@@ -1301,6 +1402,37 @@ fun ScannerScreen(
         )
     }
 
+    if (showingManualMatchSearch) {
+        Dialog(
+            onDismissRequest = { if (!manualMatchSearching) showingManualMatchSearch = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            ScannerManualMatchDialog(
+                captured = lastSourceBitmap,
+                query = manualMatchQuery,
+                results = manualMatchResults,
+                isSearching = manualMatchSearching,
+                error = manualMatchError,
+                showCardNumbers = state.preferences.showCardNumbers,
+                onQueryChanged = { manualMatchQuery = it },
+                onSearch = {
+                    manualMatchSearching = true
+                    manualMatchError = null
+                    viewModel.searchScannerCards(manualMatchQuery, selectedGame) { outcome ->
+                        manualMatchSearching = false
+                        outcome.onSuccess { manualMatchResults = it }
+                            .onFailure {
+                                manualMatchResults = emptyList()
+                                manualMatchError = it.message ?: "Card search failed."
+                            }
+                    }
+                },
+                onSelect = ::applyManualMatch,
+                onDismiss = { showingManualMatchSearch = false },
+            )
+        }
+    }
+
     quadEditorBitmap?.let { bitmap ->
         val initial = if (editingBinderPage) {
             lastSourceQuad ?: ScannerCropQuad.fromBounds(0.035f, 0.035f, 0.965f, 0.965f)
@@ -1371,6 +1503,9 @@ fun ScannerScreen(
             capabilities = capabilities,
             game = selectedGame,
             isProcessing = state.isScanning,
+            cameraOptions = cameraOptions,
+            selectedCameraId = selectedCameraId,
+            onCameraSelected = { selectedCameraId = it },
             onOptionsChanged = ::updateOptions,
             onPickPhoto = {
                 showingOptions = false
@@ -1627,6 +1762,131 @@ fun ScannerScreen(
 }
 
 @Composable
+private fun ScannerMatchComparison(
+    captured: Bitmap?,
+    candidate: CardScanCandidate,
+    showCardNumbers: Boolean,
+    onChangeMatch: () -> Unit,
+    onAdd: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 2.dp,
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (captured != null) {
+                        Image(
+                            bitmap = captured.asImageBitmap(),
+                            contentDescription = "Captured card",
+                            modifier = Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Fit,
+                        )
+                    } else {
+                        Box(Modifier.fillMaxWidth().height(210.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+                    }
+                    Text("Captured", style = MaterialTheme.typography.labelMedium)
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    AsyncImage(
+                        model = candidate.card.imageUrl,
+                        contentDescription = "Matched card ${candidate.card.name}",
+                        modifier = Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Text("Matched", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            CatalogCardRow(candidate.card, showCardNumbers = showCardNumbers) {
+                candidate.confidence?.let {
+                    Text("${(it * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onChangeMatch, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                    Text(" Change Match")
+                }
+                Button(onClick = onAdd, modifier = Modifier.weight(1f)) { Text("Add to Binder") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScannerManualMatchDialog(
+    captured: Bitmap?,
+    query: String,
+    results: List<CatalogCard>,
+    isSearching: Boolean,
+    error: String?,
+    showCardNumbers: Boolean,
+    onQueryChanged: (String) -> Unit,
+    onSearch: () -> Unit,
+    onSelect: (CatalogCard) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Surface(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Choose Match", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = onDismiss, enabled = !isSearching) { Text("Cancel") }
+            }
+            if (captured != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Image(
+                        bitmap = captured.asImageBitmap(),
+                        contentDescription = "Captured card",
+                        modifier = Modifier.width(70.dp).height(98.dp).clip(RoundedCornerShape(10.dp)),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Column {
+                        Text("Captured card", fontWeight = FontWeight.SemiBold)
+                        Text("Compare it with the catalog results.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChanged,
+                    label = { Text("Card name or number") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Button(onClick = onSearch, enabled = query.trim().length >= 2 && !isSearching) {
+                    if (isSearching) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Default.Search, contentDescription = "Search")
+                }
+            }
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (!isSearching && results.isEmpty()) {
+                Text(
+                    if (query.isBlank()) "Search by card name or collector number."
+                    else "No cards found yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            LazyColumn(
+                Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(results, key = { "${it.tcg}:${it.id}" }) { card ->
+                    CatalogCardRow(card, showCardNumbers = showCardNumbers) {
+                        Button(onClick = { onSelect(card) }) { Text("Use") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ScannerCapturePane(
     state: AppUiState,
     contentPadding: PaddingValues,
@@ -1635,6 +1895,7 @@ private fun ScannerCapturePane(
     onSelectedGame: (String) -> Unit,
     onCaptured: (ByteArray, Boolean) -> Unit,
     fastCapture: Boolean,
+    selectedCameraId: String?,
     automaticCapture: Boolean,
     automaticIntervalMillis: Long,
     onPickPhoto: () -> Unit,
@@ -1740,6 +2001,7 @@ private fun ScannerCapturePane(
                     hasCameraPermission -> CameraPreview(
                         onCaptured = onCaptured,
                         fastCapture = fastCapture,
+                        selectedCameraId = selectedCameraId,
                         automaticCapture = automaticCapture,
                         automaticIntervalMillis = automaticIntervalMillis,
                         isProcessing = state.isScanning,
@@ -1813,6 +2075,7 @@ private fun ScannerCapturePane(
 private fun CameraPreview(
     onCaptured: (ByteArray, Boolean) -> Unit,
     fastCapture: Boolean,
+    selectedCameraId: String?,
     automaticCapture: Boolean,
     automaticIntervalMillis: Long,
     isProcessing: Boolean,
@@ -1820,9 +2083,9 @@ private fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val controller = remember(fastCapture) {
+    val controller = remember(fastCapture, selectedCameraId) {
         LifecycleCameraController(context).apply {
-            cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            cameraSelector = scannerCameraSelector(selectedCameraId)
             imageCaptureMode = if (fastCapture) {
                 ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
             } else {
@@ -1911,6 +2174,7 @@ private fun CameraPreview(
                     this.controller = controller
                 }
             },
+            update = { it.controller = controller },
         )
         if (automaticCapture) {
             Text(
@@ -1958,4 +2222,57 @@ private fun formatScannerAssetBytes(bytes: Long): String = when {
     bytes <= 0L -> "preparing…"
     bytes < 1_000_000L -> "${bytes / 1_000} KB"
     else -> String.format("%.1f MB", bytes / 1_000_000.0)
+}
+
+private data class RearCameraDescriptor(
+    val id: String,
+    val equivalentFocalLength: Float,
+)
+
+private fun discoverScannerCameras(cameraManager: CameraManager): List<ScannerCameraOption> {
+    val cameras = runCatching {
+        cameraManager.cameraIdList.mapNotNull { id ->
+            val characteristics = cameraManager.getCameraCharacteristics(id)
+            if (characteristics.get(CameraCharacteristics.LENS_FACING) != CameraCharacteristics.LENS_FACING_BACK) {
+                return@mapNotNull null
+            }
+            val focalLength = characteristics
+                .get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                ?.minOrNull()
+                ?: return@mapNotNull null
+            val sensorWidth = characteristics
+                .get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+                ?.width
+                ?.takeIf { it > 0f }
+            val equivalent = sensorWidth?.let { focalLength * 36f / it } ?: focalLength
+            RearCameraDescriptor(id, equivalent)
+        }
+    }.getOrDefault(emptyList())
+    if (cameras.isEmpty()) return emptyList()
+
+    val main = cameras.minByOrNull { abs(it.equivalentFocalLength - 26f) } ?: cameras.first()
+    return cameras
+        .sortedBy(RearCameraDescriptor::equivalentFocalLength)
+        .map { camera ->
+            val ratio = camera.equivalentFocalLength / main.equivalentFocalLength
+            val zoom = String.format("%.1f×", ratio)
+            val label = when {
+                camera.id == main.id -> "Main Camera · 1×"
+                ratio < 0.8f -> "Ultra Wide · $zoom"
+                ratio > 1.2f -> "Telephoto · $zoom"
+                else -> "Back Camera · $zoom"
+            }
+            ScannerCameraOption(camera.id, label)
+        }
+}
+
+private fun scannerCameraSelector(cameraId: String?): CameraSelector {
+    if (cameraId == null) return CameraSelector.DEFAULT_BACK_CAMERA
+    return CameraSelector.Builder()
+        .addCameraFilter { cameraInfos ->
+            cameraInfos.filter { info ->
+                runCatching { Camera2CameraInfo.from(info).cameraId == cameraId }.getOrDefault(false)
+            }
+        }
+        .build()
 }

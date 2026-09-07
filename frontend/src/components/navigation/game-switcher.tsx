@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { Check, Layers } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -67,7 +69,7 @@ export function GameSwitcher() {
     (game) => game === "all" || enabledGames[game],
   );
   const selectedLabel =
-    selectedGame === "all" ? "All games" : GAME_LABELS[selectedGame];
+    selectedGame === "all" ? "All games" : gameLabel(selectedGame);
 
   return (
     <>
@@ -106,7 +108,7 @@ export function GameSwitcher() {
               >
                 <GameIcon game={game} selected={false} />
                 <span className="flex-1">
-                  {game === "all" ? "All games" : GAME_LABELS[game]}
+                  {game === "all" ? "All games" : gameLabel(game)}
                 </span>
                 {isSelected && <Check className="h-4 w-4" aria-hidden="true" />}
               </DropdownMenuItem>
@@ -144,14 +146,14 @@ export function GameSwitcher() {
             <ToggleGroupItem
               key={game}
               value={game}
-              title={GAME_LABELS[game]}
+              title={gameLabel(game)}
               className="flex min-w-[3rem] items-center gap-2"
               data-oid="d3w.0o-"
             >
               <GameIcon game={game} selected={isSelected} />
 
               <span className="sr-only" data-oid="ji47x4:">
-                {GAME_LABELS[game]}
+                {gameLabel(game)}
               </span>
             </ToggleGroupItem>
           );

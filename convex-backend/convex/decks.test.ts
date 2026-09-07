@@ -298,3 +298,23 @@ describe("Convex-native decks REST routes", () => {
     );
   });
 });
+
+test("future games persist declarative rules and validate custom zones over HTTP", async () => {
+  const t = createTestConvex();
+  const headers = bridgeHeaders("future_game_user");
+  const rules = { version: 1, defaultFormat: "duel", formats: [{ id: "duel", label: "Duel", defaultZone: "lineup", maxCopies: 2, zones: [{ id: "captain", label: "Captain", min: 1, max: 1, eligibility: [{ property: "attributes.role", values: ["captain"] }] }, { id: "lineup", label: "Lineup", min: 2, max: 4 }] }] };
+  const created = await t.fetch("/decks", { method: "POST", headers, body: JSON.stringify({ name: "Star Garden", tcg: "star-garden", rules }) });
+  expect(created.status).toBe(201);
+  const deck = await created.json();
+  expect(deck.rules.defaultFormat).toBe("duel");
+  const leader = await t.fetch(`/decks/${deck.id}/cards`, { method: "POST", headers, body: JSON.stringify({ externalId: "captain-1", tcg: "star-garden", name: "Captain", quantity: 1, zone: "captain", cardData: { attributes: { role: "captain" } } }) });
+  expect(leader.status).toBe(201);
+  const scout = await t.fetch(`/decks/${deck.id}/cards`, { method: "POST", headers, body: JSON.stringify({ externalId: "scout-1", tcg: "star-garden", name: "Scout", quantity: 2 }) });
+  expect(scout.status).toBe(201);
+  expect((await scout.json()).zone).toBe("lineup");
+  const validation = await t.fetch(`/decks/${deck.id}/validate`, { method: "POST", headers, body: "{}" });
+  expect(validation.status).toBe(200);
+  expect(await validation.json()).toMatchObject({ valid: true, status: "valid" });
+  const mismatched = await t.fetch(`/decks/${deck.id}/cards`, { method: "POST", headers, body: JSON.stringify({ externalId: "foreign", tcg: "pokemon", name: "Foreign card" }) });
+  expect(mismatched.status).toBe(400);
+});

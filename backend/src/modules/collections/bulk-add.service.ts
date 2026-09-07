@@ -172,12 +172,12 @@ export async function commitBulkAdd(
 
     const entryIds: string[] = [];
     for (const row of rows) {
-      await ensureCardForCollection(tx, row.cardId, row.cardData);
+      const resolvedCard = await ensureCardForCollection(tx, row.cardId, row.cardData);
       for (let index = 0; index < row.quantity; index += 1) {
         const entry = await tx.collection.create({
           data: buildCollectionCreateInput(
             userId,
-            row,
+            { ...row, cardId: resolvedCard.id },
             binderDefaultConditions.get(row.binderId)
           )
         });

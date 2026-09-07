@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { CollectionCard } from "@/lib/api/collections";
+import { useDemoStore } from "@/stores/demo-store";
 import { SMART_FOLDER_STORAGE_KEY_PREFIX } from "@/lib/storage/keys";
 
 export type SmartFolderRuleType =
@@ -29,7 +30,8 @@ export type SmartFolderRuleType =
   | "rarity"
   | "condition"
   | "setCode"
-  | "isFoil";
+  | "isFoil"
+  | "tag";
 
 export interface SmartFolderRule {
   id: string;
@@ -51,6 +53,7 @@ const RULE_LABELS: Record<SmartFolderRuleType, string> = {
   condition: "Condition",
   setCode: "Set code",
   isFoil: "Foil only",
+  tag: "Tag",
 };
 
 /** A fresh demo should show what automatic folders do before the visitor builds one. */
@@ -87,6 +90,7 @@ export function smartFolderStorageKey(userId?: string | null) {
 export function loadSmartFolders(userId?: string | null): SmartFolder[] {
   if (typeof window === "undefined") return [];
   try {
+    if (userId === "demo-user-001" && Array.isArray(useDemoStore.getState().portableSections.smartFolders)) return useDemoStore.getState().portableSections.smartFolders as SmartFolder[];
     const raw = localStorage.getItem(smartFolderStorageKey(userId));
     if (raw === null && userId === "demo-user-001") {
       return DEMO_SMART_FOLDERS.map((folder) => ({
@@ -106,32 +110,26 @@ function persistSmartFolders(
   folders: SmartFolder[],
 ) {
   localStorage.setItem(smartFolderStorageKey(userId), JSON.stringify(folders));
+  if (userId === "demo-user-001") useDemoStore.setState(state => ({ portableSections: { ...state.portableSections, smartFolders: folders } }));
 }
 
 export function matchesSmartFolder(card: CollectionCard, folder: SmartFolder) {
-  const matchesRule = (rule: SmartFolderRule) => {
-    const value = rule.value.trim().toLowerCase();
-    switch (rule.type) {
-      case "tcg":
-        return card.tcg.toLowerCase() === value;
-      case "rarity":
-        return card.rarity?.toLowerCase() === value;
-      case "condition":
-        return card.copies.some(
-          (copy) => copy.condition?.toLowerCase() === value,
-        );
-      case "setCode":
-        return card.setCode?.toLowerCase() === value;
-      case "isFoil":
-        return card.copies.some(
-          (copy) => copy.isFoil || Boolean(copy.finishCode),
-        );
-    }
-  };
   if (!folder.rules.length) return true;
-  return folder.matchMode === "all"
-    ? folder.rules.every(matchesRule)
-    : folder.rules.some(matchesRule);
+  const copies = card.copies.length ? card.copies : [{ condition: card.condition, isFoil: false, tags: [] }];
+  return copies.some(copy => {
+    const matchesRule = (rule: SmartFolderRule) => {
+      const value = rule.value.trim().toLowerCase();
+      switch (rule.type) {
+        case "tcg": return card.tcg.toLowerCase() === value;
+        case "rarity": return card.rarity?.toLowerCase() === value;
+        case "condition": return copy.condition?.toLowerCase() === value;
+        case "setCode": return card.setCode?.toLowerCase() === value;
+        case "isFoil": return Boolean(copy.isFoil) === (value !== "false");
+        case "tag": return copy.tags?.some(tag => tag.label.trim().toLowerCase() === value) ?? false;
+      }
+    };
+    return folder.matchMode === "all" ? folder.rules.every(matchesRule) : folder.rules.some(matchesRule);
+  });
 }
 
 interface SmartFolderManagerProps {

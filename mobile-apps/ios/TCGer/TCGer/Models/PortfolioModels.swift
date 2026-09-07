@@ -100,6 +100,7 @@ struct DeckCard: Identifiable, Codable, Hashable, Sendable {
 }
 
 struct Deck: Identifiable, Codable, Hashable, Sendable {
+    var rules: GameDeckRules? = nil
     let id: String
     let name: String
     let description: String?

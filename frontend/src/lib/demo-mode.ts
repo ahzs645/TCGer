@@ -73,7 +73,7 @@ function maybeHandleDemoFetch(
   if (shouldHandleDemoRequests() && url.startsWith(DEMO_API_BASE_URL)) {
     const path = url.slice(DEMO_API_BASE_URL.length); // e.g. "/auth/login"
     const method = init?.method?.toUpperCase() ?? "GET";
-    const body = init?.body ? JSON.parse(init.body as string) : undefined;
+    const body = init?.body instanceof FormData ? init.body : init?.body ? JSON.parse(init.body as string) : undefined;
     return handleDemoRequest(method, path, body);
   }
 

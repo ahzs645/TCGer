@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -338,7 +340,7 @@ export function BulkAddDialog() {
                     .filter((value) => value !== "all")
                     .map((value) => (
                       <SelectItem key={value} value={value}>
-                        {GAME_LABELS[value]}
+                        {gameLabel(value)}
                       </SelectItem>
                     ))}
                 </SelectContent>

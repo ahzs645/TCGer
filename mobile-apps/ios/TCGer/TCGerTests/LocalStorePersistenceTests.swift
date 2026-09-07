@@ -116,6 +116,37 @@ final class LocalStorePersistenceTests: XCTestCase {
         XCTAssertEqual(store.persistenceFailure?.operation, .restore)
     }
 
+    func testSharedPortableFixtureRetainsCopiesGamesAndUnknownSections() throws {
+        var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("mobile-parity").path), directory.path != "/" {
+            directory.deleteLastPathComponent()
+        }
+        let fixture = try Data(contentsOf: directory.appendingPathComponent("mobile-parity/fixtures/portable-backup-v2.json"))
+        let store = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root))
+        try store.importPortableBackup(fixture)
+        try store.importPortableBackup(fixture)
+        let exported = try XCTUnwrap(JSONSerialization.jsonObject(with: store.exportPortableBackup()) as? [String: Any])
+        let binders = try XCTUnwrap(exported["binders"] as? [[String: Any]])
+        let copies = try XCTUnwrap(binders.first?["cards"] as? [[String: Any]])
+        XCTAssertEqual(copies.count, 3)
+        XCTAssertEqual(Set(copies.compactMap { $0["id"] as? String }).count, 3)
+        XCTAssertEqual(Set(copies.compactMap { ($0["card"] as? [String: Any])?["tcg"] as? String }), ["pokemon", "magic"])
+        XCTAssertNotNil((exported["sections"] as? [String: Any])?["futureFeature"])
+        let pokemon = try XCTUnwrap(store.getCollections().first?.cards.first { $0.tcg == "pokemon" })
+        let unconditionedCopy = try XCTUnwrap(pokemon.copies.first { $0.condition == nil })
+        XCTAssertFalse(SmartFolderRule(id: UUID(), type: .condition, value: "LP").matches(card: pokemon, copy: unconditionedCopy))
+    }
+
+    func testMalformedSmartFolderIsRejectedBeforeImportChangesState() throws {
+        let store = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root))
+        _ = store.createCollection(name: "Keep me", description: nil, colorHex: nil)
+        var document = try XCTUnwrap(JSONSerialization.jsonObject(with: store.exportPortableBackup()) as? [String: Any])
+        document["binders"] = []
+        document["sections"] = ["smartFolders": [["name": "Missing rules"]]]
+        XCTAssertThrowsError(try store.importPortableBackup(JSONSerialization.data(withJSONObject: document)))
+        XCTAssertTrue(store.getCollections().contains { $0.name == "Keep me" })
+    }
+
     func testWriteFailureRollsBackInMemoryStateAndIsObservable() {
         let store = LocalStore(persistenceRepository: FailingPersistenceRepository())
 

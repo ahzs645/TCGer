@@ -237,6 +237,8 @@ final class LocalStore {
     // `loadSampleData()` — and every change is snapshotted to disk so nothing
     // is lost when the app is relaunched.
 
+    private var portableSections: [String: JSONValue]?
+
     private struct PersistedState: Codable {
         var collections: [Collection]
         var binderPages: [SavedBinderPage]?
@@ -261,6 +263,7 @@ final class LocalStore {
         /// Absent in stores written before sample data became opt-in; those
         /// stores were seeded automatically, so they are treated as loaded.
         var sampleDataLoaded: Bool?
+        var portableSections: [String: JSONValue]? = nil
     }
 
     private struct PortableBackup: Codable {
@@ -299,6 +302,7 @@ final class LocalStore {
     }
 
     private func applyPersistedState(_ state: PersistedState) {
+        portableSections = state.portableSections
         collections = state.collections
         binderPages = state.binderPages ?? []
         tags = state.tags
@@ -358,7 +362,8 @@ final class LocalStore {
             user: user,
             preferences: preferences,
             appSettings: appSettings,
-            sampleDataLoaded: sampleDataLoaded
+            sampleDataLoaded: sampleDataLoaded,
+            portableSections: portableSections
         )
     }
 
@@ -464,7 +469,7 @@ final class LocalStore {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try encoder.encode(backup)
+        return try encodeSharedBackup(native: encoder.encode(backup))
     }
 
     func portableBackupSummary(from data: Data) throws -> LocalDataBackupSummary {
@@ -504,6 +509,160 @@ final class LocalStore {
         }
     }
 
+    /// Shared v2 shape uses one record per physical copy; unrecognized sections
+    /// remain in the durable state so another interface can recover them later.
+    private func encodeSharedBackup(native: Data) throws -> Data {
+        let root = try JSONSerialization.jsonObject(with: native) as! [String: Any]
+        let payload = root["payload"] as! [String: Any]
+        var sections = payload["portableSections"] as? [String: Any] ?? [:]
+        var nativeRoot = root
+        var nativePayload = payload; nativePayload.removeValue(forKey: "portableSections")
+        nativeRoot["payload"] = nativePayload
+        sections["ios"] = nativeRoot
+        for key in ["transactions", "onlineCodes", "binderPages", "preferences"] { sections[key] = payload[key] }
+        sections["binderPageImages"] = root["binderPageImages"]
+        sections["smartFolders"] = (root["appPreferences"] as? [String: Any])?["smartFolders"]
+        let binders = (payload["collections"] as? [[String: Any]] ?? []).map { binder -> [String: Any] in
+            var result = binder
+            result["colorHex"] = binder["colorHex"] as? String ?? "315DA8"
+            result["cards"] = (binder["cards"] as? [[String: Any]] ?? []).flatMap { card -> [[String: Any]] in
+                var identity = card
+                identity["id"] = card["externalId"] as? String ?? card["cardId"] as? String ?? card["id"]
+                var copies = card["copies"] as? [[String: Any]] ?? []
+                if copies.isEmpty {
+                    copies = (0..<(card["quantity"] as? Int ?? 1)).map { index in
+                        var copy = card; copy["id"] = "legacy-\(card["id"] as? String ?? "")-\(index)"; return copy
+                    }
+                }
+                return copies.map { copy in
+                    var result: [String: Any] = ["id": copy["id"]!, "card": identity, "quantity": 1, "details": copy]
+                    for key in ["condition", "price", "acquisitionPrice"] { result[key] = copy[key] }
+                    return result
+                }
+            }
+            return result
+        }
+        let lists = (payload["wishlists"] as? [[String: Any]] ?? []).map { list -> [String: Any] in
+            var result = list; result["colorHex"] = list["colorHex"] as? String ?? "315DA8"
+            result["matchAnyPrinting"] = list["matchAnyPrinting"] as? Bool ?? false
+            result["rules"] = list["rules"] as? [[String: Any]] ?? []
+            result["cards"] = (list["cards"] as? [[String: Any]] ?? []).map { card -> [String: Any] in
+                var identity = card; identity["id"] = card["externalId"]
+                var item: [String: Any] = ["id": card["id"]!, "card": identity, "desiredQuantity": card["desiredQuantity"] as? Int ?? 1]
+                item["notes"] = card["notes"]; return item
+            }; return result
+        }
+        let sealed = (payload["sealedInventory"] as? [[String: Any]] ?? []).map { item -> [String: Any] in
+            var result = item; let product = item["product"] as? [String: Any] ?? [:]
+            result["productId"] = product["id"]; result["productName"] = product["name"]; return result
+        }
+        return try JSONSerialization.data(withJSONObject: ["format": "com.tcger.portable-backup", "formatVersion": 2, "exportedAt": root["exportedAt"]!, "binders": binders, "wishlists": lists, "sealedInventory": sealed, "sections": sections], options: [.prettyPrinted, .sortedKeys])
+    }
+
+    private func decodeSharedBackup(_ document: [String: Any]) throws -> (state: PersistedState, exportedAt: Date?, appPreferences: LocalDataAppPreferences?, binderPageImages: [String: Data]?) {
+        guard let version = document["formatVersion"] as? Int, (1...2).contains(version),
+              document["format"] == nil || document["format"] as? String == "com.tcger.portable-backup",
+              let binders = document["binders"] as? [[String: Any]] else { throw LocalDataTransferError.invalidBackup }
+        let now = ISO8601DateFormatter().string(from: Date())
+        let sections = document["sections"] as? [String: Any] ?? [:]
+        let ios = sections["ios"] as? [String: Any] ?? [:]
+        var payload = ios["payload"] as? [String: Any] ?? [:]
+        var allTags: [String: [String: Any]] = [:]
+        var copyIDs = Set<String>()
+        payload["collections"] = try binders.enumerated().map { binderIndex, binder -> [String: Any] in
+            guard let name = binder["name"] as? String, !name.isEmpty, let cards = binder["cards"] as? [[String: Any]] else { throw LocalDataTransferError.invalidBackup }
+            var result = binder
+            let binderID = binder["id"] as? String ?? "portable-binder-\(binderIndex)-\(name)"
+            result["id"] = binderID; result["createdAt"] = now; result["updatedAt"] = now
+            var groups: [String: [String: Any]] = [:]; var order: [String] = []
+            for (index, owned) in cards.enumerated() {
+                guard let card = owned["card"] as? [String: Any], let cardID = card["id"] as? String, !cardID.isEmpty,
+                      let game = card["tcg"] as? String, !game.isEmpty, let quantity = owned["quantity"] as? Int, (1...10000).contains(quantity) else { throw LocalDataTransferError.invalidBackup }
+                for key in ["price", "acquisitionPrice"] {
+                    if let amount = owned[key] as? Double, !amount.isFinite || amount < 0 { throw LocalDataTransferError.invalidBackup }
+                }
+                let groupID = "\(game.lowercased()):\(cardID)"
+                var group = groups[groupID] ?? card
+                group["id"] = group["id"] as? String ?? "portable-card-\(index)"
+                group["cardId"] = cardID; group["externalId"] = cardID
+                var copies = group["copies"] as? [[String: Any]] ?? []
+                if groups[groupID] == nil { copies = []; order.append(groupID) }
+                for copyIndex in 0..<quantity {
+                    var copy = owned["details"] as? [String: Any] ?? [:]
+                    let baseID = owned["id"] as? String ?? "\(binderID)-copy-\(index)"
+                    let copyID = copyIndex == 0 ? baseID : "\(baseID)-\(copyIndex)"
+                    guard copyIDs.insert(copyID).inserted else { throw LocalDataTransferError.invalidBackup }
+                    copy["id"] = copyID
+                    for key in ["condition", "price", "acquisitionPrice"] { copy[key] = owned[key] }
+                    copy["tags"] = (copy["tags"] as? [[String: Any]] ?? []).map { tag -> [String: Any] in
+                        var tagged = tag; let label = tag["label"] as? String ?? "Tag"
+                        let id = (tag["id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "portable-tag-\(label)"
+                        tagged["id"] = id; tagged["colorHex"] = tag["colorHex"] as? String ?? "315DA8"; allTags[id] = tagged; return tagged
+                    }
+                    copies.append(copy)
+                }
+                group["copies"] = copies; group["quantity"] = copies.count
+                group["price"] = copies.first?["price"]; group["condition"] = copies.first?["condition"]
+                groups[groupID] = group
+            }
+            result["cards"] = order.compactMap { groups[$0] }; return result
+        }
+        payload["tags"] = Array(allTags.values)
+        payload["wishlists"] = try (document["wishlists"] as? [[String: Any]] ?? []).enumerated().map { index, list -> [String: Any] in
+            guard let name = list["name"] as? String, !name.isEmpty else { throw LocalDataTransferError.invalidBackup }
+            var result = list; let id = list["id"] as? String ?? "portable-wishlist-\(index)"
+            result["id"] = id; result["createdAt"] = now; result["updatedAt"] = now
+            result["rules"] = (list["rules"] as? [[String: Any]] ?? []).enumerated().map { i, rule -> [String: Any] in
+                var result = rule; result["id"] = rule["id"] as? String ?? "\(id)-rule-\(i)"; result["createdAt"] = rule["createdAt"] as? String ?? now; result["updatedAt"] = now; return result
+            }
+            let cards = try (list["cards"] as? [[String: Any]] ?? []).enumerated().map { i, item -> [String: Any] in
+                guard var card = item["card"] as? [String: Any], let externalID = card["id"] as? String else { throw LocalDataTransferError.invalidBackup }
+                card["externalId"] = externalID; card["id"] = item["id"] as? String ?? "\(id)-card-\(i)"
+                card["desiredQuantity"] = item["desiredQuantity"] as? Int ?? 1; card["notes"] = item["notes"]
+                card["owned"] = false; card["ownedQuantity"] = 0; card["createdAt"] = now; return card
+            }
+            result["cards"] = cards; result["totalCards"] = cards.count; result["ownedCards"] = 0; result["completionPercent"] = 0; return result
+        }
+        payload["sealedInventory"] = try (document["sealedInventory"] as? [[String: Any]] ?? []).enumerated().map { index, item -> [String: Any] in
+            var result = item
+            if result["product"] == nil {
+                guard let productID = item["productId"] as? String, let product = sealedProducts.first(where: { $0.id == productID }) else { throw LocalDataTransferError.invalidBackup }
+                result["product"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(product))
+            }
+            result["id"] = item["id"] as? String ?? "portable-sealed-\(index)"; result["createdAt"] = now; return result
+        }
+        for key in ["transactions", "onlineCodes", "binderPages"] { payload[key] = sections[key] as? [[String: Any]] ?? payload[key] as? [[String: Any]] ?? [] }
+        payload["preferences"] = sections["preferences"] ?? payload["preferences"]
+        payload["portableSections"] = sections
+        for key in ["nextBinderId", "nextCollectionCardId", "nextCopyId", "nextTagId", "nextWishlistId", "nextWishlistRuleId", "nextTransactionId", "nextOnlineCodeId"] { payload[key] = payload[key] as? Int ?? 1000000 }
+        payload["sampleDataLoaded"] = false
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: value) { return date }
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: value) { return date }
+            formatter.formatOptions = [.withFullDate]
+            if let date = formatter.date(from: value) { return date }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid backup date")
+        }
+        if let folders = sections["smartFolders"] {
+            _ = try decoder.decode([SmartFolder].self, from: JSONSerialization.data(withJSONObject: folders))
+        }
+        let state = try decoder.decode(PersistedState.self, from: JSONSerialization.data(withJSONObject: payload))
+        let images = (sections["binderPageImages"] as? [String: String] ?? [:]).mapValues { Data(base64Encoded: $0) ?? Data() }
+        let preferences = try (ios["appPreferences"] as? [String: Any]).map { try decoder.decode(LocalDataAppPreferences.self, from: JSONSerialization.data(withJSONObject: $0)) }
+        return (state, (document["exportedAt"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }, preferences, images)
+    }
+
+    func importedPortableSmartFolders() throws -> [SmartFolder]? {
+        guard let value = portableSections?["smartFolders"] else { return nil }
+        return try JSONDecoder().decode([SmartFolder].self, from: JSONEncoder().encode(value))
+    }
+
     static func portableBackupFilename(date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -520,6 +679,10 @@ final class LocalStore {
         binderPageImages: [String: Data]?
     ) {
         guard !data.isEmpty else { throw LocalDataTransferError.emptyBackup }
+        if let document = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+           document["formatVersion"] != nil {
+            return try decodeSharedBackup(document)
+        }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -1686,7 +1849,7 @@ final class LocalStore {
         // default before landing as unspecified.
         let condition = condition ?? binder.defaultCondition
         var binderCards = binder.cards
-        if let existingIndex = binderCards.firstIndex(where: { $0.cardId == resolvedCard.id }) {
+        if let existingIndex = binderCards.firstIndex(where: { $0.cardId == resolvedCard.id && $0.tcg.caseInsensitiveCompare(resolvedCard.tcg) == .orderedSame }) {
             var existing = binderCards[existingIndex]
             let newCopies = makeCopies(
                 quantity: qty,
@@ -1705,28 +1868,14 @@ final class LocalStore {
                 storageLocation: storageLocation
             )
             let allCopies = existing.copies + newCopies
-            existing = CollectionCard(
-                id: existing.id,
-                cardId: existing.cardId,
-                externalId: existing.externalId,
-                name: existing.name,
-                tcg: existing.tcg,
-                setCode: existing.setCode,
-                setName: existing.setName,
-                rarity: existing.rarity,
-                imageUrl: existing.imageUrl,
-                imageUrlSmall: existing.imageUrlSmall,
-                quantity: allCopies.count,
-                price: price ?? existing.price,
-                condition: condition ?? existing.condition,
-                language: language ?? existing.language,
-                notes: notes ?? existing.notes,
-                collectorNumber: existing.collectorNumber,
-                copies: allCopies
-            )
+            existing = replaceCard(existing, copies: allCopies)
+            existing.price = price ?? existing.price
+            existing.condition = condition ?? existing.condition
+            existing.language = language ?? existing.language
+            existing.notes = notes ?? existing.notes
             binderCards[existingIndex] = existing
         } else {
-            let newCard = CollectionCard(
+            var newCard = CollectionCard(
                 id: "local-cc-\(nextCollectionCardId)",
                 cardId: resolvedCard.id,
                 externalId: resolvedCard.id,
@@ -1760,6 +1909,7 @@ final class LocalStore {
                     storageLocation: storageLocation
                 )
             )
+            applyCatalogMetadata(resolvedCard, to: &newCard)
             nextCollectionCardId += 1
             binderCards.append(newCard)
         }
@@ -1825,30 +1975,13 @@ final class LocalStore {
             sourceCards[sourceCardIndex] = sourceCard
             sourceCards.removeAll { $0.quantity <= 0 }
 
-            if let destinationCardIndex = destinationCards.firstIndex(where: { $0.cardId == sourceCard.cardId }) {
+            if let destinationCardIndex = destinationCards.firstIndex(where: { $0.cardId == sourceCard.cardId && $0.tcg.caseInsensitiveCompare(sourceCard.tcg) == .orderedSame }) {
                 let existing = destinationCards[destinationCardIndex]
                 let mergedCopies = existing.copies + movingCopies
                 destinationCards[destinationCardIndex] = replaceCard(existing, copies: mergedCopies)
             } else {
-                let movedCard = CollectionCard(
-                    id: "local-cc-\(nextCollectionCardId)",
-                    cardId: sourceCard.cardId,
-                    externalId: sourceCard.externalId,
-                    name: sourceCard.name,
-                    tcg: sourceCard.tcg,
-                    setCode: sourceCard.setCode,
-                    setName: sourceCard.setName,
-                    rarity: sourceCard.rarity,
-                    imageUrl: sourceCard.imageUrl,
-                    imageUrlSmall: sourceCard.imageUrlSmall,
-                    quantity: movingCopies.count,
-                    price: sourceCard.price,
-                    condition: sourceCard.condition,
-                    language: sourceCard.language,
-                    notes: sourceCard.notes,
-                    collectorNumber: sourceCard.collectorNumber,
-                    copies: movingCopies
-                )
+                var movedCard = replaceCard(sourceCard, copies: movingCopies)
+                movedCard.id = "local-cc-\(nextCollectionCardId)"
                 nextCollectionCardId += 1
                 destinationCards.append(movedCard)
             }
@@ -1856,7 +1989,7 @@ final class LocalStore {
             collections[sourceBinderIndex] = stampUpdatedAt(sourceBinder, cards: sourceCards)
             collections[destinationIndex] = stampUpdatedAt(destinationBinder, cards: destinationCards)
 
-            guard let updatedDestination = destinationCards.first(where: { $0.cardId == sourceCard.cardId }) else {
+            guard let updatedDestination = destinationCards.first(where: { $0.cardId == sourceCard.cardId && $0.tcg.caseInsensitiveCompare(sourceCard.tcg) == .orderedSame }) else {
                 throw APIService.APIError.serverError(status: 500, message: "Failed to move card")
             }
             try persistOrThrow()
@@ -1864,9 +1997,10 @@ final class LocalStore {
         }
 
         let createdTags = (newTags ?? []).map { payload in
-            createTag(label: payload.label, colorHex: payload.colorHex)
+            createTagInMemory(label: payload.label, colorHex: payload.colorHex)
         }
         let selectedTags = tags.filter { tagIds?.contains($0.id) == true } + createdTags
+        let shouldUpdateTags = tagIds != nil || newTags != nil
 
         var updatedCopies = sourceCard.copies
         if let qty = quantity {
@@ -1926,7 +2060,7 @@ final class LocalStore {
             isSigned != nil ||
             isAltered != nil ||
             includeOwnedCopyDetails ||
-            !selectedTags.isEmpty {
+            shouldUpdateTags {
             updatedCopies = updatedCopies.map { copy in
                 guard targetCopyId == nil || copy.id == targetCopyId else {
                     return copy
@@ -1955,7 +2089,7 @@ final class LocalStore {
                     gradingScore: includeOwnedCopyDetails ? gradingScore : copy.gradingScore,
                     certNumber: includeOwnedCopyDetails ? certNumber : copy.certNumber,
                     storageLocation: includeOwnedCopyDetails ? storageLocation : copy.storageLocation,
-                    tags: selectedTags.isEmpty ? copy.tags : selectedTags
+                    tags: shouldUpdateTags ? selectedTags : copy.tags
                 )
             }
         }
@@ -1981,6 +2115,7 @@ final class LocalStore {
                 collectorNumber: newPrint.collectorNumber,
                 copies: updatedCard.copies
             )
+            applyCatalogMetadata(newPrint, to: &updatedCard)
         }
 
         sourceCards[sourceCardIndex] = updatedCard
@@ -2627,26 +2762,40 @@ final class LocalStore {
     }
 
     private func replaceCard(_ card: CollectionCard, copies: [CollectionCardCopy]) -> CollectionCard {
-        CollectionCard(
-            id: card.id,
-            cardId: card.cardId,
-            externalId: card.externalId,
-            name: card.name,
-            tcg: card.tcg,
-            setCode: card.setCode,
-            setName: card.setName,
-            rarity: card.rarity,
-            artist: card.artist,
-            imageUrl: card.imageUrl,
-            imageUrlSmall: card.imageUrlSmall,
-            quantity: copies.count,
-            price: card.price,
-            condition: copies.first?.condition ?? card.condition,
-            language: copies.first?.language ?? card.language,
-            notes: copies.first?.notes ?? card.notes,
-            collectorNumber: card.collectorNumber,
-            copies: copies
-        )
+        var updated = card
+        updated.copies = copies
+        updated.quantity = copies.count
+        updated.condition = copies.first?.condition ?? card.condition
+        updated.language = copies.first?.language ?? card.language
+        updated.notes = copies.first?.notes ?? card.notes
+        return updated
+    }
+
+    /// Copy catalog fields when creating a collection entry or selecting a different printing.
+    /// Ordinary copy edits retain the original value instead of reconstructing its metadata.
+    private func applyCatalogMetadata(_ card: Card, to entry: inout CollectionCard) {
+        entry.artist = card.artist
+        entry.supertype = card.supertype
+        entry.formatLegality = card.formatLegality
+        entry.dexEntries = card.dexEntries
+        entry.region = card.region
+        entry.setSymbolUrl = card.setSymbolUrl
+        entry.setLogoUrl = card.setLogoUrl
+        entry.regulationMark = card.regulationMark
+        entry.pokemonPrint = card.pokemonPrint
+        entry.attributes = card.attributes
+        entry.provenance = card.provenance
+        entry.legalityPeriods = card.legalityPeriods
+        entry.evolution = card.evolution
+        entry.functionalIdentity = card.functionalIdentity
+        entry.baseExternalId = card.baseExternalId
+        entry.printingKey = card.printingKey
+        entry.artworkId = card.artworkId
+        entry.printingKind = card.printingKind
+        entry.sanctionedPlayLegal = card.sanctionedPlayLegal
+        entry.originalPrintingKey = card.originalPrintingKey
+        entry.languageCode = card.language
+        entry.releasedAt = card.releasedAt.map { Self.isoFormatter.string(from: $0) }
     }
 
     /// Stand-in for a card that is added by id while its catalog is not

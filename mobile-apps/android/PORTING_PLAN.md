@@ -4,6 +4,8 @@ The Android app should match product behavior and data semantics, not reproduce
 iOS-only presentation APIs. Material 3 adaptive components replace Liquid
 Glass, while API payloads and offline collection behavior remain shared.
 
+Current implementation and verification: [September 5 product improvements](../../docs/android-product-improvements-2026-09-05.md). Historical milestone bullets below are not a release-certification checklist.
+
 ## Milestone 1 — collection vertical slice (implemented)
 
 - Compose app shell with adaptive bottom navigation

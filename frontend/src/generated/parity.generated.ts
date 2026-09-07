@@ -85,6 +85,13 @@ export const ParityFeatureIDs = {
   scannerDebugPerformanceFastFooterOcr: "scanner.debug.performance.fastFooterOcr",
   scannerDebugPerformanceLeanOcrStrips: "scanner.debug.performance.leanOcrStrips",
   scannerDebugPerformanceFooterFirstOcr: "scanner.debug.performance.footerFirstOcr",
+  dataPortableBackup: "data.portableBackup",
+  cardsFilteredSearch: "cards.filteredSearch",
+  scannerBinderCorners: "scanner.binderCorners",
+  collectionsCopyMetadata: "collections.copyMetadata",
+  collectionsSmartFolders: "collections.smartFolders",
+  accountManagement: "account.management",
+  scannerBinderReview: "scanner.binderReview",
 } as const;
 
 export type ParityFeatureID = (typeof ParityFeatureIDs)[keyof typeof ParityFeatureIDs];
@@ -139,13 +146,25 @@ export const implementedParityFeatureIDs: ReadonlySet<ParityFeatureID> = new Set
   ParityFeatureIDs.scannerResultsAddToBinder,
   ParityFeatureIDs.scannerSharedWebSession,
   ParityFeatureIDs.scannerDebugServerCapture,
+  ParityFeatureIDs.scannerDebugDeveloperAccess,
   ParityFeatureIDs.scannerDebugCaptureBrowser,
   ParityFeatureIDs.scannerDebugLiveConfiguration,
+  ParityFeatureIDs.scannerDebugRecording,
   ParityFeatureIDs.scannerDebugDevModeRecording,
+  ParityFeatureIDs.scannerDebugSessionManagement,
+  ParityFeatureIDs.scannerDebugReplay,
   ParityFeatureIDs.scannerDebugReferenceSets,
   ParityFeatureIDs.scannerDebugAssetDiagnostics,
   ParityFeatureIDs.scannerDebugDecisionDiagnostics,
   ParityFeatureIDs.scannerDebugFeedbackLabels,
+  ParityFeatureIDs.scannerDebugPerformanceWarmStart,
+  ParityFeatureIDs.dataPortableBackup,
+  ParityFeatureIDs.cardsFilteredSearch,
+  ParityFeatureIDs.scannerBinderCorners,
+  ParityFeatureIDs.collectionsCopyMetadata,
+  ParityFeatureIDs.collectionsSmartFolders,
+  ParityFeatureIDs.accountManagement,
+  ParityFeatureIDs.scannerBinderReview,
 ]);
 
 export const parityScreenID = (featureID: ParityFeatureID): string => `feature.${featureID}`;

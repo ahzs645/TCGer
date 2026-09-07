@@ -1,5 +1,6 @@
+import { gameIdSchema, getGameDefinitionOrDefault } from "@tcg/api-types";
 import type { Collection as PrismaCollection, Prisma } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type {
   CreateBinderInput,
   UpdateBinderInput,
@@ -295,31 +296,34 @@ export async function ensureCardForCollection(
   input?: CardDataPayload
 ) {
   const existing = await tx.card.findUnique({ where: { id: cardId } });
-  if (existing) {
-    if (!input) {
-      return existing;
-    }
-    const identityId = await upsertCardIdentity(tx, existing.tcgGameId, input);
-    return tx.card.update({
-      where: { id: cardId },
-      data: buildCardRefreshData(existing.tcgSpecific, input, identityId)
-    });
-  }
-
   if (!input) {
+    if (existing) return existing;
     throw new Error('Card not found and no card data provided');
   }
 
-  const tcgGame = await tx.tcgGame.findFirst({
-    where: { code: input.tcg }
+  const gameId = gameIdSchema.parse(input.tcg);
+  const tcgGame = await tx.tcgGame.findFirst({ where: { code: gameId } }) ?? await tx.tcgGame.upsert({
+    where: { code: gameId },
+    create: { code: gameId, displayName: getGameDefinitionOrDefault(gameId).label },
+    update: {},
   });
-  if (!tcgGame) {
-    throw new Error(`TCG game '${input.tcg}' not found`);
-  }
 
+  // Clients may supply catalog IDs rather than database UUIDs. Resolve the
+  // game-scoped printing before refreshing metadata or linking a new copy.
+  const matching = existing?.tcgGameId === tcgGame.id && existing.externalId === input.externalId
+    ? existing
+    : await tx.card.findUnique({
+        where: { tcgGameId_externalId: { tcgGameId: tcgGame.id, externalId: input.externalId } }
+      });
   const identityId = await upsertCardIdentity(tx, tcgGame.id, input);
+  if (matching) {
+    return tx.card.update({
+      where: { id: matching.id },
+      data: buildCardRefreshData(matching.tcgSpecific, input, identityId)
+    });
+  }
   return tx.card.create({
-    data: buildCardCreateData(cardId, tcgGame.id, input, identityId)
+    data: buildCardCreateData(existing ? randomUUID() : cardId, tcgGame.id, input, identityId)
   });
 }
 
@@ -986,13 +990,13 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
   const condition = input.condition ?? binder.defaultCondition ?? undefined;
 
   const createdEntries = await prisma.$transaction(async (tx) => {
-    await ensureCardForCollection(tx, cardId, input.cardData);
+    const resolvedCard = await ensureCardForCollection(tx, cardId, input.cardData);
     const created = [] as PrismaCollection[];
     for (let index = 0; index < copiesToCreate; index += 1) {
       const entry = await tx.collection.create({
         data: {
           userId,
-          cardId,
+          cardId: resolvedCard.id,
           binderId,
           quantity: 1,
           condition,
@@ -1061,13 +1065,13 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
   const acquiredAt = parseOptionalDate(input.acquiredAt ?? undefined) ?? undefined;
 
   const createdEntries = await prisma.$transaction(async (tx) => {
-    await ensureCardForCollection(tx, cardId, input.cardData);
+    const resolvedCard = await ensureCardForCollection(tx, cardId, input.cardData);
     const created = [] as PrismaCollection[];
     for (let index = 0; index < copiesToCreate; index += 1) {
       const entry = await tx.collection.create({
         data: {
           userId,
-          cardId,
+          cardId: resolvedCard.id,
           binderId: null,
           quantity: 1,
           condition: input.condition,
@@ -1294,7 +1298,10 @@ export async function updateCardInBinder(
     const isGroupMutation =
       input.quantity !== undefined ||
       (hasTargetBinder && resolvedTargetBinderId !== resolvedBinderId);
-    const desiredScopeCardId = desiredCardId ?? collection.cardId;
+    const overrideCard = wantsCardOverride && desiredCardId
+      ? await ensureCardForCollection(tx, desiredCardId, input.cardOverride?.cardData)
+      : undefined;
+    const desiredScopeCardId = overrideCard?.id ?? collection.cardId;
     const beforeRows = isGroupMutation
       ? await tx.collection.findMany({
           where: {
@@ -1320,19 +1327,10 @@ export async function updateCardInBinder(
     );
     const hasFieldUpdates = Object.keys(updatePayload).length > 0;
 
-    if (wantsCardOverride && desiredCardId) {
-      const existingTarget = await tx.card.findUnique({ where: { id: desiredCardId } });
-      const payload = input.cardOverride?.cardData;
-      if (!existingTarget && !payload) {
-        throw new Error('Card data is required when selecting a new print.');
-      }
-      await ensureCardForCollection(tx, desiredCardId, payload);
-
+    if (overrideCard) {
       await tx.collection.update({
         where: { id: collectionId },
-        data: {
-          cardId: desiredCardId
-        }
+        data: { cardId: overrideCard.id }
       });
     }
 

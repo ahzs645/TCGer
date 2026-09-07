@@ -17,6 +17,7 @@ extension TCGGame {
             return Color(red: 143 / 255, green: 110 / 255, blue: 30 / 255)
         case .dragonball:
             return Color(red: 204 / 255, green: 78 / 255, blue: 15 / 255)
+        default: return .accentColor
         }
     }
 }

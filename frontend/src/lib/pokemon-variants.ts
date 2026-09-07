@@ -1,8 +1,10 @@
+import { packageCardPresentation, getGameDefinitionOrDefault } from "@tcg/api-types";
 import type { Card } from "@/types/card";
 
 export interface PokemonFinishOption {
   code: string;
   label: string;
+  foil?: boolean;
 }
 
 export const POKEMON_FINISH_CATALOG: PokemonFinishOption[] = [
@@ -95,11 +97,13 @@ export function formatFinishLabel(
 }
 
 export function getPokemonFinishOptions(
-  card: Pick<Card, "pokemonPrint">,
+  card: Pick<Card, "pokemonPrint"> & Partial<Pick<Card, "tcg" | "attributes">>,
   includeCatalog = false,
 ): PokemonFinishOption[] {
   const pokemonPrint = card.pokemonPrint as RichPokemonPrint | undefined;
   const options = new Map<string, PokemonFinishOption>();
+  const declared = packageCardPresentation(card)?.printings ?? (card.tcg ? getGameDefinitionOrDefault(card.tcg).printings : undefined);
+  if (declared) for (const finish of declared.finishes) options.set(normalizeFinishKey(finish.code), finish);
 
   for (const option of pokemonPrint?.finishOptions ?? []) {
     if (!option?.code?.trim()) continue;
@@ -135,7 +139,7 @@ export function getPokemonFinishOptions(
     }
   }
 
-  if (includeCatalog) {
+  if (includeCatalog && (card.tcg === "pokemon" || (!card.tcg && card.pokemonPrint))) {
     for (const finish of POKEMON_FINISH_CATALOG) {
       const key = normalizeFinishKey(finish.code);
       if (!options.has(key)) {
@@ -147,10 +151,12 @@ export function getPokemonFinishOptions(
   return [...options.values()];
 }
 
-export function isFoilFinish(code?: string | null): boolean {
+export function isFoilFinish(code?: string | null, options: readonly PokemonFinishOption[] = []): boolean {
+  const declared = options.find(option => option.code === code);
+  if (declared?.foil !== undefined) return declared.foil;
   if (!code) return false;
   const key = normalizeFinishKey(code);
-  return key !== "normal" && key !== "nonholo" && key !== "firstedition";
+  return key !== "nonfoil" && key !== "normal" && key !== "nonholo" && key !== "firstedition";
 }
 
 export function getCopyVariantBadges(copy: {

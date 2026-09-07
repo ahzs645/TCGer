@@ -1,10 +1,13 @@
 package com.ahmadjalil.tcger.data.remote
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.*
+import kotlinx.serialization.encodeToString
+import com.ahmadjalil.tcger.domain.CollectionDetails
+import com.ahmadjalil.tcger.domain.CollectionTag
 
 @Serializable
-data class HealthDto(val status: String)
+data class HealthDto(val status: String, val features: Map<String, Boolean> = emptyMap())
 
 @Serializable
 data class SignInRequest(val username: String, val password: String)
@@ -29,6 +32,8 @@ data class CardDto(
     val artist: String? = null,
     val supertype: String? = null,
     val attributes: JsonObject? = null,
+    val setSymbolUrl: String? = null,
+    val setLogoUrl: String? = null,
 )
 
 @Serializable
@@ -157,7 +162,38 @@ data class CollectionCardDto(
     val condition: String? = null,
     val price: Double? = null,
     val acquisitionPrice: Double? = null,
+    val copies: List<CollectionCopyDto> = emptyList(),
 )
+
+@Serializable
+data class CollectionCopyDto(
+    val id: String,
+    val condition: String? = null,
+    val price: Double? = null,
+    val acquisitionPrice: Double? = null,
+    val language: String? = null,
+    val notes: String? = null,
+    val serialNumber: String? = null,
+    val acquiredAt: String? = null,
+    val isFoil: Boolean = false,
+    val finishCode: String? = null,
+    val finishLabel: String? = null,
+    val edition: String? = null,
+    val stamp: String? = null,
+    val isSealedPromo: Boolean = false,
+    val isOversized: Boolean = false,
+    val isPeelOff: Boolean = false,
+    val isSigned: Boolean = false,
+    val isAltered: Boolean = false,
+    val gradingCompany: String? = null,
+    val gradingScore: String? = null,
+    val certNumber: String? = null,
+    val storageLocation: String? = null,
+    val imageUrls: List<String> = emptyList(),
+    val tags: List<CollectionTag> = emptyList(),
+) {
+    fun details(): CollectionDetails = Json { ignoreUnknownKeys = true }.decodeFromJsonElement(Json.encodeToJsonElement(this))
+}
 
 @Serializable
 data class BinderDto(
@@ -207,7 +243,23 @@ data class AddCardRequest(
     val cardId: String,
     val quantity: Int = 1,
     val cardData: CardDataRequest? = null,
-)
+    val condition: String? = null,
+    val price: Double? = null,
+    val acquisitionPrice: Double? = null,
+    @kotlinx.serialization.Transient val details: CollectionDetails = CollectionDetails(),
+) {
+    fun payload(): JsonObject {
+        val codec = Json { encodeDefaults = true; explicitNulls = false }
+        val fields = codec.encodeToJsonElement(this).jsonObject.toMutableMap()
+        fields.putAll(codec.encodeToJsonElement(details).jsonObject)
+        details.acquiredAt?.takeIf { it.length == 10 }?.let { fields["acquiredAt"] = JsonPrimitive(java.time.LocalDate.parse(it).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toString()) }
+        fields["tags"] = JsonArray(details.tags.filter { it.id.isNotBlank() }.map { JsonPrimitive(it.id) })
+        fields["newTags"] = JsonArray(details.tags.filter { it.id.isBlank() }.map {
+            buildJsonObject { put("label", it.label); put("colorHex", it.colorHex) }
+        })
+        return JsonObject(fields)
+    }
+}
 
 @Serializable
 data class CardDataRequest(
@@ -336,6 +388,7 @@ data class WishlistDto(
     val colorHex: String? = null,
     val matchAnyPrinting: Boolean = false,
     val cards: List<WishlistCardDto> = emptyList(),
+    val rules: List<com.ahmadjalil.tcger.domain.WishlistRule> = emptyList(),
 )
 
 @Serializable
@@ -359,3 +412,6 @@ data class AddWishlistCardRequest(
     val imageUrlSmall: String? = null,
     val desiredQuantity: Int = 1,
 )
+
+@Serializable
+data class CardPrintsDto(val prints: List<CardDto> = emptyList())

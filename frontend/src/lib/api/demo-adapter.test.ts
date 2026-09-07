@@ -497,3 +497,32 @@ test("seeds analytics, price movers, and the finance ledger", async () => {
   );
   assert.equal(invalidTransactionResponse.status, 400);
 });
+
+test("local card PATCH clears tags, preserves omitted tags and metadata, and moves without crossing games", async () => {
+  useDemoStore.getState().init();
+  const source = useDemoStore.getState().binders[0]!;
+  const target = { id: await useDemoStore.getState().addBinder("Review target", "#123456") };
+  const tag = useDemoStore.getState().addTag({ label: "Review tag", colorHex: "123456" });
+  const payload = { cardId: "review-001", quantity: 2, tags: [tag.id], cardData: { externalId: "review-001", name: "Review Pokemon", tcg: "pokemon", baseExternalId: "review-base", printingKey: "review-print", imageUrl: "https://example.test/card.png" } };
+  await handleDemoRequest("POST", `/collections/${source.id}/cards`, payload);
+  await handleDemoRequest("POST", `/collections/${target.id}/cards`, { ...payload, quantity: 1, cardData: { ...payload.cardData, tcg: "magic", name: "Review Magic" } });
+  const card = useDemoStore.getState().binders.find((b) => b.id === source.id)!.cards.find((c) => c.cardId === "review-001" && c.tcg === "pokemon")!;
+  assert.ok(card);
+  assert.deepEqual(card.copies![0]!.tags.map((t) => t.id), [tag.id]);
+  const copy = card.copies![0]!;
+  const patch = async (body: unknown) => {
+    const response = await handleDemoRequest("PATCH", `/collections/${source.id}/cards/${copy.id}`, body);
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  await patch({ condition: "LP" });
+  assert.deepEqual(useDemoStore.getState().binders.find((b) => b.id === source.id)!.cards.find((c) => c.id === card.id)!.copies![0]!.tags.map((t) => t.id), [tag.id]);
+  await patch({ tags: [] });
+  const remaining = useDemoStore.getState().binders.find((b) => b.id === source.id)!.cards.find((c) => c.id === card.id)!;
+  assert.deepEqual(remaining.copies![0]!.tags, []);
+  assert.deepEqual(remaining.copies![1]!.tags.map((t) => t.id), [tag.id]);
+  await patch({ targetBinderId: target.id });
+  const moved = useDemoStore.getState().binders.find((b) => b.id === target.id)!;
+  assert.equal(moved.cards.length, 2);
+  assert.equal(moved.cards.find((c) => c.tcg === "pokemon")?.cardData?.baseExternalId, "review-base");
+});

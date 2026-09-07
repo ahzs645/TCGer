@@ -1,3 +1,4 @@
+import { installedCardPrints } from "@/lib/game-packages/game-package-client";
 import { API_BASE_URL } from "@/lib/api/base-url";
 import type {
   Card,
@@ -28,7 +29,7 @@ export async function searchCardsApi(params: {
   }
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE_URL}/cards/search?${usp.toString()}`, {
+  const res = await fetch(`${API_BASE_URL}/cards/search/all?unique=prints&limit=1000&${usp.toString()}`, {
     headers,
     credentials: "include",
     next: { revalidate: 30 },
@@ -57,9 +58,14 @@ export async function discoverCardsApi(params: {
 export async function fetchCardPrintsApi(params: {
   tcg: TcgCode;
   cardId: string;
+  packageId?: string;
   token?: string | null;
 }): Promise<CardPrintsResponse> {
   const { tcg, cardId, token } = params;
+  if (typeof indexedDB !== "undefined") {
+    const prints = await installedCardPrints(tcg, cardId, params.packageId);
+    if (prints) return { mode: "simple", total: prints.length, prints: prints.map(card => ({ ...card, tcg, dexEntries: card.dexEntries?.map(entry => ({ ...entry, name: entry.name ?? `#${entry.number}` })) })) };
+  }
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}/prints`, {

@@ -1,3 +1,5 @@
+
+import { gameLabel } from "@/lib/utils";
 import {
   AlertCircle,
   Cpu,
@@ -72,7 +74,7 @@ export interface ScanControlsProps {
 
 export function ScanControlsSidebar(props: ScanControlsProps) {
   const hashScopeLabel =
-    props.scanFilter === "all" ? "all games" : GAME_LABELS[props.scanFilter];
+    props.scanFilter === "all" ? "all games" : gameLabel(props.scanFilter);
 
   return (
     <div className="space-y-5">
@@ -469,7 +471,7 @@ export function ActiveTracksPanel({
               <div className="space-y-1">
                 <p className="font-semibold">{primaryCandidate.name}</p>
                 <p className="text-sm opacity-80">
-                  {GAME_LABELS[primaryCandidate.tcg]} ·{" "}
+                  {gameLabel(primaryCandidate.tcg)} ·{" "}
                   {primaryCandidate.setCode ?? "unknown set"}
                 </p>
               </div>
@@ -538,7 +540,7 @@ export function ActiveTracksPanel({
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {track.match.proposalLabel} ·{" "}
-                        {GAME_LABELS[track.match.tcg]}
+                        {gameLabel(track.match.tcg)}
                         {track.isClipped ? " · clipped inference" : ""} ·{" "}
                         {formatSeconds(track.lastSeenSeconds)}
                       </p>
@@ -590,7 +592,7 @@ export function TimelinePanel({ timeline }: { timeline: VideoTimelineItem[] }) {
                     #{item.trackId} · {item.match.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {GAME_LABELS[item.match.tcg]} ·{" "}
+                    {gameLabel(item.match.tcg)} ·{" "}
                     {item.match.setCode ?? "unknown set"}
                   </p>
                 </div>

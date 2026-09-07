@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { gameDeckRulesSchema, gamePrintingsSchema, gameSymbolSchema } from "./game-capabilities";
 
 import { TCG_CODES, gameIdSchema, type TcgCode } from "./cards";
 import type { GameFilterSelection } from "./game-packages";
@@ -8,7 +9,7 @@ const collectionPropertyPath = z
   .min(1)
   .max(96)
   .regex(
-    /^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\.number|formatLegality\.(standard|expanded|unlimited)|attributes\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|copies\.(condition|language|finishCode|finishLabel|edition|stamp))$/,
+    /^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\.number|formatLegality\.[a-z0-9][a-z0-9-]*|attributes\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|copies\.(condition|language|finishCode|finishLabel|edition|stamp))$/,
     "Property is not available to collection facets",
   );
 
@@ -95,6 +96,7 @@ export const gameDefinitionSchema = z
       .optional(),
     presentation: z
       .object({
+        symbols: z.array(gameSymbolSchema).max(1000).optional(),
         accentColor: z
           .string()
           .regex(/^#[0-9a-f]{6}$/i)
@@ -104,6 +106,8 @@ export const gameDefinitionSchema = z
       })
       .strict()
       .optional(),
+    deckRules: gameDeckRulesSchema.optional(),
+    printings: gamePrintingsSchema.optional(),
     interfaces: z
       .object({
         search: z.boolean().default(true),
@@ -466,6 +470,7 @@ const definitions: Record<TcgCode, GameDefinition> = {
     },
   },
   magic: {
+    printings: { version: 1, selection: "printing", finishes: [{ code: "nonfoil", label: "Non-Foil", foil: false }, { code: "foil", label: "Foil", foil: true }, { code: "etched", label: "Etched Foil", foil: true }] },
     id: "magic",
     label: "Magic: The Gathering",
     search: {
@@ -577,6 +582,7 @@ const definitions: Record<TcgCode, GameDefinition> = {
     },
   },
   pokemon: {
+    printings: { version: 1, selection: "functional", finishes: [{ code: "normal", label: "Non-Holo", foil: false }, { code: "holo", label: "Holofoil", foil: true }, { code: "reverse", label: "Reverse Holofoil", foil: true }] },
     id: "pokemon",
     label: "Pokémon",
     interfaces: {
@@ -987,12 +993,12 @@ export const GAME_DEFINITIONS: Readonly<Record<TcgCode, GameDefinition>> =
   definitions;
 
 export function getGameDefinition(tcg: TcgCode): GameDefinition {
-  return GAME_DEFINITIONS[tcg];
+  return getGameDefinitionOrDefault(tcg);
 }
 
 /** Generic fallback for stored cards whose installed package is unavailable. */
 export function getGameDefinitionOrDefault(gameId: string): GameDefinition {
-  const builtIn = GAME_DEFINITIONS[gameId as TcgCode];
+  const builtIn = Object.prototype.hasOwnProperty.call(GAME_DEFINITIONS, gameId) ? GAME_DEFINITIONS[gameId as TcgCode] : undefined;
   if (builtIn) return builtIn;
   return {
     id: gameId,
@@ -1123,4 +1129,21 @@ export function collectionFacetOptions(
     )
     .slice(0, 200)
     .map((value) => ({ value, label: String(value) }));
+}
+
+/** Metadata travels with a card snapshot so a removed package remains legible. */
+export function packageCardPresentation(card: { attributes?: Record<string, unknown> }) {
+  const metadata = card.attributes?.tcger;
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const parsed = z.object({ packageId: z.string().optional(), printings: gamePrintingsSchema.optional(), symbols: z.array(gameSymbolSchema).optional() }).safeParse(metadata);
+  return parsed.success ? parsed.data : undefined;
+}
+
+export function cardSupportsPrintSelection(card: { tcg: string; baseExternalId?: string; attributes?: Record<string, unknown> }): boolean {
+  return packageCardPresentation(card)?.printings !== undefined ||
+    getGameDefinitionOrDefault(card.tcg).printings !== undefined;
+}
+
+export function cardGameSymbol(card: { attributes?: Record<string, unknown> }, kind: "rarity" | "resource" | "type", value: string) {
+  return packageCardPresentation(card)?.symbols?.find(symbol => symbol.kind === kind && symbol.id === value);
 }

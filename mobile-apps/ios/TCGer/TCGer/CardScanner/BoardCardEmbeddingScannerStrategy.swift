@@ -1285,9 +1285,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
                 recordOutcome(.titlePrintingUnresolved)
                 if context.purpose == .binderPage, titleConstrained {
                     let alternatives = ranked.filter { $0.id != primary.id }
-                    let resultMode = ScanMode.allCases.first {
-                        $0 != .automatic && $0.tcgGame == primary.details.identity.game
-                    } ?? context.mode
+                    let resultMode = ScanMode.game(primary.details.identity.game)
                     return CardScanResult(
                         mode: resultMode,
                         capturedImage: cropped,
@@ -1323,9 +1321,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         )
         if printingDecision.requiresSelection {
             recordOutcome(.titlePrintingUnresolved)
-            let resultMode = ScanMode.allCases.first {
-                $0 != .automatic && $0.tcgGame == primary.details.identity.game
-            } ?? context.mode
+            let resultMode = ScanMode.game(primary.details.identity.game)
             return CardScanResult(
                 mode: resultMode,
                 capturedImage: cropped,
@@ -1341,9 +1337,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         let alternatives = ranked.filter { $0.id != resolvedPrimary.id }
         recordOutcome(.accepted)
 
-        let resultMode = ScanMode.allCases.first {
-            $0 != .automatic && $0.tcgGame == resolvedPrimary.details.identity.game
-        } ?? context.mode
+        let resultMode = ScanMode.game(resolvedPrimary.details.identity.game)
         return CardScanResult(
             mode: resultMode,
             capturedImage: cropped,

@@ -43,6 +43,9 @@ fun DashboardScreen(
     onScan: () -> Unit,
     onOpenPacks: () -> Unit,
     onBinder: (String) -> Unit,
+    onCreateBinder: () -> Unit,
+    onGameStore: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     LazyColumn(
         Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.HOME_DASHBOARD)),
@@ -79,9 +82,22 @@ fun DashboardScreen(
                 }
             }
         }
+        if (state.gamePackages.installed.isEmpty()) item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Take your games offline", style = MaterialTheme.typography.titleMedium)
+                    Text("Download a library to find new cards without a connection.")
+                    TextButton(onClick = onGameStore) { Text("Browse Game Store") }
+                }
+            }
+        }
+        if (state.preferences.dataSourceMode == com.ahmadjalil.tcger.domain.DataSourceMode.SERVER && !state.preferences.isSignedIn) item {
+            FilledTonalButton(onClick = onSettings) { Text("Finish server setup in Settings") }
+        }
         if (state.isLoading) item { LoadingPane() }
         else if (state.binders.isEmpty()) item {
-            EmptyPane("No binders yet", "Create your first binder from the Binders tab to start organizing your cards.")
+            EmptyPane("Your collection starts here", "Create a binder, then search or scan to add your first card.")
+            FilledTonalButton(onClick = onCreateBinder, modifier = Modifier.fillMaxWidth()) { Text("Create your first binder") }
         } else {
             item {
                 Text("Overview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

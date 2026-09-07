@@ -31,6 +31,13 @@ export const gamePackageAssetSchema = z
   })
   .strict();
 
+export const gamePackageScannerBundleSchema = z.object({
+  schema: z.literal("tcger-scanner-bundle-v1"),
+  gameId: packageId,
+  index: gamePackageAssetSchema,
+  model: gamePackageAssetSchema,
+}).strict();
+
 const filterOptionSchema = z
   .object({
     value: z.union([z.string(), z.number(), z.boolean()]),
@@ -83,7 +90,7 @@ const runtimeAssetSchema = z
 
 export const gamePackageManifestSchema = z
   .object({
-    schema: z.literal("https://tcger.app/schemas/game-package-manifest/v1"),
+    schema: z.enum(["https://tcger.app/schemas/game-package-manifest/v1", "https://tcger.app/schemas/game-package-manifest/v2"]),
     packageId: packageId.optional(),
     packageVersion: z.string().min(1).max(80),
     publishedAt: z.string().datetime(),
@@ -149,6 +156,7 @@ export const gamePackageManifestSchema = z
       })
       .strict()
       .optional(),
+    pricing: z.object({ schema: z.literal("tcger-price-snapshot-v1"), asset: gamePackageAssetSchema }).strict().optional(),
     offlinePacks: z
       .object({
         schema: z.literal("tcger-pack-library-v1"),
@@ -201,6 +209,10 @@ export const gamePackageManifestSchema = z
         path: ["signature", "keyId"],
         message: "Signature key id must match the publisher signing key",
       });
+    }
+    if (manifest.schema.endsWith("/v2")) {
+      if (manifest.definition?.interfaces?.decks && !manifest.definition.deckRules) context.addIssue({ code: z.ZodIssueCode.custom, path: ["definition", "deckRules"], message: "Deck interface requires declarative deck rules" });
+      if (manifest.definition?.interfaces?.pricing && !manifest.pricing) context.addIssue({ code: z.ZodIssueCode.custom, path: ["pricing"], message: "Pricing interface requires a price snapshot" });
     }
     const publisherId = manifest.publisher.id;
     for (const [index, feature] of (
@@ -340,11 +352,8 @@ export interface GamePackageCatalogCard {
   language?: string;
   regulationMark?: string;
   sanctionedPlayLegal?: boolean;
-  formatLegality?: {
-    standard?: boolean;
-    expanded?: boolean;
-    unlimited?: boolean;
-  };
+  formatLegality?: Record<string, boolean | undefined>;
+  legalityPeriods?: Array<{ format: string; legal: boolean; validFrom?: string; validTo?: string }>;
   dexEntries?: Array<{
     number: number;
     name?: string;

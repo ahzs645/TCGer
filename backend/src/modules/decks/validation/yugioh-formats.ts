@@ -11,6 +11,7 @@ export function validateYugiohDeck(
 ): DeckValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  for (const card of cards) if (card.zone && !["main", "extra", "side"].includes(card.zone)) errors.push(`${card.name}: unknown zone ${card.zone}`);
 
   const mainCards = cards.filter(c => inferYugiohZone(c) === 'main');
   const extraCards = cards.filter(c => inferYugiohZone(c) === 'extra');

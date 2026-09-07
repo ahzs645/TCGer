@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import Image from "next/image";
 import {
   useCallback,
@@ -404,7 +406,7 @@ export function CollectionTable() {
     ).map((card) => {
       const base = {
         Name: card.name,
-        Game: GAME_LABELS[card.tcg],
+        Game: gameLabel(card.tcg),
         Set: card.setName ?? card.setCode ?? "Unknown",
         Rarity: card.rarity ?? "N/A",
         Quantity: card.quantity,
@@ -705,7 +707,7 @@ export function CollectionTable() {
                                 className="text-sm font-semibold"
                                 data-oid="_b.a0rb"
                               >
-                                {GAME_LABELS[tcg as keyof typeof GAME_LABELS]}
+                                {gameLabel(tcg as keyof typeof GAME_LABELS)}
                               </h3>
                               <p
                                 className="text-xs text-muted-foreground"
@@ -723,7 +725,7 @@ export function CollectionTable() {
                               className="uppercase"
                               data-oid="awrj_it"
                             >
-                              {GAME_LABELS[tcg as keyof typeof GAME_LABELS] ??
+                              {gameLabel(tcg as keyof typeof GAME_LABELS) ??
                                 tcg}
                             </Badge>
                           </div>
@@ -754,7 +756,7 @@ export function CollectionTable() {
                                         return next;
                                       })
                                     }
-                                    aria-label={`Select all ${GAME_LABELS[tcg as keyof typeof GAME_LABELS]} cards`}
+                                    aria-label={`Select all ${gameLabel(tcg as keyof typeof GAME_LABELS)} cards`}
                                     data-oid="fxozyrf"
                                   />
                                 </TableHead>
@@ -1043,7 +1045,7 @@ function CardDetailsPanel({
     if (finishCode !== originalFinishCode) {
       updates.finishCode = finishCode || null;
       updates.finishLabel = finishCode ? formatFinishLabel(finishCode) : null;
-      updates.isFoil = isFoilFinish(finishCode);
+      updates.isFoil = isFoilFinish(finishCode, finishChoices);
     }
     if (edition !== (selectedCopy.edition ?? "")) {
       updates.edition = edition.trim() || null;
@@ -1296,7 +1298,7 @@ function CardDetailsPanel({
                   className="text-sm font-semibold text-foreground"
                   data-oid="ngs9pd9"
                 >
-                  {GAME_LABELS[card.tcg as keyof typeof GAME_LABELS]}
+                  {gameLabel(card.tcg as keyof typeof GAME_LABELS)}
                 </p>
               </div>
               <div data-oid=".4u.ca2">

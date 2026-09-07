@@ -1,21 +1,12 @@
 import { v } from "convex/values";
 import { richCardMetadataFields } from "./cardMetadata";
 
-export const tcgCodeValidator = v.union(
-  v.literal("yugioh"),
-  v.literal("magic"),
-  v.literal("pokemon"),
-  v.literal("onepiece"),
-  v.literal("lorcana"),
-  v.literal("dragonball")
-);
-export type TcgCode =
-  | "yugioh"
-  | "magic"
-  | "pokemon"
-  | "onepiece"
-  | "lorcana"
-  | "dragonball";
+export const tcgCodeValidator = v.string();
+export type TcgCode = string;
+
+export function isGameId(value: unknown): value is string {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
+}
 
 export const binderKindValidator = v.union(
   v.literal("binder"),

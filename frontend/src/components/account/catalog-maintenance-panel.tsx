@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DatabaseZap, Loader2, RefreshCw, RotateCcw, Search } from "lucide-react";
 import type {
@@ -226,7 +228,7 @@ export function CatalogMaintenancePanel({ token }: { token: string }) {
         <Select value={tcg} onValueChange={(value) => setTcg(value as TcgCode)}>
           <SelectTrigger aria-label="Catalog game"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {games.map((game) => <SelectItem key={game} value={game}>{GAME_LABELS[game]}</SelectItem>)}
+            {games.map((game) => <SelectItem key={game} value={game}>{gameLabel(game)}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={targetType} onValueChange={(value) => setTargetType(value as "identity" | "printing")}>
@@ -307,7 +309,7 @@ export function CatalogMaintenancePanel({ token }: { token: string }) {
           <div key={correction.id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <Badge variant="outline">{GAME_LABELS[correction.tcg]}</Badge>
+                <Badge variant="outline">{gameLabel(correction.tcg)}</Badge>
                 <span className="font-medium">{correction.targetType}</span>
                 <span>revision {correction.revision}</span>
                 {correction.action === "remove" && <Badge variant="secondary">removed</Badge>}

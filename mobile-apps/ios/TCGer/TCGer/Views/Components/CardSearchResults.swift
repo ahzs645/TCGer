@@ -190,7 +190,7 @@ struct CardSearchResultCell: View {
                 }
 
                 if let rarity = card.rarity {
-                    PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
+                    PokemonRarityBadge(rarity: rarity, tcg: card.tcg, symbol: card.gamePresentation?.symbols?.first { $0.kind == "rarity" && $0.id == rarity })
                 }
 
                 HStack(alignment: .top, spacing: 4) {
@@ -347,7 +347,7 @@ struct CardSearchResultCell: View {
         }
 
         if let rarity = nonEmpty(card.rarity) {
-            parts.append(rarity)
+            parts.append(CardRarityDisplay.name(for: rarity))
         }
         if let worlds = card.pokemonPrint?.worldChampionship {
             parts.append("World Championship \(worlds.year) replica for \(worlds.playerName)")

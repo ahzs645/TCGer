@@ -1,4 +1,7 @@
 "use client";
+import { cardSupportsPrintSelection } from "@tcg/api-types";
+
+import { gameLabel } from "@/lib/utils";
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -262,7 +265,7 @@ function FullCardHeader({
               className="break-words text-sm font-medium leading-snug text-foreground"
               data-oid="_yl__x8"
             >
-              {GAME_LABELS[card.tcg]}
+              {gameLabel(card.tcg)}
             </p>
           </div>
           <div className="min-w-0" data-oid=".dz8lzr">
@@ -347,7 +350,7 @@ function PrintSelection({
   printSelectionLabel?: string;
   printSelectionDisabled?: boolean;
 }) {
-  const supportsPrintSelection = ["magic", "pokemon"].includes(card.tcg);
+  const supportsPrintSelection = cardSupportsPrintSelection(card);
   if (!supportsPrintSelection || !onSelectPrint) return null;
   const variantBadges = selectedCopy ? getCopyVariantBadges(selectedCopy) : [];
 

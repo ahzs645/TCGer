@@ -17,6 +17,7 @@ final class BackendHashScannerStrategy: ScanStrategy {
             return true
         case .automatic:
             return false
+            default: return false
         }
     }
 

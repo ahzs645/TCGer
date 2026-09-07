@@ -13,6 +13,8 @@ import type * as alertsAutomations from "../alertsAutomations.js";
 import type * as alertsAutomationsHttp from "../alertsAutomationsHttp.js";
 import type * as analytics from "../analytics.js";
 import type * as analyticsHttp from "../analyticsHttp.js";
+import type * as backups from "../backups.js";
+import type * as backupsHttp from "../backupsHttp.js";
 import type * as banlistSync from "../banlistSync.js";
 import type * as banlists from "../banlists.js";
 import type * as banlistsHttp from "../banlistsHttp.js";
@@ -74,6 +76,8 @@ declare const fullApi: ApiFromModules<{
   alertsAutomationsHttp: typeof alertsAutomationsHttp;
   analytics: typeof analytics;
   analyticsHttp: typeof analyticsHttp;
+  backups: typeof backups;
+  backupsHttp: typeof backupsHttp;
   banlistSync: typeof banlistSync;
   banlists: typeof banlists;
   banlistsHttp: typeof banlistsHttp;

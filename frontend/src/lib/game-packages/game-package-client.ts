@@ -1,4 +1,6 @@
 import {
+  gamePriceSnapshotSchema, gamePackLibrarySchema, gamePackageScannerBundleSchema,
+  type GamePriceSnapshot, type GamePackLibrary, type GamePackageAsset,
   duplicateGamePackage,
   gameDefinitionSupportsFeature,
   gamePackageDefinition,
@@ -13,7 +15,8 @@ import {
 } from "@tcg/api-types";
 
 const DB_NAME = "tcger-game-packages";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+const CAPABILITIES = "capabilities";
 const PACKAGES = "packages";
 const CARDS = "cards";
 const PUBLISHER_KEYS = "publisher-keys";
@@ -83,6 +86,7 @@ async function database(): Promise<IDBDatabase> {
   const request = indexedDB.open(DB_NAME, DB_VERSION);
   request.onupgradeneeded = () => {
     const db = request.result;
+    if (!db.objectStoreNames.contains(CAPABILITIES)) db.createObjectStore(CAPABILITIES, { keyPath: "id" });
     if (!db.objectStoreNames.contains(PACKAGES))
       db.createObjectStore(PACKAGES, { keyPath: "id" });
     if (!db.objectStoreNames.contains(CARDS)) {
@@ -374,7 +378,7 @@ export async function installGamePackage(
 
   const installed: InstalledGamePackage = {
     id: gamePackageId(manifest),
-    sourceUrl: manifest.update?.manifestUrl ?? sourceUrl.href,
+    sourceUrl: sourceUrl.href,
     installedAt: previous?.installedAt ?? new Date().toISOString(),
     manifest,
     trust: publisherVerification.trust,
@@ -389,17 +393,20 @@ export async function installGamePackage(
         .getAllKeys(installed.id),
     );
     const transaction = db.transaction(
-      [PACKAGES, CARDS, PUBLISHER_KEYS],
+      [PACKAGES, CARDS, PUBLISHER_KEYS, CAPABILITIES],
       "readwrite",
     );
     const cardsStore = transaction.objectStore(CARDS);
     existingKeys.forEach((key) => cardsStore.delete(key));
     transaction.objectStore(PACKAGES).put(installed);
+    for (const capability of ["pricing", "packs", "scanner"]) transaction.objectStore(CAPABILITIES).delete(`${installed.id}:${capability}`);
     if (publisherVerification.key)
       transaction.objectStore(PUBLISHER_KEYS).put(publisherVerification.key);
-    cards.forEach((card) =>
-      cardsStore.put({ ...card, gameId: installed.id } satisfies StoredCard),
-    );
+    const definition = gamePackageDefinition(manifest);
+    cards.forEach((card) => cardsStore.put({ ...card, gameId: installed.id,
+      attributes: { ...card.attributes, tcger: { packageId: installed.id,
+        printings: definition.printings, symbols: definition.presentation?.symbols } },
+    } satisfies StoredCard));
     await transactionDone(transaction);
   } finally {
     db.close();
@@ -481,8 +488,9 @@ export async function gamePackageCards(
 export async function removeGamePackage(gameId: string): Promise<void> {
   const db = await database();
   try {
-    const transaction = db.transaction([PACKAGES, CARDS], "readwrite");
+    const transaction = db.transaction([PACKAGES, CARDS, CAPABILITIES], "readwrite");
     transaction.objectStore(PACKAGES).delete(gameId);
+    for (const capability of ["pricing", "packs", "scanner"]) transaction.objectStore(CAPABILITIES).delete(`${gameId}:${capability}`);
     const store = transaction.objectStore(CARDS);
     store.index("by-game").openKeyCursor(IDBKeyRange.only(gameId)).onsuccess = (
       event,
@@ -498,4 +506,78 @@ export async function removeGamePackage(gameId: string): Promise<void> {
     db.close();
   }
   dispatchGamePackagesChanged();
+}
+
+export type PackageCapability = "pricing" | "packs" | "scanner";
+export interface InstalledPackageCapability {
+  id: string;
+  packageId: string;
+  gameId: string;
+  kind: PackageCapability;
+  manifestHash: string;
+  pricing?: GamePriceSnapshot;
+  packs?: GamePackLibrary;
+  scanner?: { artifact: Parameters<typeof import("@/lib/scan/embedding-matcher").parseEmbeddingIndex>[0]; model: Uint8Array };
+}
+
+async function verifiedAsset(base: URL, asset: GamePackageAsset): Promise<Uint8Array> {
+  const bytes = await fetchBytes(assetUrl(base, asset.url), asset.bytes);
+  if (bytes.length !== asset.bytes || await sha256(bytes) !== asset.sha256.toLowerCase()) throw new Error("Capability asset checksum or byte count does not match");
+  return bytes;
+}
+
+export async function installedPackageCapabilities(): Promise<InstalledPackageCapability[]> {
+  const db = await database();
+  try { return await requestValue(db.transaction(CAPABILITIES).objectStore(CAPABILITIES).getAll()); }
+  finally { db.close(); }
+}
+
+export async function installPackageCapability(packageId: string, kind: PackageCapability): Promise<void> {
+  const installed = (await listInstalledGamePackages()).find(p => p.id === packageId);
+  if (!installed) throw new Error("Install this game catalog first");
+  const manifest = installed.manifest;
+  const asset = kind === "pricing" ? manifest.pricing?.asset : kind === "packs" ? manifest.offlinePacks?.manifest : manifest.scanner?.web?.manifest;
+  if (!asset) throw new Error("This package does not supply the capability for this platform");
+  const base = validatedSourceUrl(installed.sourceUrl);
+  const bytes = await verifiedAsset(base, asset);
+  const record: InstalledPackageCapability = { id: `${packageId}:${kind}`, packageId, gameId: manifest.game.id, kind, manifestHash: asset.sha256 };
+  const ids = new Set((await gamePackageCards(packageId)).map(card => card.id));
+  if (kind === "pricing") {
+    const snapshot = gamePriceSnapshotSchema.parse(decodeJson(bytes));
+    if (snapshot.gameId !== manifest.game.id || snapshot.quotes.some(q => !ids.has(q.cardId))) throw new Error("Price snapshot does not match the catalog");
+    record.pricing = snapshot;
+  } else if (kind === "packs") {
+    const library = gamePackLibrarySchema.parse(decodeJson(bytes));
+    if (library.gameId !== manifest.game.id || library.packs.some(p => p.slots.some(s => s.pool.some(c => !ids.has(c.cardId))))) throw new Error("Pack library does not match the catalog");
+    record.packs = library;
+  } else {
+    const bundle = gamePackageScannerBundleSchema.parse(decodeJson(bytes));
+    if (bundle.gameId !== manifest.game.id) throw new Error("Scanner game does not match the catalog");
+    const bundleBase = assetUrl(base, asset.url);
+    const artifact = decodeJson(await verifiedAsset(bundleBase, bundle.index)) as NonNullable<InstalledPackageCapability["scanner"]>["artifact"];
+    if (artifact.encoder !== "arcface" || artifact.tcg !== manifest.game.id || !Array.isArray(artifact.entries) || artifact.entries.some(e => !ids.has(e.externalId)) || artifact.total !== artifact.entries.length || !Number.isInteger(artifact.dimension) || artifact.dimension < 1 || artifact.dimension > 4096 || typeof artifact.vectors !== "string" || base64Bytes(artifact.vectors).length !== artifact.total * artifact.dimension) throw new Error("Scanner index does not match the catalog or runtime");
+    record.scanner = { artifact: { ...artifact, gateUrl: undefined, modelUrl: undefined }, model: await verifiedAsset(bundleBase, bundle.model) };
+  }
+  const db = await database();
+  try {
+    // Prevent a concurrent package replacement from activating old capabilities.
+    const transaction = db.transaction([CAPABILITIES, PACKAGES], "readwrite");
+    const current = await requestValue(transaction.objectStore(PACKAGES).get(packageId)) as InstalledGamePackage | undefined;
+    if (!current || gamePackageReleaseRelation(manifest, current.manifest) !== "same") { transaction.abort(); throw new Error("Package changed during capability download; try again"); }
+    transaction.objectStore(CAPABILITIES).put(record);
+    await transactionDone(transaction);
+  } finally { db.close(); }
+  dispatchGamePackagesChanged();
+}
+
+/** Exact-print browsing uses the installed catalog, preserving package scope. */
+export async function installedCardPrints(gameId: string, cardId: string, packageId?: string): Promise<GamePackageCatalogCard[] | undefined> {
+  const packages = (await listInstalledGamePackages()).filter(p => p.manifest.game.id === gameId && (!packageId || p.id === packageId));
+  if (!packageId && packages.length > 1) return undefined;
+  for (const installed of packages) {
+    const cards = await gamePackageCards(installed.id);
+    const card = cards.find(c => c.id === cardId);
+    if (card) return cards.filter(c => (c.baseExternalId ?? c.id) === (card.baseExternalId ?? card.id));
+  }
+  return undefined;
 }

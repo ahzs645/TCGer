@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -72,7 +73,9 @@ fun CardArtwork(card: CatalogCard, modifier: Modifier = Modifier) {
             model = card.imageUrl,
             contentDescription = card.name,
             modifier = modifier.clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
+            placeholder = rememberVectorPainter(Icons.Default.BrokenImage),
+            error = rememberVectorPainter(Icons.Default.BrokenImage),
         )
     } else {
         Box(
@@ -120,6 +123,4 @@ fun String.displayGame(): String = when (this) {
     else -> replaceFirstChar { it.uppercase() }
 }
 
-fun Double.asCurrency(code: String): String = runCatching {
-    NumberFormat.getCurrencyInstance().apply { currency = Currency.getInstance(code) }.format(this)
-}.getOrElse { "%.2f %s".format(this, code) }
+fun Double.asCurrency(code: String): String = com.ahmadjalil.tcger.domain.CurrencyDisplay.format(this, destination = code)

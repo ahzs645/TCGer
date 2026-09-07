@@ -17,8 +17,14 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 - `frontend/` - Next.js 15 web app (app router).
 - `services/` - Optional cache services (scryfall-bulk, ygo-cache, tcgdex-cache, pokemon-cache).
 - `docker/` - Compose files, nginx gateway, cache backup scripts.
-- `mobile-apps/` - iOS SwiftUI client (in progress) and Android placeholder.
+- `mobile-apps/` - iOS SwiftUI and Android Jetpack Compose clients.
 - `docs/` - Starlight documentation site source + OpenAPI spec.
+
+## Adding games
+
+Start with the [future-game authoring guide](docs/src/content/docs/adding-games/index.md). The documentation site's **Adding Games** section has separate pages for catalogs, search and collections, decks, printings and finishes, legality, symbols, pricing, packs, scanning, sealed-product limits, and publishing. The [Star Garden example](docs/scanner-system/examples/star-garden/README.md) supplies a complete v2 package.
+
+Run `npm --prefix docs run dev` to browse the linked guides locally. Specialized Pokédex collection views remain deferred.
 
 ## Quick start (recommended: frontend on host, services in Docker)
 ```bash
@@ -203,7 +209,7 @@ The generated artifacts are written to the named Docker volume `tcger_card_scan_
 
 ## Mobile apps
 - iOS SwiftUI client with dashboard, collections, scanner, and API service layers lives in `mobile-apps/ios/TCGer` (in progress).
-- Android scaffold is in `mobile-apps/android`.
+- Android client is in `mobile-apps/android`, with local Room storage and server-backed collections, scanner, account, and backup workflows.
 
 ## Docs and scripts
 - Starlight docs source: `docs/src/content/docs/`

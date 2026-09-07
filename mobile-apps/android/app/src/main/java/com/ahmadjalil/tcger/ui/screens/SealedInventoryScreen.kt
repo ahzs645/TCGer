@@ -449,4 +449,4 @@ private fun QuantitySelector(quantity: Int, max: Int = 9_999, onQuantity: (Int) 
     }
 }
 
-private fun Double.money(): String = NumberFormat.getCurrencyInstance().format(this)
+private fun Double.money(): String = com.ahmadjalil.tcger.domain.CurrencyDisplay.format(this)

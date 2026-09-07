@@ -160,7 +160,7 @@ decksRouter.post('/:deckId/validate', asyncHandler(async (req, res) => {
   const deck = await decksService.getDeck(userId, req.params.deckId);
   const input = validateDeckSchema.parse(req.body ?? {});
   const format = input.format || deck.format;
-  const result = validateDeck(deck.tcg, deck.cards, format);
+  const result = validateDeck(deck.tcg, deck.cards, format, input.rules ?? deck.rules);
   if (deck.tcg !== 'yugioh' || !input.banlist) {
     return res.json(result);
   }

@@ -39,7 +39,10 @@ import { registerAlertsAutomationsRoutes } from "./alertsAutomationsHttp";
 import { registerBanlistRoutes } from "./banlistsHttp";
 import { registerNotificationRoutes } from "./notificationsHttp";
 
+import { registerBackupRoutes } from "./backupsHttp";
+
 const http = httpRouter();
+registerBackupRoutes(http);
 authComponent.registerRoutes(http, createAuth);
 
 const LIBRARY_COLLECTION_ID = "__library__";
@@ -65,7 +68,7 @@ function importPreviewFromBody(body: Record<string, any>) {
 }
 
 function isTcgCode(value: unknown): value is TcgCode {
-  return typeof value === "string" && TCG_CODES.includes(value as TcgCode);
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
 }
 
 function parseOptionalDesiredQuantity(value: unknown): number | undefined {
@@ -962,7 +965,7 @@ http.route({
         return errorJson(
           400,
           "VALIDATION_ERROR",
-          `defaultGame must be one of: ${TCG_CODES.join(", ")}, or null`
+          "defaultGame must be a valid game identifier, or null"
         );
       }
       if (Object.prototype.hasOwnProperty.call(body, "focusedSetOrder")) {

@@ -27,7 +27,7 @@ export async function createApp() {
   );
   app.use(compression());
 
-  app.use(express.json());
+  app.use((req, res, next) => req.path.startsWith('/backups') ? next() : express.json()(req, res, next));
 
   // Serve uploaded images
   app.use('/uploads', express.static(getUploadsRootDir()));

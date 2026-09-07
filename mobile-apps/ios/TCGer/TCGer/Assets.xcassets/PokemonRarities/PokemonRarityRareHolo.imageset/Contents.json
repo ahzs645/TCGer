@@ -1,0 +1,16 @@
+{
+  "images": [
+    {
+      "filename": "rare-holo.aab14d7ee57de99c.svg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "properties": {
+    "preserves-vector-representation": true,
+    "template-rendering-intent": "original"
+  }
+}

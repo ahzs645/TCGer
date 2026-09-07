@@ -60,6 +60,7 @@ const BOOLEAN_FIELDS = [
 ] as const;
 
 export interface CardIdentity {
+  cardData?: Record<string, unknown>;
   tcg: string;
   externalId: string;
   printingKey?: string;
@@ -190,6 +191,8 @@ export function binderEntries(
 /* ------------------------------------------------------------------ */
 
 export interface AddCopiesArgs {
+  /** Local runtimes embed tags; hosted runtimes maintain tag assignments separately. */
+  embeddedTags?: CollectionEntryRow["tags"];
   userId: string;
   binderId: string;
   card: CardIdentity;
@@ -232,6 +235,7 @@ export async function addCopies(
         cardId,
         quantity: 1,
         ...(args.fields ?? {}),
+        ...(args.embeddedTags !== undefined ? { tags: args.embeddedTags } : {}),
         createdAt: now,
         updatedAt: now,
       };
@@ -286,6 +290,8 @@ export function applyUpdate(
 }
 
 export interface UpdateEntryArgs {
+  /** Explicit [] clears embedded local tags; omission preserves them. */
+  embeddedTags?: CollectionEntryRow["tags"];
   userId: string;
   entryId: string;
   updates: UpdateFields;
@@ -343,6 +349,7 @@ export async function updateEntry(
 
     await db.patch("collectionEntries", args.entryId, {
       ...applyUpdate(entry, updates, now),
+      ...(args.embeddedTags !== undefined ? { tags: args.embeddedTags } : {}),
       binderId: targetBinderId,
       quantity: 1,
     });

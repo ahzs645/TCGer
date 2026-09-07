@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { CardScanPanel } from "@/components/scan/card-scan-panel";
+import { ScannerWorkbench } from "@/components/scan/scanner-workbench";
 import { VideoScanLab } from "@/components/scan/video-scan-lab";
 import { SharedScanSessionPanel } from "@/components/scan/shared-scan-session";
 import { Badge } from "@/components/ui/badge";
@@ -32,13 +33,15 @@ export default function ScanPage() {
             The Gathering, and Yu-Gi-Oh! — no sign-in or server needed.
           </p>
         </div>
-        <Tabs defaultValue="video" className="space-y-4">
-          <TabsList className="grid w-full max-w-xl grid-cols-3">
+        <Tabs defaultValue="camera" className="space-y-4">
+          <TabsList className="grid w-full max-w-xl grid-cols-4">
+            <TabsTrigger value="camera">Camera &amp; pages</TabsTrigger>
             <TabsTrigger value="video">Video Mode</TabsTrigger>
             <TabsTrigger value="image">Image Mode</TabsTrigger>
-            <TabsTrigger value="shared">iPhone Session</TabsTrigger>
+            <TabsTrigger value="shared">Shared Session</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="camera"><ScannerWorkbench /></TabsContent>
           <TabsContent value="video" className="space-y-3">
             <div className="space-y-2">
               <div className="flex items-center gap-2">

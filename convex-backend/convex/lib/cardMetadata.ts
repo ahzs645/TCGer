@@ -1,10 +1,7 @@
 import { v } from "convex/values";
 import type { TcgCode } from "./validators";
 
-export const formatLegalityValidator = v.object({
-  standard: v.optional(v.boolean()),
-  expanded: v.optional(v.boolean())
-});
+export const formatLegalityValidator = v.record(v.string(), v.boolean());
 
 export const dexEntryValidator = v.object({
   number: v.number(),
@@ -101,10 +98,7 @@ export type RichCardMetadata = {
   regulationMark?: string;
   language?: string;
   supertype?: string;
-  formatLegality?: {
-    standard?: boolean;
-    expanded?: boolean;
-  };
+  formatLegality?: Record<string, boolean>;
   dexEntries?: Array<{
     number: number;
     name: string;
@@ -123,10 +117,7 @@ export type RichCardMetadata = {
     category?: string;
     regulationMark?: string;
     language?: string;
-    formatLegality?: {
-      standard?: boolean;
-      expanded?: boolean;
-    };
+    formatLegality?: Record<string, boolean>;
     dexEntries?: Array<{
       number: number;
       name: string;

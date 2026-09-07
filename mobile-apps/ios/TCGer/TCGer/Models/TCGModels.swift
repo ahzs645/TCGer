@@ -149,8 +149,16 @@ enum PokemonTcgRegion: String, Codable, CaseIterable, Sendable {
 
 // MARK: - Pokemon Format Legality
 nonisolated struct PokemonFormatLegality: Codable, Hashable, Sendable {
-    let standard: Bool?
-    let expanded: Bool?
+    var values: [String: Bool]
+    var standard: Bool? { values["standard"] }
+    var expanded: Bool? { values["expanded"] }
+    subscript(format: String) -> Bool? { values[format] }
+    init(standard: Bool? = nil, expanded: Bool? = nil) {
+        values = [:]; values["standard"] = standard; values["expanded"] = expanded
+    }
+    init(values: [String: Bool]) { self.values = values }
+    init(from decoder: Decoder) throws { values = try decoder.singleValueContainer().decode([String: Bool].self) }
+    func encode(to encoder: Encoder) throws { var container = encoder.singleValueContainer(); try container.encode(values) }
 
     var legalFormats: [PokemonCardFormat] {
         var formats: [PokemonCardFormat] = []
@@ -253,6 +261,7 @@ nonisolated struct PokemonPrintMetadata: Codable, Hashable, Sendable {
 struct PokemonFinishOption: Identifiable, Hashable, Sendable {
     let code: String
     let label: String
+    var foil: Bool? = nil
     var id: String { code }
 
     static let catalog: [PokemonFinishOption] = [
@@ -302,6 +311,7 @@ struct PokemonFinishOption: Identifiable, Hashable, Sendable {
     }
 
     static func options(for card: Card, includeCatalog: Bool = false) -> [PokemonFinishOption] {
+        if let printings = card.gamePresentation?.printings { return printings.finishes.map { .init(code: $0.code, label: $0.label, foil: $0.foil) } }
         var options: [PokemonFinishOption] = []
         func append(_ code: String) {
             guard !options.contains(where: { $0.code.caseInsensitiveCompare(code) == .orderedSame }) else { return }
@@ -311,7 +321,7 @@ struct PokemonFinishOption: Identifiable, Hashable, Sendable {
         if card.pokemonPrint?.variants?.normal == true { append("normal") }
         if card.pokemonPrint?.variants?.reverse == true { append("reverse") }
         if card.pokemonPrint?.variants?.holo == true { append("holo") }
-        if includeCatalog {
+        if includeCatalog && card.tcg == "pokemon" {
             catalog.forEach { append($0.code) }
         }
         return options
@@ -319,7 +329,7 @@ struct PokemonFinishOption: Identifiable, Hashable, Sendable {
 
     static func isFoil(_ code: String?) -> Bool {
         guard let normalized = code?.lowercased(), !normalized.isEmpty else { return false }
-        return !["normal", "nonholo", "firstedition"].contains(normalized)
+        return !["normal", "nonholo", "nonfoil", "firstedition"].contains(normalized)
     }
 }
 
@@ -556,6 +566,7 @@ nonisolated struct Card: Identifiable, Codable, Hashable, Sendable {
     }
 
     var supportsPrintSelection: Bool {
+        if case .object(let metadata)? = attributes?["tcger"], metadata["printings"] != nil { return true }
         switch tcg.lowercased() {
         case "magic", "pokemon": return true
         default: return false
@@ -701,7 +712,7 @@ enum BinderAccessLog {
 }
 
 struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
-    let id: String
+    var id: String
     let cardId: String
     let externalId: String?
     let name: String
@@ -712,13 +723,13 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     var artist: String? = nil
     let imageUrl: String?
     let imageUrlSmall: String?
-    let quantity: Int
-    let price: Double?
-    let condition: String?
-    let language: String?
-    let notes: String?
+    var quantity: Int
+    var price: Double?
+    var condition: String?
+    var language: String?
+    var notes: String?
     let collectorNumber: String?
-    let copies: [CollectionCardCopy]
+    var copies: [CollectionCardCopy]
     var releasedAt: String? = nil
     var setSymbolUrl: String? = nil
     var setLogoUrl: String? = nil
@@ -742,6 +753,7 @@ struct CollectionCard: Identifiable, Codable, Hashable, Sendable {
     var originalPrintingKey: String? = nil
 
     var supportsPrintSelection: Bool {
+        if case .object(let metadata)? = attributes?["tcger"], metadata["printings"] != nil { return true }
         switch tcg.lowercased() {
         case "magic", "pokemon": return true
         default: return false
@@ -947,14 +959,20 @@ nonisolated struct TcgSet: Identifiable, Codable, Hashable, Sendable {
 }
 
 // MARK: - Game Filter
-nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
-    case all = "all"
-    case yugioh = "yugioh"
-    case magic = "magic"
-    case pokemon = "pokemon"
-    case onepiece = "onepiece"
-    case lorcana = "lorcana"
-    case dragonball = "dragonball"
+nonisolated struct TCGGame: RawRepresentable, CaseIterable, Identifiable, Hashable, Sendable {
+    let rawValue: String
+    init?(rawValue: String) {
+        guard rawValue.range(of: "^[a-z0-9][a-z0-9-]{0,63}$", options: .regularExpression) != nil else { return nil }
+        self.rawValue = rawValue
+    }
+    static let all = TCGGame(rawValue: "all")!
+    static let yugioh = TCGGame(rawValue: "yugioh")!
+    static let magic = TCGGame(rawValue: "magic")!
+    static let pokemon = TCGGame(rawValue: "pokemon")!
+    static let onepiece = TCGGame(rawValue: "onepiece")!
+    static let lorcana = TCGGame(rawValue: "lorcana")!
+    static let dragonball = TCGGame(rawValue: "dragonball")!
+    static let allCases: [TCGGame] = [.all, .yugioh, .magic, .pokemon, .onepiece, .lorcana, .dragonball]
 
     var id: String { rawValue }
 
@@ -967,6 +985,7 @@ nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
         case .onepiece: return "One Piece"
         case .lorcana: return "Disney Lorcana"
         case .dragonball: return "Dragon Ball Super"
+        default: return rawValue.replacingOccurrences(of: "-", with: " ").capitalized
         }
     }
 
@@ -979,6 +998,7 @@ nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
         case .onepiece: return "One Piece"
         case .lorcana: return "Lorcana"
         case .dragonball: return "Dragon Ball"
+        default: return displayName
         }
     }
 
@@ -990,6 +1010,7 @@ nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
         case .pokemon: return "PokemonIcon"
         case .onepiece: return "OnePieceIcon"
         case .lorcana, .dragonball: return nil
+        default: return nil
         }
     }
 
@@ -1002,6 +1023,7 @@ nonisolated enum TCGGame: String, CaseIterable, Identifiable, Sendable {
         case .onepiece: return "sailboat.fill"
         case .lorcana: return "wand.and.stars"
         case .dragonball: return "flame.fill"
+        default: return "rectangle.portrait"
         }
     }
 }

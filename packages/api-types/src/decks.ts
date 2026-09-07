@@ -1,7 +1,10 @@
 import { z } from 'zod';
-import { tcgCodeSchema } from './cards';
+import { tcgCodeSchema, gameIdSchema } from './cards';
+import { gameDeckRulesSchema, type GameDeckRules } from './game-capabilities';
 
 export const yugiohDeckZoneSchema = z.enum(['main', 'extra', 'side']);
+export const deckZoneSchema = gameIdSchema;
+export type DeckZone = string;
 export type YugiohDeckZone = z.infer<typeof yugiohDeckZoneSchema>;
 
 // ---------------------------------------------------------------------------
@@ -9,6 +12,7 @@ export type YugiohDeckZone = z.infer<typeof yugiohDeckZoneSchema>;
 // ---------------------------------------------------------------------------
 
 export const createDeckSchema = z.object({
+  rules: gameDeckRulesSchema.optional(),
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
   tcg: tcgCodeSchema,
@@ -34,7 +38,7 @@ export const addDeckCardSchema = z.object({
   tcg: z.string().min(1),
   name: z.string().min(1),
   quantity: z.number().int().positive().default(1),
-  zone: yugiohDeckZoneSchema.optional(),
+  zone: deckZoneSchema.optional(),
   isCommander: z.boolean().optional(),
   isSideboard: z.boolean().optional(),
   imageUrl: z.string().optional(),
@@ -47,7 +51,7 @@ export type AddDeckCardInput = z.infer<typeof addDeckCardSchema>;
 
 export const updateDeckCardSchema = z.object({
   quantity: z.number().int().positive().optional(),
-  zone: yugiohDeckZoneSchema.optional(),
+  zone: deckZoneSchema.optional(),
   isCommander: z.boolean().optional(),
   isSideboard: z.boolean().optional()
 }).refine(data => Object.values(data).some(v => v !== undefined), {
@@ -65,6 +69,7 @@ export const importDeckSchema = z.object({
 export type ImportDeckInput = z.infer<typeof importDeckSchema>;
 
 export const validateDeckSchema = z.object({
+  rules: gameDeckRulesSchema.optional(),
   format: z.string().optional(),
   banlist: z.discriminatedUnion('type', [
     z.object({
@@ -94,7 +99,7 @@ export interface DeckCardResponse {
   tcg: string;
   name: string;
   quantity: number;
-  zone: YugiohDeckZone;
+  zone: DeckZone;
   isCommander: boolean;
   isSideboard: boolean;
   imageUrl?: string;
@@ -105,6 +110,7 @@ export interface DeckCardResponse {
 }
 
 export interface DeckResponse {
+  rules?: GameDeckRules;
   id: string;
   name: string;
   description?: string;
@@ -131,6 +137,7 @@ export interface DeckAnalysis {
 }
 
 export interface DeckValidationResult {
+  status?: "valid" | "invalid" | "unknown" | "unsupported";
   valid: boolean;
   errors: string[];
   warnings: string[];
@@ -139,7 +146,7 @@ export interface DeckValidationResult {
   violations?: Array<{
     externalId?: string;
     name?: string;
-    zone?: YugiohDeckZone;
+    zone?: DeckZone;
     message: string;
   }>;
 }
@@ -150,7 +157,7 @@ export interface DeckOwnershipResult {
     externalId: string;
     name: string;
     quantity: number;
-    zone: YugiohDeckZone;
+    zone: DeckZone;
   }>;
   missingCount: number;
 }

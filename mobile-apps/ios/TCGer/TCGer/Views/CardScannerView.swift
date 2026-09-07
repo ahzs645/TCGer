@@ -304,6 +304,9 @@ struct CardScannerView: View {
                 onAdjustCrop: {
                     viewModel.prepareCropRescue(for: result.id)
                 },
+                onDiscard: {
+                    viewModel.removeSessionResult(id: result.id)
+                },
                 onAddCard: { card, binderId, details in
                     try await APIService().addCardToBinder(
                         config: environmentStore.serverConfiguration,
@@ -352,17 +355,31 @@ struct CardScannerView: View {
                 }
             )
         }
-        .alert(isPresented: Binding(
+        .sheet(item: $viewModel.manualMatchRequest, onDismiss: {
+            viewModel.cancelManualMatchSearch()
+        }) { request in
+            ScannerCardMatchSearchView(
+                mode: request.mode,
+                capturedCard: request.image
+            ) { card in
+                viewModel.applyManualMatch(card, request: request)
+            }
+            .environmentObject(environmentStore)
+        }
+        .alert("Scan Failed", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.errorMessage = nil } }
         )) {
-            Alert(
-                title: Text("Scan Failed"),
-                message: Text(viewModel.errorMessage ?? "An unknown error occurred."),
-                dismissButton: .default(Text("OK"), action: {
-                    viewModel.clearResult()
-                })
-            )
+            if viewModel.canSearchForManualMatch {
+                Button("Find Match") {
+                    viewModel.presentManualMatchSearch()
+                }
+            }
+            Button("Scan Again", role: .cancel) {
+                viewModel.clearResult()
+            }
+        } message: {
+            Text(viewModel.errorMessage ?? "An unknown error occurred.")
         }
     }
 
@@ -1219,6 +1236,7 @@ struct CardScannerView: View {
         case .pokemon: return Color.red
         case .yugioh: return Color.purple
         case .mtg: return Color.green
+            default: return Color.accentColor
         }
     }
 
@@ -1430,7 +1448,7 @@ private extension CardScannerView {
     var availableGameScanModes: [ScanMode] {
         ScannerAssetStore.downloadableGames.compactMap { game in
             guard environmentStore.isGameEnabled(game) else { return nil }
-            return ScanMode.allCases.first { $0 != .automatic && $0.tcgGame == game }
+            return ScanMode.game(game)
         }
     }
 
@@ -1767,12 +1785,14 @@ private struct ScanResultSheet: View {
     @State private var debugCapture: APIService.ScanDebugCaptureResponse?
     @State private var debugCaptureError: String?
     @State private var isUpdatingDebugCapture = false
+    @State private var showingMatchSearch = false
 
     let result: CardScanResult
     let color: Color
     let onSelectCandidate: (CardScanCandidate) -> Void
     let canAdjustCrop: Bool
     let onAdjustCrop: () -> Void
+    let onDiscard: () -> Void
     let onAddCard: (Card, String, BinderCardAddDetails) async throws -> Void
 
     init(
@@ -1781,6 +1801,7 @@ private struct ScanResultSheet: View {
         onSelectCandidate: @escaping (CardScanCandidate) -> Void,
         canAdjustCrop: Bool,
         onAdjustCrop: @escaping () -> Void,
+        onDiscard: @escaping () -> Void,
         onAddCard: @escaping (Card, String, BinderCardAddDetails) async throws -> Void
     ) {
         self.result = result
@@ -1788,6 +1809,7 @@ private struct ScanResultSheet: View {
         self.onSelectCandidate = onSelectCandidate
         self.canAdjustCrop = canAdjustCrop
         self.onAdjustCrop = onAdjustCrop
+        self.onDiscard = onDiscard
         self.onAddCard = onAddCard
         _selectedCandidate = State(initialValue: result.primary)
         _debugCapture = State(initialValue: result.debugCapture)
@@ -1830,6 +1852,45 @@ private struct ScanResultSheet: View {
                 try await onAddCard(selectedCard, binderId, details)
             }
         }
+        .sheet(isPresented: $showingMatchSearch) {
+            ScannerCardMatchSearchView(
+                mode: result.mode,
+                capturedCard: result.capturedImage
+            ) { card in
+                let candidate = CardScanCandidate(
+                    details: CardDetails(card: card),
+                    confidence: CardScanConfidence(score: 1, reason: "Selected manually"),
+                    originatingStrategy: .manual
+                )
+                selectedCandidate = candidate
+                onSelectCandidate(candidate)
+                showingMatchSearch = false
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 12) {
+                Button(role: .destructive) {
+                    dismiss()
+                    onDiscard()
+                } label: {
+                    Label("Discard", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Label("Keep Match", systemImage: "checkmark")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(color)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .background(.bar)
+        }
     }
 
     private var candidateCard: Card? {
@@ -1855,21 +1916,20 @@ private struct ScanResultSheet: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let preview = capturedImage {
-                preview
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(color.opacity(0.25), lineWidth: 2)
+            HStack(alignment: .top, spacing: 12) {
+                comparisonImage(title: "Captured") {
+                    Image(uiImage: UIImage(cgImage: result.capturedImage))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                }
+                comparisonImage(title: "Matched") {
+                    ScanCandidateArtwork(
+                        imageURL: selectedCandidate.details.imageURL,
+                        placeholderAspectRatio: 0.72
                     )
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(color.opacity(0.15))
-                    .frame(height: 200)
+                }
             }
+            .frame(maxHeight: 280)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(selectedCandidate.details.identity.name)
@@ -1912,7 +1972,34 @@ private struct ScanResultSheet: View {
                 .buttonStyle(.bordered)
                 .tint(color)
             }
+
+            Button {
+                showingMatchSearch = true
+            } label: {
+                Label("Change Match", systemImage: "magnifyingglass")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(color)
         }
+    }
+
+    private func comparisonImage<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(spacing: 6) {
+            content()
+                .frame(maxWidth: .infinity, maxHeight: 240)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(color.opacity(0.25), lineWidth: 1)
+                }
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var confidenceSection: some View {

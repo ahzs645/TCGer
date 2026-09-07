@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -55,7 +57,7 @@ const TCG_BAR_COLORS: Record<string, string> = {
 };
 
 function tcgLabel(tcg: string): string {
-  return GAME_LABELS[tcg as SupportedGame] ?? tcg;
+  return gameLabel(tcg as SupportedGame) ?? tcg;
 }
 
 function currency(value: number): string {

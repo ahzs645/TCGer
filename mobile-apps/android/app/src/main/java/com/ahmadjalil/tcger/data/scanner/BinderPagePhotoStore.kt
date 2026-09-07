@@ -73,7 +73,7 @@ class BinderPagePhotoStore(context: Context) {
 
     private fun writeManifest(entries: List<SavedBinderPagePhoto>) {
         val temporary = File(directory, "manifest.tmp")
-        temporary.writeText(codec.encodeToString(entries.takeLast(MAX_PHOTOS)))
+        temporary.writeText(codec.encodeToString(entries))
         if (manifest.exists()) manifest.delete()
         check(temporary.renameTo(manifest)) { "Could not update binder-page manifest" }
     }

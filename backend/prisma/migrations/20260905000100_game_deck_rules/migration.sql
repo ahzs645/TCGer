@@ -1,0 +1,1 @@
+ALTER TABLE "Deck" ADD COLUMN "rules" JSONB;

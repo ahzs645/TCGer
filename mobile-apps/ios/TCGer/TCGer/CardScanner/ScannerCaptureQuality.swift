@@ -356,6 +356,12 @@ struct ScannerCropRescueRequest: Identifiable {
     let sourceResultID: CardScanResult.ID?
 }
 
+struct ScannerManualMatchRequest: Identifiable {
+    let id = UUID()
+    let image: CGImage
+    let mode: ScanMode
+}
+
 /// Metric aspect recovery for a planar rectangle. This is used conservatively:
 /// only calibrated estimates that recover a standard trading-card aspect can
 /// relax the older apparent-edge heuristic.

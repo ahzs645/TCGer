@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
@@ -127,7 +129,7 @@ export function CommandMenu({
                   className="mr-2 h-2 w-2 rounded-full bg-primary"
                   data-oid="n5_srws"
                 />
-                {GAME_LABELS[option.value]}
+                {gameLabel(option.value)}
                 {selectedGame === option.value && (
                   <CommandShortcut data-oid="b:1rcww">Current</CommandShortcut>
                 )}

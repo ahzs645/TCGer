@@ -1,0 +1,42 @@
+{
+  "schema": "tcger-price-snapshot-v1",
+  "gameId": "star-garden",
+  "quotes": [
+    {
+      "cardId": "captain-1",
+      "printingKey": "captain-1",
+      "finishCode": "matte",
+      "condition": "NM",
+      "language": "English",
+      "amount": 2,
+      "currency": "USD",
+      "source": "Fictional test prices",
+      "observedAt": "2026-09-01T00:00:00Z",
+      "expiresAt": "2026-10-01T00:00:00Z"
+    },
+    {
+      "cardId": "scout-1",
+      "printingKey": "scout-1",
+      "finishCode": "matte",
+      "condition": "NM",
+      "language": "English",
+      "amount": 2,
+      "currency": "USD",
+      "source": "Fictional test prices",
+      "observedAt": "2026-09-01T00:00:00Z",
+      "expiresAt": "2026-10-01T00:00:00Z"
+    },
+    {
+      "cardId": "scout-2",
+      "printingKey": "scout-2",
+      "finishCode": "matte",
+      "condition": "NM",
+      "language": "English",
+      "amount": 2,
+      "currency": "USD",
+      "source": "Fictional test prices",
+      "observedAt": "2026-09-01T00:00:00Z",
+      "expiresAt": "2026-10-01T00:00:00Z"
+    }
+  ]
+}

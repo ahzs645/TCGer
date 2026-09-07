@@ -9,14 +9,7 @@ import {
 import { addEntryForViewer } from "./lib/library";
 import { requireBinderForUser } from "./lib/domain";
 
-const tcgValidator = v.union(
-  v.literal("yugioh"),
-  v.literal("magic"),
-  v.literal("pokemon"),
-  v.literal("onepiece"),
-  v.literal("lorcana"),
-  v.literal("dragonball"),
-);
+const tcgValidator = v.string();
 
 const MAX_SESSION_ITEMS = 500;
 

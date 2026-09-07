@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import type { UserPreferences } from "@tcg/api-types";
 import { Download, HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 import { CardImage } from "@/components/cards/card-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ENABLED_PREFERENCE_KEY, getCardBackImage } from "@/lib/utils";
-import { updateUserPreferences } from "@/lib/api/user-preferences";
+import { getCardBackImage } from "@/lib/utils";
 import {
   type CatalogTcgCode,
   type CatalogInstallStatus,
@@ -22,8 +20,6 @@ import {
   SEALED_PRODUCTS_PREFERENCE_EVENT,
   setSealedProductsEnabled,
 } from "@/lib/catalog/catalog-client";
-import { useAuthStore } from "@/stores/auth";
-import { useModuleStore } from "@/stores/preferences";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -41,11 +37,7 @@ function actionLabel(status: CatalogInstallStatus): string {
   return status === "update-available" ? "Update" : "Download";
 }
 
-interface GameStorePanelProps {
-  onInstalled?: (tcg: CatalogTcgCode) => void;
-}
-
-export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
+export function GameStorePanel() {
   const {
     states,
     manifest: catalogManifest,
@@ -62,12 +54,6 @@ export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
     OfficialGamePackage[]
   >([]);
   const [storeError, setStoreError] = useState<string>();
-  const token = useAuthStore((state) => state.token);
-  const updateStoredPreferences = useAuthStore(
-    (state) => state.updateStoredPreferences,
-  );
-  const enabledGames = useModuleStore((state) => state.enabledGames);
-  const setGameEnabled = useModuleStore((state) => state.setGameEnabled);
   const includeSealedProducts = useSyncExternalStore(
     (onStoreChange) => {
       window.addEventListener(SEALED_PRODUCTS_PREFERENCE_EVENT, onStoreChange);
@@ -114,29 +100,11 @@ export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
     }
   };
 
-  const activateGame = async (tcg: CatalogTcgCode) => {
-    setGameEnabled(tcg, true);
-    onInstalled?.(tcg);
-    if (token) {
-      const preference = {
-        [ENABLED_PREFERENCE_KEY[tcg]]: true,
-      } as Partial<UserPreferences>;
-      try {
-        await updateUserPreferences(preference, token);
-        updateStoredPreferences(preference);
-      } catch {
-        // The package and this device's active-game state are already valid;
-        // the next preference refresh can retry server persistence.
-      }
-    }
-  };
-
   const handleInstall = async (tcg: CatalogTcgCode, isUpdate: boolean) => {
     try {
       await (isUpdate
         ? update(tcg, includeSealedProducts)
         : install(tcg, includeSealedProducts));
-      await activateGame(tcg);
     } catch {
       // The hook exposes the user-facing error in the matching row.
     }
@@ -188,7 +156,6 @@ export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
           const installed = state.installed;
           const isUpdate = state.status === "update-available";
           const isInstalled = Boolean(installed);
-          const isGameEnabled = enabledGames[tcg];
           const sealedEntry = entry?.sealedProducts;
           const needsSealedInstall =
             includeSealedProducts &&
@@ -222,7 +189,7 @@ export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
                       >
                         {isUpdate
                           ? `Update v${entry?.version}`
-                          : `Installed v${installed?.version}`}
+                          : "Installed"}
                       </Badge>
                     )}
                   </div>
@@ -280,18 +247,6 @@ export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
                   )}
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  {isInstalled &&
-                    state.status === "installed" &&
-                    !needsSealedInstall &&
-                    !isGameEnabled && (
-                      <Button
-                        size="sm"
-                        disabled={Boolean(download) || isRemoving}
-                        onClick={() => void activateGame(tcg)}
-                      >
-                        Use Game
-                      </Button>
-                    )}
                   {(state.status !== "installed" || needsSealedInstall) && (
                     <Button
                       size="sm"
@@ -320,10 +275,10 @@ export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
                           : actionLabel(state.status)}
                     </Button>
                   )}
-                  {isInstalled && isGameEnabled && (
+                  {isInstalled && (
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="destructive"
                       disabled={Boolean(download) || isRemoving}
                       onClick={() => void handleRemove(tcg)}
                     >
@@ -332,7 +287,7 @@ export function GameStorePanel({ onInstalled }: GameStorePanelProps = {}) {
                       ) : (
                         <Trash2 className="mr-2 h-4 w-4" />
                       )}
-                      Remove
+                      Delete
                     </Button>
                   )}
                 </div>

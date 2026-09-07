@@ -339,7 +339,10 @@ export const deleteBatch = internalMutation({
       const prices = await ctx.db.query("cardPriceSnapshots").withIndex("by_user_and_captured_at", q => q.eq("userId", args.userId)).take(batchSize);
       const notifications = await ctx.db.query("notifications").withIndex("by_user_and_created_at", q => q.eq("userId", args.userId)).take(batchSize);
       const channels = await ctx.db.query("notificationChannels").withIndex("by_user", q => q.eq("userId", args.userId)).take(batchSize);
-      const docs = [...alerts, ...automations, ...prices, ...notifications, ...channels].slice(0, batchSize);
+      const backups = await ctx.db.query("backupStates").withIndex("by_user", q => q.eq("userId", args.userId)).take(batchSize);
+      const mappings = await ctx.db.query("backupMappings").withIndex("by_user", q => q.eq("userId", args.userId)).take(batchSize);
+      for (const backup of backups) { await ctx.storage.delete(backup.sectionsStorageId); await ctx.storage.delete(backup.recoveryStorageId); await ctx.db.delete(backup._id); }
+      const docs = [...alerts, ...automations, ...prices, ...notifications, ...channels, ...mappings].slice(0, batchSize);
       if (docs.length) { await Promise.all(docs.map(doc => ctx.db.delete(doc._id))); await schedule(args.phase); }
       else await advance();
       return null;

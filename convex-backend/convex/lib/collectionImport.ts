@@ -1,4 +1,4 @@
-import type { TcgCode } from "./validators";
+import { isGameId, type TcgCode } from "./validators";
 
 export type CollectionImportIssue = {
   row: number;
@@ -272,12 +272,12 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
     const externalId = source.external_id?.trim();
     const cardName = source.card_name?.trim();
     if (
-      !["pokemon", "magic", "yugioh", "onepiece", "lorcana", "dragonball"].includes(tcg)
+      !isGameId(tcg)
     ) {
       issues.push({
         row: rowNumber,
         field: "tcg",
-        message: "must be pokemon, magic, yugioh, onepiece, lorcana, or dragonball",
+        message: "must be a lowercase game identifier (letters, numbers, and hyphens)",
       });
     }
     if (!externalId)

@@ -1,4 +1,7 @@
 "use client";
+import { cardSupportsPrintSelection, packageCardPresentation } from "@tcg/api-types";
+
+import { gameLabel } from "@/lib/utils";
 
 import Image from "next/image";
 import {
@@ -631,10 +634,10 @@ export function CollectionView() {
     [sortedCards, selectedCardId],
   );
   const currentGameLabel = selectedCard
-    ? (GAME_LABELS[selectedCard.tcg as TcgCode] ?? "this card")
+    ? (gameLabel(selectedCard.tcg as TcgCode) ?? "this card")
     : "this card";
   const supportsPrintSelection = selectedCard
-    ? ["magic", "pokemon"].includes(selectedCard.tcg)
+    ? cardSupportsPrintSelection(selectedCard)
     : false;
   const printOptions = printData?.prints ?? null;
   const pokemonFunctionalGroup: PokemonFunctionalGroup | null =
@@ -777,6 +780,7 @@ export function CollectionView() {
     fetchCardPrintsApi({
       tcg: selectedCard.tcg as TcgCode,
       cardId: targetExternalId,
+      packageId: packageCardPresentation(selectedCard)?.packageId,
       token,
     })
       .then((data) => {
@@ -980,9 +984,9 @@ export function CollectionView() {
     if (draftFinishCode !== originalFinishCode) {
       updates.finishCode = draftFinishCode || null;
       updates.finishLabel = draftFinishCode
-        ? formatFinishLabel(draftFinishCode)
+        ? (selectedCard ? getPokemonFinishOptions(selectedCard).find(f => f.code === draftFinishCode)?.label : undefined) ?? formatFinishLabel(draftFinishCode)
         : null;
-      updates.isFoil = isFoilFinish(draftFinishCode);
+      updates.isFoil = isFoilFinish(draftFinishCode, selectedCard ? getPokemonFinishOptions(selectedCard) : []);
     }
     if (draftEdition !== (selectedCopy.edition ?? "")) {
       updates.edition = draftEdition.trim() || null;
@@ -1138,7 +1142,7 @@ export function CollectionView() {
           isSealedPromo: selectedPrintIsSealedPromo,
           isOversized: selectedPrintIsOversized,
           isPeelOff: selectedPrintIsPeelOff,
-          isFoil: isFoilFinish(selectedPrintFinishCode),
+          isFoil: isFoilFinish(selectedPrintFinishCode, selectedPrintFinishOptions),
           ...(selectedPrintCard.id !== selectedCard.cardId
             ? {
                 cardOverride: {

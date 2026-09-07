@@ -209,7 +209,7 @@ private struct CreateDeckSheet: View {
                     TextField("Name", text: $name)
                     TextField("Description", text: $description, axis: .vertical)
                     Picker("Game", selection: $game) {
-                        ForEach(environmentStore.enabledGames) { Text($0.displayName).tag($0) }
+                        ForEach(Array(Set(environmentStore.enabledGames + GamePackageStore.shared.installed.filter { $0.manifest.definition?.deckRules != nil }.compactMap { TCGGame(rawValue: $0.manifest.game.id) })).sorted { $0.rawValue < $1.rawValue }) { Text($0.displayName).tag($0) }
                     }
                     TextField("Format (optional)", text: $format)
                     Toggle("Public Deck", isOn: $isPublic)
@@ -246,7 +246,8 @@ private struct CreateDeckSheet: View {
                 description: description.nilIfBlank,
                 tcg: game.rawValue,
                 format: format.nilIfBlank,
-                isPublic: isPublic
+                isPublic: isPublic,
+                rules: GamePackageStore.shared.installed.first { $0.manifest.game.id == game.rawValue }?.manifest.definition?.deckRules
             )
             onCreated(deck)
             HapticManager.notification(.success)
@@ -286,7 +287,7 @@ private struct ImportDeckSheet: View {
                 Section("Details") {
                     TextField("Deck name (optional)", text: $name)
                     Picker("Game", selection: $game) {
-                        ForEach(environmentStore.enabledGames) { Text($0.displayName).tag($0) }
+                        ForEach(Array(Set(environmentStore.enabledGames + GamePackageStore.shared.installed.filter { $0.manifest.definition?.deckRules != nil }.compactMap { TCGGame(rawValue: $0.manifest.game.id) })).sorted { $0.rawValue < $1.rawValue }) { Text($0.displayName).tag($0) }
                     }
                     .disabled(source == "ydk")
                     TextField("Format (optional)", text: $format)
@@ -409,7 +410,7 @@ private struct DeckDetailView: View {
                     }
 
                     ForEach(groupedCards(deck), id: \.zone) { group in
-                        Section("\(group.zone.capitalized) · \(group.cards.reduce(0) { $0 + $1.quantity })") {
+                        Section("\(deck.rules?.formats.first(where: { $0.id == (deck.format ?? deck.rules?.defaultFormat) })?.zones.first(where: { $0.id == group.zone })?.label ?? group.zone.capitalized) · \(group.cards.reduce(0) { $0 + $1.quantity })") {
                             ForEach(group.cards) { card in
                                 Button { activeSheet = .editCard(card) } label: {
                                     DeckCardRow(card: card, banlistEntry: yugiohBanlist?.entry(for: card))
@@ -460,7 +461,7 @@ private struct DeckDetailView: View {
                         .environmentObject(environmentStore)
                 }
             case .editCard(let card):
-                EditDeckCardSheet(deckID: deckID, card: card) { await load() }
+                EditDeckCardSheet(deckID: deckID, card: card, zones: deck?.rules?.formats.first { $0.id == (deck?.format ?? deck?.rules?.defaultFormat) }?.zones ?? []) { await load() }
                     .environmentObject(environmentStore)
             case .checkout:
                 if let deck {
@@ -478,7 +479,7 @@ private struct DeckDetailView: View {
     }
 
     private func groupedCards(_ deck: Deck) -> [(zone: String, cards: [DeckCard])] {
-        let order = ["main", "extra", "side"]
+        let order = deck.rules?.formats.first { $0.id == (deck.format ?? deck.rules?.defaultFormat) }?.zones.map(\.id) ?? ["main", "extra", "side"]
         let groups = Dictionary(grouping: deck.cards, by: \.zone)
         return order.compactMap { zone in groups[zone].map { (zone, $0) } } +
             groups.keys.filter { !order.contains($0) }.sorted().map { ($0, groups[$0] ?? []) }
@@ -640,6 +641,7 @@ private struct DeckCardPicker: View {
                     }
                 }
             }
+            .onAppear { zone = deck.rules?.formats.first { $0.id == (deck.format ?? deck.rules?.defaultFormat) }?.defaultZone ?? "main" }
             .navigationTitle("Add Card")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchModel.query, prompt: "Search \(TCGGame(rawValue: deck.tcg)?.shortName ?? deck.tcg)")
@@ -654,9 +656,9 @@ private struct DeckCardPicker: View {
                         Section { Text(card.name).font(.headline) }
                         Stepper("Quantity: \(quantity)", value: $quantity, in: 1...99)
                         Picker("Zone", selection: $zone) {
-                            Text("Main").tag("main")
-                            Text("Extra").tag("extra")
-                            Text("Side").tag("side")
+                            if let format = deck.rules?.formats.first(where: { $0.id == (deck.format ?? deck.rules?.defaultFormat) }) {
+                                ForEach(format.zones) { Text($0.label).tag($0.id) }
+                            } else { Text("Main").tag("main"); Text("Extra").tag("extra"); Text("Side").tag("side") }
                         }
                     }
                     .navigationTitle("Add to Deck")
@@ -715,9 +717,11 @@ private struct EditDeckCardSheet: View {
 
     private let apiService = APIService()
 
-    init(deckID: String, card: DeckCard, onSaved: @escaping () async -> Void) {
+    let zones: [GameDeckZone]
+    init(deckID: String, card: DeckCard, zones: [GameDeckZone] = [], onSaved: @escaping () async -> Void) {
         self.deckID = deckID
         self.card = card
+        self.zones = zones
         self.onSaved = onSaved
         _quantity = State(initialValue: card.quantity)
         _zone = State(initialValue: card.zone)
@@ -729,9 +733,8 @@ private struct EditDeckCardSheet: View {
                 Section { Text(card.name).font(.headline) }
                 Stepper("Quantity: \(quantity)", value: $quantity, in: 1...99)
                 Picker("Zone", selection: $zone) {
-                    Text("Main").tag("main")
-                    Text("Extra").tag("extra")
-                    Text("Side").tag("side")
+                    if zones.isEmpty { Text("Main").tag("main"); Text("Extra").tag("extra"); Text("Side").tag("side") }
+                    else { ForEach(zones) { Text($0.label).tag($0.id) } }
                 }
                 if let errorMessage { Section { Text(errorMessage).foregroundStyle(.red) } }
             }

@@ -49,6 +49,7 @@ extension CatalogStore {
             if let level = entry.card.level { attributes["level"] = .number(Double(level)) }
         case .pokemon, .all, .onepiece, .lorcana, .dragonball:
             break
+            default: break
         }
 
         let pokemonPrint: PokemonPrintMetadata? = {

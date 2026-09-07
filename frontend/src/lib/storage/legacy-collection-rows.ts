@@ -80,6 +80,7 @@ function toCardRow(card: DemoBinderCard, now: number): CardRow {
     tcg: card.tcg,
     externalId: data?.externalId ?? card.cardId,
     printingKey: data?.printingKey,
+    cardData: data ? { ...data } : undefined,
     name: data?.name ?? card.name,
     setCode: data?.setCode ?? card.setCode,
     setName: data?.setName ?? card.setName,
@@ -146,6 +147,8 @@ function toEntryRows(
     gradingScore: copy.gradingScore,
     certNumber: copy.certNumber,
     storageLocation: copy.storageLocation,
+    imageUrls: copy.imageUrls,
+    tags: copy.tags,
     createdAt: addedAt,
     updatedAt: addedAt,
   }));
@@ -201,10 +204,13 @@ export function toPortableRows(
       if (!row) {
         row = toCardRow(card, now);
         cardRows.set(key, row);
-      } else if (!row.imageUrl && card.cardData?.imageUrl) {
-        // A later copy of the same printing may carry enrichment the first did
-        // not; keep the richer row rather than the first one seen.
-        cardRows.set(key, { ...row, imageUrl: card.cardData.imageUrl });
+      } else if (card.cardData) {
+        // A later binder can hold richer metadata for this same printing.
+        cardRows.set(key, {
+          ...row,
+          imageUrl: row.imageUrl ?? card.cardData.imageUrl,
+          cardData: { ...card.cardData, ...row.cardData },
+        });
       }
       entryRows.push(...toEntryRows(card, binder.id, row._id, now));
     }
@@ -274,7 +280,8 @@ export function toDemoBinders(
         gradingScore: entry.gradingScore,
         certNumber: entry.certNumber,
         storageLocation: entry.storageLocation,
-        tags: [],
+        imageUrls: entry.imageUrls,
+        tags: entry.tags ?? [],
       } satisfies CollectionCardCopy;
 
       const existing = grouped.get(entry.cardId);
@@ -287,7 +294,7 @@ export function toDemoBinders(
       const demoCardId = card ? demoCardIdFromRow(card) : entry.cardId;
       // Preserve whatever the previous nested card carried that rows do not
       // model — chiefly `cardData`, which catalog enrichment writes back.
-      const previous = demoCards?.get(`${binder._id}:${demoCardId}`);
+      const previous = demoCards?.get(demoCardKey(binder._id, card?.tcg ?? "", demoCardId));
       grouped.set(entry.cardId, {
         id: entry._id,
         cardId: demoCardId,
@@ -300,7 +307,7 @@ export function toDemoBinders(
         price: entry.price ?? previous?.price ?? 0,
         quantity: 1,
         addedAt: entry.acquiredAt ?? new Date(entry.createdAt).toISOString(),
-        cardData: previous?.cardData,
+        cardData: (card?.cardData as DemoBinderCard["cardData"]) ?? previous?.cardData,
         copies: [copy],
       });
     }
@@ -338,8 +345,8 @@ export function toDemoBinders(
 }
 
 /** Key `toDemoBinders` uses to carry non-row fields across a rebuild. */
-export function demoCardKey(binderId: string, demoCardId: string): string {
-  return `${binderId}:${demoCardId}`;
+export function demoCardKey(binderId: string, tcg: string, demoCardId: string): string {
+  return `${binderId}:${tcg}:${demoCardId}`;
 }
 
 /** Index the current nested cards so a rebuild can preserve `cardData`. */
@@ -349,7 +356,7 @@ export function indexDemoCards(
   const index = new Map<string, DemoBinderCard>();
   for (const binder of binders) {
     for (const card of binder.cards) {
-      index.set(demoCardKey(binder.id, card.cardId), card);
+      index.set(demoCardKey(binder.id, card.tcg, card.cardId), card);
     }
   }
   return index;

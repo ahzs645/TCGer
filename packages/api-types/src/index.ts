@@ -27,3 +27,7 @@ export * from './game-definitions';
 export * from './catalog-corrections';
 export * from './collection-grouping';
 export * from './banlists';
+
+export * from "./portable-backup";
+
+export * from "./game-capabilities";

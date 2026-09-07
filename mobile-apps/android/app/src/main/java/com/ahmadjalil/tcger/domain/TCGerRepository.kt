@@ -1,6 +1,10 @@
 package com.ahmadjalil.tcger.domain
 
 interface TCGerRepository {
+    suspend fun eraseLocalCardsAndBinders() { error("Local erasure is not supported") }
+    suspend fun exportBackup(): String
+    suspend fun importBackup(raw: String)
+    suspend fun restoreLatestRecoveryPoint()
     suspend fun getBinders(): List<Binder>
     suspend fun createBinder(input: BinderInput): Binder
     suspend fun createBinder(name: String, description: String? = null): Binder =
@@ -11,6 +15,7 @@ interface TCGerRepository {
     suspend fun createBinderShareLink(id: String, label: String): BinderShareLink
     suspend fun revokeBinderShareLink(id: String, linkId: String)
     suspend fun searchCards(query: String, tcg: String? = null): List<CatalogCard>
+    suspend fun cardPrints(card: CatalogCard): List<CatalogCard>
     suspend fun discoverCards(tcg: String? = null, count: Int = 6): List<CatalogCard>
     suspend fun scanCard(imageBytes: ByteArray, tcg: String, options: CardScanOptions = CardScanOptions()): CardScanResult
     suspend fun getScanDebugCaptures(limit: Int = 12): List<ScanDebugCapture>
@@ -22,7 +27,12 @@ interface TCGerRepository {
     ): ScanDebugCapture
     /** Returns the created collection-copy ID when the active data source exposes one. */
     suspend fun addCard(binderId: String, card: CatalogCard, quantity: Int = 1): String?
+    suspend fun addCardWithDetails(binderId: String, card: CatalogCard, quantity: Int, edit: CollectionEdit): String?
+    suspend fun updateCard(binderId: String, copyId: String, edit: CollectionEdit, targetBinderId: String? = null)
     suspend fun removeCard(binderId: String, ownedCardId: String)
+    suspend fun saveWishlistRule(wishlistId: String, rule: WishlistRule): WishlistRule
+    suspend fun deleteWishlistRule(wishlistId: String, ruleId: String)
+    suspend fun resolveWishlistRule(rule: WishlistRule): List<CatalogCard>
     suspend fun getWishlists(): List<Wishlist>
     suspend fun createWishlist(input: WishlistInput): Wishlist
     suspend fun createWishlist(name: String): Wishlist = createWishlist(WishlistInput(name = name))

@@ -34,7 +34,7 @@ describe('collection CSV import', () => {
     );
   });
 
-  it.each(['onepiece', 'lorcana', 'dragonball'] as const)(
+  it.each(['onepiece', 'lorcana', 'dragonball', 'star-garden'] as const)(
     'accepts %s CSV imports',
     (tcg) => {
       const preview = previewCollectionImport(

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -57,7 +58,7 @@ import org.bouncycastle.crypto.signers.Ed25519Signer
 @Serializable data class GamePackageOfflinePacks(val schema: String, val manifest: GamePackageAsset)
 @Serializable data class GamePackageSealedProducts(val schema: String, val asset: GamePackageAsset, val productCount: Int)
 @Serializable data class GamePackageFormat(val id: String, val label: String, val physical: Boolean = true)
-@Serializable data class GamePackagePresentation(val accentColor: String? = null, val iconUrl: String? = null, val cardBackUrl: String? = null)
+@Serializable data class GamePackagePresentation(val accentColor: String? = null, val iconUrl: String? = null, val cardBackUrl: String? = null, val symbols: List<GameSymbol> = emptyList())
 @Serializable data class GamePackageFeature(val id: String, val version: Int = 1)
 object GameFeatureAdapters {
     const val POKEDEX = "pokedex"
@@ -96,7 +97,10 @@ object GameFeatureAdapters {
     val interfaces: GamePackageInterfaces? = null,
     val collection: GamePackageCollectionDefinition,
     val search: GamePackageSearchDefinition,
+    val deckRules: GameDeckRules? = null,
+    val printings: GamePrintings? = null,
 )
+@Serializable data class GamePackagePricing(val schema: String, val asset: GamePackageAsset)
 @Serializable data class GamePackageManifest(
     val schema: String,
     val packageId: String? = null,
@@ -112,6 +116,7 @@ object GameFeatureAdapters {
     val scanner: GamePackageScanner? = null,
     val offlinePacks: GamePackageOfflinePacks? = null,
     val sealedProducts: GamePackageSealedProducts? = null,
+    val pricing: GamePackagePricing? = null,
 ) {
     val installedId: String get() = if (packageId != null && publisher.id != null) "${publisher.id}--$packageId" else game.id
     val effectiveDefinition: GamePackageDefinition get() = definition ?: GamePackageDefinition(
@@ -214,10 +219,13 @@ fun duplicateGamePackage(installed: List<GamePackageManifest>, candidate: GamePa
     val regulationMark: String? = null,
     val sanctionedPlayLegal: Boolean? = null,
     val formatLegality: Map<String, JsonElement> = emptyMap(),
+    val legalityPeriods: List<GameLegalityPeriod> = emptyList(),
     val dexEntries: List<JsonElement> = emptyList(),
     val releasedAt: String? = null,
     val imageUrl: String? = null,
     val imageUrlSmall: String? = null,
+    val setSymbolUrl: String? = null,
+    val setLogoUrl: String? = null,
     val attributes: Map<String, JsonElement> = emptyMap(),
 ) {
     fun effectiveAttributes(): Map<String, JsonElement> = buildMap {
@@ -231,6 +239,10 @@ fun duplicateGamePackage(installed: List<GamePackageManifest>, candidate: GamePa
         strings("subtypes", subtypes); strings("types", types); strings("colors", colors)
         number("hp", hp); number("atk", atk); number("def", def); number("level", level)
         putAll(attributes)
+        baseExternalId?.let { put("baseExternalId", JsonPrimitive(it)) }
+        put("formatLegality", JsonObject(formatLegality))
+        put("legalityPeriods", Json.encodeToJsonElement(legalityPeriods))
+        sanctionedPlayLegal?.let { put("sanctionedPlayLegal", JsonPrimitive(it)) }
     }
 }
 @Serializable data class CommunityCatalogSet(val code: String, val name: String, val series: String? = null, val releasedAt: String? = null, val cardCount: Int? = null, val iconUrl: String? = null, val logoUrl: String? = null)
@@ -412,7 +424,7 @@ class GamePackageStore(
             val previous = _state.value.installed.firstOrNull { it.id == manifest.installedId }
             val record = InstalledGamePackage(
                 manifest.installedId,
-                manifest.update?.manifestUrl ?: sourceUri.toString(),
+                sourceUri.toString(),
                 previous?.installedAt ?: Instant.now().toString(),
                 manifest,
                 publisherVerification.trust,
@@ -448,9 +460,47 @@ class GamePackageStore(
 
     suspend fun cards(gameId: String): List<CommunityCatalogCard> = withContext(Dispatchers.IO) {
         val catalog = json.decodeFromString<CommunityCatalog>(File(File(root, gameId), "catalog.json").readText())
-        val setNames = catalog.sets.associate { it.code to it.name }
-        catalog.cards.map { card -> if (card.setName == null) card.copy(setName = card.setCode?.let(setNames::get)) else card }
+        val sets = catalog.sets.associateBy { it.code }
+        val definition = _state.value.installed.find { it.id == gameId }?.manifest?.effectiveDefinition
+        val presentation = GameCardPresentation(gameId, definition?.printings, definition?.presentation?.symbols.orEmpty())
+        val metadata = json.parseToJsonElement(json.encodeToString(presentation))
+        catalog.cards.map { card ->
+            val set = card.setCode?.let(sets::get)
+            card.copy(
+                attributes = card.attributes + ("tcger" to metadata),
+                setName = card.setName ?: set?.name,
+                setSymbolUrl = card.setSymbolUrl ?: set?.iconUrl,
+                setLogoUrl = card.setLogoUrl ?: set?.logoUrl,
+            )
+        }
     }
+
+    suspend fun enableCapability(packageId: String, kind: String) = withContext(Dispatchers.IO) {
+        require(kind in listOf("pricing", "packs"))
+        val installed = requireNotNull(_state.value.installed.find { it.id == packageId })
+        val asset = requireNotNull(if (kind == "pricing") installed.manifest.pricing?.asset else installed.manifest.offlinePacks?.manifest)
+        val bytes = download(secureUri(URI(installed.sourceUrl).resolve(asset.url).toString()), asset.bytes)
+        require(bytes.size.toLong() == asset.bytes && MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }.equals(asset.sha256, true)) { "Capability checksum mismatch" }
+        val ids = cards(packageId).map { it.id }.toSet()
+        if (kind == "pricing") {
+            val snapshot = json.decodeFromString<GamePriceSnapshot>(bytes.decodeToString())
+            snapshot.validateContract()
+            require(snapshot.schema == "tcger-price-snapshot-v1" && snapshot.gameId == installed.manifest.game.id && snapshot.quotes.all { it.cardId in ids && it.amount.isFinite() && it.amount >= 0 && Instant.parse(it.expiresAt).isAfter(Instant.parse(it.observedAt)) }) { "Price snapshot does not match the catalog" }
+        } else {
+            val library = json.decodeFromString<GamePackLibrary>(bytes.decodeToString())
+            library.validateContract()
+            require(library.schema == "tcger-pack-library-v1" && library.gameId == installed.manifest.game.id && library.packs.map { it.id }.distinct().size == library.packs.size && library.packs.all { it.slots.all { it.pool.all { it.cardId in ids } } }) { "Pack library does not match the catalog" }
+            library.packs.forEach { it.open { 0.0 } }
+        }
+        require(_state.value.installed.any { it.id == packageId && it.manifest == installed.manifest }) { "Package changed during download" }
+        val destination = File(File(root, packageId), "capability-$kind.json")
+        val staging = File(destination.parentFile, ".capability-${UUID.randomUUID()}")
+        try { staging.writeBytes(bytes); Files.move(staging.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING) }
+        finally { staging.delete() }
+    }
+
+    fun priceSnapshot(packageId: String): GamePriceSnapshot? = runCatching { json.decodeFromString<GamePriceSnapshot>(File(File(root, packageId), "capability-pricing.json").readText()) }.getOrNull()
+    fun packLibrary(packageId: String): GamePackLibrary? = runCatching { json.decodeFromString<GamePackLibrary>(File(File(root, packageId), "capability-packs.json").readText()) }.getOrNull()
 
     fun remove(gameId: String) {
         File(root, gameId).deleteRecursively()
@@ -464,7 +514,7 @@ class GamePackageStore(
     }
 
     private fun validate(manifest: GamePackageManifest) {
-        require(manifest.schema == "https://tcger.app/schemas/game-package-manifest/v1") { "Unsupported game package schema" }
+        require(manifest.schema in listOf("https://tcger.app/schemas/game-package-manifest/v1", "https://tcger.app/schemas/game-package-manifest/v2")) { "Unsupported game package schema" }
         require(manifest.catalog.schema == "tcger-catalog-v1") { "Unsupported catalog schema" }
         require(manifest.game.id.matches(Regex("^[a-z0-9][a-z0-9-]{0,63}$"))) { "Invalid game id" }
         require(manifest.catalog.cardCount >= 0 && manifest.catalog.asset.bytes in 1L..536_870_912L && manifest.catalog.asset.sha256.matches(Regex("^[A-Fa-f0-9]{64}$"))) { "Invalid catalog asset" }
@@ -482,6 +532,14 @@ class GamePackageStore(
         require(manifest.publisher.signingKey?.id == manifest.signature?.keyId) { "Signature key id does not match publisher key" }
         require(manifest.update == null || manifest.update.sequence >= 0) { "Invalid package release sequence" }
         manifest.definition?.let { definition ->
+            definition.deckRules?.validateContract()
+            definition.printings?.validateContract()
+            require((definition.presentation?.symbols?.size ?: 0) <= 1000)
+            definition.presentation?.symbols?.forEach { it.validateContract() }
+            if (manifest.schema.endsWith("/v2")) {
+                require(definition.interfaces?.decks != true || definition.deckRules != null) { "Decks require rules" }
+                require(definition.interfaces?.pricing != true || manifest.pricing != null) { "Pricing requires a snapshot" }
+            }
             require(!(definition.interfaces?.scanner == true && manifest.scanner == null)) { "Scanner interface requires a scanner capability" }
             require(!(definition.interfaces?.packOpening == true && manifest.offlinePacks == null)) { "Pack opening interface requires a pack capability" }
             require(!(definition.interfaces?.sealedProducts == true && manifest.sealedProducts == null)) { "Sealed products interface requires a sealed catalog capability" }
@@ -496,7 +554,7 @@ class GamePackageStore(
             require(modes.isNotEmpty() && modes.size <= 2 && modes.map { it.id }.distinct().size == modes.size) { "Invalid collection identity modes" }
             require(modes.any { it.id == definition.collection.defaultIdentityMode }) { "Default collection identity mode is not declared" }
             require(modes.all { it.id in setOf("consolidated", "collector") && it.key == if (it.id == "consolidated") "baseExternalId" else "printingKey" }) { "Invalid collection identity key" }
-            val definitionProperty = Regex("^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.(standard|expanded|unlimited)|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$")
+            val definitionProperty = Regex("^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$")
             validateFilters(definition.collection.facets, definitionProperty, requireOptions = false)
             validateFilters(definition.search.facets, definitionProperty, requireOptions = false)
         }

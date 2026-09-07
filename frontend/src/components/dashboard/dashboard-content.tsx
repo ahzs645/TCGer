@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -378,7 +380,7 @@ export function DashboardContent() {
           className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive"
           data-oid="5sv8-:2"
         >
-          {GAME_LABELS[selectedGame]} is disabled in your module preferences.
+          {gameLabel(selectedGame)} is disabled in your module preferences.
           Enable it from the account menu to bring back its analytics.
         </div>
       )}
@@ -590,7 +592,7 @@ function SetCompletionOverview({
                 <div>
                   <p className="font-semibold">{metric.setName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {GAME_LABELS[metric.tcg]} · {metric.setCode}
+                    {gameLabel(metric.tcg)} · {metric.setCode}
                   </p>
                 </div>
                 <CompletionBar
@@ -725,7 +727,7 @@ function GameBreakdown({
                   data-oid="dhdh532"
                 >
                   <span className="font-medium" data-oid="sels9l:">
-                    {GAME_LABELS[game as TcgCode]}
+                    {gameLabel(game as TcgCode)}
                   </span>
                   <span className="text-muted-foreground" data-oid="w2epbtk">
                     {info.copies}
@@ -798,7 +800,7 @@ function RecentActivity({
                   {item.name}
                 </p>
                 <p className="text-xs text-muted-foreground" data-oid="s8laehg">
-                  {GAME_LABELS[item.tcg]}
+                  {gameLabel(item.tcg)}
                   {item.binderName ? ` • ${item.binderName}` : ""}
                   {item.quantity > 1 ? ` • ${item.quantity} copies` : ""}
                 </p>

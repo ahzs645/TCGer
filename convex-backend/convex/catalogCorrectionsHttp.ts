@@ -37,7 +37,7 @@ const patchFields = new Set([
 ]);
 
 function isTcg(value: unknown): value is TcgCode {
-  return typeof value === "string" && tcgs.has(value as TcgCode);
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
 }
 
 function correctionInput(body: Record<string, any>) {

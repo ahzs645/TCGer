@@ -86,6 +86,13 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     case scannerDebugPerformanceFastFooterOcr = "scanner.debug.performance.fastFooterOcr"
     case scannerDebugPerformanceLeanOcrStrips = "scanner.debug.performance.leanOcrStrips"
     case scannerDebugPerformanceFooterFirstOcr = "scanner.debug.performance.footerFirstOcr"
+    case dataPortableBackup = "data.portableBackup"
+    case cardsFilteredSearch = "cards.filteredSearch"
+    case scannerBinderCorners = "scanner.binderCorners"
+    case collectionsCopyMetadata = "collections.copyMetadata"
+    case collectionsSmartFolders = "collections.smartFolders"
+    case accountManagement = "account.management"
+    case scannerBinderReview = "scanner.binderReview"
 
     static let implemented: Set<ParityFeatureID> = [
         .homeDashboard,
@@ -172,6 +179,13 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .scannerDebugPerformanceFastFooterOcr,
         .scannerDebugPerformanceLeanOcrStrips,
         .scannerDebugPerformanceFooterFirstOcr,
+        .dataPortableBackup,
+        .cardsFilteredSearch,
+        .scannerBinderCorners,
+        .collectionsCopyMetadata,
+        .collectionsSmartFolders,
+        .accountManagement,
+        .scannerBinderReview,
     ]
 
     var screenIdentifier: String { "feature.\(rawValue)" }

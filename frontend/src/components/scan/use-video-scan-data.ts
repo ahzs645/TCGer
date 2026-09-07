@@ -1,4 +1,5 @@
-import { useCallback, useRef } from "react";
+import { installedPackageCapabilities } from "@/lib/game-packages/game-package-client";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { Table } from "dexie";
 
@@ -370,6 +371,8 @@ export function useVideoScanData(
   token: string | null,
   callbacks: VideoScanDataCallbacks,
 ) {
+  const modelUrls = useRef(new Set<string>());
+  useEffect(() => () => { modelUrls.current.forEach(url => URL.revokeObjectURL(url)); modelUrls.current.clear(); }, []);
   const hashCacheRef = useRef(new Map<string, CardScanHashEntry[]>());
   const artworkDbRef = useRef<ArtworkFingerprintEntry[] | null>(null);
   const embeddingIndexesRef = useRef(new Map<SupportedTcg, EmbeddingIndex>());
@@ -403,6 +406,8 @@ export function useVideoScanData(
         // Offline: each concrete shard can still fall back to IndexedDB.
       }
 
+      const capabilities = await installedPackageCapabilities().catch(() => []);
+      const packageScanners = capabilities.filter(c => c.scanner && (requestedFilter === "all" || c.gameId === requestedFilter));
       const games: SupportedTcg[] =
         requestedFilter === "all" ? gameOrder : [requestedFilter];
 
@@ -470,6 +475,18 @@ export function useVideoScanData(
       const loaded = (await Promise.all(games.map(loadShard))).filter(
         (index): index is EmbeddingIndex => index !== null,
       );
+      for (const capability of packageScanners) {
+        const scanner = capability.scanner!;
+        const key = `${capability.packageId}:${capability.manifestHash}`;
+        let index = embeddingIndexesRef.current.get(key);
+        if (!index) {
+          index = parseEmbeddingIndex(scanner.artifact, capability.gameId);
+          index.modelUrl = URL.createObjectURL(new Blob([scanner.model as BlobPart], { type: "application/octet-stream" }));
+          modelUrls.current.add(index.modelUrl);
+          embeddingIndexesRef.current.set(key, index);
+        }
+        loaded.push(index);
+      }
       if (loaded.length === 0) {
         callbacks.onHashStatus("Embedding index unavailable.");
         return [];

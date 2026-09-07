@@ -1,8 +1,7 @@
 # TCGer for Android
 
-The Android client is a native Kotlin + Jetpack Compose application. The first
-milestone ports the iOS app's offline-first shell and the collection-management
-vertical slice:
+The Android client is a native Kotlin + Jetpack Compose application. It supports
+offline collection management and optional self-hosted server access:
 
 - on-device and self-hosted server environments
 - dashboard statistics and recent binders
@@ -19,9 +18,10 @@ vertical slice:
 - persisted appearance, currency, card-number visibility, default/enabled games, and bottom-navigation preferences
 - Room persistence, DataStore preferences, and a Retrofit API boundary
 
-Sets/Pokédex, automatic binder-page detection/page-photo storage, analytics,
-and widgets remain tracked in
-[`PORTING_PLAN.md`](PORTING_PLAN.md).
+See [`PORTING_PLAN.md`](PORTING_PLAN.md) for porting history and the
+[September 5 implementation report](../../docs/android-product-improvements-2026-09-05.md)
+for the latest setup, collection, settings, backup, and platform changes.
+Implemented screens and verified release behavior are tracked separately.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ Open `mobile-apps/android` in Android Studio to run the `app` configuration on
 an emulator or physical device. The app supports Android 8.0 (API 26) and newer.
 
 The default launch mode is **On this device** and needs no account or backend.
-Use **Settings > Data source** to configure a TCGer server.
+Use **Settings > Account & connection** to configure a TCGer server.
 
 The scanner works in both modes. A signed-in server session can use the shared
 pHash or embedding scanner and authenticated price endpoint. On-device mode
@@ -55,7 +55,7 @@ preview; choosing existing photos remains available.
 No game-specific recognition runtime ships in the APK/AAB. Opening the scanner
 prompts for the selected game's current package; the current Pokémon, Magic,
 and Yu-Gi-Oh! ArcFace runtimes are also independently downloadable under
-**Settings > Offline scanner models**. Each R2 manifest, model, vectors, and
+**Settings > Scanner > Offline scanner models**. Each R2 manifest, model, vectors, and
 metadata set is checksum-validated as one version before app-private atomic
 activation. A downloaded runtime is used only for its explicitly selected
 game; it is not used for cross-game automatic classification. Scanner entry
@@ -74,6 +74,8 @@ The app follows a small, feature-oriented MVVM structure:
 - `ui` — Compose screens, navigation, theme, and view models
 
 Remote credentials are exchanged for a session token. Passwords are never
-persisted. The token is stored in private DataStore preferences for this first
-milestone; moving it to Android Keystore-backed encrypted storage is required
-before production release.
+persisted. Session tokens and optional personal pricing keys are encrypted with AES-GCM
+using a non-exportable Android Keystore key. Existing plaintext tokens migrate
+on preferences startup. Credential-bearing preferences are excluded from OS
+backup and device transfer; portable collection exports exclude credentials.
+A restore that cannot decrypt a session requires signing in again.

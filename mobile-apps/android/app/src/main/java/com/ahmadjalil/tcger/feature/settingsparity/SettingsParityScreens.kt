@@ -52,6 +52,7 @@ fun PricingSourceSettingsScreen(
     preferenceStore: PricingSourcePreferenceStore,
     enabledGames: List<String>,
     contentPadding: PaddingValues = PaddingValues(),
+    local: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     var catalog by remember { mutableStateOf<PriceSourcesResponse?>(null) }
@@ -69,6 +70,7 @@ fun PricingSourceSettingsScreen(
     val sources = catalog?.sources.orEmpty()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = settingsFeaturePadding(contentPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SettingsFeatureHeader("Pricing Source", "Choose a default and optional per-game providers", ::load) }
+        if (local) item { com.ahmadjalil.tcger.ui.screens.PersonalPricingPanel() }
         if (loading) item { SettingsLoading() }
         error?.let { item { SettingsMessage(it, true) } }
         result?.let { item { SettingsMessage(it, false) } }

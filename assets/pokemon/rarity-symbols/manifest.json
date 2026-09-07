@@ -14,6 +14,13 @@
         "file": "amazing-rare.836e292370c47b8f.svg",
         "sha256": "836e292370c47b8f53f76f8f7005b30538307068dfbd86d0aa31ac0223205a0b",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/amazing-rare.836e292370c47b8f.svg"
+      },
+      "raster": {
+        "file": "amazing-rare.4a876821ba5bd97b.png",
+        "sha256": "4a876821ba5bd97b32c6f53d4d5e276cbf9bf2556435f050a2e2c8f79e12c684",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/amazing-rare.4a876821ba5bd97b.png"
       }
     },
     "common": {
@@ -25,6 +32,13 @@
         "file": "common.2b7fcc0607f1c064.svg",
         "sha256": "2b7fcc0607f1c0648b609eac530c58ae07ccf984b697dbf52db1ec7c258d80b0",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/common.2b7fcc0607f1c064.svg"
+      },
+      "raster": {
+        "file": "common.af7e4bfde3168935.png",
+        "sha256": "af7e4bfde3168935ce48ad15347c29905308dbc3bf171e57dbd2eecc25383547",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/common.af7e4bfde3168935.png"
       }
     },
     "uncommon": {
@@ -36,6 +50,13 @@
         "file": "uncommon.371e5b180b55f4cc.svg",
         "sha256": "371e5b180b55f4cc84e8c8730d8a0e32ee1185883e016926c3caaab3dfcac60b",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/uncommon.371e5b180b55f4cc.svg"
+      },
+      "raster": {
+        "file": "uncommon.713182708480c351.png",
+        "sha256": "713182708480c351e8a7d9d53b42399c3ff665a13e7b8a17f2631e138ee5dc3d",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/uncommon.713182708480c351.png"
       }
     },
     "rare": {
@@ -47,6 +68,13 @@
         "file": "rare.8a6867507251dba0.svg",
         "sha256": "8a6867507251dba037567789c58b244f452f7da77879e711d28ab2898af32e16",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/rare.8a6867507251dba0.svg"
+      },
+      "raster": {
+        "file": "rare.df6ff2f19f0a9e6e.png",
+        "sha256": "df6ff2f19f0a9e6ebcf14d554e7758a0beee9d2d1d578701457464a8171b4506",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/rare.df6ff2f19f0a9e6e.png"
       }
     },
     "rare-holo": {
@@ -59,6 +87,13 @@
         "file": "rare-holo.aab14d7ee57de99c.svg",
         "sha256": "aab14d7ee57de99c6774c9c650e4a29df19f40d52d3004b972857435aa68efbb",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/rare-holo.aab14d7ee57de99c.svg"
+      },
+      "raster": {
+        "file": "rare-holo.df6ff2f19f0a9e6e.png",
+        "sha256": "df6ff2f19f0a9e6ebcf14d554e7758a0beee9d2d1d578701457464a8171b4506",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/rare-holo.df6ff2f19f0a9e6e.png"
       }
     },
     "shiny-rare": {
@@ -71,6 +106,13 @@
         "file": "shiny-rare.3c897980286fa765.svg",
         "sha256": "3c897980286fa7658141a1c4aa8a5a2f31a9fbe3a78f9000eb4e28702424050c",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/shiny-rare.3c897980286fa765.svg"
+      },
+      "raster": {
+        "file": "shiny-rare.df6ff2f19f0a9e6e.png",
+        "sha256": "df6ff2f19f0a9e6ebcf14d554e7758a0beee9d2d1d578701457464a8171b4506",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/shiny-rare.df6ff2f19f0a9e6e.png"
       }
     },
     "shiny-ultra-rare": {
@@ -82,6 +124,13 @@
         "file": "shiny-ultra-rare.ff4a91c850802de4.svg",
         "sha256": "ff4a91c850802de437dd5ac08ffc9239d97fabe837da7a56bb7b45791ff4b9e0",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/shiny-ultra-rare.ff4a91c850802de4.svg"
+      },
+      "raster": {
+        "file": "shiny-ultra-rare.4987458b44840d91.png",
+        "sha256": "4987458b44840d9196f01c2505b990c7b96d44f0f8d95d0ec014200a0c13a153",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/shiny-ultra-rare.4987458b44840d91.png"
       }
     },
     "ultra-rare": {
@@ -93,6 +142,13 @@
         "file": "ultra-rare.7d1e866dc5030fa7.svg",
         "sha256": "7d1e866dc5030fa71108685b097cccfdfc7c1a53a961620d1d721ff034abbcf4",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/ultra-rare.7d1e866dc5030fa7.svg"
+      },
+      "raster": {
+        "file": "ultra-rare.4987458b44840d91.png",
+        "sha256": "4987458b44840d9196f01c2505b990c7b96d44f0f8d95d0ec014200a0c13a153",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/ultra-rare.4987458b44840d91.png"
       }
     },
     "promo": {
@@ -104,6 +160,13 @@
         "file": "promo.bd2c7eb45121f553.svg",
         "sha256": "bd2c7eb45121f553e18fc2c8bbf2216868bbedf614d15a219311e8d9bf4f2403",
         "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/promo.bd2c7eb45121f553.svg"
+      },
+      "raster": {
+        "file": "promo.a1ea66277389c18b.png",
+        "sha256": "a1ea66277389c18b3c7f8be0161256e1348cdbda04dcf12c9ad85cd1cc509b5c",
+        "width": 128,
+        "height": 128,
+        "url": "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/promo.a1ea66277389c18b.png"
       }
     }
   }

@@ -32,7 +32,8 @@ class PortfolioFeatureTest {
         assertEquals(2, result.breakdown.byGame.single().cardCount)
     }
 
-    @Test fun `price keys normalize game and identifiers`() {
-        assertEquals("pokemon:sv-001", priceKey(" Pokemon ", " SV-001 "))
+    @Test fun `price keys normalize game but preserve printing identifier case`() {
+        assertEquals("pokemon:SV-001", priceKey(" Pokemon ", " SV-001 "))
+        org.junit.Assert.assertNotEquals(priceKey("pokemon", "SV-001"), priceKey("pokemon", "sv-001"))
     }
 }

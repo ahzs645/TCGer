@@ -1,4 +1,5 @@
 "use client";
+import { PackageCapabilities } from "@/components/game-features/package-capabilities";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -279,6 +280,7 @@ function CommunityLibrary({
           </Button>
         </div>
       </div>
+      <PackageCapabilities installed={installed} />
       {cards && (
         <>
           <div className="grid gap-2 sm:grid-cols-2">

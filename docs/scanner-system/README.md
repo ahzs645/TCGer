@@ -38,6 +38,8 @@ the required encoders separately and merging calibrated candidates.
 
 ## Documentation map
 
+For new game libraries, use the [future-game authoring guide](../src/content/docs/adding-games/index.md) and its separate capability pages in the documentation site's **Adding Games** section. They describe the repository implementation as of September 5, 2026; the dated production records below remain historical release evidence.
+
 | Document | Use it for |
 |---|---|
 | [Current state and direction](current-state-and-direction-2026-08-29.md) | What is live now, what the recent work established, quick versus precise behavior, and the next priorities |
@@ -60,7 +62,7 @@ the required encoders separately and merging calibrated candidates.
 | [Operations runbook](operations-runbook.md) | Source checks, catalog refresh, image sync, training, evaluation, publication, and incident response |
 | [Decisions, lessons, and open risks](decisions-and-known-issues.md) | Why the system was built this way, failed approaches, Pocket contamination, and remaining gates |
 | [Extensible game-package framework](game-package-framework.md) | Proposed catalog + optional packs + optional scanner install contract for future games |
-| [GamePackageManifest v1](game-package-manifest.md) | Implemented user-URL contract, filter model, trust boundary, schema, and publisher example |
+| [GamePackageManifest v1 and v2](game-package-manifest.md) | User-URL contract, capabilities, filter model, trust boundary, schemas, and publisher examples |
 | [Dynamic scanner runtime audit](dynamic-scanner-runtime-audit.md) | Safe activation contract, platform refactors, trust rollout, and conformance tests for community scanner models |
 | [Dynamic offline-pack runtime audit](dynamic-offline-pack-runtime-audit.md) | Declarative collation schema, cache/activation semantics, hard-coded blockers, and rollout tests |
 | [Shared card-geometry plan](shared-card-geometry-plan-2026-09-02.md) | Approved direction for one shared detector/corner/crop stack across iOS, Android, and web: licensing gate, geometry and crop contracts, corpus schema, benchmark, winner rule, and execution order |

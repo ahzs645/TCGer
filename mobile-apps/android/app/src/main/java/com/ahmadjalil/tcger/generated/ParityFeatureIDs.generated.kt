@@ -86,6 +86,13 @@ object ParityFeatureIDs {
     const val SCANNER_DEBUG_PERFORMANCE_FAST_FOOTER_OCR = "scanner.debug.performance.fastFooterOcr"
     const val SCANNER_DEBUG_PERFORMANCE_LEAN_OCR_STRIPS = "scanner.debug.performance.leanOcrStrips"
     const val SCANNER_DEBUG_PERFORMANCE_FOOTER_FIRST_OCR = "scanner.debug.performance.footerFirstOcr"
+    const val DATA_PORTABLE_BACKUP = "data.portableBackup"
+    const val CARDS_FILTERED_SEARCH = "cards.filteredSearch"
+    const val SCANNER_BINDER_CORNERS = "scanner.binderCorners"
+    const val COLLECTIONS_COPY_METADATA = "collections.copyMetadata"
+    const val COLLECTIONS_SMART_FOLDERS = "collections.smartFolders"
+    const val ACCOUNT_MANAGEMENT = "account.management"
+    const val SCANNER_BINDER_REVIEW = "scanner.binderReview"
 
     val implemented: Set<String> = setOf(
         HOME_DASHBOARD,
@@ -157,6 +164,13 @@ object ParityFeatureIDs {
         SCANNER_DEBUG_ASSET_DIAGNOSTICS,
         SCANNER_DEBUG_FEEDBACK_LABELS,
         SCANNER_DEBUG_PERFORMANCE_FAST_CAPTURE,
+        DATA_PORTABLE_BACKUP,
+        CARDS_FILTERED_SEARCH,
+        SCANNER_BINDER_CORNERS,
+        COLLECTIONS_COPY_METADATA,
+        COLLECTIONS_SMART_FOLDERS,
+        ACCOUNT_MANAGEMENT,
+        SCANNER_BINDER_REVIEW,
     )
 
     fun screen(featureId: String): String = "feature.$featureId"

@@ -1,5 +1,6 @@
 package com.ahmadjalil.tcger.features.social
 
+import com.ahmadjalil.tcger.data.gamepackage.GameDeckRules
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -22,6 +23,7 @@ data class DeckCard(
 
 @Serializable
 data class Deck(
+    val rules: GameDeckRules? = null,
     val id: String,
     val name: String,
     val description: String? = null,
@@ -43,6 +45,7 @@ data class DeckDraft(
     val format: String? = null,
     val colorHex: String? = null,
     val isPublic: Boolean = false,
+    val rules: GameDeckRules? = null,
 ) {
     fun normalized() = copy(
         name = name.trim(),
@@ -77,6 +80,7 @@ data class DeckCardDraft(
     val imageUrlSmall: String? = null,
     val setCode: String? = null,
     val setName: String? = null,
+    val cardData: Map<String, JsonElement>? = null,
 ) {
     fun normalized() = copy(
         externalId = externalId.trim(),

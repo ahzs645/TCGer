@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -1042,7 +1044,7 @@ export function WishlistContent() {
                       .filter((game) => game !== "all")
                       .map((game) => (
                         <SelectItem key={game} value={game}>
-                          {GAME_LABELS[game]}
+                          {gameLabel(game)}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -1091,7 +1093,7 @@ export function WishlistContent() {
               </Button>
               {setsQuery.isError && (
                 <p className="text-sm text-destructive">
-                  Could not load sets for {GAME_LABELS[setGame]}.
+                  Could not load sets for {gameLabel(setGame)}.
                 </p>
               )}
               {bulkStatus && addMode === "set" && (
@@ -1142,7 +1144,7 @@ export function WishlistContent() {
                         .filter((game) => game !== "all")
                         .map((game) => (
                           <SelectItem key={game} value={game}>
-                            {GAME_LABELS[game]}
+                            {gameLabel(game)}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -1432,7 +1434,7 @@ function WishlistRuleChip({
       )}
       <span className="font-medium">{describeWishlistRule(rule)}</span>
       {rule.tcg && (
-        <span className="text-muted-foreground">{GAME_LABELS[rule.tcg]}</span>
+        <span className="text-muted-foreground">{gameLabel(rule.tcg)}</span>
       )}
       {lastSynced && (
         <span className="text-muted-foreground">· synced {lastSynced}</span>

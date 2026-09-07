@@ -10,14 +10,8 @@ import {
   requireBridgeIdentity,
 } from "./lib/httpBridge";
 
-type TcgCode =
-  | "yugioh"
-  | "magic"
-  | "pokemon"
-  | "onepiece"
-  | "lorcana"
-  | "dragonball";
-type DeckZone = "main" | "extra" | "side";
+type TcgCode = string;
+type DeckZone = string;
 
 type ImportedCard = {
   externalId: string;
@@ -54,11 +48,11 @@ const IMPORT_SOURCES = [
 ] as const;
 
 function isTcgCode(value: unknown): value is TcgCode {
-  return typeof value === "string" && TCG_CODES.includes(value as TcgCode);
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
 }
 
 function isDeckZone(value: unknown): value is DeckZone {
-  return value === "main" || value === "extra" || value === "side";
+  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -321,6 +315,7 @@ async function parseImportSource(body: Record<string, any>) {
 }
 
 type CreateDeckPayload = {
+  rules?: unknown;
   name: string;
   description?: string;
   tcg: TcgCode;
@@ -459,6 +454,7 @@ export function registerDecksRoutes(http: HttpRouter) {
           name: body.name,
           description: body.description,
           tcg: body.tcg,
+          rules: body.rules,
           format: body.format,
           colorHex: body.colorHex,
           isPublic: body.isPublic,

@@ -1,4 +1,4 @@
-import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
+import { GAME_LABELS, gameLabel, type SupportedGame } from "@/lib/utils";
 
 /**
  * One place that says how a game looks.
@@ -84,7 +84,7 @@ export function gamePresentation(game?: string | null): GamePresentation {
   if (!game) return NEUTRAL;
   const key = game.toLowerCase();
   return (
-    GAME_PRESENTATION[key as SupportedGame] ??
+    (Object.prototype.hasOwnProperty.call(GAME_PRESENTATION, key) ? GAME_PRESENTATION[key as SupportedGame] : undefined) ??
     // Demo fixtures label games by their display name ("Yu-Gi-Oh!"), not their
     // code, so resolve those too rather than dropping to neutral.
     Object.values(GAME_PRESENTATION).find(
@@ -92,7 +92,7 @@ export function gamePresentation(game?: string | null): GamePresentation {
         entry.label.toLowerCase() === key ||
         entry.shortLabel.toLowerCase() === key,
     ) ??
-    NEUTRAL
+    { ...NEUTRAL, label: gameLabel(key), shortLabel: gameLabel(key) }
   );
 }
 

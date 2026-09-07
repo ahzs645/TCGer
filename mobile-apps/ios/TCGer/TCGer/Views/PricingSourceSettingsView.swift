@@ -168,7 +168,7 @@ struct PricingSourceSettingsView: View {
         Section {
             ForEach(gamesWithPricingOptions) { game in
                 Picker(selection: preferredSourceBinding(for: game)) {
-                    Text("Use Default (\(defaultSourceName(for: game)))")
+                    Text("Use Default")
                         .tag(Optional<PricingSource>.none)
                     ForEach(compatibleOptions(for: game)) { option in
                         Text(option.label)
@@ -183,7 +183,7 @@ struct PricingSourceSettingsView: View {
         } header: {
             Text("Game Priorities")
         } footer: {
-            Text("A preferred source overrides the default only for that game. Best Available uses the server's compatible provider order.")
+            Text("Use Default follows Active Source when compatible, otherwise Best Available. Best Available uses the server's compatible provider order.")
         }
     }
 
@@ -199,12 +199,6 @@ struct PricingSourceSettingsView: View {
             get: { environmentStore.preferredPricingSource(for: game) },
             set: { environmentStore.setPreferredPricingSource($0, for: game) }
         )
-    }
-
-    private func defaultSourceName(for game: TCGGame) -> String {
-        selectedSource.supports(tcg: game.rawValue)
-            ? selectedSource.displayName
-            : PricingSource.automatic.displayName
     }
 
     private var justTCGPreferencesSection: some View {

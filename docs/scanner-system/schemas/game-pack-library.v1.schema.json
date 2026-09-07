@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "game-pack-library.v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "tcger-pack-library-v1"
+    },
+    "gameId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "setCode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cardBackUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "pool": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "cardId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "weight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000
+                      }
+                    },
+                    "required": [
+                      "cardId",
+                      "weight"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "maxItems": 100000
+                },
+                "withoutReplacement": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "count",
+                "pool"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "setCode",
+          "slots"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 10000
+    }
+  },
+  "required": [
+    "schema",
+    "gameId",
+    "packs"
+  ],
+  "additionalProperties": false
+}

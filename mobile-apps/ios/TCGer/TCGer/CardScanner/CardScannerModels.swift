@@ -1,11 +1,18 @@
 import CoreGraphics
 import Foundation
 
-enum ScanMode: String, CaseIterable, Identifiable, Sendable {
-    case automatic
-    case pokemon
-    case yugioh
-    case mtg
+nonisolated struct ScanMode: RawRepresentable, CaseIterable, Identifiable, Hashable, Sendable {
+    let rawValue: String
+    init?(rawValue: String) {
+        guard TCGGame(rawValue: rawValue) != nil else { return nil }
+        self.rawValue = rawValue
+    }
+    static let automatic = ScanMode(rawValue: "automatic")!
+    static let pokemon = ScanMode(rawValue: "pokemon")!
+    static let yugioh = ScanMode(rawValue: "yugioh")!
+    static let mtg = ScanMode(rawValue: "mtg")!
+    static let allCases: [ScanMode] = [.automatic, .pokemon, .yugioh, .mtg]
+    static func game(_ game: TCGGame) -> ScanMode { game == .magic ? .mtg : game == .all ? .automatic : ScanMode(rawValue: game.rawValue)! }
 
     var id: String { rawValue }
 
@@ -15,6 +22,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
         case .pokemon: return "Pokémon"
         case .yugioh: return "Yu-Gi-Oh!"
         case .mtg: return "MTG"
+        default: return tcgGame.displayName
         }
     }
 
@@ -28,6 +36,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
             return "Keep the foil text sharp and fill the frame with the Yu-Gi-Oh! card."
         case .mtg:
             return "Capture the full Magic card art and name line for best results."
+        default: return "Center the full card in clear lighting."
         }
     }
 
@@ -37,6 +46,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
         case .pokemon: return .pokemon
         case .yugioh: return .yugioh
         case .mtg: return .magic
+        default: return TCGGame(rawValue: rawValue)!
         }
     }
 
@@ -46,6 +56,7 @@ enum ScanMode: String, CaseIterable, Identifiable, Sendable {
         case .pokemon: return "#FF3B30"
         case .yugioh: return "#AF52DE"
         case .mtg: return "#34C759"
+        default: return "#0A84FF"
         }
     }
 }
@@ -548,7 +559,7 @@ struct CardScanScope: Hashable, Sendable {
     let setName: String
 
     var scanMode: ScanMode? {
-        ScanMode.allCases.first { $0.tcgGame == game }
+        ScanMode.game(game)
     }
 }
 

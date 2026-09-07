@@ -49,6 +49,7 @@ export async function createDeck(userId: string, input: CreateDeckInput) {
       description: input.description,
       tcg: input.tcg,
       format: input.format,
+      rules: input.rules as Prisma.InputJsonValue | undefined,
       colorHex: input.colorHex,
       isPublic: input.isPublic ?? false
     },
@@ -84,13 +85,14 @@ export async function deleteDeck(userId: string, deckId: string) {
 
 export async function addCardToDeck(userId: string, deckId: string, input: AddDeckCardInput) {
   const deck = await getDeck(userId, deckId);
+  if (input.tcg !== deck.tcg) throw Object.assign(new Error("Card belongs to another game"), { status: 400 });
   const zone =
     input.zone ??
     (deck.tcg === 'yugioh'
       ? inferYugiohZone(input)
       : input.isSideboard
         ? 'side'
-        : 'main');
+        : deck.rules?.formats?.find((format: any) => format.id === (deck.format ?? deck.rules.defaultFormat))?.defaultZone ?? 'main');
   const card = await prisma.deckCard.upsert({
     where: {
       deckId_externalId_zone: {
@@ -306,6 +308,7 @@ function formatDeck(deck: any) {
     description: deck.description,
     tcg: deck.tcg,
     format: deck.format,
+    rules: deck.rules ?? undefined,
     colorHex: deck.colorHex,
     isPublic: deck.isPublic,
     cards: (deck.cards || []).map((c: any) => ({

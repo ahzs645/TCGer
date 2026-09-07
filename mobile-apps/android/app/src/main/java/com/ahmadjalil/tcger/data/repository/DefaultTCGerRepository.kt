@@ -77,14 +77,24 @@ import com.ahmadjalil.tcger.domain.TCGerRepository
 import com.ahmadjalil.tcger.domain.Wishlist
 import com.ahmadjalil.tcger.domain.WishlistCard
 import com.ahmadjalil.tcger.domain.WishlistInput
+import com.ahmadjalil.tcger.domain.WishlistRule
+import com.ahmadjalil.tcger.domain.CollectionEdit
+import com.ahmadjalil.tcger.domain.CollectionDetails
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
+import com.ahmadjalil.tcger.data.backup.*
 import java.util.UUID
 import java.time.Instant
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.serialization.json.JsonNull
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
@@ -96,6 +106,91 @@ class DefaultTCGerRepository(
     private val textRecognizer: OnDeviceCardTextRecognizer,
     private val scannerAssetStore: ScannerAssetStore,
 ) : TCGerRepository {
+    private val recoveryFile get() = java.io.File(applicationContext.filesDir, "collection-recovery.json")
+
+    private val backupSections by lazy { BackupSectionsStore(applicationContext) }
+    private val backupMutex = kotlinx.coroutines.sync.Mutex()
+    private val importJournal get() = java.io.File(applicationContext.filesDir, "collection-import-journal.json")
+    private val startupRecovery by lazy {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).async {
+            if (importJournal.exists()) {
+                restoreLocalSnapshot(Json.decodeFromString<LocalCollectionSnapshot>(importJournal.readText()))
+                check(importJournal.delete()) { "Could not finish interrupted import recovery" }
+            }
+        }
+    }
+    private suspend fun restoreLocalSnapshot(snapshot: LocalCollectionSnapshot) {
+        backupSections.apply(snapshot.sections, merge = false)
+        dao.restoreSnapshot(snapshot)
+        snapshot.sections["androidPreferences"]?.jsonObject?.let { preferencesStore.restorePortablePreferences(it) }
+    }
+    private fun writeSnapshot(file: java.io.File, snapshot: LocalCollectionSnapshot) {
+        val temp = java.io.File(file.path + ".tmp")
+        java.io.FileOutputStream(temp).use { output ->
+            output.write(Json.encodeToString(snapshot).toByteArray()); output.fd.sync()
+        }
+        check(temp.renameTo(file)) { "Could not create a recovery point; no data was imported" }
+    }
+
+    override suspend fun eraseLocalCardsAndBinders() = backupMutex.withLock {
+        startupRecovery.await()
+        check(preferencesStore.current().dataSourceMode == DataSourceMode.ON_DEVICE) { "Switch to on-device storage before erasing local cards." }
+        val before = dao.snapshot().copy(sections = withContext(Dispatchers.IO) { JsonObject(backupSections.snapshot() + ("androidPreferences" to preferencesStore.portablePreferences())) })
+        withContext(Dispatchers.IO) { writeSnapshot(recoveryFile, before); writeSnapshot(importJournal, before) }
+        try { dao.clearBinders(); withContext(Dispatchers.IO) { check(importJournal.delete()) } }
+        catch (error: Throwable) { withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { restoreLocalSnapshot(before); check(importJournal.delete()) }; throw error }
+    }
+
+    override suspend fun exportBackup(): String = withSource(
+        local = {
+            val sections = withContext(Dispatchers.IO) { backupSections.snapshot() }
+            val allSections = kotlinx.serialization.json.JsonObject(sections + ("androidPreferences" to preferencesStore.portablePreferences()) + ("androidSealedOpenings" to Json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(SealedOpeningEntity.serializer()), dao.getSealedOpenings())))
+            CollectionBackupJson.encode(CollectionBackupJson.create(getBinders(), getWishlists(), getSealedInventory()).copy(sections = allSections))
+        },
+        remote = { api, auth -> api.exportBackup(auth).toString() },
+    )
+
+    override suspend fun importBackup(raw: String) = backupMutex.withLock {
+        startupRecovery.await()
+        val backup = if (raw.trimStart().startsWith("{")) CollectionBackupJson.decode(raw) else parseCollectionCsv(raw)
+        if (preferencesStore.current().dataSourceMode == DataSourceMode.SERVER) {
+            withSource(local = { Unit }, remote = { api, auth -> api.importBackup(auth, Json.parseToJsonElement(CollectionBackupJson.encode(backup)).jsonObject); Unit })
+            return@withLock
+        }
+        withContext(Dispatchers.IO) { backupSections.validate(backup.sections) }
+        ensureLocalSealedCatalog()
+        val plan = backup.importPlan(dao.getSealedProducts())
+        val before = dao.snapshot().copy(sections = withContext(Dispatchers.IO) { backupSections.snapshot() }.let { kotlinx.serialization.json.JsonObject(it + ("androidPreferences" to preferencesStore.portablePreferences())) })
+        withContext(Dispatchers.IO) { writeSnapshot(recoveryFile, before); writeSnapshot(importJournal, before) }
+        try {
+            withContext(Dispatchers.IO) { backupSections.apply(backup.sections) }
+            dao.mergeSnapshot(plan)
+            backup.sections["preferences"]?.jsonObject?.let { preferencesStore.applyServerPreferences(it) }
+            backup.sections["androidPreferences"]?.jsonObject?.let { preferencesStore.restorePortablePreferences(it) }
+            withContext(Dispatchers.IO) { check(importJournal.delete()) { "Could not finish import" } }
+        } catch (error: Throwable) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { restoreLocalSnapshot(before); check(importJournal.delete()) { "Recovery journal could not be cleared" } }
+            throw error
+        }
+    }
+
+    override suspend fun restoreLatestRecoveryPoint() = backupMutex.withLock {
+        startupRecovery.await()
+        if (preferencesStore.current().dataSourceMode == DataSourceMode.SERVER) {
+            withSource(local = { Unit }, remote = { api, auth -> api.restoreBackup(auth); Unit })
+            return@withLock
+        }
+        val snapshot = withContext(Dispatchers.IO) { Json.decodeFromString<LocalCollectionSnapshot>(recoveryFile.readText()) }
+        val previous = dao.snapshot().copy(sections = withContext(Dispatchers.IO) { JsonObject(backupSections.snapshot() + ("androidPreferences" to preferencesStore.portablePreferences())) })
+        withContext(Dispatchers.IO) { writeSnapshot(importJournal, previous) }
+        try {
+            withContext(Dispatchers.IO) { restoreLocalSnapshot(snapshot); check(importJournal.delete()) }
+        } catch (error: Throwable) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { restoreLocalSnapshot(previous); check(importJournal.delete()) }
+            throw error
+        }
+    }
+
     private val downloadedArcFaceRecognizers = mutableMapOf<String, ArcFaceCardRecognizer>()
     @Volatile private var dinoV2Recognizer: DinoV2CardRecognizer? = null
     override suspend fun getBinders(): List<Binder> = withSource(
@@ -229,11 +324,16 @@ class DefaultTCGerRepository(
             dao.searchOwnedCards(query.trim())
                 .asSequence()
                 .filter { tcg == null || it.tcg == tcg }
-                .distinctBy { it.externalId }
+                .distinctBy { "${it.tcg}:${it.externalId}" }
                 .map(OwnedCardEntity::toCatalogCard)
                 .toList()
         },
         remote = { api, auth -> api.searchCards(auth, query.trim(), tcg).cards.map(CardDto::toDomain) },
+    )
+
+    override suspend fun cardPrints(card: CatalogCard): List<CatalogCard> = withSource(
+        local = { searchCards(card.name, card.tcg).filter { it.name.equals(card.name, true) } },
+        remote = { api, auth -> api.cardPrints(auth, card.tcg, card.id).prints.map(CardDto::toDomain) },
     )
 
     override suspend fun discoverCards(tcg: String?, count: Int): List<CatalogCard> = withSource(
@@ -242,7 +342,7 @@ class DefaultTCGerRepository(
                 .flatMap { it.cards }
                 .asSequence()
                 .filter { tcg == null || it.tcg == tcg }
-                .distinctBy { it.externalId }
+                .distinctBy { "${it.tcg}:${it.externalId}" }
                 .map(OwnedCardEntity::toCatalogCard)
                 .shuffled()
                 .take(count.coerceIn(1, 24))
@@ -533,30 +633,30 @@ class DefaultTCGerRepository(
         ).capture.toDomain()
     }
 
-    override suspend fun addCard(binderId: String, card: CatalogCard, quantity: Int) = withSource(
+    override suspend fun addCard(binderId: String, card: CatalogCard, quantity: Int): String? {
+        val condition = if (preferencesStore.current().dataSourceMode == DataSourceMode.ON_DEVICE) dao.getBinder(binderId)?.defaultCondition else null
+        return addCardWithDetails(binderId, card, quantity, CollectionEdit(condition = condition))
+    }
+
+    override suspend fun addCardWithDetails(binderId: String, card: CatalogCard, quantity: Int, edit: CollectionEdit): String? {
+        edit.validate()
+        require(quantity in 1..10000) { "Quantity must be between 1 and 10000" }
+        return withSource(
         local = {
-            val existing = dao.findOwnedCard(binderId, card.id)
             val binder = requireNotNull(dao.getBinder(binderId)) { "Binder not found" }
-            val copyId = existing?.id ?: UUID.randomUUID().toString()
-            dao.upsertOwnedCard(
+            val copies = List(quantity) {
                 OwnedCardEntity(
-                    id = copyId,
-                    binderId = binderId,
-                    externalId = card.id,
-                    name = card.name,
-                    tcg = card.tcg,
-                    setCode = card.setCode,
-                    setName = card.setName,
-                    rarity = card.rarity,
-                    collectorNumber = card.collectorNumber,
-                    imageUrl = card.imageUrl,
-                    quantity = (existing?.quantity ?: 0) + quantity.coerceAtLeast(1),
-                    condition = existing?.condition ?: binder.defaultCondition,
-                    price = existing?.price,
-                    createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                ),
-            )
-            copyId
+                    id = UUID.randomUUID().toString(), binderId = binderId,
+                    externalId = card.id, name = card.name, tcg = card.tcg,
+                    setCode = card.setCode, setName = card.setName, rarity = card.rarity,
+                    collectorNumber = card.collectorNumber, imageUrl = card.imageUrl,
+                    quantity = 1, condition = edit.condition,
+                    price = edit.price, acquisitionPrice = edit.acquisitionPrice,
+                    detailsJson = Json.encodeToString(edit.details), createdAt = System.currentTimeMillis(),
+                )
+            }
+            dao.insertCopies(copies)
+            copies.first().id
         },
         remote = { api, auth ->
             api.addCard(
@@ -564,7 +664,9 @@ class DefaultTCGerRepository(
                 binderId,
                 AddCardRequest(
                     cardId = card.id,
-                    quantity = quantity.coerceAtLeast(1),
+                    quantity = quantity,
+                    condition = edit.condition, price = edit.price, acquisitionPrice = edit.acquisitionPrice,
+                    details = edit.details,
                     cardData = CardDataRequest(
                         name = card.name,
                         tcg = card.tcg,
@@ -576,14 +678,81 @@ class DefaultTCGerRepository(
                         imageUrl = card.imageUrl,
                         imageUrlSmall = card.imageUrl,
                     ),
-                ),
+                ).payload(),
             ).createdCopyId
         },
     )
+    }
+
+    override suspend fun updateCard(binderId: String, copyId: String, edit: CollectionEdit, targetBinderId: String?) {
+        edit.validate()
+        withSource(
+            local = {
+                val existing = requireNotNull(dao.getOwnedCard(binderId, copyId)) { "Collection copy not found" }
+                val destination = targetBinderId ?: binderId
+                requireNotNull(dao.getBinder(destination)) { "Destination binder not found" }
+                dao.upsertOwnedCard(existing.copy(binderId = destination, condition = edit.condition,
+                    price = edit.price, acquisitionPrice = edit.acquisitionPrice, detailsJson = Json.encodeToString(edit.details)))
+            },
+            remote = { api, auth ->
+                val codec = Json { encodeDefaults = true; explicitNulls = true }
+                val payload = codec.encodeToJsonElement(edit.details).jsonObject.toMutableMap()
+                edit.details.acquiredAt?.takeIf { it.length == 10 }?.let { payload["acquiredAt"] = JsonPrimitive(java.time.LocalDate.parse(it).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toString()) }
+                payload.remove("imageUrls") // images are managed by the dedicated upload endpoint
+                payload["condition"] = edit.condition?.let(::JsonPrimitive) ?: JsonNull
+                payload["acquisitionPrice"] = edit.acquisitionPrice?.let(::JsonPrimitive) ?: JsonNull
+                payload["tags"] = JsonArray(edit.details.tags.filter { it.id.isNotBlank() }.map { JsonPrimitive(it.id) })
+                payload["newTags"] = JsonArray(edit.details.tags.filter { it.id.isBlank() }.map {
+                    buildJsonObject { put("label", it.label); put("colorHex", it.colorHex) }
+                })
+                targetBinderId?.let { payload["targetBinderId"] = JsonPrimitive(it) }
+                payload["scope"] = JsonPrimitive("copy")
+                api.updateCard(auth, binderId, copyId, JsonObject(payload))
+                Unit
+            },
+        )
+    }
 
     override suspend fun removeCard(binderId: String, ownedCardId: String) = withSource(
         local = { dao.deleteOwnedCard(binderId, ownedCardId) },
         remote = { api, auth -> api.removeCard(auth, binderId, ownedCardId) },
+    )
+
+    override suspend fun saveWishlistRule(wishlistId: String, rule: WishlistRule): WishlistRule {
+        rule.validate()
+        return withSource(
+            local = {
+                val wishlist = requireNotNull(dao.getWishlist(wishlistId))
+                val rules = Json.decodeFromString<List<WishlistRule>>(wishlist.rulesJson)
+                val saved = if (rule.id.isBlank()) rule.copy(id = UUID.randomUUID().toString()) else rule
+                dao.updateWishlist(wishlist.copy(rulesJson = Json.encodeToString(rules.filterNot { it.id == saved.id } + saved)))
+                saved
+            },
+            remote = { api, auth -> if (rule.id.isBlank()) api.addWishlistRule(auth, wishlistId, rule) else api.updateWishlistRule(auth, wishlistId, rule.id, rule) },
+        )
+    }
+
+    override suspend fun deleteWishlistRule(wishlistId: String, ruleId: String) = withSource(
+        local = {
+            val wishlist = requireNotNull(dao.getWishlist(wishlistId))
+            val rules = Json.decodeFromString<List<WishlistRule>>(wishlist.rulesJson)
+            dao.updateWishlist(wishlist.copy(rulesJson = Json.encodeToString(rules.filterNot { it.id == ruleId })))
+        }, remote = { api, auth -> api.deleteWishlistRule(auth, wishlistId, ruleId) },
+    )
+
+    override suspend fun resolveWishlistRule(rule: WishlistRule): List<CatalogCard> = withSource(
+        local = { dao.getBinders().flatMap { it.cards }.map(OwnedCardEntity::toCatalogCard).filter(rule::matches) },
+        remote = { api, auth ->
+            fun encode(value: String?) = java.net.URLEncoder.encode(value.orEmpty(), "UTF-8")
+            val unique = if (rule.includeAllPrintings) "prints" else "cards"
+            val path = when (rule.type) {
+                "set" -> "cards/sets/${encode(rule.tcg)}/${encode(rule.setCode)}"
+                "artist" -> "cards/search/artist?artist=${encode(rule.query)}&tcg=${encode(rule.tcg)}&unique=$unique&limit=1000"
+                "tag" -> "cards/search/tag?tag=${encode(rule.query)}&tcg=${encode(rule.tcg)}"
+                else -> "cards/search/all?query=${encode(rule.query)}&unique=$unique&limit=1000" + (rule.tcg?.let { "&tcg=${encode(it)}" } ?: "")
+            }
+            api.ruleCards(auth, path).cards.map(CardDto::toDomain)
+        },
     )
 
     override suspend fun getWishlists(): List<Wishlist> = withSource(
@@ -870,6 +1039,7 @@ class DefaultTCGerRepository(
         local: suspend () -> T,
         remote: suspend (com.ahmadjalil.tcger.data.remote.TCGerApi, String) -> T,
     ): T {
+        startupRecovery.await()
         val settings = preferencesStore.current()
         if (settings.dataSourceMode == DataSourceMode.ON_DEVICE) return local()
         val token = requireNotNull(settings.authToken) { "Sign in to the configured server first" }
@@ -879,6 +1049,7 @@ class DefaultTCGerRepository(
     private suspend fun <T> withServer(
         block: suspend (com.ahmadjalil.tcger.data.remote.TCGerApi, String) -> T,
     ): T {
+        startupRecovery.await()
         val settings = preferencesStore.current()
         val token = requireNotNull(settings.authToken) { "Sign in to the configured server first" }
         require(settings.serverUrl.isNotBlank()) { "Configure a scanner server first" }
@@ -909,7 +1080,7 @@ private fun BinderWithCards.toDomain() = Binder(
     associatedSetCode = binder.associatedSetCode,
     associatedSetName = binder.associatedSetName,
     cards = cards.map { entity ->
-        OwnedCard(entity.id, entity.binderId, entity.toCatalogCard(), entity.quantity, entity.condition, entity.price)
+        OwnedCard(entity.id, entity.binderId, entity.toCatalogCard(), entity.quantity, entity.condition, entity.price, entity.acquisitionPrice, Json { ignoreUnknownKeys = true }.decodeFromString<CollectionDetails>(entity.detailsJson))
     },
     createdAt = binder.createdAt,
     updatedAt = binder.updatedAt,
@@ -921,6 +1092,7 @@ private suspend fun WishlistWithCards.toDomain(dao: TCGerDao) = Wishlist(
     description = wishlist.description,
     colorHex = wishlist.colorHex,
     matchAnyPrinting = wishlist.matchAnyPrinting,
+    rules = Json.decodeFromString(wishlist.rulesJson),
     cards = cards.map { entity ->
         WishlistCard(
             id = entity.id,
@@ -938,7 +1110,7 @@ private suspend fun WishlistWithCards.toDomain(dao: TCGerDao) = Wishlist(
             ownedQuantity = if (wishlist.matchAnyPrinting) {
                 dao.ownedQuantityForAnyPrinting(entity.tcg, entity.name)
             } else {
-                dao.ownedQuantity(entity.externalId)
+                dao.ownedQuantity(entity.tcg, entity.externalId)
             },
             notes = entity.notes,
         )
@@ -956,6 +1128,8 @@ private fun CardDto.toDomain() = CatalogCard(
     imageUrl = imageUrlSmall ?: imageUrl,
     artist = artist,
     supertype = supertype,
+    setSymbolUrl = setSymbolUrl,
+    setLogoUrl = setLogoUrl,
     attributes = attributes.orEmpty().mapValues { (_, value) ->
         when (value) {
             is kotlinx.serialization.json.JsonArray -> value.mapNotNull {
@@ -1065,7 +1239,7 @@ private fun ScanDebugCaptureSummaryDto.toDomain() = ScanDebugCapture(
     ).distinct(),
 )
 
-private fun BinderDto.toDomain() = Binder(
+internal fun BinderDto.toDomain() = Binder(
     id = id,
     name = name,
     description = description,
@@ -1076,7 +1250,7 @@ private fun BinderDto.toDomain() = Binder(
     associatedTcg = associatedTcg,
     associatedSetCode = associatedSetCode,
     associatedSetName = associatedSetName,
-    cards = cards.map { remote ->
+    cards = cards.flatMap { remote ->
         val catalog = CatalogCard(
             remote.externalId ?: remote.cardId ?: remote.id,
             remote.name,
@@ -1087,7 +1261,8 @@ private fun BinderDto.toDomain() = Binder(
             remote.collectorNumber,
             remote.imageUrlSmall ?: remote.imageUrl,
         )
-        OwnedCard(remote.id, id, catalog, remote.quantity, remote.condition, remote.price, remote.acquisitionPrice)
+        if (remote.copies.isEmpty()) listOf(OwnedCard(remote.id, id, catalog, remote.quantity, remote.condition, remote.price, remote.acquisitionPrice))
+        else remote.copies.map { copy -> OwnedCard(copy.id, id, catalog, 1, copy.condition, copy.price, copy.acquisitionPrice, copy.details()) }
     },
 )
 
@@ -1106,6 +1281,7 @@ private fun WishlistDto.toDomain() = Wishlist(
     description = description,
     colorHex = colorHex ?: "C43D73",
     matchAnyPrinting = matchAnyPrinting,
+    rules = rules,
     cards = cards.map { remote ->
         WishlistCard(
             id = remote.id,

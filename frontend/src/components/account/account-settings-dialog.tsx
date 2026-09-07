@@ -1,5 +1,8 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
+import { BackupPanel } from "./backup-panel";
 import {
   useCallback,
   useEffect,
@@ -553,7 +556,7 @@ export function AccountSettingsDialog({
                             {icon ? (
                               <Image
                                 src={icon}
-                                alt={GAME_LABELS[game]}
+                                alt={gameLabel(game)}
                                 width={16}
                                 height={16}
                                 className="dark:invert"
@@ -566,13 +569,13 @@ export function AccountSettingsDialog({
                               className="text-sm font-medium"
                               data-oid="8g2aev:"
                             >
-                              {GAME_LABELS[game]}
+                              {gameLabel(game)}
                             </p>
                             <p
                               className="text-xs text-muted-foreground"
                               data-oid="9ohefc8"
                             >
-                              Include {GAME_LABELS[game]} in global search and
+                              Include {gameLabel(game)} in global search and
                               analytics.
                             </p>
                           </div>
@@ -581,7 +584,7 @@ export function AccountSettingsDialog({
                           checked={enabled}
                           disabled={updatingGame === game}
                           onCheckedChange={() => handleGameToggle(game)}
-                          aria-label={`Toggle ${GAME_LABELS[game]}`}
+                          aria-label={`Toggle ${gameLabel(game)}`}
                           data-oid="3ja.f.:"
                         />
                       </div>
@@ -1037,6 +1040,9 @@ export function AccountSettingsDialog({
                   )}
                 </>
               )}
+
+              <Separator />
+              <BackupPanel token={token} />
 
               {isDemoMode() && (
                 <>

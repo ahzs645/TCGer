@@ -1,5 +1,9 @@
 import type { Router as ExpressRouter, Express } from 'express';
 
+import { Router, json as parseJson } from 'express';
+import { requireAuth, type AuthRequest } from '../middleware/auth';
+import { proxyToConvexHttp } from './convex-http.proxy';
+
 import { authRouter, setupRouter } from './auth.router';
 import { cardsRouter } from './cards.router';
 import { env } from '../../config/env';
@@ -95,6 +99,17 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.use('/', docsRouter);
   app.use('/health', healthRouter);
+  const backupsRouter = Router();
+  backupsRouter.use(requireAuth);
+  backupsRouter.use((_req, res, next) => {
+    if (env.BACKEND_MODE !== 'convex') {
+      res.status(409).json({ error: 'Portable server backups require the unified Convex backend. Export each legacy collection before migrating.' });
+      return;
+    }
+    next();
+  });
+  backupsRouter.use((req, res, next) => proxyToConvexHttp(req as AuthRequest, res).catch(next));
+  app.use('/backups', parseJson({ limit: '48mb' }), backupsRouter);
   app.use('/auth', authRouter);
   app.use('/setup', setupRouter);
   app.use('/settings', settingsRouter);

@@ -1,18 +1,26 @@
 import SwiftUI
+import UIKit
 
 struct PokemonRarityBadge: View {
     let rarity: String
     let tcg: String
     var artworkSize: CGFloat = 14
+    var symbol: GameSymbol? = nil
+
+    private var displayRarity: String {
+        symbol?.label ?? CardRarityDisplay.name(for: rarity)
+    }
 
     var body: some View {
         HStack(spacing: 4) {
-            if tcg.lowercased() == "pokemon",
+            if let symbol, let url = URL(string: symbol.imageUrl) {
+                AsyncImage(url: url) { image in image.resizable().scaledToFit() } placeholder: { Color.clear }.frame(width: artworkSize, height: artworkSize)
+            } else if tcg.lowercased() == "pokemon",
                PokemonRarityArtworkCatalog.artwork(for: rarity) != nil {
                 PokemonRarityArtworkView(rarity: rarity, size: artworkSize)
             }
 
-            Text(rarity)
+            Text(displayRarity)
                 .lineLimit(1)
         }
         .font(.caption2)
@@ -23,38 +31,32 @@ struct PokemonRarityBadge: View {
         .foregroundStyle(Color.accentColor)
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Rarity: \(rarity)")
+        .accessibilityLabel("Rarity: \(displayRarity)")
     }
 }
 
 private struct PokemonRarityArtworkView: View {
     let rarity: String
     let size: CGFloat
-    @State private var artworkIndex = 0
 
-    private var artworkURLs: [URL] {
-        guard let artwork = PokemonRarityArtworkCatalog.artwork(for: rarity) else {
-            return []
-        }
-
-        var urls: [URL] = []
-        if let localURL = Self.resourceURL(for: artwork.vectorFilename) {
-            urls.append(localURL)
-        }
-        if let remoteURL = Self.remoteURL(for: artwork.vectorFilename) {
-            urls.append(remoteURL)
-        }
-        return urls
+    private var artwork: PokemonRarityArtworkAsset? {
+        PokemonRarityArtworkCatalog.artwork(for: rarity)
     }
 
-    private var artworkURL: URL? {
-        artworkURLs.indices.contains(artworkIndex) ? artworkURLs[artworkIndex] : nil
+    private var bundledAssetExists: Bool {
+        artwork.flatMap { UIImage(named: $0.assetName) } != nil
     }
 
     var body: some View {
         Group {
-            if let artworkURL {
-                CachedAsyncImage(url: artworkURL) { phase in
+            if let artwork, bundledAssetExists {
+                Image(artwork.assetName)
+                    .renderingMode(.original)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else if let artwork,
+                      let fallbackURL = Self.remoteURL(for: artwork.fallbackFilename) {
+                CachedAsyncImage(url: fallbackURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -62,11 +64,6 @@ private struct PokemonRarityArtworkView: View {
                             .aspectRatio(contentMode: .fit)
                     case .failure:
                         Color.clear
-                            .onAppear {
-                                if artworkIndex + 1 < artworkURLs.count {
-                                    artworkIndex += 1
-                                }
-                            }
                     case .empty:
                         Color.clear
                     @unknown default:
@@ -76,33 +73,36 @@ private struct PokemonRarityArtworkView: View {
             }
         }
         .frame(width: size, height: size)
-        .padding(1)
-        .background(Color.white.opacity(0.95))
-        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
         .accessibilityHidden(true)
-        .onChange(of: rarity) {
-            artworkIndex = 0
-        }
     }
 
-    private static func resourceURL(for filename: String) -> URL? {
-        if let resourceURL = Bundle.main.resourceURL {
-            let nested = resourceURL
-                .appendingPathComponent("PokemonRarities", isDirectory: true)
-                .appendingPathComponent(filename, isDirectory: false)
-            if FileManager.default.fileExists(atPath: nested.path) {
-                return nested
-            }
-        }
-        return Bundle.main.url(forResource: filename, withExtension: nil)
-    }
-
-    /// Content-addressed CDN fallback for a known rarity whose bundled SVG is
-    /// missing or cannot be decoded. Unknown rarity labels remain text-only so
-    /// the app never guesses at the wrong official symbol.
+    /// Content-addressed PNG fallback for a known rarity whose compiled asset is
+    /// unexpectedly unavailable. Normal rendering stays native and synchronous.
     private static func remoteURL(for filename: String) -> URL? {
         URL(
             string: "https://assets.tcger.ahmadjalil.com/catalogs/pokemon-rarity-symbols/\(filename)"
         )
     }
+}
+
+#Preview("Pokémon rarity badges") {
+    VStack(alignment: .leading, spacing: 8) {
+        ForEach(
+            [
+                "Common",
+                "Uncommon",
+                "Rare",
+                "Rare Holo",
+                "Amazing Rare",
+                "Shiny Rare",
+                "Shiny Ultra Rare",
+                "Ultra Rare",
+                "Promo"
+            ],
+            id: \.self
+        ) { rarity in
+            PokemonRarityBadge(rarity: rarity, tcg: "pokemon")
+        }
+    }
+    .padding()
 }

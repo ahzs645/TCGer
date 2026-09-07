@@ -160,6 +160,7 @@ struct LocalDataBackupImportButton: View {
             if let appPreferences {
                 environmentStore.applyLocalDataBackupPreferences(appPreferences)
             }
+            if let folders = try LocalStore.shared.importedPortableSmartFolders() { environmentStore.smartFolders = folders }
             onRestored(pending.summary)
             DispatchQueue.main.async {
                 activeAlert = .status(LocalDataBackupStatus(

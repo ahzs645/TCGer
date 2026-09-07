@@ -1422,7 +1422,7 @@ private struct BinderCardDetectionDetailView: View {
             }
         }
         .sheet(isPresented: $showingCardSearch) {
-            BinderCardMatchSearchView(mode: mode, capturedCard: detection.crop) { card in
+            ScannerCardMatchSearchView(mode: mode, capturedCard: detection.crop) { card in
                 applyManualMatch(details: CardDetails(card: card))
                 showingCardSearch = false
             }
@@ -1613,7 +1613,7 @@ private struct BinderCardDetectionDetailView: View {
     }
 }
 
-private struct BinderCardMatchSearchView: View {
+struct ScannerCardMatchSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var environmentStore: EnvironmentStore
 

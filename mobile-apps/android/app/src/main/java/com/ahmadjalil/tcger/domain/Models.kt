@@ -15,6 +15,8 @@ data class CatalogCard(
     val artist: String? = null,
     val supertype: String? = null,
     val attributes: Map<String, List<String>> = emptyMap(),
+    val setSymbolUrl: String? = null,
+    val setLogoUrl: String? = null,
 )
 
 enum class CardScanSource { SERVER_IMAGE_MATCH, ON_DEVICE_EMBEDDING, ON_DEVICE_TEXT }
@@ -114,6 +116,7 @@ data class OwnedCard(
     val condition: String? = null,
     val price: Double? = null,
     val acquisitionPrice: Double? = null,
+    val details: CollectionDetails = CollectionDetails(),
 )
 
 data class Binder(
@@ -131,7 +134,7 @@ data class Binder(
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
 ) {
-    val uniqueCards: Int get() = cards.size
+    val uniqueCards: Int get() = cards.map { it.card.identity() }.distinct().size
     val totalCopies: Int get() = cards.sumOf(OwnedCard::quantity)
     val totalValue: Double get() = cards.sumOf { (it.price ?: 0.0) * it.quantity }
 }
@@ -193,6 +196,7 @@ data class Wishlist(
     val colorHex: String = "C43D73",
     val matchAnyPrinting: Boolean = false,
     val cards: List<WishlistCard> = emptyList(),
+    val rules: List<WishlistRule> = emptyList(),
 ) {
     val ownedCards: Int get() = cards.count { it.ownedQuantity > 0 }
     val completionPercent: Int
@@ -212,6 +216,7 @@ data class WishlistInput(
     )
 }
 
+@kotlinx.serialization.Serializable
 data class SealedProduct(
     val id: String,
     val tcg: String,
@@ -291,6 +296,8 @@ fun List<Binder>.dashboardStats() = DashboardStats(
 enum class DataSourceMode { ON_DEVICE, SERVER }
 
 data class AppPreferences(
+    val setupComplete: Boolean = false,
+    val sealedProductsEnabled: Boolean = true,
     val dataSourceMode: DataSourceMode = DataSourceMode.ON_DEVICE,
     val serverUrl: String = "",
     val authToken: String? = null,
@@ -358,8 +365,20 @@ enum class BottomNavigationItem {
 
     val isPinned: Boolean get() = this == SETTINGS
 
+    fun isSupportedBy(features: Map<String, Boolean>): Boolean {
+        val feature = when (this) { DECKS -> "decks"; TRADES -> "trades"; ACTIVITY -> "notifications"; SEALED -> "sealed"; CODES -> "onlineCodes"; PRICES -> "prices"; ANALYTICS -> "analytics"; else -> null }
+        return feature == null || features[feature] != false
+    }
+
+    fun isAvailable(server: Boolean, pokedex: Boolean, sealed: Boolean): Boolean = when (this) {
+        DECKS, TRADES, ACTIVITY -> server
+        POKEDEX -> pokedex
+        SEALED -> sealed
+        else -> true
+    }
+
     companion object {
-        val defaultOrder: List<BottomNavigationItem> = entries.toList()
+        val defaultOrder: List<BottomNavigationItem> = listOf(HOME, COLLECTIONS, SEARCH, SCAN) + entries.filterNot { it in setOf(HOME, COLLECTIONS, SEARCH, SCAN) }
 
         fun normalizedOrder(rawValues: Iterable<String>): List<BottomNavigationItem> {
             val seen = mutableSetOf<BottomNavigationItem>()
@@ -387,14 +406,14 @@ enum class BottomNavigationItem {
     }
 }
 
-data class BottomNavigationLayout(val items: List<BottomNavigationItem>) {
-    val primaryItems: List<BottomNavigationItem> = if (items.size > MAX_VISIBLE_ITEMS) {
-        items.take(MAX_VISIBLE_ITEMS - 1)
+data class BottomNavigationLayout(val items: List<BottomNavigationItem>, val maxVisibleItems: Int = MAX_VISIBLE_ITEMS) {
+    val primaryItems: List<BottomNavigationItem> = if (items.size > maxVisibleItems) {
+        items.take(maxVisibleItems - 1)
     } else {
         items
     }
-    val overflowItems: List<BottomNavigationItem> = if (items.size > MAX_VISIBLE_ITEMS) {
-        items.drop(MAX_VISIBLE_ITEMS - 1)
+    val overflowItems: List<BottomNavigationItem> = if (items.size > maxVisibleItems) {
+        items.drop(maxVisibleItems - 1)
     } else {
         emptyList()
     }
@@ -406,6 +425,6 @@ data class BottomNavigationLayout(val items: List<BottomNavigationItem>) {
 }
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
-enum class AccentChoice { BLUE, GREEN, ORANGE, PURPLE, RED, TEAL }
+enum class AccentChoice { SYSTEM, BLUE, GREEN, ORANGE, PURPLE, RED, TEAL }
 
 data class SignInResult(val username: String, val token: String, val userId: String? = null)

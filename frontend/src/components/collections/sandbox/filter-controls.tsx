@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,7 +96,7 @@ export function FilterControls({
           <SelectTrigger aria-label="Collection game"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All games</SelectItem>
-            {availableGames.map((game) => <SelectItem key={game} value={game}>{GAME_LABELS[game]}</SelectItem>)}
+            {availableGames.map((game) => <SelectItem key={game} value={game}>{gameLabel(game)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

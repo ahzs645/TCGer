@@ -481,15 +481,6 @@ private struct PackCardBrowser<Header: View>: View {
                     .padding(16)
                 }
             }
-
-            Divider()
-
-            Text("Showing \(filteredCards.count) of \(pool.cards.count) cards")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .background(.regularMaterial)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .searchable(

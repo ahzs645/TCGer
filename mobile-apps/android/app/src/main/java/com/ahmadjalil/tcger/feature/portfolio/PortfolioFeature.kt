@@ -130,7 +130,14 @@ data class PricePortfolio(
     val refreshedAt: String? = null,
     val refreshAfter: String? = null,
     val warning: String? = null,
-) { val totalValue: Double get() = cards.sumOf(TrackedCard::totalValue) }
+ ) {
+    val totalsByCurrency: Map<String, Double> get() = cards.groupBy { it.currency.uppercase() }
+        .mapValues { (_, cards) -> cards.sumOf(TrackedCard::totalValue) }
+    val totalValue: Double get() {
+        require(totalsByCurrency.size <= 1) { "Mixed currencies require separate totals" }
+        return totalsByCurrency.values.singleOrNull() ?: 0.0
+    }
+}
 
 data class CostBasisCoverage(
     val totalCopies: Int,
@@ -165,12 +172,14 @@ class DefaultPortfolioRepository(
     private val connection: PortfolioConnection,
     private val client: OkHttpClient = OkHttpClient(),
     private val priceSourceResolver: (String) -> String = { "automatic" },
+    private val localPricing: (suspend (List<Binder>, PricePortfolio) -> PricePortfolio)? = null,
 ) : PortfolioRepository {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
 
     override suspend fun prices(binders: List<Binder>, force: Boolean): PricePortfolio {
         val local = buildLocalPricePortfolio(binders)
-        if (connection.serverUrl.isBlank() || connection.authToken.isNullOrBlank() || local.cards.isEmpty()) return local
+        if (local.cards.isEmpty()) return local
+        if (connection.serverUrl.isBlank() || connection.authToken.isNullOrBlank()) return if (force && localPricing != null) localPricing.invoke(binders, local) else local
         return runCatching {
             val items = local.cards.map { TrackedPriceItem(it.tcg, it.externalId) }.distinct()
             val responses = items.groupBy { priceSourceResolver(it.tcg) }.map { (source, sourceItems) ->
@@ -295,7 +304,7 @@ fun buildLocalAnalytics(binders: List<Binder>, period: AnalyticsPeriod): Analyti
     )
 }
 
-fun priceKey(tcg: String, externalId: String) = "${tcg.trim().lowercase()}:${externalId.trim().lowercase()}"
+fun priceKey(tcg: String, externalId: String) = "${tcg.trim().lowercase()}:${externalId.trim()}"
 
 fun formatPortfolioMoney(value: Double, currency: String = "USD"): String =
     runCatching { java.text.NumberFormat.getCurrencyInstance().apply { this.currency = java.util.Currency.getInstance(currency) }.format(value) }

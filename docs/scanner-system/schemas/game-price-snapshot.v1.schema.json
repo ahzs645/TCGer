@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "game-price-snapshot.v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "tcger-price-snapshot-v1"
+    },
+    "gameId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "quotes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "printingKey": {
+            "type": "string"
+          },
+          "finishCode": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "cardId",
+          "amount",
+          "currency",
+          "source",
+          "observedAt",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 1000000
+    }
+  },
+  "required": [
+    "schema",
+    "gameId",
+    "quotes"
+  ],
+  "additionalProperties": false
+}

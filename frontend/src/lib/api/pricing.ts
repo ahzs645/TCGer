@@ -17,6 +17,7 @@ import type {
   PriceSource,
   PriceSourcesResponse,
 } from "@tcg/api-types";
+import { packageTrackedPrices } from "../pricing/package-prices";
 import { API_BASE_URL } from "./base-url";
 
 export type {
@@ -198,7 +199,9 @@ export async function getTrackedCardPrices(
   force = false,
   source: PriceSource = "automatic",
 ): Promise<TrackedPricesResponse> {
-  const responses: TrackedPricesResponse[] = [];
+  const packages = source === "automatic" ? await packageTrackedPrices(items) : { remaining: items, response: undefined };
+  items = packages.remaining;
+  const responses: TrackedPricesResponse[] = packages.response ? [packages.response] : [];
   for (let index = 0; index < items.length; index += 100) {
     responses.push(
       await authFetch(`${API_BASE_URL}/prices/tracked`, token, {

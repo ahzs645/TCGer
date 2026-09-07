@@ -6,7 +6,7 @@ import type {
   CollectionImportRequest,
   CollectionImportResult,
 } from '@tcg/api-types';
-import { tcgCodeSchema } from '@tcg/api-types';
+import { tcgCodeSchema, getGameDefinitionOrDefault } from '@tcg/api-types';
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '../../lib/prisma';
@@ -586,7 +586,8 @@ export async function commitCollectionImport(
     const gamesByCode = new Map(games.map((game) => [game.code, game]));
     for (const row of preview.rows) {
       if (!gamesByCode.has(row.tcg)) {
-        throw new Error(`TCG game "${row.tcg}" is not configured`);
+        const game = await tx.tcgGame.upsert({ where: { code: row.tcg }, create: { code: row.tcg, displayName: getGameDefinitionOrDefault(row.tcg).label }, update: {} });
+        gamesByCode.set(game.code, game);
       }
     }
 

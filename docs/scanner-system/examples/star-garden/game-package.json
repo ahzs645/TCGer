@@ -1,0 +1,159 @@
+{
+  "schema": "https://tcger.app/schemas/game-package-manifest/v2",
+  "packageId": "star-garden",
+  "packageVersion": "1",
+  "publishedAt": "2026-09-01T00:00:00Z",
+  "game": {
+    "id": "star-garden",
+    "name": "Star Garden"
+  },
+  "publisher": {
+    "id": "tcger-fixtures",
+    "name": "TCGer fixtures"
+  },
+  "catalog": {
+    "schema": "tcger-catalog-v1",
+    "asset": {
+      "url": "cards.json",
+      "bytes": 1777,
+      "sha256": "8d2c322c61787e56c799060b328a8eff4dd1407e7807aca33a301b0bf74aa1ff"
+    },
+    "cardCount": 3,
+    "setCount": 1
+  },
+  "filters": [],
+  "definition": {
+    "id": "star-garden",
+    "label": "Star Garden",
+    "deckRules": {
+      "version": 1,
+      "defaultFormat": "duel",
+      "formats": [
+        {
+          "id": "duel",
+          "label": "Garden Duel",
+          "zones": [
+            {
+              "id": "captain",
+              "label": "Captain",
+              "min": 1,
+              "max": 1,
+              "eligibility": [
+                {
+                  "property": "attributes.role",
+                  "values": [
+                    "captain"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "lineup",
+              "label": "Lineup",
+              "min": 2,
+              "max": 4
+            }
+          ],
+          "defaultZone": "lineup",
+          "maxCopies": 2,
+          "copyIdentity": "baseExternalId",
+          "requireLegality": true
+        }
+      ]
+    },
+    "printings": {
+      "version": 1,
+      "selection": "printing",
+      "finishes": [
+        {
+          "code": "matte",
+          "label": "Matte petal",
+          "foil": false
+        },
+        {
+          "code": "moon-glow",
+          "label": "Moon glow",
+          "foil": true
+        }
+      ]
+    },
+    "interfaces": {
+      "search": true,
+      "collection": true,
+      "sets": true,
+      "wishlists": true,
+      "decks": true,
+      "pricing": true,
+      "sealedProducts": false,
+      "scanner": false,
+      "packOpening": true,
+      "features": []
+    },
+    "collection": {
+      "identityModes": [
+        {
+          "id": "consolidated",
+          "label": "Consolidated",
+          "description": "Group every printing by the underlying card identity.",
+          "key": "baseExternalId"
+        },
+        {
+          "id": "collector",
+          "label": "Collector",
+          "description": "Keep exact sets, rarities, artwork, and variants separate.",
+          "key": "printingKey"
+        }
+      ],
+      "defaultIdentityMode": "collector",
+      "facets": [
+        {
+          "id": "language",
+          "label": "Language",
+          "property": "copies.language",
+          "type": "multiSelect"
+        },
+        {
+          "id": "edition",
+          "label": "Edition",
+          "property": "copies.edition",
+          "type": "multiSelect"
+        },
+        {
+          "id": "owned-quantity",
+          "label": "Owned quantity",
+          "property": "quantity",
+          "type": "numberRange",
+          "min": 0,
+          "max": 999,
+          "step": 1
+        }
+      ]
+    },
+    "search": {
+      "facets": [
+        {
+          "id": "duel",
+          "label": "Duel legal",
+          "property": "formatLegality.duel",
+          "type": "boolean"
+        }
+      ]
+    }
+  },
+  "pricing": {
+    "schema": "tcger-price-snapshot-v1",
+    "asset": {
+      "url": "prices.json",
+      "bytes": 1069,
+      "sha256": "156f3238031ffc30300c74d407bcda21dc652cf6f7c7a56168a661e7354b739f"
+    }
+  },
+  "offlinePacks": {
+    "schema": "tcger-pack-library-v1",
+    "manifest": {
+      "url": "packs.json",
+      "bytes": 661,
+      "sha256": "c188720735b3fa5f67c4e309feec686e184d7cd8c2780c7d511da419b4150fe2"
+    }
+  }
+}

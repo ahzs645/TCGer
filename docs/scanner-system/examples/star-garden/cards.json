@@ -1,0 +1,85 @@
+{
+  "formatVersion": 1,
+  "tcg": "star-garden",
+  "cards": [
+    {
+      "id": "captain-1",
+      "baseExternalId": "captain",
+      "printingKey": "captain-1",
+      "name": "Orchid Captain",
+      "rarity": "bloom",
+      "attributes": {
+        "role": "captain"
+      },
+      "setCode": "SG1",
+      "setName": "First Garden",
+      "collectorNumber": "1",
+      "sanctionedPlayLegal": true,
+      "formatLegality": {
+        "duel": true
+      },
+      "legalityPeriods": [
+        {
+          "format": "duel",
+          "legal": true,
+          "validFrom": "2026-09-01"
+        }
+      ]
+    },
+    {
+      "id": "scout-1",
+      "baseExternalId": "scout",
+      "printingKey": "scout-1",
+      "name": "Moonseed Scout",
+      "rarity": "seed",
+      "attributes": {
+        "role": "unit"
+      },
+      "setCode": "SG1",
+      "setName": "First Garden",
+      "collectorNumber": "2",
+      "sanctionedPlayLegal": true,
+      "formatLegality": {
+        "duel": true
+      },
+      "legalityPeriods": [
+        {
+          "format": "duel",
+          "legal": true,
+          "validFrom": "2026-09-01"
+        }
+      ]
+    },
+    {
+      "id": "scout-2",
+      "baseExternalId": "scout",
+      "printingKey": "scout-2",
+      "name": "Moonseed Scout",
+      "rarity": "bloom",
+      "attributes": {
+        "role": "unit"
+      },
+      "setCode": "SG1",
+      "setName": "First Garden",
+      "collectorNumber": "3",
+      "sanctionedPlayLegal": true,
+      "formatLegality": {
+        "duel": true
+      },
+      "legalityPeriods": [
+        {
+          "format": "duel",
+          "legal": true,
+          "validFrom": "2026-09-01"
+        }
+      ]
+    }
+  ],
+  "sets": [
+    {
+      "code": "SG1",
+      "name": "First Garden",
+      "cardCount": 3
+    }
+  ]
+}

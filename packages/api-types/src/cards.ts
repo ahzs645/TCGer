@@ -13,8 +13,8 @@ export const TCG_CODES = [
   'lorcana',
   'dragonball'
 ] as const;
-export const tcgCodeSchema = z.enum(TCG_CODES);
-export type TcgCode = z.infer<typeof tcgCodeSchema>;
+export const builtInTcgCodeSchema = z.enum(TCG_CODES);
+export type BuiltInTcgCode = z.infer<typeof builtInTcgCodeSchema>;
 
 /**
  * Stable game identifier used by generic catalog, collection, and package
@@ -28,6 +28,15 @@ export const gameIdSchema = z
   .max(64)
   .regex(/^[a-z0-9][a-z0-9-]*$/);
 export type GameId = z.infer<typeof gameIdSchema>;
+
+/** Compatibility names for game-qualified records. Only provider discovery
+ * should use the closed builtInTcgCodeSchema; owned data accepts every game. */
+export const tcgCodeSchema = gameIdSchema;
+export type TcgCode = BuiltInTcgCode | (string & {});
+
+export function isBuiltInGame(value: unknown): value is BuiltInTcgCode {
+  return builtInTcgCodeSchema.safeParse(value).success;
+}
 
 /**
  * Finish codes are deliberately open-ended. Providers already expose more
@@ -81,7 +90,7 @@ export const pokemonPrintMetadataSchema = z.object({
   category: z.string().optional(),
   regulationMark: z.string().optional(),
   language: z.string().optional(),
-  formatLegality: pokemonFormatLegalitySchema.optional(),
+  formatLegality: z.record(z.boolean().optional()).optional(),
   dexEntries: z.array(pokedexEntrySchema).optional(),
   region: z.string().optional(),
   worldChampionship: pokemonWorldChampionshipPrintSchema.optional()
@@ -184,7 +193,7 @@ export const cardSchema = z.object({
   regulationMark: z.string().optional(),
   language: z.string().optional(),
   supertype: z.string().optional(),
-  formatLegality: pokemonFormatLegalitySchema.optional(),
+  formatLegality: z.record(z.boolean().optional()).optional(),
   dexEntries: z.array(pokedexEntrySchema).optional(),
   region: z.string().optional(),
   pokemonPrint: pokemonPrintMetadataSchema.optional(),

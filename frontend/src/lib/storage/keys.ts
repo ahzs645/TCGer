@@ -243,6 +243,7 @@ export const SCAN_CACHE_EMBEDDING_STORE = "embeddingIndex";
  * Cleared: same consequence as {@link DEMO_STORE_STORAGE_KEY} — the demo
  * collection is gone and re-seeds from fixtures.
  */
+export const SCANNER_REVIEW_DB_NAME = "tcger-scanner-review";
 export const DEMO_DB_NAME = "tcger-demo";
 
 /**
@@ -264,6 +265,7 @@ export const TESSERACT_CACHE_DB_NAME = "keyval-store";
 
 /** Every fixed localStorage key TCGer's origin owns. */
 export const LOCAL_STORAGE_KEYS = [
+  "tcger.scanner.developer",
   DEMO_MODE_STORAGE_KEY,
   AUTH_STORE_STORAGE_KEY,
   DEMO_STORE_STORAGE_KEY,
@@ -289,6 +291,7 @@ export const LOCAL_STORAGE_KEY_PREFIXES = [
 
 /** Every IndexedDB database on TCGer's origin, including the third-party one. */
 export const INDEXED_DB_NAMES = [
+  SCANNER_REVIEW_DB_NAME,
   CATALOG_DB_NAME,
   SCAN_CACHE_DB_NAME,
   DEMO_DB_NAME,

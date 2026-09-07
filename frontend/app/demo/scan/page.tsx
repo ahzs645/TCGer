@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { ScannerWorkbench } from "@/components/scan/scanner-workbench";
 import { VideoScanLab } from "@/components/scan/video-scan-lab";
 import { Badge } from "@/components/ui/badge";
 
@@ -26,6 +27,7 @@ export default function DemoScanPage() {
             TCGer&apos;s asset CDN and caches them for later runs.
           </p>
         </div>
+        <ScannerWorkbench />
         <VideoScanLab />
       </div>
     </AppShell>

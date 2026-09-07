@@ -101,6 +101,9 @@ final class CardScannerViewModel: ObservableObject {
     @Published var cropRescueRequest: ScannerCropRescueRequest? {
         didSet { syncCameraOverlayState() }
     }
+    @Published var manualMatchRequest: ScannerManualMatchRequest? {
+        didSet { syncCameraOverlayState() }
+    }
     // Off by default: debug captures upload the scan image + crops for training.
     // Opt-in via the testing tools rather than silently shipping every scan.
     @Published var saveDebugCapture = false {
@@ -110,6 +113,7 @@ final class CardScannerViewModel: ObservableObject {
         didSet { rebuildContext() }
     }
     private(set) var scanScope: CardScanScope?
+    private var pendingManualMatchRequest: ScannerManualMatchRequest?
 
     /// Selects an explicit Yu-Gi-Oh deck gallery. Passing nil restores the full
     /// catalog. A deck selection also selects Yu-Gi-Oh mode so the restricted
@@ -222,7 +226,7 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     private var isOverlayCoveringPreview: Bool {
-        latestResult != nil || binderReviewPresentation != nil || cropRescueRequest != nil
+        latestResult != nil || binderReviewPresentation != nil || cropRescueRequest != nil || manualMatchRequest != nil
     }
 
     /// Pushes the overlay state into the camera the moment it changes, so
@@ -470,6 +474,7 @@ final class CardScannerViewModel: ObservableObject {
 
         isProcessingPhoto = true
         state = .processing
+        pendingManualMatchRequest = nil
         defer { isProcessingPhoto = false }
 
         await awaitRecognitionPreparation()
@@ -543,6 +548,7 @@ final class CardScannerViewModel: ObservableObject {
         }
         apply(
             result,
+            manualMatchImage: source == .livePreview ? nil : image,
             rescueInput: allowsCropRescue
                 && source != .livePreview
                 && ScannerDevModeStore.isCropRescueEnabled
@@ -728,6 +734,7 @@ final class CardScannerViewModel: ObservableObject {
     func clearResult() {
         latestResult = nil
         errorMessage = nil
+        pendingManualMatchRequest = nil
         if isSimulator {
             state = .error("Card scanning is not supported in the iOS Simulator.")
         } else if AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
@@ -857,6 +864,42 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
+    var canSearchForManualMatch: Bool {
+        pendingManualMatchRequest != nil
+    }
+
+    func presentManualMatchSearch() {
+        guard let request = pendingManualMatchRequest else { return }
+        errorMessage = nil
+        manualMatchRequest = request
+    }
+
+    func cancelManualMatchSearch() {
+        manualMatchRequest = nil
+    }
+
+    func applyManualMatch(_ card: Card, request: ScannerManualMatchRequest) {
+        let candidate = CardScanCandidate(
+            details: CardDetails(card: card),
+            confidence: CardScanConfidence(score: 1, reason: "Selected manually"),
+            originatingStrategy: .manual
+        )
+        let result = CardScanResult(
+            mode: request.mode,
+            capturedImage: request.image,
+            primary: candidate,
+            alternatives: [],
+            printingResolutionProvenance: .userSelected,
+            elapsed: 0
+        )
+        pendingManualMatchRequest = nil
+        manualMatchRequest = nil
+        appendToSession(result)
+        latestResult = result
+        state = .result(result)
+        if !isSimulator { HapticManager.notification(.success) }
+    }
+
     func markSessionResultsAdded(_ resultIDs: Set<CardScanResult.ID>) {
         addedSessionResultIDs.formUnion(resultIDs)
         Task.detached(priority: .utility) {
@@ -935,6 +978,7 @@ final class CardScannerViewModel: ObservableObject {
 
     private func apply(
         _ result: Result<CardScanResult, CardScannerError>,
+        manualMatchImage: CGImage? = nil,
         rescueInput: ScannerCropRescueRequest? = nil
     ) {
         switch result {
@@ -957,6 +1001,14 @@ final class CardScannerViewModel: ObservableObject {
             }
             if !isSimulator { HapticManager.notification(.success) }
         case .failure(let error):
+            switch error {
+            case .noMatch, .rejectedInput, .degenerateInput:
+                pendingManualMatchRequest = manualMatchImage.map {
+                    ScannerManualMatchRequest(image: $0, mode: selectedMode)
+                }
+            default:
+                pendingManualMatchRequest = nil
+            }
             let canRescue: Bool
             switch error {
             case .noMatch, .rejectedInput: canRescue = true

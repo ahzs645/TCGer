@@ -1,16 +1,21 @@
 "use client";
+import { usePackageCapabilities } from "@/components/game-features/package-capabilities";
+
+import { gameLabel } from "@/lib/utils";
 
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   Camera,
+  Check,
   Loader2,
+  Search,
   Sparkles,
   Target,
   Video,
 } from "lucide-react";
 
-import { fetchCardByIdApi } from "@/lib/api-client";
+import { fetchCardByIdApi, searchCardsApi } from "@/lib/api-client";
 import {
   getCardScanDebugCapturesApi,
   getCardScanStatsApi,
@@ -32,6 +37,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -165,7 +178,47 @@ function formatRevision(
     : revision.revision;
 }
 
+function cameraDisplayName(device: MediaDeviceInfo, index: number): string {
+  const label = device.label.toLowerCase();
+  if (label.includes("ultra") || label.includes("0.5")) return "Ultra Wide";
+  if (label.includes("tele") || label.includes("zoom")) return "Telephoto";
+  if (
+    label.includes("back") ||
+    label.includes("rear") ||
+    label.includes("environment")
+  ) {
+    return index === 0 ? "Main Camera" : `Back Camera ${index + 1}`;
+  }
+  return index === 0 ? "Main Camera" : `Camera ${index + 1}`;
+}
+
+function preferRearCameras(
+  devices: MediaDeviceInfo[],
+  activeDeviceId?: string,
+): MediaDeviceInfo[] {
+  const videoDevices = devices.filter((device) => device.kind === "videoinput");
+  const rearDevices = videoDevices.filter((device) => {
+    const label = device.label.toLowerCase();
+    return (
+      label.includes("back") ||
+      label.includes("rear") ||
+      label.includes("environment") ||
+      label.includes("ultra") ||
+      label.includes("tele")
+    );
+  });
+  if (rearDevices.length) return rearDevices;
+
+  // Camera labels are browser- and locale-specific. If we cannot confidently
+  // identify rear lenses, keep only the stream that `facingMode: environment`
+  // selected instead of accidentally offering the selfie camera.
+  return activeDeviceId
+    ? videoDevices.filter((device) => device.deviceId === activeDeviceId)
+    : [];
+}
+
 export function CardScanPanel() {
+  const packageScanners = usePackageCapabilities().filter(c => c.scanner);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -216,6 +269,19 @@ export function CardScanPanel() {
   const [liveCameraSupported, setLiveCameraSupported] = useState(false);
   const [liveCameraUnavailableReason, setLiveCameraUnavailableReason] =
     useState<string | null>(null);
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraDeviceId, setSelectedCameraDeviceId] = useState("");
+  const [manualMatchCard, setManualMatchCard] = useState<CardType | null>(null);
+  const [manualSearchOpen, setManualSearchOpen] = useState(false);
+  const [manualSearchQuery, setManualSearchQuery] = useState("");
+  const [manualSearchResults, setManualSearchResults] = useState<CardType[]>(
+    [],
+  );
+  const [manualSearchError, setManualSearchError] = useState<string | null>(
+    null,
+  );
+  const [isSearchingManually, setIsSearchingManually] = useState(false);
+  const [matchConfirmed, setMatchConfirmed] = useState(false);
 
   useEffect(() => {
     if (selectedGame !== "all" && isSupportedScannerTcg(selectedGame)) {
@@ -391,6 +457,11 @@ export function CardScanPanel() {
     setDebugCaptureError(null);
     setResult(null);
     setResolvedCards({});
+    setManualMatchCard(null);
+    setMatchConfirmed(false);
+    setManualSearchOpen(false);
+    setManualSearchResults([]);
+    setManualSearchError(null);
     setPreviewUrl((previousUrl) => {
       if (previousUrl) {
         URL.revokeObjectURL(previousUrl);
@@ -428,7 +499,27 @@ export function CardScanPanel() {
     setCameraMode("idle");
   };
 
-  const handleStartLiveCamera = async () => {
+  const refreshCameraDevices = async (activeDeviceId?: string) => {
+    const devices = preferRearCameras(
+      await navigator.mediaDevices.enumerateDevices(),
+      activeDeviceId,
+    );
+    setCameraDevices(devices);
+    setSelectedCameraDeviceId((current) => {
+      if (
+        activeDeviceId &&
+        devices.some((device) => device.deviceId === activeDeviceId)
+      ) {
+        return activeDeviceId;
+      }
+      if (current && devices.some((device) => device.deviceId === current)) {
+        return current;
+      }
+      return devices[0]?.deviceId ?? "";
+    });
+  };
+
+  const handleStartLiveCamera = async (deviceId = selectedCameraDeviceId) => {
     if (!liveCameraSupported) {
       return;
     }
@@ -440,7 +531,9 @@ export function CardScanPanel() {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          facingMode: { ideal: "environment" },
+          ...(deviceId
+            ? { deviceId: { exact: deviceId } }
+            : { facingMode: { ideal: "environment" } }),
         },
       });
 
@@ -455,6 +548,8 @@ export function CardScanPanel() {
         await videoRef.current.play().catch(() => undefined);
       }
 
+      const activeDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+      await refreshCameraDevices(activeDeviceId).catch(() => undefined);
       setCameraMode("live");
     } catch (error) {
       setCameraMode("idle");
@@ -463,6 +558,13 @@ export function CardScanPanel() {
           ? error.message
           : "Unable to open the camera preview.",
       );
+    }
+  };
+
+  const handleCameraChange = async (deviceId: string) => {
+    setSelectedCameraDeviceId(deviceId);
+    if (cameraMode === "live") {
+      await handleStartLiveCamera(deviceId);
     }
   };
 
@@ -539,6 +641,8 @@ export function CardScanPanel() {
         captureNotes,
       });
       setResult(nextResult);
+      setManualMatchCard(null);
+      setMatchConfirmed(false);
       setDebugCaptureError(nextResult.debugCaptureError ?? null);
 
       if (nextResult.debugCapture) {
@@ -565,6 +669,45 @@ export function CardScanPanel() {
     } finally {
       setIsScanning(false);
     }
+  };
+
+  const openManualMatchSearch = () => {
+    const suggestedQuery = manualMatchCard?.name ?? result?.match?.name ?? "";
+    setManualSearchQuery((current) => current || suggestedQuery);
+    setManualSearchError(null);
+    setManualSearchOpen(true);
+  };
+
+  const handleManualSearch = async () => {
+    const query = manualSearchQuery.trim();
+    if (!query) {
+      setManualSearchError("Enter a card name, number, or set.");
+      return;
+    }
+
+    setIsSearchingManually(true);
+    setManualSearchError(null);
+    try {
+      const cards = await searchCardsApi({ query, tcg: scanFilter, token });
+      setManualSearchResults(cards);
+      if (!cards.length) {
+        setManualSearchError("No catalog cards matched that search.");
+      }
+    } catch (error) {
+      setManualSearchError(
+        error instanceof Error
+          ? error.message
+          : "Unable to search the catalog.",
+      );
+    } finally {
+      setIsSearchingManually(false);
+    }
+  };
+
+  const handleManualMatchSelected = (card: CardType) => {
+    setManualMatchCard(card);
+    setMatchConfirmed(false);
+    setManualSearchOpen(false);
   };
 
   const handleCaptureUpdate = async (
@@ -623,8 +766,25 @@ export function CardScanPanel() {
     await handleCaptureUpdate(capture.id, { reviewTags: nextTags });
   };
 
-  const bestMatch = result?.match ?? null;
-  const bestMatchCard = bestMatch ? resolvedCards[resultKey(bestMatch)] : null;
+  const manualMatch: CardScanMatch | null = manualMatchCard
+    ? {
+        externalId: manualMatchCard.id,
+        tcg: manualMatchCard.tcg,
+        name: manualMatchCard.name,
+        setCode: manualMatchCard.setCode ?? null,
+        setName: manualMatchCard.setName ?? null,
+        rarity: manualMatchCard.rarity ?? null,
+        imageUrl:
+          manualMatchCard.imageUrlSmall ?? manualMatchCard.imageUrl ?? null,
+        confidence: 1,
+        distance: 0,
+        printingResolutionProvenance: "user_selected",
+        requiresPrintingChoice: false,
+      }
+    : null;
+  const bestMatch = manualMatch ?? result?.match ?? null;
+  const bestMatchCard =
+    manualMatchCard ?? (bestMatch ? resolvedCards[resultKey(bestMatch)] : null);
   const scanMeta = result?.meta ?? null;
   const otherCandidates =
     result?.candidates.filter((candidate) => {
@@ -718,6 +878,31 @@ export function CardScanPanel() {
             </div>
           )}
 
+          {cameraDevices.length > 1 && (
+            <div className="space-y-2">
+              <Label htmlFor="scanner-camera">Camera</Label>
+              <Select
+                value={selectedCameraDeviceId}
+                onValueChange={(value) => void handleCameraChange(value)}
+              >
+                <SelectTrigger id="scanner-camera">
+                  <SelectValue placeholder="Main Camera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cameraDevices.map((device, index) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {cameraDisplayName(device, index)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                TCGer starts with the main rear camera. Change lenses only when
+                focus or framing needs it.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2" data-oid="3upg5jk">
             <label className="text-sm font-medium" data-oid="v417g0p">
               Scan Scope
@@ -746,6 +931,7 @@ export function CardScanPanel() {
                 <SelectItem value="pokemon" data-oid="4:rkdzv">
                   {GAME_LABELS.pokemon}
                 </SelectItem>
+                {[...new Set(packageScanners.map(c => c.gameId))].filter(id => !["pokemon", "magic", "yugioh"].includes(id)).map(id => <SelectItem key={id} value={id}>{gameLabel(id)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -836,7 +1022,7 @@ export function CardScanPanel() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={handleStartLiveCamera}
+                onClick={() => void handleStartLiveCamera()}
                 disabled={!liveCameraSupported || cameraMode === "starting"}
                 className="gap-2"
                 data-oid="-2_6o1s"
@@ -1036,7 +1222,7 @@ export function CardScanPanel() {
                             data-oid="-pks-a4"
                           >
                             {capture.bestMatch?.tcg
-                              ? GAME_LABELS[capture.bestMatch.tcg]
+                              ? gameLabel(capture.bestMatch.tcg)
                               : "Unknown game"}
                             {capture.bestMatch?.distance !== null &&
                             capture.bestMatch?.distance !== undefined
@@ -1551,7 +1737,7 @@ export function CardScanPanel() {
                   {formatConfidence(bestMatch.confidence)} match score
                 </Badge>
                 <Badge variant="outline" data-oid=".u4yp8g">
-                  {GAME_LABELS[bestMatch.tcg]}
+                  {gameLabel(bestMatch.tcg)}
                 </Badge>
                 <Badge variant="outline" data-oid="om7_npv">
                   Distance {bestMatch.distance}
@@ -1574,23 +1760,41 @@ export function CardScanPanel() {
               </div>
 
               <div
-                className="grid gap-4 rounded-2xl border bg-muted/20 p-4 lg:grid-cols-[220px_1fr]"
+                className="space-y-5 rounded-2xl border bg-muted/20 p-4"
                 data-oid="h47a2qs"
               >
-                <div
-                  className="overflow-hidden rounded-xl border bg-background"
-                  data-oid="psdydw2"
-                >
-                  <img
-                    src={
-                      bestMatchCard?.imageUrlSmall ??
-                      bestMatchCard?.imageUrl ??
-                      getCardBackImage(bestMatch.tcg)
-                    }
-                    alt={bestMatch.name}
-                    className="h-full w-full object-cover"
-                    data-oid="3i.wxyj"
-                  />
+                <div className="grid grid-cols-2 gap-3 sm:gap-5">
+                  <figure className="space-y-2">
+                    <figcaption className="text-sm font-medium text-muted-foreground">
+                      Captured Card
+                    </figcaption>
+                    <div className="aspect-[5/7] overflow-hidden rounded-xl border bg-background">
+                      {previewUrl ? (
+                        <img
+                          src={previewUrl}
+                          alt="Captured card"
+                          className="h-full w-full object-contain p-2"
+                        />
+                      ) : null}
+                    </div>
+                  </figure>
+                  <figure className="space-y-2">
+                    <figcaption className="text-sm font-medium text-muted-foreground">
+                      Catalog Match
+                    </figcaption>
+                    <div className="aspect-[5/7] overflow-hidden rounded-xl border bg-background">
+                      <img
+                        src={
+                          bestMatchCard?.imageUrlSmall ??
+                          bestMatchCard?.imageUrl ??
+                          getCardBackImage(bestMatch.tcg)
+                        }
+                        alt={bestMatch.name}
+                        className="h-full w-full object-contain p-2"
+                        data-oid="3i.wxyj"
+                      />
+                    </div>
+                  </figure>
                 </div>
                 <div className="space-y-3" data-oid=":2v_pf0">
                   <div data-oid="-7-v20c">
@@ -1625,7 +1829,7 @@ export function CardScanPanel() {
                     />
                     <ScanFact
                       label="Game"
-                      value={GAME_LABELS[bestMatch.tcg]}
+                      value={gameLabel(bestMatch.tcg)}
                       data-oid="3oqevrg"
                     />
                     <ScanFact
@@ -1658,10 +1862,38 @@ export function CardScanPanel() {
                 </div>
               </div>
 
-              <AddScanMatchToCollection
-                match={bestMatch}
-                card={bestMatchCard}
-              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={openManualMatchSearch}
+                >
+                  <Search className="h-4 w-4" />
+                  Change Match
+                </Button>
+                <Button type="button" variant="outline" onClick={handleClear}>
+                  Discard / Scan Again
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setMatchConfirmed(true)}
+                  disabled={matchConfirmed}
+                >
+                  <Check className="h-4 w-4" />
+                  {matchConfirmed ? "Match Kept" : "Keep Match"}
+                </Button>
+              </div>
+
+              {matchConfirmed ? (
+                <AddScanMatchToCollection
+                  match={bestMatch}
+                  card={bestMatchCard}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Confirm the match before adding it to a binder.
+                </p>
+              )}
             </section>
           )}
 
@@ -1675,15 +1907,32 @@ export function CardScanPanel() {
                   className="mt-0.5 h-5 w-5 shrink-0"
                   data-oid="mhr.-4."
                 />
-                <div data-oid="dc18rk5">
+                <div className="space-y-3" data-oid="dc18rk5">
                   <p className="font-medium" data-oid="dityhqv">
                     No confident match yet
                   </p>
                   <p className="mt-1 text-sm" data-oid="1-0mo_l">
                     The current upload did not land under the confidence
-                    threshold. Try a tighter crop, flatter angle, or choose a
-                    specific game before rescanning.
+                    threshold. Search the catalog directly or try a tighter
+                    crop, flatter angle, or specific game.
                   </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={openManualMatchSearch}
+                    >
+                      <Search className="h-4 w-4" />
+                      Find Match
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleClear}
+                    >
+                      Discard / Scan Again
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1733,7 +1982,7 @@ export function CardScanPanel() {
                           data-oid="196b7-9"
                         >
                           <Badge variant="outline" data-oid="s6q_2-d">
-                            {GAME_LABELS[candidate.tcg]}
+                            {gameLabel(candidate.tcg)}
                           </Badge>
                           <Badge
                             className={cn(
@@ -1777,6 +2026,102 @@ export function CardScanPanel() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={manualSearchOpen} onOpenChange={setManualSearchOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Find or change the catalog match</DialogTitle>
+            <DialogDescription>
+              Compare the captured card with catalog results, then choose the
+              exact printing you meant to scan.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-5 md:grid-cols-[180px_1fr]">
+            <figure className="space-y-2">
+              <figcaption className="text-sm font-medium text-muted-foreground">
+                Captured Card
+              </figcaption>
+              <div className="aspect-[5/7] overflow-hidden rounded-xl border bg-muted/20">
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt="Captured card reference"
+                    className="h-full w-full object-contain p-2"
+                  />
+                ) : null}
+              </div>
+            </figure>
+
+            <div className="space-y-4">
+              <form
+                className="flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleManualSearch();
+                }}
+              >
+                <Input
+                  value={manualSearchQuery}
+                  onChange={(event) => setManualSearchQuery(event.target.value)}
+                  placeholder="Card name, number, or set"
+                  autoFocus
+                />
+                <Button type="submit" disabled={isSearchingManually}>
+                  {isSearchingManually ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  Search
+                </Button>
+              </form>
+
+              {manualSearchError ? (
+                <p className="text-sm text-rose-700">{manualSearchError}</p>
+              ) : null}
+
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+                {manualSearchResults.map((card) => (
+                  <button
+                    key={`${card.tcg}:${card.id}`}
+                    type="button"
+                    onClick={() => handleManualMatchSelected(card)}
+                    className="flex w-full items-center gap-3 rounded-xl border bg-background p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <img
+                      src={
+                        card.imageUrlSmall ??
+                        card.imageUrl ??
+                        getCardBackImage(card.tcg)
+                      }
+                      alt=""
+                      className="h-24 w-16 shrink-0 rounded-md object-contain"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">
+                        {card.name}
+                      </span>
+                      <span className="block text-sm text-muted-foreground">
+                        {card.setName ?? card.setCode ?? "Set unknown"}
+                        {card.collectorNumber
+                          ? ` • ${card.collectorNumber}`
+                          : ""}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {gameLabel(card.tcg)}
+                      </span>
+                    </span>
+                    <span className="text-sm font-medium text-primary">
+                      Use
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

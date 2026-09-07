@@ -4,7 +4,7 @@ export interface YugiohDeckDomainCard {
   externalId: string;
   name: string;
   quantity: number;
-  zone?: YugiohDeckZone;
+  zone?: string;
   isSideboard?: boolean;
   cardData?: Record<string, unknown>;
 }
@@ -83,7 +83,7 @@ export function resolveYugiohBaseId(card: Pick<YugiohDeckDomainCard, 'externalId
 export function inferYugiohZone(
   card: Pick<YugiohDeckDomainCard, 'isSideboard' | 'zone' | 'cardData'>
 ): YugiohDeckZone {
-  if (card.zone) {
+  if (card.zone === "main" || card.zone === "extra" || card.zone === "side") {
     return card.zone;
   }
   if (card.isSideboard) {

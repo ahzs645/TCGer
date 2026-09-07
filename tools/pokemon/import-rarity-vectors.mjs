@@ -1,14 +1,23 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 
 const REPO_ROOT = resolve(import.meta.dirname, "../..");
+const requireFromBackend = createRequire(
+  resolve(REPO_ROOT, "backend/package.json"),
+);
+const sharp = requireFromBackend("sharp");
 const DEFAULT_SOURCE = resolve(
   process.env.HOME ?? "",
   "Downloads/Pokémon TCG Vectors/Rarities",
 );
 const OUTPUT_DIRECTORY = resolve(REPO_ROOT, "assets/pokemon/rarity-symbols");
-const IOS_RESOURCE_DIRECTORY = resolve(
+const IOS_ASSET_CATALOG_DIRECTORY = resolve(
+  REPO_ROOT,
+  "mobile-apps/ios/TCGer/TCGer/Assets.xcassets/PokemonRarities",
+);
+const LEGACY_IOS_RESOURCE_DIRECTORY = resolve(
   REPO_ROOT,
   "mobile-apps/ios/TCGer/TCGer/Resources/PokemonRarities",
 );
@@ -94,46 +103,135 @@ function swiftString(value) {
   return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
+function assetName(key) {
+  const suffix = key
+    .split("-")
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join("");
+  return `PokemonRarity${suffix}`;
+}
+
+async function readSourceSVG(sourceDirectory, entry) {
+  const archiveFilename = `${entry.source}.svg`;
+  try {
+    return {
+      contents: await readFile(
+        resolve(sourceDirectory, archiveFilename),
+        "utf8",
+      ),
+      filename: archiveFilename,
+    };
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  // Allow a checked-in, content-addressed rarity directory to regenerate all
+  // derived outputs without requiring the original user-provided archive.
+  const candidates = (await readdir(sourceDirectory)).filter(
+    (filename) =>
+      filename.startsWith(`${entry.key}.`) && filename.endsWith(".svg"),
+  );
+  if (candidates.length !== 1) {
+    throw new Error(
+      `${archiveFilename} is missing and expected exactly one ${entry.key}.*.svg fallback`,
+    );
+  }
+  return {
+    contents: await readFile(resolve(sourceDirectory, candidates[0]), "utf8"),
+    filename: candidates[0],
+  };
+}
+
+async function renderFallbackPNG(vectorContents) {
+  return sharp(Buffer.from(vectorContents), { density: 384 })
+    .resize(128, 128, {
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+}
+
 async function main() {
   const sourceDirectory = parseSourceArgument(process.argv.slice(2));
   const imported = [];
 
   for (const entry of ARTWORK) {
-    const sourceFilename = `${entry.source}.svg`;
-    const vectorContents = cropArchivePadding(
-      await readFile(resolve(sourceDirectory, sourceFilename), "utf8"),
-    );
-    validateSVG(vectorContents, sourceFilename);
+    const source = await readSourceSVG(sourceDirectory, entry);
+    const vectorContents = cropArchivePadding(source.contents);
+    validateSVG(vectorContents, source.filename);
     const vectorSha256 = hash(vectorContents);
     const vectorFilename = `${entry.key}.${vectorSha256.slice(0, 16)}.svg`;
+    const rasterContents = await renderFallbackPNG(vectorContents);
+    const rasterSha256 = hash(rasterContents);
+    const rasterFilename = `${entry.key}.${rasterSha256.slice(0, 16)}.png`;
 
     imported.push({
       ...entry,
-      sourceFile: sourceFilename,
+      assetName: assetName(entry.key),
+      sourceFile: `${entry.source}.svg`,
       vectorContents,
       vectorFilename,
       vectorSha256,
+      rasterContents,
+      rasterFilename,
+      rasterSha256,
     });
   }
 
   await Promise.all([
     rm(OUTPUT_DIRECTORY, { recursive: true, force: true }),
-    rm(IOS_RESOURCE_DIRECTORY, { recursive: true, force: true }),
+    rm(IOS_ASSET_CATALOG_DIRECTORY, { recursive: true, force: true }),
+    rm(LEGACY_IOS_RESOURCE_DIRECTORY, { recursive: true, force: true }),
   ]);
   await Promise.all([
     mkdir(OUTPUT_DIRECTORY, { recursive: true }),
-    mkdir(IOS_RESOURCE_DIRECTORY, { recursive: true }),
+    mkdir(IOS_ASSET_CATALOG_DIRECTORY, { recursive: true }),
   ]);
 
+  await writeFile(
+    resolve(IOS_ASSET_CATALOG_DIRECTORY, "Contents.json"),
+    `${JSON.stringify({ info: { author: "xcode", version: 1 } }, null, 2)}\n`,
+  );
+
   for (const asset of imported) {
+    const imageSetDirectory = resolve(
+      IOS_ASSET_CATALOG_DIRECTORY,
+      `${asset.assetName}.imageset`,
+    );
+    await mkdir(imageSetDirectory, { recursive: true });
     await Promise.all([
       writeFile(
         resolve(OUTPUT_DIRECTORY, asset.vectorFilename),
         asset.vectorContents,
       ),
       writeFile(
-        resolve(IOS_RESOURCE_DIRECTORY, asset.vectorFilename),
+        resolve(OUTPUT_DIRECTORY, asset.rasterFilename),
+        asset.rasterContents,
+      ),
+      writeFile(
+        resolve(imageSetDirectory, asset.vectorFilename),
         asset.vectorContents,
+      ),
+      writeFile(
+        resolve(imageSetDirectory, "Contents.json"),
+        `${JSON.stringify(
+          {
+            images: [
+              {
+                filename: asset.vectorFilename,
+                idiom: "universal",
+              },
+            ],
+            info: { author: "xcode", version: 1 },
+            properties: {
+              "preserves-vector-representation": true,
+              "template-rendering-intent": "original",
+            },
+          },
+          null,
+          2,
+        )}\n`,
       ),
     ]);
   }
@@ -141,7 +239,10 @@ async function main() {
   const manifest = {
     formatVersion: 1,
     source: "User-provided Pokémon TCG Vectors archive",
-    sourceDirectory: basename(sourceDirectory),
+    sourceDirectory:
+      sourceDirectory === OUTPUT_DIRECTORY
+        ? "Rarities"
+        : basename(sourceDirectory),
     sourceLicense: null,
     artworkCount: imported.length,
     assets: Object.fromEntries(
@@ -154,6 +255,13 @@ async function main() {
             file: asset.vectorFilename,
             sha256: asset.vectorSha256,
             url: `${PUBLIC_ROOT}/${asset.vectorFilename}`,
+          },
+          raster: {
+            file: asset.rasterFilename,
+            sha256: asset.rasterSha256,
+            width: 128,
+            height: 128,
+            url: `${PUBLIC_ROOT}/${asset.rasterFilename}`,
           },
         },
       ]),
@@ -176,14 +284,18 @@ async function main() {
       .map(
         (label) =>
           `        case ${swiftString(label.toLowerCase())}:\n` +
-          `            return PokemonRarityArtworkAsset(vectorFilename: ${swiftString(asset.vectorFilename)})`,
+          `            return PokemonRarityArtworkAsset(\n` +
+          `                assetName: ${swiftString(asset.assetName)},\n` +
+          `                fallbackFilename: ${swiftString(asset.rasterFilename)}\n` +
+          `            )`,
       ),
   );
   const swift =
     `// Generated by tools/pokemon/import-rarity-vectors.mjs. Do not edit.\n` +
     `import Foundation\n\n` +
     `struct PokemonRarityArtworkAsset: Equatable {\n` +
-    `    let vectorFilename: String\n` +
+    `    let assetName: String\n` +
+    `    let fallbackFilename: String\n` +
     `}\n\n` +
     `enum PokemonRarityArtworkCatalog {\n` +
     `    static func artwork(for rarity: String) -> PokemonRarityArtworkAsset? {\n` +
@@ -202,8 +314,9 @@ async function main() {
         sourceDirectory,
         artworkCount: imported.length,
         vectorCount: imported.length,
+        rasterCount: imported.length,
         outputDirectory: OUTPUT_DIRECTORY,
-        iosResourceDirectory: IOS_RESOURCE_DIRECTORY,
+        iosAssetCatalogDirectory: IOS_ASSET_CATALOG_DIRECTORY,
       },
       null,
       2,

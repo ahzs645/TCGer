@@ -69,7 +69,7 @@ class PricingSourceRepository(
     suspend fun test(source: String): TestPriceSourceResult {
         if (connection.serverUrl.isBlank()) {
             return when (source) {
-                "automatic", "scryfall" -> TestPriceSourceResult(true, 0)
+                "automatic", "scryfall", "justtcg" -> TestPriceSourceResult(false, error = "Local configuration selected. Use Test connection in Personal JustTCG pricing or refresh Prices to check live quotes.")
                 else -> TestPriceSourceResult(false, error = "This provider requires server configuration.")
             }
         }
@@ -83,6 +83,7 @@ class PricingSourceRepository(
 fun localPriceSources() = PriceSourcesResponse(
     sources = listOf(
         PriceSourceOption("automatic", "Best available", "Use the first compatible configured source for each game."),
+        PriceSourceOption("justtcg", "JustTCG", "Uses your personal API key on this device."),
         PriceSourceOption("scryfall", "Scryfall", "Free regular, foil, and etched Magic market prices.", listOf("magic")),
     ),
 )
@@ -165,14 +166,16 @@ data class CreateFinanceTransaction(
     val acquiredAt: String? = null,
     val notes: String? = null,
     val date: String? = null,
+    val collectionEntryId: String? = null,
+    val externalId: String? = null,
 ) {
     fun normalized() = copy(
         cardName = cardName?.trim()?.ifBlank { null }, tcg = tcg?.trim()?.ifBlank { null },
         quantity = quantity.coerceAtLeast(1), currency = currency.trim().uppercase(),
         platform = platform?.trim()?.ifBlank { null }, notes = notes?.trim()?.ifBlank { null },
     )
-    val isValid get() = amount > 0 && quantity > 0 && currency.matches(Regex("[A-Z]{3}", RegexOption.IGNORE_CASE)) &&
-        listOf(costBasis, fees, shippingCost).all { it == null || it >= 0 }
+    val isValid get() = amount.isFinite() && amount > 0 && quantity > 0 && currency.matches(Regex("[A-Z]{3}", RegexOption.IGNORE_CASE)) &&
+        listOf(costBasis, fees, shippingCost).all { it == null || it.isFinite() && it >= 0 }
 }
 
 @Serializable
@@ -201,6 +204,7 @@ class LocalFinanceRepository(context: Context) : FinanceRepository {
         val normalized = input.normalized()
         val transaction = FinanceTransaction(
             id = UUID.randomUUID().toString(), type = normalized.type, cardName = normalized.cardName,
+            collectionEntryId = normalized.collectionEntryId, externalId = normalized.externalId,
             tcg = normalized.tcg, quantity = normalized.quantity, amount = normalized.amount,
             currency = normalized.currency, platform = normalized.platform, costBasis = normalized.costBasis,
             fees = normalized.fees, shippingCost = normalized.shippingCost, acquiredAt = normalized.acquiredAt,
@@ -212,8 +216,8 @@ class LocalFinanceRepository(context: Context) : FinanceRepository {
         return transaction
     }
     override suspend fun delete(id: String) { write(read().filterNot { it.id == id }) }
-    private fun read() = preferences.getString("items", null)?.let { runCatching { json.decodeFromString(ListSerializer(FinanceTransaction.serializer()), it) }.getOrDefault(emptyList()) }.orEmpty()
-    private fun write(items: List<FinanceTransaction>) { preferences.edit().putString("items", json.encodeToString(ListSerializer(FinanceTransaction.serializer()), items)).apply() }
+    private fun read() = preferences.getString("items", null)?.let { json.decodeFromString(ListSerializer(FinanceTransaction.serializer()), it) }.orEmpty()
+    private fun write(items: List<FinanceTransaction>) { check(preferences.edit().putString("items", json.encodeToString(ListSerializer(FinanceTransaction.serializer()), items)).commit()) { "Could not save the transaction" } }
 }
 
 class RemoteFinanceRepository(connection: SettingsFeatureConnection, client: OkHttpClient = OkHttpClient()) : FinanceRepository {

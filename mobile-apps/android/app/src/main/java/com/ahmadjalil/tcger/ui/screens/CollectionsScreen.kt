@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -76,8 +77,9 @@ fun CollectionsScreen(
     onCreate: (BinderInput) -> Unit,
     onDelete: (String) -> Unit,
     onOpen: (String) -> Unit,
+    canEdit: Boolean = true,
 ) {
-    var creating by remember { mutableStateOf(false) }
+    var creating by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Binder?>(null) }
     Column(
         Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.COLLECTIONS_BROWSE)).padding(
@@ -88,11 +90,12 @@ fun CollectionsScreen(
         ),
     ) {
         ScreenTitle(stringResource(R.string.binders_title), stringResource(R.string.binders_subtitle)) {
-            FloatingActionButton(
+            if (canEdit) FloatingActionButton(
                 onClick = { creating = true },
                 modifier = Modifier.testTag(ParityControlIDs.ACTION_COLLECTIONS_CREATE),
             ) { Icon(Icons.Default.Add, stringResource(R.string.new_binder)) }
         }
+        SmartFoldersPanel(state, onOpen)
         if (state.isLoading) LoadingPane()
         else if (state.binders.isEmpty()) EmptyPane(stringResource(R.string.no_binders), stringResource(R.string.no_binders_detail))
         else LazyColumn(
@@ -100,7 +103,7 @@ fun CollectionsScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            items(state.binders, key = { it.id }) { binder -> BinderRow(binder, onOpen) { pendingDelete = binder } }
+            items(state.binders, key = { it.id }) { binder -> BinderRow(binder, onOpen, canEdit) { pendingDelete = binder } }
         }
     }
 
@@ -133,7 +136,7 @@ fun CollectionsScreen(
 }
 
 @Composable
-private fun BinderRow(binder: Binder, onOpen: (String) -> Unit, onDelete: (String) -> Unit) {
+private fun BinderRow(binder: Binder, onOpen: (String) -> Unit, canEdit: Boolean, onDelete: (String) -> Unit) {
     Card(
         Modifier.fillMaxWidth().clickable { onOpen(binder.id) },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -153,7 +156,7 @@ private fun BinderRow(binder: Binder, onOpen: (String) -> Unit, onDelete: (Strin
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            IconButton(onClick = { onDelete(binder.id) }) {
+            if (canEdit) IconButton(onClick = { onDelete(binder.id) }) {
                 Icon(Icons.Default.Delete, stringResource(R.string.delete_binder, binder.name))
             }
         }
@@ -171,12 +174,12 @@ fun BinderEditorDialog(
     inputTestId: String? = null,
     confirmTestId: String? = null,
 ) {
-    var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
-    var description by remember(initial?.id) { mutableStateOf(initial?.description.orEmpty()) }
-    var colorHex by remember(initial?.id) { mutableStateOf(initial?.colorHex ?: binderColors.first()) }
-    var defaultCondition by remember(initial?.id) { mutableStateOf(initial?.defaultCondition.orEmpty()) }
-    var containerType by remember(initial?.id) { mutableStateOf(initial?.containerType.orEmpty()) }
-    var imageUrl by remember(initial?.id) { mutableStateOf(initial?.imageUrl.orEmpty()) }
+    var name by rememberSaveable(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
+    var description by rememberSaveable(initial?.id) { mutableStateOf(initial?.description.orEmpty()) }
+    var colorHex by rememberSaveable(initial?.id) { mutableStateOf(initial?.colorHex ?: binderColors.first()) }
+    var defaultCondition by rememberSaveable(initial?.id) { mutableStateOf(initial?.defaultCondition.orEmpty()) }
+    var containerType by rememberSaveable(initial?.id) { mutableStateOf(initial?.containerType.orEmpty()) }
+    var imageUrl by rememberSaveable(initial?.id) { mutableStateOf(initial?.imageUrl.orEmpty()) }
     var conditionMenuOpen by remember { mutableStateOf(false) }
     val input = BinderInput(
         name = name,

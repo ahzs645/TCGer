@@ -8,6 +8,9 @@ struct AddCardToBinderSheet: View {
     let initialBinderId: String?
     let onAdd: (Card, String, BinderCardAddDetails) async throws -> Void
 
+    @State private var selectedPrint: Card?
+    @State private var printings: [Card] = []
+    private var activeCard: Card { selectedPrint ?? originalCard }
     @State private var draft: CardEditorDraft
     @State private var collections: [Collection] = []
     @State private var localTags: [CollectionCardTag] = []
@@ -58,7 +61,13 @@ struct AddCardToBinderSheet: View {
             Form {
                 // Card Preview Section
                 Section {
-                    CardPreviewRow(card: originalCard)
+                    CardPreviewRow(card: activeCard)
+                    GameCardSymbolsView(card: activeCard)
+                    if printings.count > 1 {
+                        Picker("Printing", selection: Binding(get: { activeCard.id }, set: { id in selectedPrint = printings.first { $0.id == id }; draft.applyCardDefaults(for: activeCard) })) {
+                            ForEach(printings) { card in Text("\(card.setName ?? card.setCode ?? card.name) · \(card.collectorNumber ?? card.id)").tag(card.id) }
+                        }
+                    }
                 } header: {
                     Text("Card")
                 }
@@ -76,7 +85,7 @@ struct AddCardToBinderSheet: View {
 
                 Section {
                     Button {
-                        wishlistCard = originalCard
+                        wishlistCard = activeCard
                     } label: {
                         Label("Add to Wishlist", systemImage: "heart")
                     }
@@ -88,7 +97,7 @@ struct AddCardToBinderSheet: View {
                 }
 
                 CardCopyEditorSections(
-                    card: originalCard,
+                    card: activeCard,
                     draft: $draft,
                     tags: $localTags,
                     showsQuantity: true,
@@ -124,6 +133,10 @@ struct AddCardToBinderSheet: View {
             }
         }
         .task {
+            if originalCard.supportsPrintSelection {
+                do { printings = try await apiService.getCardPrints(config: environmentStore.serverConfiguration, token: environmentStore.authToken ?? "", tcg: originalCard.tcg, cardId: originalCard.id, packageId: originalCard.gamePresentation?.packageId) }
+                catch { errorMessage = error.localizedDescription }
+            }
             if draft.finishCode.isEmpty {
                 draft.applyCardDefaults(for: originalCard)
             }
@@ -179,11 +192,11 @@ struct AddCardToBinderSheet: View {
 
         isAdding = true
         errorMessage = nil
-        let values = draft.normalizedValues(for: originalCard)
+        let values = draft.normalizedValues(for: activeCard)
 
         do {
             try await onAdd(
-                originalCard,
+                activeCard,
                 binderId,
                 BinderCardAddDetails(
                     quantity: values.quantity,
@@ -241,7 +254,7 @@ private struct CardPreviewRow: View {
             }
 
             if let rarity = card.rarity {
-                PokemonRarityBadge(rarity: rarity, tcg: card.tcg)
+                PokemonRarityBadge(rarity: rarity, tcg: card.tcg, symbol: card.gamePresentation?.symbols?.first { $0.kind == "rarity" && $0.id == rarity })
             }
         }
         .padding(.vertical, 4)

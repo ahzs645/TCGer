@@ -1,5 +1,6 @@
 package com.ahmadjalil.tcger.data.local
 
+import kotlinx.serialization.Serializable
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -8,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Relation
 
 @Entity(tableName = "binders")
+@Serializable
 data class BinderEntity(
     @PrimaryKey val id: String,
     val name: String,
@@ -35,6 +37,7 @@ data class BinderEntity(
     ],
     indices = [Index("binderId"), Index("name"), Index(value = ["externalId", "binderId"])],
 )
+@Serializable
 data class OwnedCardEntity(
     @PrimaryKey val id: String,
     val binderId: String,
@@ -50,8 +53,11 @@ data class OwnedCardEntity(
     val condition: String?,
     val price: Double?,
     val createdAt: Long,
+    val acquisitionPrice: Double? = null,
+    @androidx.room.ColumnInfo(defaultValue = "'{}'") val detailsJson: String = "{}",
 )
 
+@Serializable
 data class BinderWithCards(
     @Embedded val binder: BinderEntity,
     @Relation(parentColumn = "id", entityColumn = "binderId")
@@ -59,6 +65,7 @@ data class BinderWithCards(
 )
 
 @Entity(tableName = "wishlists")
+@Serializable
 data class WishlistEntity(
     @PrimaryKey val id: String,
     val name: String,
@@ -67,6 +74,7 @@ data class WishlistEntity(
     val matchAnyPrinting: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    @androidx.room.ColumnInfo(defaultValue = "'[]'") val rulesJson: String = "[]",
 )
 
 @Entity(
@@ -79,8 +87,9 @@ data class WishlistEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("wishlistId"), Index(value = ["externalId", "wishlistId"], unique = true)],
+    indices = [Index("wishlistId"), Index(value = ["tcg", "externalId", "wishlistId"], unique = true)],
 )
+@Serializable
 data class WishlistCardEntity(
     @PrimaryKey val id: String,
     val wishlistId: String,
@@ -97,6 +106,7 @@ data class WishlistCardEntity(
     val createdAt: Long,
 )
 
+@Serializable
 data class WishlistWithCards(
     @Embedded val wishlist: WishlistEntity,
     @Relation(parentColumn = "id", entityColumn = "wishlistId")
@@ -104,6 +114,7 @@ data class WishlistWithCards(
 )
 
 @Entity(tableName = "sealed_products", indices = [Index("tcg"), Index("name"), Index("upc")])
+@Serializable
 data class SealedProductEntity(
     @PrimaryKey val id: String,
     val tcg: String,
@@ -131,6 +142,7 @@ data class SealedProductEntity(
     ],
     indices = [Index("productId"), Index("createdAt")],
 )
+@Serializable
 data class SealedInventoryEntity(
     @PrimaryKey val id: String,
     val productId: String,
@@ -141,6 +153,7 @@ data class SealedInventoryEntity(
     val createdAt: String,
 )
 
+@Serializable
 data class SealedInventoryWithProduct(
     @Embedded val inventory: SealedInventoryEntity,
     @Relation(parentColumn = "productId", entityColumn = "id")
@@ -159,6 +172,7 @@ data class SealedInventoryWithProduct(
     ],
     indices = [Index("productId"), Index("openedAt")],
 )
+@Serializable
 data class SealedOpeningEntity(
     @PrimaryKey val id: String,
     val inventoryId: String,

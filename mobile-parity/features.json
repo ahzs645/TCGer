@@ -309,7 +309,7 @@
     },
     {
       "id": "pokedex.browse",
-      "title": "Pokédex progress",
+      "title": "Pok\u00e9dex progress",
       "policy": "track",
       "web": {
         "status": "implemented",
@@ -1240,7 +1240,7 @@
     },
     {
       "id": "scanner.mode.pokemon",
-      "title": "Pokémon card scanning mode",
+      "title": "Pok\u00e9mon card scanning mode",
       "policy": "track",
       "web": {
         "status": "implemented",
@@ -1783,9 +1783,10 @@
       "title": "Hidden developer-tools unlock and scanner-testing toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-parity/SCANNER_PACK_MATRIX.md"
+          "mobile-parity/SCANNER_PACK_MATRIX.md",
+          "frontend/src/components/scan/scanner-workbench.tsx"
         ]
       },
       "ios": {
@@ -1929,9 +1930,10 @@
       "title": "Record, pause, clear, save, and share live analyzed frames",
       "policy": "track",
       "web": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-parity/SCANNER_PACK_MATRIX.md"
+          "mobile-parity/SCANNER_PACK_MATRIX.md",
+          "frontend/src/components/scan/scanner-workbench.tsx"
         ]
       },
       "ios": {
@@ -2008,9 +2010,10 @@
       "title": "Browse, select, share, delete, and export recorded sessions",
       "policy": "track",
       "web": {
-        "status": "partial",
+        "status": "implemented",
         "sources": [
-          "frontend/src/components/scan/card-scan-panel.tsx"
+          "frontend/src/components/scan/card-scan-panel.tsx",
+          "frontend/src/components/scan/scanner-workbench.tsx"
         ]
       },
       "ios": {
@@ -2033,10 +2036,11 @@
       "title": "Import and replay extracted scanner recordings",
       "policy": "track",
       "web": {
-        "status": "partial",
+        "status": "implemented",
         "sources": [
           "frontend/app/scan/review/page.tsx",
-          "frontend/src/components/scan/scan-review-lab.tsx"
+          "frontend/src/components/scan/scan-review-lab.tsx",
+          "frontend/src/components/scan/scanner-workbench.tsx"
         ]
       },
       "ios": {
@@ -2300,9 +2304,10 @@
       "title": "Scanner-model warm-start toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
+        "status": "implemented",
         "sources": [
-          "mobile-parity/SCANNER_PACK_MATRIX.md"
+          "mobile-parity/SCANNER_PACK_MATRIX.md",
+          "frontend/src/components/scan/scanner-workbench.tsx"
         ]
       },
       "ios": {
@@ -2413,6 +2418,244 @@
         "status": "planned",
         "sources": [
           "mobile-parity/SCANNER_PACK_MATRIX.md"
+        ]
+      }
+    },
+    {
+      "id": "data.portableBackup",
+      "title": "Portable backup fidelity and recovery",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/lib/storage/portable-backup.ts"
+        ],
+        "tests": [
+          {
+            "runner": "playwright",
+            "id": "data.portableBackup",
+            "path": "frontend/tests/parity/portable-workflows.spec.ts"
+          }
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "data.portableBackup",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LocalStorePersistenceTests.swift"
+          }
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/CollectionBackup.kt"
+        ],
+        "tests": [
+          {
+            "runner": "gradle",
+            "id": "data.portableBackup",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/backup/PortableParityTest.kt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cards.filteredSearch",
+      "title": "Filter cards beyond preview limits",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/components/cards/card-search-panel.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "playwright",
+            "id": "cards.filteredSearch",
+            "path": "frontend/tests/parity/portable-workflows.spec.ts"
+          }
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "cards.filteredSearch",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CardSearchFilterTests.swift"
+          }
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt"
+        ]
+      }
+    },
+    {
+      "id": "scanner.binderCorners",
+      "title": "Correct and persist binder page crops",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "playwright",
+            "id": "scanner.binderCorners",
+            "path": "frontend/tests/parity/portable-workflows.spec.ts"
+          }
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
+        ]
+      }
+    },
+    {
+      "id": "collections.copyMetadata",
+      "title": "Edit and retain physical-copy metadata",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/components/collections/sandbox/detail-panel.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "node",
+            "id": "collections.copyMetadata",
+            "path": "frontend/src/lib/storage/portable-backup.test.ts"
+          }
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "collections.copyMetadata",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LocalStorePersistenceTests.swift"
+          }
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionCopyEditor.kt"
+        ],
+        "tests": [
+          {
+            "runner": "gradle",
+            "id": "collections.copyMetadata",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/backup/PortableParityTest.kt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "collections.smartFolders",
+      "title": "Condition and tag smart folders",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/components/collections/smart-folder-manager.tsx"
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Models/SmartFolderModels.swift"
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SmartFoldersPanel.kt"
+        ],
+        "tests": [
+          {
+            "runner": "gradle",
+            "id": "collections.smartFolders",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/backup/PortableParityTest.kt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "account.management",
+      "title": "Profile password signup deletion and preferences",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/components/account/account-settings-dialog.tsx"
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/ProfileView.swift"
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/AccountManagementPanel.kt"
+        ]
+      }
+    },
+    {
+      "id": "scanner.binderReview",
+      "title": "Save selected cards and reopen saved binder photos",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "playwright",
+            "id": "scanner.binderReview",
+            "path": "frontend/tests/parity/portable-workflows.spec.ts"
+          }
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
         ]
       }
     }

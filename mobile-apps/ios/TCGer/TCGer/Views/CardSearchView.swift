@@ -27,6 +27,7 @@ struct CardSearchView: View {
     @State private var searchResults: [Card] = []
     @State private var ownedSearchResults: [OwnedCardSearchResult] = []
     @State private var isSearching = false
+    @State private var latestSearch = LatestSearchRequest()
     @State private var errorMessage: String?
     @State private var hasSearched = false
     @State private var detailCard: Card?
@@ -95,7 +96,7 @@ struct CardSearchView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error = errorMessage {
                     ErrorView(title: "Search Failed", message: error) {
-                        Task { await performSearch() }
+                        performSearch()
                     }
                 } else if hasSearched && rawResultsAreEmpty {
                     if searchScope == .collection {
@@ -179,7 +180,7 @@ struct CardSearchView: View {
 
                 ToolbarItem(placement: .bottomBar) {
                     Button {
-                        Task { await discoverCards() }
+                        performSearch(discover: true)
                     } label: {
                         Label("Discover", systemImage: "dice")
                     }
@@ -189,21 +190,22 @@ struct CardSearchView: View {
                 ToolbarSpacer(.flexible, placement: .bottomBar)
                 DefaultToolbarItem(kind: .search, placement: .bottomBar)
             }
-            .scrollEdgeEffectStyle(.hard, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .onSubmit(of: .search) {
                 isSearchPresented = false
-                Task { await performSearch() }
+                performSearch()
             }
             .sheet(isPresented: $showingFilters) {
                 CardSearchFilterSheet(
                     game: selectedGame,
                     filters: searchFilters,
-                    resultCards: searchResults
+                    resultCards: searchResults,
+                    hasSearched: hasSearched
                 ) { game, filters in
                     selectedGame = game
                     searchFilters = filters
-                    if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Task { await performSearch() }
+                    if hasSearched {
+                        performSearch()
                     }
                 }
                 .environmentObject(environmentStore)
@@ -265,15 +267,17 @@ struct CardSearchView: View {
                 ownedSearchResults = []
                 errorMessage = nil
                 hasSearched = false
-                if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Task { await performSearch() }
-                }
+                performSearch()
+            }
+            .onDisappear {
+                latestSearch.cancel()
+                isSearching = false
             }
             .onChange(of: initialSearchText) { _, nextQuery in
                 guard nextQuery != searchText else { return }
                 searchText = nextQuery
                 hasSearched = false
-                Task { await performSearch() }
+                performSearch()
             }
             .onAppear {
                 if let defaultGame = environmentStore.defaultGame,
@@ -288,7 +292,7 @@ struct CardSearchView: View {
                 await loadCollectionAvailability()
                 if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                    !hasSearched {
-                    await performSearch()
+                    performSearch()
                 }
             }
         }
@@ -310,18 +314,6 @@ struct CardSearchView: View {
                 .padding(.vertical, 8)
             }
 
-            if environmentStore.shouldShowGamePicker {
-                GamePickerPills(
-                    selection: Binding(
-                        get: { selectedGame },
-                        set: { selectGame($0) }
-                    ),
-                    games: environmentStore.gamePickerGames
-                )
-                .padding(.vertical, 8)
-            }
-
-
             let searchablePackages = gamePackages.installed.filter {
                 $0.manifest.effectiveDefinition.interfaces?.search != false
             }
@@ -333,8 +325,8 @@ struct CardSearchView: View {
                             Button {
                                 selectedPackageId = selected ? nil : package.id
                                 if !selected { selectedGame = .all }
-                                if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Task { await performSearch() }
+                                if hasSearched {
+                                    performSearch()
                                 }
                             } label: {
                                 Text("\(package.manifest.effectiveDefinition.shortLabel ?? package.manifest.effectiveDefinition.label) · \(package.manifest.publisher.name)")
@@ -414,27 +406,17 @@ struct CardSearchView: View {
         if resolvedGame != selectedGame {
             selectedGame = resolvedGame
             searchFilters.clearIncompatibleValues(for: resolvedGame)
-            if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Task { await performSearch() }
+            if hasSearched {
+                performSearch()
             }
-        }
-    }
-
-    private func selectGame(_ game: TCGGame) {
-        guard game != selectedGame || selectedPackageId != nil else { return }
-        selectedPackageId = nil
-        selectedGame = game
-        searchFilters.clearIncompatibleValues(for: game)
-        if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            Task { await performSearch() }
         }
     }
 
     private func clearSearchFilters() {
         guard searchFilters.isActive else { return }
         searchFilters = CardSearchFilterState()
-        if hasSearched && !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            Task { await performSearch() }
+        if hasSearched {
+            performSearch()
         }
     }
 
@@ -539,120 +521,95 @@ struct CardSearchView: View {
         }
     }
 
-    @MainActor
-    private func discoverCards() async {
-        guard let token = environmentStore.authToken else {
-            errorMessage = "Not authenticated"
-            return
-        }
-        searchScope = .catalog
-        isSearching = true
-        errorMessage = nil
-        hasSearched = true
-        do {
-            let result = try await apiService.discoverCards(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                game: selectedGame,
-                count: 6
-            )
-            searchResults = result.cards
-            ownedSearchResults = []
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isSearching = false
+    private struct SearchOutput {
+        var cards: [Card]
+        var owned: [OwnedCardSearchResult] = []
+        var collections: [Collection]?
     }
 
     @MainActor
-    private func performSearch() async {
+    private func performSearch(discover: Bool = false) {
+        latestSearch.cancel()
+        isSearching = false
+        errorMessage = nil
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else {
+        guard discover || !query.isEmpty else {
             hasSearched = false
             searchResults = []
             ownedSearchResults = []
             return
         }
-
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
             return
         }
 
+        // Capture the entire request before awaiting; later UI changes start a new request.
+        let scope = searchScope
+        let game = selectedGame
+        let packageId = selectedPackageId
+        let filters = searchFilters
+        let config = environmentStore.serverConfiguration
+        let useCache = environmentStore.offlineModeEnabled
+        let cachedCollections = loadedCollections
         isSearching = true
-        errorMessage = nil
         hasSearched = true
 
-        do {
-            if let selectedPackageId, searchScope == .catalog {
-                searchResults = try gamePackages.search(packageId: selectedPackageId, query: query)
-                ownedSearchResults = []
-            } else if searchScope == .collection {
+        latestSearch.run {
+            var output: SearchOutput
+            if discover {
+                let result = try await apiService.discoverCards(
+                    config: config, token: token, game: game, count: 6
+                )
+                return SearchOutput(cards: result.cards)
+            } else if let packageId, scope == .catalog {
+                output = SearchOutput(cards: try gamePackages.search(packageId: packageId, query: query))
+            } else if scope == .collection {
                 let collections: [Collection]
-                if let loadedCollections {
-                    collections = loadedCollections
+                if let cachedCollections {
+                    collections = cachedCollections
                 } else {
-                    collections = try await apiService.getCollections(
-                        config: environmentStore.serverConfiguration,
-                        token: token,
-                        useCache: environmentStore.offlineModeEnabled
-                    )
-                    self.loadedCollections = collections
+                    collections = try await apiService.getCollections(config: config, token: token, useCache: useCache)
                 }
-                ownedSearchResults = collections.flatMap { collection in
-                    collection.cards.compactMap { card in
+                let owned = collections.flatMap { collection in
+                    collection.cards.compactMap { card -> OwnedCardSearchResult? in
                         let preview = card.previewCard
-                        guard selectedGame == .all ||
-                                preview.tcg.caseInsensitiveCompare(selectedGame.rawValue) == .orderedSame,
-                              preview.matchesSearchText(query) else {
-                            return nil
-                        }
+                        guard game == .all || preview.tcg.caseInsensitiveCompare(game.rawValue) == .orderedSame,
+                              preview.matchesSearchText(query) else { return nil }
                         return OwnedCardSearchResult(collection: collection, card: card)
                     }
-                }
-                .sorted {
-                    let nameOrder = $0.card.name.localizedCaseInsensitiveCompare($1.card.name)
-                    if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+                }.sorted {
+                    let order = $0.card.name.localizedCaseInsensitiveCompare($1.card.name)
+                    if order != .orderedSame { return order == .orderedAscending }
                     return $0.collection.name.localizedCaseInsensitiveCompare($1.collection.name) == .orderedAscending
                 }
-                searchResults = ownedSearchResults.map(\.previewCard)
-            } else if let set = searchFilters.set {
-                let cards = try await apiService.getSetCards(
-                    config: environmentStore.serverConfiguration,
-                    token: token,
-                    tcg: set.tcg,
-                    setCode: set.code
-                )
-                searchResults = cards.filter { $0.matchesSearchText(query) }
-            } else if searchFilters.hasDetailFilters {
-                searchResults = try await apiService.searchAllCards(
-                    config: environmentStore.serverConfiguration,
-                    token: token,
-                    query: query,
-                    game: selectedGame
-                )
+                output = SearchOutput(cards: owned.map(\.previewCard), owned: owned, collections: collections)
+            } else if let set = filters.set {
+                let cards = try await apiService.getSetCards(config: config, token: token, tcg: set.tcg, setCode: set.code)
+                output = SearchOutput(cards: cards.filter { $0.matchesSearchText(query) })
+            } else if filters.hasDetailFilters {
+                output = SearchOutput(cards: try await apiService.searchAllCards(config: config, token: token, query: query, game: game))
             } else {
-                let response = try await apiService.searchCards(
-                    config: environmentStore.serverConfiguration,
-                    token: token,
-                    query: query,
-                    game: selectedGame
-                )
-                searchResults = response.cards
+                let response = try await apiService.searchCards(config: config, token: token, query: query, game: game)
+                output = SearchOutput(cards: response.cards)
             }
-            if searchScope == .catalog {
-                searchResults = SearchTextNormalizer.rankedByName(
-                    searchResults,
-                    query: query,
-                    name: \.name
-                )
+            if scope == .catalog {
+                output.cards = SearchTextNormalizer.rankedByName(output.cards, query: query, name: \.name)
             }
+            return output
+        } completion: { result in
             isSearching = false
-        } catch {
-            errorMessage = error.localizedDescription
-            isSearching = false
+            switch result {
+            case .success(let output):
+                searchResults = output.cards
+                ownedSearchResults = output.owned
+                if let collections = output.collections { loadedCollections = collections }
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
         }
     }
+
 }
 
 private extension Card {

@@ -57,6 +57,7 @@ export const DEMO_SCHEMA_VERSION = 4;
  * out of this list.
  */
 export interface PersistedDemoState {
+  portableSections: Record<string, unknown>;
   profile: DemoProfile;
   preferences: UserPreferences;
   tags: DemoTag[];
@@ -92,6 +93,7 @@ export interface PersistedDemoState {
 export type DemoSlice = keyof PersistedDemoState;
 
 export const DEMO_SLICES: readonly DemoSlice[] = [
+  "portableSections",
   "profile",
   "preferences",
   "tags",
@@ -129,6 +131,8 @@ export interface DemoPersistence {
 
   /** Drop everything this implementation owns. Used by "reset demo". */
   clear(): Promise<void>;
+  commitDurably?(changes: Partial<PersistedDemoState>, recovery?: Partial<PersistedDemoState>): Promise<void>;
+  readRecovery?(): Promise<Partial<PersistedDemoState> | null>;
 }
 
 /**

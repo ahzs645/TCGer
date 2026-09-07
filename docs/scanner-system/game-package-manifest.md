@@ -1,4 +1,6 @@
-# GamePackageManifest v1
+# GamePackageManifest v1 and v2
+
+For step-by-step authoring, start with [Adding a future game](../src/content/docs/adding-games/index.md). The Starlight documentation site's **Adding Games** section provides a separate page for each capability, examples, validation steps, and current limitations. This file remains the consolidated package reference.
 
 `GamePackageManifest` is the platform-neutral intake contract for any game library, including an alternative library for a game TCGer already ships. The same URL works in web account settings and in the iOS and Android Settings screens. Built-in libraries remain available and use the same effective `GameDefinition` shape inside each client.
 
@@ -48,7 +50,7 @@ The Codex Critters README includes one stable HTTPS URL that can be pasted into
 web, iOS, or Android Settings. URL fields intentionally start empty; clients do
 not silently select a publisher or example package.
 
-The normative JSON Schema is [`schemas/game-package-manifest.v1.schema.json`](schemas/game-package-manifest.v1.schema.json). TypeScript runtime validation lives in `packages/api-types/src/game-packages.ts`; iOS and Android apply the same allowlists before saving anything.
+The structural JSON Schemas are [v2 for new packages](schemas/game-package-manifest.v2.schema.json) and [v1 for legacy packages](schemas/game-package-manifest.v1.schema.json). TypeScript runtime validation lives in `packages/api-types/src/game-packages.ts`; iOS and Android also validate packages before saving them. Runtime checks additionally enforce cross-field and artifact integrity requirements.
 
 ## Filters
 
@@ -87,4 +89,110 @@ allowlisted types, paths, sizes, and counts in line with
 
 ## Specialized capability boundary
 
-The optional scanner entries reference per-platform manifests and name the `tcger-arcface-v1` data runtime. The optional `sealedProducts` entry references a `tcger-sealed-catalog-v1` artifact, and the optional offline-pack entry names the declarative `tcger-pack-library-v1` schema. Declaring a sealed-products interface without its sealed catalog is invalid, just as scanner and pack-opening interfaces require their corresponding capabilities. Current clients preserve these declarations but specialized unknown-game renderers remain capability-gated until their runtime adapters are connected. Catalog and filter support does not depend on those adapters.
+The optional scanner entries reference per-platform manifests and name the `tcger-arcface-v1` data runtime. The optional `sealedProducts` entry references a `tcger-sealed-catalog-v1` artifact, and the optional offline-pack entry names the declarative `tcger-pack-library-v1` schema. Declaring a sealed-products interface without its sealed catalog is invalid, just as scanner and pack-opening interfaces require their corresponding capabilities. Compatible pricing, pack-opening, and scanner assets can be downloaded from the installed library on web, iOS, and Android. Generic URL-package ingestion into sealed inventory is not yet implemented; the sealed declaration alone does not activate that integration. Catalog and filter support does not depend on enabling optional downloads.
+
+
+## Version 2: reusable game capabilities
+
+Use `schema: "https://tcger.app/schemas/game-package-manifest/v2"` for new packages.
+Existing v1 catalogs remain readable. Both versions use the same catalog format;
+v2 additionally requires `definition.deckRules` when `interfaces.decks` is true,
+and a `pricing` asset when `interfaces.pricing` is true. Flags describe available
+features; downloading a scanner or pack library is a separate action in the
+installed library. Packages contain data, never executable extensions.
+
+The [Star Garden fixture](examples/star-garden/README.md) is a complete example.
+The structural contracts are generated with
+`npx tsx tools/game-packages/build-schema.ts` into `schemas/`. Clients also check
+cross-field invariants that JSON Schema does not express, including unique IDs,
+reference integrity, checksum agreement, and effective-date ordering.
+
+### Decks
+
+`definition.deckRules` version 1 declares formats, each format's named zones,
+zone size limits and optional card eligibility, its default zone, a copy limit,
+and optional copy-limit exceptions. Eligibility predicates read a supported
+card field or `attributes.*`; values in a predicate are alternatives, and multiple
+predicates are all required. Copies aggregate across zones and alternate
+printings by `baseExternalId` (falling back to exact card ID), or by normalized
+name when explicitly configured. Declare `baseExternalId` for every alternate
+printing if they share a copy limit.
+
+Deck creation snapshots these rules into the deck. Editing and validation use
+that snapshot after catalog updates or removal. Unsupported formats and unknown
+legality return `valid: false` with `unsupported` or `unknown` status. The existing
+built-in validators remain available for older decks. Rules supplied by a package
+are publisher rules, not an assertion that an official tournament approved them.
+Decks remain subject to each client's existing account/server availability.
+
+### Printings, finishes, and symbols
+
+`definition.printings` version 1 enables printing selection and declares finishes
+as `{ code, label, foil }`. A custom non-foil finish must explicitly set `foil: false`.
+`baseExternalId` groups alternate printings; `printingKey` identifies one printing.
+Names alone do not establish that two cards are the same card. Printing lookup is
+scoped to the originating installed package; an ambiguous source is not silently
+chosen. The `selection` value preserves a publisher's preferred grouping mode;
+package catalogs currently expose a flat list of exact printings.
+
+`definition.presentation.symbols` supplies HTTPS artwork with a stable ID, label,
+and kind (`rarity`, `resource`, or `type`). Rarity badges match the card's rarity
+value to the declared symbol ID. Resource and type symbols match string tokens in
+`types` or scalar/array `attributes` (for example, `attributes.resources: ["sun"]`). Clients retain metadata in `attributes.tcger`
+when a catalog card is saved, so labels and finish behavior survive removal of
+its source library. Publishers must reserve that attribute for the app.
+
+### Legality
+
+`formatLegality` accepts arbitrary format IDs. `legalityPeriods` can declare
+`format`, `legal`, `validFrom`, and `validTo`; starts are inclusive, ends exclusive.
+The latest applicable start wins. Once a format has dated coverage, a date outside
+that coverage is unknown, even when an undated value exists. A card marked
+`sanctionedPlayLegal: false` is always ineligible for sanctioned validation.
+Static catalog filters read `formatLegality`; deck validation applies the dated
+rules at the requested/current time.
+
+### Price snapshots
+
+`pricing: { schema: "tcger-price-snapshot-v1", asset }` references quotes with exact
+card/printing/finish/condition/language identity, amount, currency, source,
+observation time, and expiry. Optional identity fields are exact: absent means
+unspecified, not a wildcard. Supply `printingKey` when the catalog uses it.
+Clients never substitute another variant, currency, or expired quote. For example,
+a Japanese foil quote does not become an English non-foil value.
+
+Native copy/detail views and web card previews expose package prices with source
+and date. Web tracked collection pricing also resolves installed snapshots before
+remote providers when the source is automatic, using exact USD quotes for its
+existing accounting path. Multiple installed price sources for one game are an
+explicit miss in that aggregate path; individual card previews retain package
+scope. Package snapshots do not create a live provider integration or a background
+price-alert service. Refresh a snapshot by publishing and installing a new release.
+
+### Packs and scanner assets
+
+`offlinePacks.manifest` references a `tcger-pack-library-v1` file. Each pack has
+named weighted slots; `withoutReplacement` applies within that slot. Pools
+reference catalog card IDs and cannot have duplicates or impossible draw counts.
+The shared sampler and native samplers use the same weighted semantics. Once
+installed, collation works offline. Artwork still follows normal image caching.
+Pulls can be inspected and saved through existing collection/wishlist controls.
+
+Web `scanner.web.manifest` references `tcger-scanner-bundle-v1`, containing bounded,
+hashed `index` and `model` assets. The index must declare the package's game and
+catalog IDs, the supported ArcFace encoder, and consistent int8 vector dimensions.
+The verified model bytes feed the existing inference runtime. Index-supplied
+unverified model/gate URLs are discarded. iOS and Android entries point to their
+existing native ArcFace manifests, including those runtimes' model/index and
+integrity requirements. A scanner flag cannot make an incompatible or untrained
+model work; publishers still need platform-compatible models and accuracy tests.
+
+All relative URLs resolve against the manifest that contains the reference.
+`update.manifestUrl` is an update channel, not the base URL of the installed
+release. Failed capability downloads preserve the previous active data. Web
+catalog replacement clears its capability activation records; new native catalog
+installations replace the capability files in their package directory. Native
+scanner binaries retain the scanner store's independent installation lifecycle.
+
+Specialized collection views, including Pokémon's Pokédex roster and generations,
+are unchanged by this work.

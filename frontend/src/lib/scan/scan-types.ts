@@ -1,10 +1,10 @@
 import type { CardScanHashEntry, CardScanMatch } from "@/lib/api/scan";
 import type { TcgCode } from "@/types/card";
 
-export type SupportedTcg = Extract<TcgCode, "magic" | "pokemon" | "yugioh">;
+export type SupportedTcg = string;
 
 export function isSupportedScannerTcg(value: TcgCode): value is SupportedTcg {
-  return value === "magic" || value === "pokemon" || value === "yugioh";
+  return /^[a-z0-9][a-z0-9-]{0,63}$/.test(value) && value !== "all";
 }
 
 export interface RGBHash {

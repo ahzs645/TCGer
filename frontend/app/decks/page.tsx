@@ -1,4 +1,8 @@
 "use client";
+import { PackageDeckBuilder } from "@/components/decks/package-deck-builder";
+import { listInstalledGamePackages, type InstalledGamePackage } from "@/lib/game-packages/game-package-client";
+
+import { gameLabel } from "@/lib/utils";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -79,7 +83,7 @@ const MANAGEABLE_GAMES: readonly ManageableGame[] = [
 ];
 
 function tcgLabel(tcg: string): string {
-  return GAME_LABELS[tcg as SupportedGame] ?? tcg;
+  return gameLabel(tcg as SupportedGame) ?? tcg;
 }
 
 export default function DecksPage() {
@@ -391,7 +395,7 @@ function DeckDetail({
         </div>
       </CardHeader>
       <CardContent>
-        {deck.tcg === "yugioh" ? (
+        {deck.rules ? <PackageDeckBuilder deck={deck} /> : deck.tcg === "yugioh" ? (
           <YugiohDeckBuilder deck={deck} />
         ) : deck.cards.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
@@ -942,7 +946,10 @@ function NewDeckDialog({
   onCreated: (deck: DeckResponse) => void;
 }) {
   const [name, setName] = useState("");
-  const [tcg, setTcg] = useState<ManageableGame>("magic");
+  const [tcg, setTcg] = useState<string>("magic");
+  const [packages, setPackages] = useState<InstalledGamePackage[]>([]);
+  useEffect(() => { let active = true; void listInstalledGamePackages().then(p => { if (active) setPackages(p.filter(p => p.manifest.definition?.deckRules)); }).catch(() => {}); return () => { active = false; }; }, []);
+  const selectedPackage = packages.find(p => `package:${p.id}` === tcg);
   const [format, setFormat] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -951,8 +958,9 @@ function NewDeckDialog({
     mutationFn: () =>
       createDeck(token!, {
         name: name.trim(),
-        tcg,
-        format: format.trim() || undefined,
+        tcg: selectedPackage?.manifest.game.id ?? tcg,
+        rules: selectedPackage?.manifest.definition?.deckRules,
+        format: format.trim() || selectedPackage?.manifest.definition?.deckRules?.defaultFormat,
         description: description.trim() || undefined,
       }),
     onSuccess: (deck) => {
@@ -1004,7 +1012,7 @@ function NewDeckDialog({
             <Label htmlFor="deck-tcg">Game</Label>
             <Select
               value={tcg}
-              onValueChange={(v) => setTcg(v as ManageableGame)}
+              onValueChange={setTcg}
             >
               <SelectTrigger id="deck-tcg">
                 <SelectValue />
@@ -1018,6 +1026,7 @@ function NewDeckDialog({
                     {tcgLabel(g)}
                   </SelectItem>
                 ))}
+                {packages.map(p => <SelectItem key={p.id} value={`package:${p.id}`}>{p.manifest.game.name} · {p.manifest.publisher.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

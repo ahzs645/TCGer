@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="scan" android:enabled="true" android:icon="@drawable/ic_launcher" android:shortcutShortLabel="@string/shortcut_scan">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.ahmadjalil.tcger" android:targetClass="com.ahmadjalil.tcger.MainActivity" android:data="tcger://scan" />
+    </shortcut>
+    <shortcut android:shortcutId="search" android:enabled="true" android:icon="@drawable/ic_launcher" android:shortcutShortLabel="@string/shortcut_search">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.ahmadjalil.tcger" android:targetClass="com.ahmadjalil.tcger.MainActivity" android:data="tcger://search" />
+    </shortcut>
+</shortcuts>

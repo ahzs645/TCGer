@@ -52,7 +52,19 @@ func gameSectionIsOrderedBefore(
 
 struct TCGGameIcon: View {
     let game: TCGGame
-    var size: CGFloat = 14
+    var size: CGFloat = 16
+
+    private var opticalScale: CGFloat {
+        switch game {
+        case .yugioh:
+            return 0.9
+        case .pokemon:
+            return 1.15
+        case .all, .magic, .onepiece, .lorcana, .dragonball:
+            return 1
+        default: return 1
+        }
+    }
 
     var body: some View {
         Group {
@@ -66,6 +78,7 @@ struct TCGGameIcon: View {
                     .font(.system(size: size))
             }
         }
+        .scaleEffect(opticalScale)
         .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
@@ -126,6 +139,7 @@ struct GameLabel: View {
             Text(text ?? game.shortName)
         } icon: {
             TCGGameIcon(game: game)
+                .foregroundStyle(game.brandColor)
         }
     }
 }

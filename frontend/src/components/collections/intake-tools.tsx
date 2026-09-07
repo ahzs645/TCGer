@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, RotateCcw, Search } from "lucide-react";
@@ -193,7 +195,7 @@ export function RapidSetEntry() {
                   <SelectContent>
                     {GAMES.map((game) => (
                       <SelectItem key={game} value={game}>
-                        {GAME_LABELS[game as SupportedGame]}
+                        {gameLabel(game as SupportedGame)}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -542,7 +542,8 @@ model Deck {
   name        String
   description String?
   tcg         String // Canonical TCG code from @tcg/api-types
-  format      String? // 'standard', 'modern', 'commander', etc.
+  format      String? // Package-defined format identifier
+  rules       Json?   // Versioned declarative game rules captured at creation
   colorHex    String?
   isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())

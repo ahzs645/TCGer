@@ -345,3 +345,31 @@ test("round trip preserves the totals the dashboard shows", () => {
     .size;
   assert.equal(uniqueAfter, uniqueBefore, "unique cards");
 });
+
+test("metadata, tags, and images survive editing, moving across games, and a row-only reload", async () => {
+  const { addCopies, updateEntry } = await import("@tcg/api-types");
+  const source = structuredClone(seededBinders()[0]!);
+  source.id = "review-source";
+  const original = source.cards[0]!;
+  original.cardId = "001";
+  original.tcg = "pokemon";
+  original.cardData = { name: original.name, tcg: "pokemon", externalId: "001", baseExternalId: "base", printingKey: "printing", imageUrl: "https://example.test/card.png" };
+  original.copies = [{ id: "review-copy", condition: "NM", tags: [{ id: "tag", label: "Keep", colorHex: "123456" }], imageUrls: ["https://example.test/copy.png"] }];
+  original.quantity = 1;
+  source.cards = [original];
+  const target = { ...source, id: "review-target", cards: [] };
+  const db = new LocalPortableDb({ ...emptySnapshot(), ...toPortableRows([source, target]) });
+  const [other] = await addCopies(db, { userId: LOCAL_USER_ID, binderId: target.id, card: { tcg: "magic", externalId: "001", name: "Other game" }, quantity: 1 });
+  await updateEntry(db, { userId: LOCAL_USER_ID, entryId: "review-copy", updates: { condition: "LP", targetBinderId: target.id } });
+  const reloaded = toDemoBinders(JSON.parse(JSON.stringify(db.snapshot())));
+  const moved = reloaded.find((binder) => binder.id === target.id)!;
+  assert.equal(moved.cards.length, 2);
+  const pokemon = moved.cards.find((card) => card.tcg === "pokemon")!;
+  assert.deepEqual(pokemon.cardData, original.cardData);
+  assert.deepEqual(pokemon.copies?.[0]?.tags, original.copies[0]!.tags);
+  assert.deepEqual(pokemon.copies?.[0]?.imageUrls, original.copies[0]!.imageUrls);
+  assert.equal(pokemon.copies?.[0]?.condition, "LP");
+  assert.equal(moved.cards.find((card) => card.tcg === "magic")?.copies?.[0]?.id, other!._id);
+  await updateEntry(db, { userId: LOCAL_USER_ID, entryId: "review-copy", updates: {}, embeddedTags: [] });
+  assert.deepEqual(toDemoBinders(db.snapshot()).find((b) => b.id === target.id)!.cards.find((c) => c.tcg === "pokemon")!.copies![0]!.tags, []);
+});

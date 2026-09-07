@@ -73,4 +73,7 @@
     <string name="navigation_back">Back</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_reset">Reset</string>
+    <string name="shortcut_scan">Scan cards</string>
+    <string name="shortcut_search">Search cards</string>
+    <string name="widget_description">Open TCGer scanning and card search</string>
 </resources>

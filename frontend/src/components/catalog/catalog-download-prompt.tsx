@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useEffect, useMemo, useState } from "react";
 import { Download, Loader2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -143,7 +145,7 @@ export function CatalogDownloadPrompt() {
       <Card className="shadow-xl">
         <CardHeader className="relative pb-4 pr-14">
           <CardTitle className="text-lg">
-            Download the {requestedGame ? GAME_LABELS[requestedGame] : ""}{" "}
+            Download the {requestedGame ? gameLabel(requestedGame) : ""}{" "}
             catalog{formatApproximateSize(state?.manifest?.bytes)}?
           </CardTitle>
           <CardDescription>

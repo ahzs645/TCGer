@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -56,7 +58,7 @@ interface OwnedPrice {
 }
 
 function tcgLabel(tcg: string): string {
-  return GAME_LABELS[tcg as SupportedGame] ?? tcg;
+  return gameLabel(tcg as SupportedGame) ?? tcg;
 }
 
 export default function PricesPage() {

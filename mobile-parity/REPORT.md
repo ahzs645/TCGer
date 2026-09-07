@@ -4,16 +4,16 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 
 - Platforms: Web, iOS, Android.
 - 7 features are parity-required.
-- 77 features are explicitly tracked.
+- 84 features are explicitly tracked.
 - A declaration is backed by source paths in the manifest. “Verified” additionally requires passing current JUnit evidence on every declared platform; a declared test that was not supplied is “Not run.”
 
 ## Declaration summary
 
 | Platform | Implemented | Partial | Planned | Unavailable | Not applicable | Waived |
 |---|---|---|---|---|---|---|
-| Web | 56 | 10 | 18 | 0 | 0 | 0 |
-| iOS | 84 | 0 | 0 | 0 | 0 | 0 |
-| Android | 69 | 6 | 9 | 0 | 0 | 0 |
+| Web | 68 | 8 | 15 | 0 | 0 | 0 |
+| iOS | 91 | 0 | 0 | 0 | 0 | 0 |
+| Android | 76 | 6 | 9 | 0 | 0 | 0 |
 
 ## Feature matrix
 
@@ -79,16 +79,16 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 | scanner.sharedWebSession | Sync scanner results into a shared web session | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
 | scanner.binder.savePagePhotos | Save binder-page photos and replace them on retake | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
 | scanner.debug.serverCapture | Persist server-side scan images, crops, timings, and metadata | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| scanner.debug.developerAccess | Hidden developer-tools unlock and scanner-testing toggle | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
+| scanner.debug.developerAccess | Hidden developer-tools unlock and scanner-testing toggle | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.testingInputs | Deterministic demo card and binder-page scanner inputs | track | Partial | — | Implemented | — | Implemented | Not run | Tracked gap |
 | scanner.debug.captureBrowser | Browse, inspect, refresh, and label recent server debug captures | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.livePipeline | Live scanner debug camera, quad overlay, timing, and log | track | Partial | — | Implemented | — | Implemented | — | Tracked gap |
 | scanner.debug.liveConfiguration | Debug game, embedding-only, and analysis-interval options | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
-| scanner.debug.recording | Record, pause, clear, save, and share live analyzed frames | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
+| scanner.debug.recording | Record, pause, clear, save, and share live analyzed frames | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.devModeRecording | Record production scans and decision evidence as training data | track | Implemented | — | Implemented | — | Partial | — | Tracked gap |
 | scanner.debug.attemptImages | Optionally persist every crop-attempt image | track | Partial | — | Implemented | — | Partial | — | Tracked gap |
-| scanner.debug.sessionManagement | Browse, select, share, delete, and export recorded sessions | track | Partial | — | Implemented | — | Implemented | — | Tracked gap |
-| scanner.debug.replay | Import and replay extracted scanner recordings | track | Partial | — | Implemented | — | Implemented | — | Tracked gap |
+| scanner.debug.sessionManagement | Browse, select, share, delete, and export recorded sessions | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
+| scanner.debug.replay | Import and replay extracted scanner recordings | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.referenceSets | Browse labeled reference sets and compare expected results | track | Implemented | Not run | Implemented | — | Partial | — | Tracked gap |
 | scanner.debug.assetDiagnostics | Validate scanner models, indexes, hashes, and reference assets | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.decisionDiagnostics | Capture per-attempt thresholds, geometry, OCR, gate, and timing evidence | track | Implemented | — | Implemented | — | Partial | — | Tracked gap |
@@ -98,8 +98,15 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 | scanner.debug.performance.stagedHypotheses | Staged crop-retry hypotheses toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
 | scanner.debug.performance.batchedOrientation | Batched orientation-check toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
 | scanner.debug.performance.concurrentOrientation | Parallel orientation-check toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
-| scanner.debug.performance.warmStart | Scanner-model warm-start toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
+| scanner.debug.performance.warmStart | Scanner-model warm-start toggle | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
 | scanner.debug.performance.fastCapture | Fast shutter-capture toggle | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
 | scanner.debug.performance.fastFooterOcr | Fast-first footer OCR toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
 | scanner.debug.performance.leanOcrStrips | Lean OCR-strip processing toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
 | scanner.debug.performance.footerFirstOcr | Footer-first OCR ordering toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
+| data.portableBackup | Portable backup fidelity and recovery | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
+| cards.filteredSearch | Filter cards beyond preview limits | track | Implemented | Not run | Implemented | Not run | Implemented | — | Aligned |
+| scanner.binderCorners | Correct and persist binder page crops | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
+| collections.copyMetadata | Edit and retain physical-copy metadata | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
+| collections.smartFolders | Condition and tag smart folders | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
+| account.management | Profile password signup deletion and preferences | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
+| scanner.binderReview | Save selected cards and reopen saved binder photos | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |

@@ -1,12 +1,14 @@
 package com.ahmadjalil.tcger.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -18,6 +20,8 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,11 +34,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.ahmadjalil.tcger.domain.CatalogCard
 import com.ahmadjalil.tcger.domain.DataSourceMode
 import com.ahmadjalil.tcger.generated.ParityFeatureIDs
@@ -44,8 +53,8 @@ import com.ahmadjalil.tcger.ui.AppViewModel
 @Composable
 fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: AppViewModel) {
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
-    var appliedDefaultGame by remember { mutableStateOf(false) }
-    var showingFilters by remember { mutableStateOf(false) }
+    var appliedDefaultGame by rememberSaveable { mutableStateOf(false) }
+    var showingFilters by rememberSaveable { mutableStateOf(false) }
     var filters by remember { mutableStateOf(CardSearchFilters()) }
     val packageDefinitions = state.gamePackages.installed
         .filter { it.manifest.effectiveDefinition.interfaces?.search != false }
@@ -63,15 +72,22 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
         }
     }
 
-    Column(
+    LazyColumn(
         Modifier.fillMaxSize().testTag(ParityFeatureIDs.screen(ParityFeatureIDs.CARDS_SEARCH)).padding(
             start = 16.dp,
             end = 16.dp,
             top = contentPadding.calculateTopPadding() + 20.dp,
             bottom = contentPadding.calculateBottomPadding(),
         ),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
     ) {
-        ScreenTitle("Card search", if (state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE) "Search cards already saved on this device" else "Search the connected TCGer catalog")
+        item {
+        ScreenTitle("Card search", if (state.searchCollectionOnly) "Find cards in your binders" else "Search downloaded libraries and your connected catalog")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(!state.searchCollectionOnly, { viewModel.setSearchCollectionOnly(false) }, { Text("All cards") })
+            FilterChip(state.searchCollectionOnly, { viewModel.setSearchCollectionOnly(true) }, { Text("My collection") })
+        }
         OutlinedTextField(
             value = state.searchQuery,
             onValueChange = viewModel::setSearchQuery,
@@ -94,29 +110,27 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
                 Icon(Icons.Default.FilterList, null)
                 Text(" Filters${if (filters.activeCount > 0) " (${filters.activeCount})" else ""}")
             }
-            OutlinedButton(onClick = viewModel::discoverCards, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = viewModel::discoverCards, enabled = !state.searchCollectionOnly, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.Casino, null)
                 Text(" Discover")
             }
         }
-        if (state.isSearching) LoadingPane()
-        else if (state.searchQuery.length >= 2 && state.searchResults.isEmpty()) {
-            EmptyPane("No matches", if (state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE) "Add a manual card below, or connect to a server for catalog search." else "Try another name or game.")
+        }
+        if (state.isSearching) item { LoadingPane() }
+        else if (state.searchQuery.length >= 2 && state.searchResults.isEmpty()) { item {
+            EmptyPane("No matches", if (state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE) "Try another name or download a game library in Settings → Games. You can also add a card manually." else "Try another name or game.")
             if (state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE && state.binders.isNotEmpty()) {
                 Button(onClick = { selectedCard = viewModel.manualCard() }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, null)
                     Text(" Add “${state.searchQuery.trim()}” manually")
                 }
             }
-        } else if (state.searchResults.isNotEmpty() && filteredResults.isEmpty()) {
-            EmptyPane("No filtered matches", "Clear or broaden the advanced filters.")
-        } else LazyColumn(
-            Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-        ) {
+        } } else if (state.searchResults.isNotEmpty() && filteredResults.isEmpty()) {
+            item { EmptyPane("No filtered matches", "Clear or broaden the advanced filters.") }
+        } else {
             items(filteredResults, key = { "${it.tcg}:${it.id}" }) { card ->
                 CatalogCardRow(card, showCardNumbers = state.preferences.showCardNumbers) {
+                    TextButton(onClick = { viewModel.openCatalogCard(card) }) { Text("View") }
                     IconButton(onClick = { selectedCard = card }) { Icon(Icons.Default.Add, "Add ${card.name}") }
                 }
             }
@@ -136,6 +150,7 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
         SearchFiltersDialog(
             game = state.searchGame,
             initial = filters,
+            resultCards = state.searchResults,
             onDismiss = { showingFilters = false },
             onApply = { filters = it; showingFilters = false },
         )
@@ -155,7 +170,7 @@ private data class CardSearchFilters(
 
     fun matches(card: CatalogCard, game: String?): Boolean {
         fun String?.containsQuery(query: String) = query.isBlank() || this?.contains(query.trim(), true) == true
-        if (!(card.setName.containsQuery(set) || card.setCode.containsQuery(set))) return false
+        if (set.isNotBlank() && card.setFilterValue() != set) return false
         if (!card.rarity.containsQuery(rarity)) return false
         if (!card.collectorNumber.containsQuery(collectorNumber)) return false
         if (!card.artist.containsQuery(artist)) return false
@@ -180,6 +195,20 @@ private data class CardSearchFilters(
     }
 }
 
+private data class ResultSetChoice(
+    val value: String,
+    val name: String,
+    val code: String,
+    val tcg: String,
+    val symbolUrl: String?,
+    val logoUrl: String?,
+)
+
+private fun CatalogCard.setFilterValue(): String? {
+    val code = setCode?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    return "${tcg.lowercase()}::${code.lowercase()}"
+}
+
 private fun statKey(game: String?) = when (game) {
     "pokemon" -> "hp"
     "magic" -> "cmc"
@@ -202,24 +231,136 @@ private fun statTitle(game: String?) = when (game) {
 private fun SearchFiltersDialog(
     game: String?,
     initial: CardSearchFilters,
+    resultCards: List<CatalogCard>,
     onDismiss: () -> Unit,
     onApply: (CardSearchFilters) -> Unit,
 ) {
     var draft by remember(initial) { mutableStateOf(initial) }
+    var setMenuExpanded by remember { mutableStateOf(false) }
+    val setChoices = resultCards
+        .filter { draft.copy(set = "").matches(it, game) }
+        .mapNotNull { card ->
+            val value = card.setFilterValue() ?: return@mapNotNull null
+            ResultSetChoice(
+                value = value,
+                name = card.setName ?: card.setCode.orEmpty(),
+                code = card.setCode.orEmpty(),
+                tcg = card.tcg,
+                symbolUrl = card.setSymbolUrl,
+                logoUrl = card.setLogoUrl,
+            )
+        }
+        .distinctBy(ResultSetChoice::value)
+        .sortedWith(compareBy(ResultSetChoice::tcg, ResultSetChoice::name))
+    val selectedSet = setChoices.firstOrNull { it.value == draft.set }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Advanced filters") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { OutlinedTextField(draft.set, { draft = draft.copy(set = it) }, label = { Text("Set name or code") }) }
-                item { OutlinedTextField(draft.rarity, { draft = draft.copy(rarity = it) }, label = { Text("Rarity") }) }
-                item { OutlinedTextField(draft.collectorNumber, { draft = draft.copy(collectorNumber = it) }, label = { Text("Collector number") }) }
-                item { OutlinedTextField(draft.artist, { draft = draft.copy(artist = it) }, label = { Text("Artist / illustrator") }) }
-                item { OutlinedTextField(draft.rulesText, { draft = draft.copy(rulesText = it) }, label = { Text("Rules or card text") }) }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Set", style = MaterialTheme.typography.labelMedium)
+                        Box {
+                            OutlinedButton(
+                                onClick = { setMenuExpanded = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = setChoices.isNotEmpty(),
+                            ) {
+                                selectedSet?.let { set ->
+                                    AsyncImage(
+                                        model = set.symbolUrl ?: set.logoUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                    )
+                                }
+                                Column(
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.Start,
+                                ) {
+                                    Text(
+                                        selectedSet?.name ?: if (resultCards.isEmpty()) "Search first to choose a set" else "Any set in this search",
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    selectedSet?.let { set ->
+                                        Text(
+                                            set.code.uppercase(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = setMenuExpanded,
+                                onDismissRequest = { setMenuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text("Any set", color = MaterialTheme.colorScheme.onSurface)
+                                            Text(
+                                                "All sets in this search",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        draft = draft.copy(set = "")
+                                        setMenuExpanded = false
+                                    },
+                                )
+                                setChoices.forEach { set ->
+                                    DropdownMenuItem(
+                                        leadingIcon = {
+                                            AsyncImage(
+                                                model = set.symbolUrl ?: set.logoUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(28.dp),
+                                            )
+                                        },
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    set.name,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    fontWeight = FontWeight.Medium,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Text(
+                                                    "${set.code.uppercase()} · ${set.tcg.displayGame()}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            draft = draft.copy(set = set.value)
+                                            setMenuExpanded = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            if (setChoices.isEmpty()) "Run a search to choose from matching sets." else "${setChoices.size} ${if (setChoices.size == 1) "set" else "sets"} in the current results.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                item { OutlinedTextField(draft.rarity, { draft = draft.copy(set = "", rarity = it) }, label = { Text("Rarity") }) }
+                item { OutlinedTextField(draft.collectorNumber, { draft = draft.copy(set = "", collectorNumber = it) }, label = { Text("Collector number") }) }
+                item { OutlinedTextField(draft.artist, { draft = draft.copy(set = "", artist = it) }, label = { Text("Artist / illustrator") }) }
+                item { OutlinedTextField(draft.rulesText, { draft = draft.copy(set = "", rulesText = it) }, label = { Text("Rules or card text") }) }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(draft.minimumStat, { draft = draft.copy(minimumStat = it) }, Modifier.weight(1f), label = { Text("Min ${statTitle(game)}") })
-                        OutlinedTextField(draft.maximumStat, { draft = draft.copy(maximumStat = it) }, Modifier.weight(1f), label = { Text("Max ${statTitle(game)}") })
+                        OutlinedTextField(draft.minimumStat, { draft = draft.copy(set = "", minimumStat = it) }, Modifier.weight(1f), label = { Text("Min ${statTitle(game)}") })
+                        OutlinedTextField(draft.maximumStat, { draft = draft.copy(set = "", maximumStat = it) }, Modifier.weight(1f), label = { Text("Max ${statTitle(game)}") })
                     }
                 }
             }
@@ -235,7 +376,7 @@ private fun SearchFiltersDialog(
 }
 
 @Composable
-private fun AddCardDialog(
+fun AddCardDialog(
     card: CatalogCard,
     state: AppUiState,
     onDismiss: () -> Unit,

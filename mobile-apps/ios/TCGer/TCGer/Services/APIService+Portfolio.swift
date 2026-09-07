@@ -392,6 +392,7 @@ extension APIService {
     }
 
     private struct CreateDeckRequest: Encodable {
+        var rules: GameDeckRules? = nil
         let name: String
         let description: String?
         let tcg: String
@@ -409,6 +410,7 @@ extension APIService {
     }
 
     private struct AddDeckCardRequest: Encodable {
+        let cardData: [String: JSONValue]
         let externalId: String
         let tcg: String
         let name: String
@@ -625,10 +627,12 @@ extension APIService {
         description: String?,
         tcg: String,
         format: String?,
-        isPublic: Bool
+        isPublic: Bool,
+        rules: GameDeckRules? = nil
     ) async throws -> Deck {
         try requireServer(config, feature: "Decks")
         let body = CreateDeckRequest(
+            rules: rules,
             name: name,
             description: description,
             tcg: tcg,
@@ -680,6 +684,7 @@ extension APIService {
     ) async throws -> DeckCard {
         try requireServer(config, feature: "Decks")
         let body = AddDeckCardRequest(
+            cardData: try JSONDecoder().decode([String: JSONValue].self, from: JSONEncoder().encode(card)),
             externalId: card.id,
             tcg: card.tcg,
             name: card.name,

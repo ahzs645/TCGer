@@ -104,6 +104,8 @@ struct GamePackageManifest: Codable, Hashable {
     let scanner: Scanner?
     let offlinePacks: OfflinePacks?
     let sealedProducts: SealedProducts?
+    struct Pricing: Codable, Hashable { let schema: String; let asset: GamePackageAsset }
+    var pricing: Pricing? = nil
 
     var installedId: String {
         if let packageId, let publisherId = publisher.id { return "\(publisherId)--\(packageId)" }
@@ -122,7 +124,7 @@ struct GamePackageDefinition: Codable, Hashable {
         var effectiveVersion: Int { version ?? 1 }
     }
     struct Format: Codable, Hashable, Identifiable { let id: String; let label: String; let physical: Bool? }
-    struct Presentation: Codable, Hashable { let accentColor: String?; let iconUrl: String?; let cardBackUrl: String? }
+    struct Presentation: Codable, Hashable { let accentColor: String?; let iconUrl: String?; let cardBackUrl: String?; var symbols: [GameSymbol]? = nil }
     struct Interfaces: Codable, Hashable {
         let search: Bool?; let collection: Bool?; let sets: Bool?; let wishlists: Bool?
         let decks: Bool?; let pricing: Bool?; let sealedProducts: Bool?; let scanner: Bool?; let packOpening: Bool?
@@ -153,6 +155,8 @@ struct GamePackageDefinition: Codable, Hashable {
     let interfaces: Interfaces?
     let collection: CollectionDefinition
     let search: SearchDefinition
+    var deckRules: GameDeckRules? = nil
+    var printings: GamePrintings? = nil
 
     static func legacy(manifest: GamePackageManifest) -> Self {
         .init(
@@ -265,11 +269,12 @@ struct CommunityCatalogCard: Codable, Hashable, Identifiable {
     let regulationMark: String?
     let sanctionedPlayLegal: Bool?
     let formatLegality: [String: PackageJSONValue]?
+    var legalityPeriods: [PackageJSONValue]? = nil
     let dexEntries: [PackageJSONValue]?
     let releasedAt: String?
     let imageUrl: String?
     let imageUrlSmall: String?
-    let attributes: [String: PackageJSONValue]?
+    var attributes: [String: PackageJSONValue]?
 
     var effectiveAttributes: [String: PackageJSONValue] {
         var root: [String: PackageJSONValue] = [:]
@@ -326,7 +331,7 @@ final class GamePackageStore: ObservableObject {
     private let encoder = JSONEncoder()
     private let maximumManifestBytes = 1_048_576
     private let allowedProperties = try! NSRegularExpression(pattern: "^(id|name|setCode|collectorNumber|rarity|artist|type|category|releasedAt|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)$")
-    private let allowedDefinitionProperties = try! NSRegularExpression(pattern: "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.(standard|expanded|unlimited)|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$")
+    private let allowedDefinitionProperties = try! NSRegularExpression(pattern: "^(name|setCode|setName|collectorNumber|rarity|releasedAt|language|artist|supertype|regulationMark|sanctionedPlayLegal|quantity|dexEntries\\.number|formatLegality\\.[a-z0-9][a-z0-9-]*|attributes\\.[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*|copies\\.(condition|language|finishCode|finishLabel|edition|stamp))$")
     private var publisherKeys: [String: String] = [:]
 
     private init() {
@@ -447,7 +452,7 @@ final class GamePackageStore: ObservableObject {
             let previous = installed.first { $0.id == manifest.installedId }
             let record = InstalledGamePackage(
                 id: manifest.installedId,
-                sourceURL: manifest.update?.manifestUrl ?? sourceURL.absoluteString,
+                sourceURL: sourceURL.absoluteString,
                 installedAt: previous?.installedAt ?? Date(),
                 manifest: manifest,
                 trust: publisherVerification.trust
@@ -493,6 +498,11 @@ final class GamePackageStore: ObservableObject {
         return catalog.cards.map { card in
             var card = card
             if card.setName == nil, let code = card.setCode { card.setName = setNames[code] }
+            let definition = package.manifest.effectiveDefinition
+            let metadata = GameCardPresentation(packageId: package.id, printings: definition.printings, symbols: definition.presentation?.symbols)
+            if let data = try? JSONEncoder().encode(metadata), let value = try? decoder.decode(PackageJSONValue.self, from: data) {
+                var attributes = card.attributes ?? [:]; attributes["tcger"] = value; card.attributes = attributes
+            }
             return card
         }
     }
@@ -511,6 +521,46 @@ final class GamePackageStore: ObservableObject {
             .map { $0.card(gameId: package.manifest.game.id) }
     }
 
+    func enableCapability(_ kind: String, for package: InstalledGamePackage) async throws {
+        if kind == "scanner" {
+            guard let game = TCGGame(rawValue: package.manifest.game.id) else { throw GameCapabilityError.invalidContract }
+            try await ScannerAssetStore.shared.install(game)
+            return
+        }
+        let asset = kind == "pricing" ? package.manifest.pricing?.asset : package.manifest.offlinePacks?.manifest
+        guard let asset, let base = URL(string: package.sourceURL) else { throw GameCapabilityError.unsupported }
+        let url = try secureURL(URL(string: asset.url, relativeTo: base)!.absoluteURL.absoluteString)
+        let data = try await download(url, maximumBytes: asset.bytes)
+        guard data.count == asset.bytes, SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == asset.sha256.lowercased() else { throw GameCapabilityError.invalidContract }
+        let ids = Set(try cards(for: package).map(\.id))
+        if kind == "pricing" {
+            let snapshot = try decoder.decode(GamePriceSnapshot.self, from: data)
+            try snapshot.validateContract()
+            guard snapshot.schema == "tcger-price-snapshot-v1", snapshot.gameId == package.manifest.game.id,
+                  snapshot.quotes.allSatisfy({ ids.contains($0.cardId) && $0.amount.isFinite && $0.amount >= 0 && gameCapabilityDate($0.observedAt) != nil && gameCapabilityDate($0.expiresAt) != nil }) else { throw GameCapabilityError.catalogMismatch }
+        } else {
+            let library = try decoder.decode(GamePackLibrary.self, from: data)
+            try library.validateContract()
+            guard library.schema == "tcger-pack-library-v1", library.gameId == package.manifest.game.id,
+                  Set(library.packs.map(\.id)).count == library.packs.count,
+                  library.packs.allSatisfy({ $0.slots.allSatisfy { $0.pool.allSatisfy { ids.contains($0.cardId) } } }) else { throw GameCapabilityError.catalogMismatch }
+            for pack in library.packs { _ = try pack.open(random: { 0 }) }
+        }
+        guard installed.contains(where: { $0.id == package.id && $0.manifest == package.manifest }) else { throw GameCapabilityError.catalogMismatch }
+        try data.write(to: packageDirectory(package.id).appendingPathComponent("capability-\(kind).json"), options: .atomic)
+        objectWillChange.send()
+    }
+
+    func priceSnapshot(for package: InstalledGamePackage) -> GamePriceSnapshot? {
+        guard let data = try? Data(contentsOf: packageDirectory(package.id).appendingPathComponent("capability-pricing.json")) else { return nil }
+        return try? decoder.decode(GamePriceSnapshot.self, from: data)
+    }
+
+    func packLibrary(for package: InstalledGamePackage) -> GamePackLibrary? {
+        guard let data = try? Data(contentsOf: packageDirectory(package.id).appendingPathComponent("capability-packs.json")) else { return nil }
+        return try? decoder.decode(GamePackLibrary.self, from: data)
+    }
+
     func remove(_ package: InstalledGamePackage) {
         try? FileManager.default.removeItem(at: packageDirectory(package.id))
         installed.removeAll { $0.id == package.id }
@@ -520,7 +570,7 @@ final class GamePackageStore: ObservableObject {
     }
 
     private func validate(_ manifest: GamePackageManifest) throws {
-        guard manifest.schema == "https://tcger.app/schemas/game-package-manifest/v1",
+        guard ["https://tcger.app/schemas/game-package-manifest/v1", "https://tcger.app/schemas/game-package-manifest/v2"].contains(manifest.schema),
               manifest.catalog.schema == "tcger-catalog-v1",
               manifest.game.id.range(of: "^[a-z0-9][a-z0-9-]{0,63}$", options: .regularExpression) != nil,
               manifest.catalog.cardCount >= 0,
@@ -542,6 +592,14 @@ final class GamePackageStore: ObservableObject {
             throw PackageError.invalid("Invalid package release sequence")
         }
         if let definition = manifest.definition {
+            try definition.deckRules?.validateContract()
+            try definition.printings?.validateContract()
+            guard (definition.presentation?.symbols?.count ?? 0) <= 1000 else { throw GameCapabilityError.invalidContract }
+            for symbol in definition.presentation?.symbols ?? [] { try symbol.validateContract() }
+            if manifest.schema.hasSuffix("/v2") {
+                guard definition.interfaces?.decks != true || definition.deckRules != nil,
+                      definition.interfaces?.pricing != true || manifest.pricing != nil else { throw GameCapabilityError.invalidContract }
+            }
             let features = definition.interfaces?.features ?? []
             guard !(definition.interfaces?.scanner == true && manifest.scanner == nil),
                   !(definition.interfaces?.packOpening == true && manifest.offlinePacks == nil),
@@ -703,10 +761,12 @@ extension CommunityCatalogCard {
             supertype: supertype ?? type,
             subtypes: subtypes,
             types: types,
+            formatLegality: formatLegality.map { PokemonFormatLegality(values: $0.compactMapValues { if case .bool(let value) = $0 { return value }; return nil }) },
             dexEntries: normalizedDexEntries,
             regulationMark: regulationMark,
             language: language,
             attributes: effectiveAttributes.mapValues { $0.jsonValue },
+            legalityPeriods: legalityPeriods?.map { $0.jsonValue },
             baseExternalId: baseExternalId,
             printingKey: printingKey ?? id,
             artworkId: artworkId,
@@ -880,6 +940,7 @@ struct CommunityGameLibraryView: View {
 
     var body: some View {
         List {
+            GamePackageCapabilitiesView(package: package, store: store)
             if !package.manifest.effectiveDefinition.search.facets.isEmpty { Section("Filters") { ForEach(package.manifest.effectiveDefinition.search.facets) { filter in FilterControl(filter: filter, values: Binding(get: { selections[filter.id] ?? [] }, set: { selections[filter.id] = $0 })) } } }
             Section("Cards") { ForEach(filteredCards) { card in VStack(alignment: .leading) { Text(card.name); if let set = card.setCode { Text([set, card.collectorNumber].compactMap { $0 }.joined(separator: " ")).font(.caption).foregroundStyle(.secondary) } } } }
         }.navigationTitle(package.manifest.effectiveDefinition.label).searchable(text: $search).task { cards = (try? store.cards(for: package)) ?? [] }

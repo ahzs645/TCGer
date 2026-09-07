@@ -1,0 +1,24 @@
+{
+  "format": "com.tcger.portable-backup",
+  "formatVersion": 2,
+  "exportedAt": "2026-09-04T12:00:00Z",
+  "binders": [{
+    "id": "fixture-binder",
+    "name": "Parity, binder",
+    "colorHex": "315DA8",
+    "defaultCondition": "NM",
+    "cards": [
+      {"id":"pokemon-copy-1","card":{"id":"001","name":"Pikachu","tcg":"pokemon","setCode":"SV1","collectorNumber":"001"},"quantity":1,"condition":"LP","price":10.5,"acquisitionPrice":4.25,"details":{"language":"English","notes":"First line\nSecond, \"quoted\" line","serialNumber":"physical-1","acquiredAt":"2026-08-01T00:00:00Z","isFoil":true,"finishCode":"reverse-holo","gradingCompany":"PSA","gradingScore":"9","certNumber":"123456","storageLocation":"Shelf A","tags":[{"id":"fixture-tag","label":"Favorites","colorHex":"AABBCC"}]}},
+      {"id":"pokemon-copy-2","card":{"id":"001","name":"Pikachu","tcg":"pokemon","setCode":"SV1"},"quantity":1,"condition":null,"price":20.25,"acquisitionPrice":8,"details":{"notes":"Unspecified condition must stay unspecified"}},
+      {"id":"magic-copy-1","card":{"id":"001","name":"Lightning Bolt","tcg":"magic","setCode":"M11"},"quantity":1,"condition":"NM","price":3,"details":{}}
+    ]
+  }],
+  "wishlists":[{"id":"fixture-wishlist","name":"Every Pikachu","colorHex":"C43D73","matchAnyPrinting":false,"cards":[{"id":"wanted-1","card":{"id":"001","name":"Pikachu","tcg":"pokemon"},"desiredQuantity":2,"notes":"Reverse holo"}],"rules":[{"id":"rule-1","type":"name","tcg":"pokemon","query":"Pikachu","includeAllPrintings":true,"autoSync":false}]}],
+  "sealedInventory":[],
+  "sections":{
+    "transactions":[{"id":"tx-1","type":"purchase","cardName":"Pikachu","tcg":"pokemon","quantity":1,"amount":4.25,"currency":"USD","date":"2026-08-01T00:00:00Z"}],
+    "onlineCodes":[{"id":"code-1","tcg":"pokemon","code":"TEST-PARITY-001","status":"unused","source":"manual","capturedAt":"2026-09-04T12:00:00Z","createdAt":"2026-09-04T12:00:00Z","updatedAt":"2026-09-04T12:00:00Z"}],
+    "futureFeature":{"records":[{"id":"preserve-me","value":42}]},
+    "preferences":{"showPricing":false,"showCardNumbers":true,"enabledPokemon":true,"enabledMagic":true,"enabledYugioh":false,"enabledOnepiece":false,"enabledLorcana":false,"enabledDragonball":false}
+  }
+}

@@ -2,10 +2,14 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="scanner-attempt-images/" />
+        <exclude domain="file" path="datastore/tcger_preferences.preferences_pb" />
+        <exclude domain="sharedpref" path="personal_pricing.xml" />
         <exclude domain="file" path="scanner-recordings/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="scanner-attempt-images/" />
+        <exclude domain="file" path="datastore/tcger_preferences.preferences_pb" />
+        <exclude domain="sharedpref" path="personal_pricing.xml" />
         <exclude domain="file" path="scanner-recordings/" />
     </device-transfer>
 </data-extraction-rules>

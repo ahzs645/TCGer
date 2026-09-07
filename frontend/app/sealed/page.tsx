@@ -1,5 +1,7 @@
 "use client";
 
+import { gameLabel } from "@/lib/utils";
+
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -86,7 +88,7 @@ import { getSetCards } from "@/lib/api/cards";
 import type { Card as TradingCard, TcgCode } from "@tcg/api-types";
 
 function tcgLabel(tcg: string): string {
-  return GAME_LABELS[tcg as SupportedGame] ?? tcg;
+  return gameLabel(tcg as SupportedGame) ?? tcg;
 }
 
 function currency(value: number): string {

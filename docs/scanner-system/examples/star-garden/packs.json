@@ -1,0 +1,36 @@
+{
+  "schema": "tcger-pack-library-v1",
+  "gameId": "star-garden",
+  "packs": [
+    {
+      "id": "first-garden",
+      "name": "First Garden",
+      "setCode": "SG1",
+      "slots": [
+        {
+          "count": 1,
+          "pool": [
+            {
+              "cardId": "captain-1",
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "count": 2,
+          "pool": [
+            {
+              "cardId": "scout-1",
+              "weight": 4
+            },
+            {
+              "cardId": "scout-2",
+              "weight": 1
+            }
+          ],
+          "withoutReplacement": true
+        }
+      ]
+    }
+  ]
+}

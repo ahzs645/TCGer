@@ -49,7 +49,11 @@ fun BottomNavigationCustomizationScreen(
 ) {
     var showingResetConfirmation by remember { mutableStateOf(false) }
     val preferences = state.preferences
-    val order = preferences.bottomNavigationOrder
+    val order = preferences.bottomNavigationOrder.filter {
+        it.isAvailable(preferences.dataSourceMode == com.ahmadjalil.tcger.domain.DataSourceMode.SERVER && preferences.isSignedIn,
+            state.gamePackages.official.any { game -> game.game.id in preferences.enabledGames && game.effectiveDefinition.interfaces?.supportsFeature("pokedex") == true } ||
+                state.gamePackages.installed.any { game -> game.manifest.effectiveDefinition.interfaces?.supportsFeature("pokedex") == true }, preferences.sealedProductsEnabled) && it.isSupportedBy(state.serverFeatures)
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -74,7 +78,7 @@ fun BottomNavigationCustomizationScreen(
                     Text(
                         stringResource(
                             R.string.navigation_customize_summary,
-                            preferences.visibleBottomNavigationItems.size,
+                            order.count { it !in preferences.hiddenBottomNavigationItems },
                             order.size,
                         ),
                         style = MaterialTheme.typography.bodySmall,
@@ -97,8 +101,8 @@ fun BottomNavigationCustomizationScreen(
                 canMoveUp = index > 0,
                 canMoveDown = index < order.lastIndex,
                 onVisibleChange = { viewModel.setBottomNavigationItemVisible(item, it) },
-                onMoveUp = { viewModel.moveBottomNavigationItem(item, -1) },
-                onMoveDown = { viewModel.moveBottomNavigationItem(item, 1) },
+                onMoveUp = { viewModel.moveBottomNavigationItem(item, preferences.bottomNavigationOrder.indexOf(order[index - 1]) - preferences.bottomNavigationOrder.indexOf(item)) },
+                onMoveDown = { viewModel.moveBottomNavigationItem(item, preferences.bottomNavigationOrder.indexOf(order[index + 1]) - preferences.bottomNavigationOrder.indexOf(item)) },
             )
         }
         item {

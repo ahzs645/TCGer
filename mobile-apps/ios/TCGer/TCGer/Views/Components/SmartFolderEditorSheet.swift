@@ -112,7 +112,7 @@ struct SmartFolderEditorSheet: View {
             }
         case .rarity: defaultValue = "Rare"
         case .condition: defaultValue = CardCondition.nearMint.rawValue
-        case .setCode: defaultValue = ""
+        case .setCode, .tag: defaultValue = ""
         case .isFoil: defaultValue = "true"
         }
         rules.append(SmartFolderRule(id: UUID(), type: type, value: defaultValue))
@@ -150,10 +150,12 @@ private struct RuleRow: View {
                         }
                     }
                     .labelsHidden()
-                } else {
+                } else if rule.type == .isFoil {
                     Text(displayValue)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                } else {
+                    TextField(rule.type.rawValue, text: $rule.value)
                 }
             }
         }

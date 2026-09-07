@@ -70,7 +70,7 @@ function computeCardFeatureHashes(
     footer: null,
   };
 
-  for (const region of FEATURE_REGION_SPECS[tcg]) {
+  for (const region of FEATURE_REGION_SPECS[tcg] ?? []) {
     const regionCanvas = extractRegionCanvas(canvas, region);
     hashes[region.name] = computeRGBHashFromCanvas(regionCanvas);
   }

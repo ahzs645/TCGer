@@ -72,7 +72,19 @@ nonisolated enum ScannerAssetConfiguration {
 @MainActor
 final class ScannerAssetStore: ObservableObject {
     static let shared = ScannerAssetStore()
-    static let downloadableGames: [TCGGame] = [.pokemon, .magic, .yugioh]
+    static var downloadableGames: [TCGGame] {
+        Array(Set([TCGGame.pokemon, .magic, .yugioh] + GamePackageStore.shared.installed.compactMap { package in
+            package.manifest.scanner?.ios == nil ? nil : TCGGame(rawValue: package.manifest.game.id)
+        })).sorted { $0.rawValue < $1.rawValue }
+    }
+
+    private func packageScanner(for game: TCGGame) -> (url: URL, asset: GamePackageAsset)? {
+        let sources = GamePackageStore.shared.installed.filter { $0.manifest.game.id == game.rawValue && $0.manifest.scanner?.ios != nil }
+        guard sources.count == 1, let source = sources.first, let asset = source.manifest.scanner?.ios?.manifest,
+              let base = URL(string: source.sourceURL), let url = URL(string: asset.url, relativeTo: base)?.absoluteURL,
+              url.scheme == "https" else { return nil }
+        return (url, asset)
+    }
 
     enum StoreError: LocalizedError {
         case unavailable
@@ -213,7 +225,7 @@ final class ScannerAssetStore: ObservableObject {
 
         var completedBytes = 0
         for asset in allAssets {
-            let data = try await download(asset.remote)
+            let data = try await download(asset.remote, baseOverride: packageScanner(for: game)?.url.deletingLastPathComponent())
             try fileManager.createDirectory(
                 at: asset.destination.deletingLastPathComponent(),
                 withIntermediateDirectories: true
@@ -260,10 +272,11 @@ final class ScannerAssetStore: ObservableObject {
     }
 
     private func fetchManifest(for game: TCGGame) async throws -> (ScannerAssetManifest, Data) {
-        guard let baseURL else { throw StoreError.unavailable }
-        let url = baseURL
-            .appendingPathComponent(game.rawValue, isDirectory: true)
-            .appendingPathComponent("manifest.json", isDirectory: false)
+        let sources = GamePackageStore.shared.installed.filter { $0.manifest.game.id == game.rawValue && $0.manifest.scanner?.ios != nil }
+        guard sources.count <= 1 else { throw StoreError.unavailable }
+        let package = packageScanner(for: game)
+        guard package != nil || [TCGGame.pokemon, .magic, .yugioh].contains(game) else { throw StoreError.unavailable }
+        guard let url = package?.url ?? baseURL?.appendingPathComponent(game.rawValue, isDirectory: true).appendingPathComponent("manifest.json", isDirectory: false) else { throw StoreError.unavailable }
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 60
@@ -271,6 +284,9 @@ final class ScannerAssetStore: ObservableObject {
         guard let response = response as? HTTPURLResponse,
               (200..<300).contains(response.statusCode) else {
             throw StoreError.invalidResponse
+        }
+        if let asset = package?.asset {
+            guard data.count == asset.bytes, SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == asset.sha256.lowercased() else { throw StoreError.checksumMismatch }
         }
         let manifest = try JSONDecoder().decode(ScannerAssetManifest.self, from: data)
         guard (1...3).contains(manifest.formatVersion) else {
@@ -316,8 +332,8 @@ final class ScannerAssetStore: ObservableObject {
         return (manifest, data)
     }
 
-    private func download(_ asset: ScannerAssetFile) async throws -> Data {
-        guard let baseURL,
+    private func download(_ asset: ScannerAssetFile, baseOverride: URL? = nil) async throws -> Data {
+        guard let baseURL = baseOverride ?? baseURL,
               let url = Self.remoteURL(baseURL: baseURL, relativePath: asset.file) else {
             throw StoreError.unsafePath
         }

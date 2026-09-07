@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.ahmadjalil.tcger.ui.toDomainCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +58,7 @@ fun CommunityGamePackagesSection(
         Text("Community game libraries", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
         Card {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Install a publisher's HTTPS GamePackageManifest. Catalogs are checksum-verified and stored offline.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Download game libraries for offline search and browsing, or add a library from another publisher.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (onOpenStore != null && onInstallFromUrl != null) {
                     FilledTonalButton(onClick = onOpenStore, modifier = Modifier.fillMaxWidth()) {
                         Text("Game Store")
@@ -66,7 +67,7 @@ fun CommunityGamePackagesSection(
                         Text("Install from URL")
                     }
                 } else {
-                    Text("Open the Game Store for TCGer packages, or install another publisher's manifest URL.")
+                    Text("Open the Game Store or paste a library link from another publisher.")
                 }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 state.installed.forEachIndexed { index, game ->
@@ -100,6 +101,7 @@ fun CommunityGamePackagesSection(
                         TextButton(onClick = { viewModel.removeGamePackage(game.id) }) { Text("Remove") }
                     }
                 }
+                state.installed.forEach { game -> GameCapabilityControls(viewModel, game) }
                 if (state.installed.isEmpty()) Text("No community libraries installed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.installed.isNotEmpty()) {
                     TextButton(onClick = viewModel::checkGamePackageUpdates, modifier = Modifier.fillMaxWidth()) {
@@ -135,7 +137,7 @@ fun OfficialGameStoreScreen(
         item {
             Text("Game Store", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
-                "Official libraries are generated from the same signed manifests used by every client.",
+                "Download the games you collect. Your installed libraries are available offline.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -161,7 +163,7 @@ fun OfficialGameStoreScreen(
                     manifest.game.description?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     val installed = state.installed.any { it.id == manifest.installedId }
                     if (manifest.game.id in enabledGames && !installed) {
-                        Text("Enabled with the existing app catalog", style = MaterialTheme.typography.labelSmall)
+                        Text("Enabled · download this library for offline search", style = MaterialTheme.typography.labelSmall)
                     }
                     FilledTonalButton(
                         onClick = { onEnable(manifest.game.id) },
@@ -198,7 +200,7 @@ fun InstallGamePackageScreen(
         item {
             Text("Install from URL", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
-                "Paste an HTTPS GamePackageManifest URL. The manifest, signature, and catalog checksum are validated before installation.",
+                "Paste the library link provided by its publisher. TCGer checks the download before adding it to your device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -357,3 +359,30 @@ private fun CommunityCatalogCard.value(path: String): kotlinx.serialization.json
 }
 
 private fun kotlinx.serialization.json.JsonElement.scalarString(): String = (this as? JsonPrimitive)?.let { it.contentOrNull ?: it.booleanOrNull?.toString() } ?: toString()
+
+@Composable
+private fun GameCapabilityControls(viewModel: com.ahmadjalil.tcger.ui.AppViewModel, game: InstalledGamePackage) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var library by remember(game.id) { mutableStateOf(viewModel.gamePackLibrary(game.id)) }
+    var pulls by remember { mutableStateOf<List<CommunityCatalogCard>>(emptyList()) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf("pricing" to game.manifest.pricing, "packs" to game.manifest.offlinePacks, "scanner" to game.manifest.scanner?.android).filter { it.second != null }.forEach { (kind, _) ->
+            TextButton(enabled = !busy, onClick = { scope.launch {
+                busy = true; error = null
+                runCatching { viewModel.enableGameCapability(game.id, kind) }.onSuccess { library = viewModel.gamePackLibrary(game.id) }.onFailure { error = it.message }
+                busy = false
+            } }) { Text("Enable $kind for ${game.manifest.game.name}") }
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        library?.packs?.forEach { pack -> TextButton(onClick = { scope.launch {
+            runCatching { val cards = viewModel.communityGameCards(game.id).associateBy { it.id }; pulls = pack.open().mapNotNull(cards::get) }.onFailure { error = it.message }
+        } }) { Text("Open ${pack.name}") } }
+        pulls.forEach { card ->
+            TextButton(onClick = { viewModel.openCatalogCard(card.toDomainCard(game.id, game.manifest.game.id)) }) { Text("Inspect or save ${card.name}", fontWeight = FontWeight.Medium) }
+            card.rarity?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+            viewModel.gamePriceSnapshot(game.id)?.quote(card.id, "USD")?.let { Text("${it.amount} ${it.currency} · ${it.source}", style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}

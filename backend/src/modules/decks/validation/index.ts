@@ -1,4 +1,4 @@
-import type { DeckValidationResult } from '@tcg/api-types';
+import { validateGameDeck, type GameDeckRules, type DeckValidationResult } from '@tcg/api-types';
 import { validateMagicDeck } from './magic-formats';
 import { validateYugiohDeck } from './yugioh-formats';
 import { validatePokemonDeck } from './pokemon-formats';
@@ -9,13 +9,15 @@ export function validateDeck(
     externalId: string;
     name: string;
     quantity: number;
-    zone?: 'main' | 'extra' | 'side';
+    zone?: string;
     isSideboard: boolean;
     isCommander?: boolean;
     cardData?: Record<string, unknown>;
   }>,
-  format?: string
+  format?: string,
+  rules?: GameDeckRules
 ): DeckValidationResult {
+  if (rules) return validateGameDeck(tcg, cards, rules, format);
   switch (tcg) {
     case 'magic':
       return validateMagicDeck(cards, format || 'standard');
@@ -24,6 +26,6 @@ export function validateDeck(
     case 'pokemon':
       return validatePokemonDeck(cards, format || 'standard');
     default:
-      return { valid: true, errors: [], warnings: [`Unknown TCG "${tcg}"`] };
+      return { valid: false, status: "unsupported", errors: [], warnings: [`No deck rules are installed for "${tcg}".`] };
   }
 }

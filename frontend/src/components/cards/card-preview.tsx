@@ -1,4 +1,8 @@
 "use client";
+import { GameCardSymbols, GameRarity, PackagePrice } from "@/components/game-features/package-capabilities";
+import { cardSupportsPrintSelection, packageCardPresentation } from "@tcg/api-types";
+
+import { gameLabel } from "@/lib/utils";
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ChevronDown, Heart, Loader2, Minus, Plus } from "lucide-react";
@@ -50,7 +54,6 @@ import { CardImage } from "./card-image";
 import { SetSymbol } from "./set-symbol";
 
 import { useShallow } from "zustand/react/shallow";
-const PRINT_SUPPORTED_GAMES: Card["tcg"][] = ["magic", "pokemon"];
 interface CardPreviewProps {
   card: Card;
 }
@@ -90,7 +93,7 @@ export function CardPreview({ card }: CardPreviewProps) {
     "idle" | "pending" | "success" | "error"
   >("idle");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const supportsPrintSelection = PRINT_SUPPORTED_GAMES.includes(card.tcg);
+  const supportsPrintSelection = cardSupportsPrintSelection(card);
   const [selectedPrintCard, setSelectedPrintCard] = useState<Card>(card);
   const [printData, setPrintData] = useState<CardPrintsResponse | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -135,7 +138,7 @@ export function CardPreview({ card }: CardPreviewProps) {
           : ""
       }${selectedFinish ? ` · ${selectedFinish.label}` : ""}`
     : "";
-  const currentGameLabel = GAME_LABELS[card.tcg];
+  const currentGameLabel = gameLabel(card.tcg);
 
   const formatPrintDetails = (print: Card) => {
     const parts: string[] = [];
@@ -259,7 +262,7 @@ export function CardPreview({ card }: CardPreviewProps) {
     setIsLoadingPrints(true);
     setPrintError(null);
 
-    fetchCardPrintsApi({ tcg: card.tcg, cardId: card.id, token })
+    fetchCardPrintsApi({ tcg: card.tcg, cardId: card.id, packageId: packageCardPresentation(card)?.packageId, token })
       .then((data) => {
         if (cancelled) return;
         setPrintData(data);
@@ -350,7 +353,7 @@ export function CardPreview({ card }: CardPreviewProps) {
 
     const cardToPersist = supportsPrintSelection ? selectedPrintCard : card;
     const finishLabel = selectedFinish?.label;
-    const isFoil = isFoilFinish(selectedFinishCode);
+    const isFoil = isFoilFinish(selectedFinishCode, finishOptions);
 
     setStatus("pending");
     setStatusMessage(null);
@@ -918,6 +921,8 @@ export function CardPreview({ card }: CardPreviewProps) {
               {activeCard.name}
             </span>
           </p>
+          <GameCardSymbols card={activeCard} />
+          <PackagePrice card={activeCard} finishCode={selectedFinishCode || undefined} />
           {activeCard.rarity && (
             <div className="flex justify-center" data-oid="kxwhbmo">
               <Badge
@@ -925,7 +930,7 @@ export function CardPreview({ card }: CardPreviewProps) {
                 className="text-[10px] h-5"
                 data-oid="wkxwror"
               >
-                {activeCard.rarity}
+                <GameRarity card={activeCard} />
               </Badge>
             </div>
           )}
