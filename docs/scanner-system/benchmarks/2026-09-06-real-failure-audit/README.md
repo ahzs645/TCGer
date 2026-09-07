@@ -6,7 +6,7 @@ The input manifest pins the original repaired YOLOX epoch-50 checkpoint and orig
 
 Selection was recorded before execution: all 600 real evaluation images receive the frozen inference path only; 88 training-corpus validation records are selected deterministically, taking up to eight per source-kind/archive/scene/known-corner group. Only those validation records receive the YOLO11s RGB-array versus BGR-array intervention. The intervention must also reproduce PIL-input predictions. No training or held-out parameter sweep is performed.
 
-The declaration and exact commands are in `input-publication.json` and the candidate command files. Results will be added after the two bounded inference jobs complete.
+The declaration and exact commands are in `input-publication.json` and the candidate command files. Both bounded inference jobs completed; the completed automated and visual findings are in [ANALYSIS.md](ANALYSIS.md).
 
 ## Human comparison interface
 
@@ -24,7 +24,7 @@ Compare YOLOX and YOLO11s side by side. Select final outlines, raw outlines or n
 
 Reviews are stored in `.artifacts/card-geometry/human-failure-review/reviews.jsonl`. Each save appends a revision containing the reviewer, timestamp, record/image hashes and pinned report/checkpoint hashes. Export downloads the latest revisions. Conflicting edits in another tab fail instead of overwriting a review. Unsaved drafts are kept in this browser and can be discarded explicitly. The server verifies image bytes before serving the review set and binds only to localhost.
 
-These are proposed review annotations, not direct release edits. In particular, evaluation/Dev Mode records retain their evaluation scope and cannot become training data through this interface. Human review must finish before deciding the next data repair or experiment freeze; no new training has been launched.
+These are proposed review annotations, not direct release edits. In particular, evaluation/Dev Mode records retain their evaluation scope and cannot become training data through this interface. The assistant completed the automated comparison and visual audit in [ANALYSIS.md](ANALYSIS.md). Only specific unresolved labels need further review before a successor corpus is frozen; no new training has been launched.
 
 Recognition text is the saved **frame** result, not a new run on the selected crop. Only 11 of the 57 replay frames have verified identities: YOLOX identified 2, abstained on 9; YOLO11s identified 4, abstained on 6 and misidentified 1. Forty-two frames have unknown identities; the other four test specific forbidden accepts. The aggregate 44 “unknown” outcomes must not be counted as 44 recognition failures.
 

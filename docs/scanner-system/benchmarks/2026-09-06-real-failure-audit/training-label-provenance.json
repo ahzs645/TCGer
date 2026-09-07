@@ -1,0 +1,1628 @@
+[
+  {
+    "recordId": "coco-9f3dbcc23c7722c34bc0bf89c01adde3a96599e3b757452486d9caf70bbe6238",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:80"
+        ],
+        "bbox": [
+          87.55,
+          179.2,
+          301.57,
+          415.35999999999996
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:79"
+        ],
+        "bbox": [
+          47.36,
+          3.84,
+          380.16,
+          632.32
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-0a91c9aaa6bfad49d4f1a5250ef1ecc2005041f87caca75994144001f14ad1fb",
+    "archive": "pk-detect.v3i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:35"
+        ],
+        "bbox": [
+          106.0,
+          323.0,
+          132.746,
+          100.21699999999998
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:36"
+        ],
+        "bbox": [
+          261.0,
+          305.0,
+          125.166,
+          89.72800000000001
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:37"
+        ],
+        "bbox": [
+          319.0,
+          186.0,
+          127.38499999999999,
+          91.37599999999998
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:38"
+        ],
+        "bbox": [
+          410.0,
+          289.0,
+          129.846,
+          95.34899999999999
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-0c13ba8dba1aef2f9d9d45c7d5ba7afefc1244434321b3142bda9d3f0f1d2917",
+    "archive": "card-detector-wmbbb.v8i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-detector-wmbbb:Cards:10"
+        ],
+        "bbox": [
+          90.0,
+          58.0,
+          720.0,
+          1046.667
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "title_region",
+        "provenance": [
+          "card-detector-wmbbb:Name:9"
+        ],
+        "bbox": [
+          159.0,
+          111.0,
+          452.222,
+          75.55599999999998
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "collection_region",
+        "provenance": [
+          "card-detector-wmbbb:Collection:11"
+        ],
+        "bbox": [
+          610.0,
+          801.0,
+          141.111,
+          56.66700000000003
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-0de3bb42f0ba386a8a4d0a730545f89cb038683aab20f3c0bf00321674e60bd3",
+    "archive": "pk-detect.v3i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:433"
+        ],
+        "bbox": [
+          0.0,
+          90.0,
+          45.714,
+          218.755
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:430"
+        ],
+        "bbox": [
+          114.0,
+          90.0,
+          171.74599999999998,
+          226.66700000000003
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:431"
+        ],
+        "bbox": [
+          144.0,
+          339.0,
+          175.149,
+          235.10300000000007
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:429"
+        ],
+        "bbox": [
+          303.0,
+          77.0,
+          194.762,
+          241.90499999999997
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:428"
+        ],
+        "bbox": [
+          345.0,
+          322.0,
+          207.30200000000002,
+          252.85699999999997
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:432"
+        ],
+        "bbox": [
+          568.0,
+          322.0,
+          72.0,
+          236.086
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-0ec0cb01f6a7bb6ab3e1cd35c887d9b705ed4e43468f0e9175be5b5a842ecb12",
+    "archive": "pk-detect.v3i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:52"
+        ],
+        "bbox": [
+          84.0,
+          114.0,
+          162.698,
+          206.236
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:55"
+        ],
+        "bbox": [
+          118.0,
+          311.0,
+          215.079,
+          205.606
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:56"
+        ],
+        "bbox": [
+          313.0,
+          0.0,
+          144.91200000000003,
+          60.476
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:54"
+        ],
+        "bbox": [
+          313.0,
+          100.0,
+          166.66700000000003,
+          211.26999999999998
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:53"
+        ],
+        "bbox": [
+          331.0,
+          312.0,
+          205.55600000000004,
+          224.60300000000007
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+    "archive": "carddetection-hegxe.v7i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1417"
+        ],
+        "bbox": [
+          509.0,
+          132.0,
+          103.50199999999995,
+          83.43
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1418"
+        ],
+        "bbox": [
+          530.0,
+          196.0,
+          104.10900000000004,
+          100.031
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1421"
+        ],
+        "bbox": [
+          539.0,
+          284.0,
+          95.125,
+          68.971
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1427"
+        ],
+        "bbox": [
+          541.0,
+          389.0,
+          99.36400000000003,
+          67.50400000000002
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1426"
+        ],
+        "bbox": [
+          548.0,
+          462.0,
+          98.64099999999996,
+          80.16999999999996
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1422"
+        ],
+        "bbox": [
+          575.0,
+          337.0,
+          97.83500000000004,
+          66.25
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1419"
+        ],
+        "bbox": [
+          606.0,
+          172.0,
+          108.28499999999997,
+          111.62200000000001
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1415"
+        ],
+        "bbox": [
+          615.0,
+          82.0,
+          92.92399999999998,
+          75.322
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1425"
+        ],
+        "bbox": [
+          646.0,
+          463.0,
+          88.33500000000004,
+          72.51599999999996
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1424"
+        ],
+        "bbox": [
+          656.0,
+          398.0,
+          88.76999999999998,
+          70.67000000000002
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1420"
+        ],
+        "bbox": [
+          658.0,
+          263.0,
+          87.0,
+          65.05700000000002
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1423"
+        ],
+        "bbox": [
+          686.0,
+          334.0,
+          84.72699999999998,
+          62.56700000000001
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1416"
+        ],
+        "bbox": [
+          688.0,
+          160.0,
+          89.36400000000003,
+          75.321
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-15102206619f6e744e04b0e6ac8b1f9ac3bb4a299708e453c7941d963dd8f71b",
+    "archive": "pk-detect.v3i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:232"
+        ],
+        "bbox": [
+          142.0,
+          59.0,
+          105.5,
+          142.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:235"
+        ],
+        "bbox": [
+          148.0,
+          221.0,
+          106.5,
+          141.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:238"
+        ],
+        "bbox": [
+          160.0,
+          379.0,
+          105.0,
+          140.361
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:233"
+        ],
+        "bbox": [
+          262.0,
+          64.0,
+          98.5,
+          140.5
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:236"
+        ],
+        "bbox": [
+          272.0,
+          219.0,
+          100.0,
+          137.26099999999997
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:239"
+        ],
+        "bbox": [
+          282.0,
+          379.0,
+          98.0,
+          136.13099999999997
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:240"
+        ],
+        "bbox": [
+          391.0,
+          380.0,
+          97.702,
+          135.784
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:237"
+        ],
+        "bbox": [
+          392.0,
+          210.0,
+          102.5,
+          139.574
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:234"
+        ],
+        "bbox": [
+          393.0,
+          64.0,
+          99.0,
+          139.5
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-25c513d7af87491aba68620ca3cb9cca482b85eff37edca506e37a44cf8b3fc6",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:5993"
+        ],
+        "bbox": [
+          201.87,
+          230.03,
+          394.09000000000003,
+          152.71
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:5992"
+        ],
+        "bbox": [
+          43.74,
+          211.81,
+          596.26,
+          193.19
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-3210406c6f56db51c81f3da80b7ff546dd94e72b49b533d9bca5d67cc436ad86",
+    "archive": "pk-detect.v3i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:295"
+        ],
+        "bbox": [
+          0.0,
+          370.0,
+          52.5,
+          147.96399999999994
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:291"
+        ],
+        "bbox": [
+          108.0,
+          370.0,
+          133.0,
+          158.5
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:292"
+        ],
+        "bbox": [
+          183.0,
+          235.0,
+          136.0,
+          153.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:290"
+        ],
+        "bbox": [
+          230.0,
+          108.0,
+          133.5,
+          149.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:293"
+        ],
+        "bbox": [
+          233.0,
+          421.0,
+          127.5,
+          163.5
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pk-detect:pokemon_card:294"
+        ],
+        "bbox": [
+          356.0,
+          142.0,
+          139.0,
+          153.0
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-3fa0062ffbe16aa5a2af124b34f0794f2514af5becd299048f82637c12e955cd",
+    "archive": "pokemon-card-outliner.v1i.coco-yolo.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:42"
+        ],
+        "bbox": [
+          44.0,
+          564.0,
+          167.143,
+          235.71399999999994
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:41"
+        ],
+        "bbox": [
+          49.0,
+          329.0,
+          167.143,
+          217.14300000000003
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:40"
+        ],
+        "bbox": [
+          58.0,
+          118.0,
+          155.714,
+          195.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:44"
+        ],
+        "bbox": [
+          220.0,
+          330.0,
+          155.714,
+          215.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:45"
+        ],
+        "bbox": [
+          220.0,
+          565.0,
+          161.42899999999997,
+          235.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:43"
+        ],
+        "bbox": [
+          221.0,
+          121.0,
+          145.714,
+          192.85699999999997
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:48"
+        ],
+        "bbox": [
+          377.0,
+          126.0,
+          150.71399999999994,
+          187.14300000000003
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:47"
+        ],
+        "bbox": [
+          384.0,
+          331.0,
+          155.71399999999994,
+          205.71399999999994
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:46"
+        ],
+        "bbox": [
+          391.0,
+          558.0,
+          157.14300000000003,
+          231.42899999999997
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-4ab112ceb79eb88adb9fdeb576fea565e704eecb305c026bc4349cf3672e82a5",
+    "archive": "carddetection-hegxe.v7i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1770"
+        ],
+        "bbox": [
+          0.0,
+          0.0,
+          516.196,
+          544.985
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1771"
+        ],
+        "bbox": [
+          530.0,
+          117.0,
+          361.567,
+          478.6
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:1772"
+        ],
+        "bbox": [
+          834.0,
+          231.0,
+          298.71900000000005,
+          429.914
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-4fbf97e524ddd050803d2bd846dd13e8fe8e41d2457f63c454a5abfac9642b1d",
+    "archive": "carddetection-hegxe.v7i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2132"
+        ],
+        "bbox": [
+          476.0,
+          73.0,
+          145.913,
+          110.40199999999999
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2131"
+        ],
+        "bbox": [
+          493.0,
+          184.0,
+          143.75299999999993,
+          110.661
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2130"
+        ],
+        "bbox": [
+          519.0,
+          306.0,
+          138.30999999999995,
+          110.07600000000002
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2129"
+        ],
+        "bbox": [
+          529.0,
+          396.0,
+          134.94000000000005,
+          109.34500000000003
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2128"
+        ],
+        "bbox": [
+          537.0,
+          497.0,
+          133.11900000000003,
+          109.83400000000006
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2122"
+        ],
+        "bbox": [
+          623.0,
+          0.0,
+          137.62300000000005,
+          94.806
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2123"
+        ],
+        "bbox": [
+          640.0,
+          99.0,
+          132.57500000000005,
+          107.01499999999999
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2124"
+        ],
+        "bbox": [
+          646.0,
+          204.0,
+          126.519,
+          102.59300000000002
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2126"
+        ],
+        "bbox": [
+          660.0,
+          399.0,
+          125.91499999999996,
+          105.219
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2125"
+        ],
+        "bbox": [
+          672.0,
+          307.0,
+          124.32500000000005,
+          102.822
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:2127"
+        ],
+        "bbox": [
+          679.0,
+          500.0,
+          122.44899999999996,
+          104.60900000000004
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-50826b0933eb9ad3a81f2898e0b44700999a0b141d30b06ff6854806db413ad1",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:4929"
+        ],
+        "bbox": [
+          132.22,
+          185.7,
+          361.0799999999999,
+          357.62999999999994
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:4928"
+        ],
+        "bbox": [
+          85.42,
+          68.46,
+          454.19,
+          527.09
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-5a6e4d4c7b62cf348f4ca8e66aa70a50d6ccdd3324688a918ff0472083e71636",
+    "archive": "carddetection-hegxe.v7i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:867"
+        ],
+        "bbox": [
+          433.0,
+          373.0,
+          212.942,
+          318.903
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:874"
+        ],
+        "bbox": [
+          494.0,
+          167.0,
+          43.471000000000004,
+          223.3
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:873"
+        ],
+        "bbox": [
+          509.0,
+          116.0,
+          186.95900000000006,
+          255.289
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:868"
+        ],
+        "bbox": [
+          617.0,
+          410.0,
+          186.03099999999995,
+          286.66200000000003
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:872"
+        ],
+        "bbox": [
+          681.0,
+          140.0,
+          92.46900000000005,
+          132.28300000000002
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:871"
+        ],
+        "bbox": [
+          702.0,
+          178.0,
+          158.13200000000006,
+          229.199
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:869"
+        ],
+        "bbox": [
+          825.0,
+          374.0,
+          141.66700000000003,
+          240.84199999999998
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "carddetection-hegxe:cards:870"
+        ],
+        "bbox": [
+          828.0,
+          160.0,
+          137.97000000000003,
+          211.942
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-8e8a20d1f369d7b05ce68de9dcc653ffcfbbc29e6714fbe6b838406f4a23becf",
+    "archive": "pokefolio.v1i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pokefolio:pokemon_card:92"
+        ],
+        "bbox": [
+          0.0,
+          0.0,
+          203.2,
+          82.4
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokefolio:pokemon_card:94"
+        ],
+        "bbox": [
+          0.0,
+          82.0,
+          206.4,
+          160.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokefolio:pokemon_card:96"
+        ],
+        "bbox": [
+          0.0,
+          257.0,
+          197.6,
+          199.2
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokefolio:pokemon_card:93"
+        ],
+        "bbox": [
+          230.0,
+          0.0,
+          199.2,
+          82.4
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokefolio:pokemon_card:95"
+        ],
+        "bbox": [
+          231.0,
+          97.0,
+          225.60000000000002,
+          148.8
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokefolio:pokemon_card:97"
+        ],
+        "bbox": [
+          239.0,
+          266.0,
+          245.60000000000002,
+          96.0
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-90dc589e81c9e60bba71df7fc9f3743271cd7d77302edbd6af00c23cf4fb0e63",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:250"
+        ],
+        "bbox": [
+          39.16,
+          172.89,
+          300.5,
+          418.72
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:249"
+        ],
+        "bbox": [
+          1.72,
+          2.45,
+          376.36,
+          636.55
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-927747d233fb59ff34f217a99b1f1aa38ce607fb33f112e512f4505371c2dccf",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:241"
+        ],
+        "bbox": [
+          186.3,
+          178.25,
+          278.02,
+          386.1700000000001
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:242"
+        ],
+        "bbox": [
+          146.3,
+          21.7,
+          355.56,
+          585.68
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-9794bdce004e1c04e9a40977dea3f05708775b46b8b92f616a8bd60eaef2c3db",
+    "archive": "pokemon-card-outliner.v1i.coco-yolo.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:75"
+        ],
+        "bbox": [
+          68.0,
+          239.0,
+          59.61500000000001,
+          85.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:70"
+        ],
+        "bbox": [
+          72.0,
+          91.0,
+          53.462,
+          65.0
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:71"
+        ],
+        "bbox": [
+          133.0,
+          92.0,
+          50.38499999999999,
+          66.154
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:73"
+        ],
+        "bbox": [
+          135.0,
+          161.0,
+          54.61500000000001,
+          71.154
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:76"
+        ],
+        "bbox": [
+          140.0,
+          240.0,
+          54.61500000000001,
+          79.61500000000001
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:72"
+        ],
+        "bbox": [
+          186.0,
+          95.0,
+          51.53800000000001,
+          62.69200000000001
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:74"
+        ],
+        "bbox": [
+          192.0,
+          164.0,
+          56.153999999999996,
+          67.30799999999999
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "card",
+        "provenance": [
+          "pokemon-card-outliner:card:77"
+        ],
+        "bbox": [
+          200.0,
+          239.0,
+          56.53800000000001,
+          79.231
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-178a1bec452775dd5bbbc98aeaa31342d347c9f1853a3624d3a0e077d4399ff7",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:421"
+        ],
+        "bbox": [
+          52.48,
+          181.76,
+          320.0,
+          422.4
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:420"
+        ],
+        "bbox": [
+          5.12,
+          2.56,
+          405.76,
+          636.16
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-1b643002eda1122935028f9dd30d2c01b7caed66c01eb2befed926db9c2568d7",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:1703"
+        ],
+        "bbox": [
+          162.27,
+          187.18,
+          270.44000000000005,
+          372.41
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:1704"
+        ],
+        "bbox": [
+          120.39,
+          22.15,
+          348.28,
+          574.39
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-38a3d4f3d29b3b08d9228a7765efd45190f914d7a1f6f0c8f19fcdf200b808ea",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:5216"
+        ],
+        "bbox": [
+          134.38,
+          182.25,
+          377.84000000000003,
+          392.61
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:5215"
+        ],
+        "bbox": [
+          65.42,
+          33.98,
+          513.79,
+          594.08
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-52c5ef32618ed96e0245234813151e78679435209f4dd325974d010ab58a67dc",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:332"
+        ],
+        "bbox": [
+          159.01,
+          114.4,
+          355.18000000000006,
+          348.77
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:331"
+        ],
+        "bbox": [
+          113.2,
+          72.03,
+          447.29,
+          513.8
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-7bf07ec8b04184aa68ba243bf14bdfff8993bc4be2fc41f05dbb834958eb85f1",
+    "archive": "mtg-scanner-bughx.v4i.coco.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "mtg-scanner-bughx:card:946"
+        ],
+        "bbox": [
+          127.2,
+          99.68,
+          422.2200000000001,
+          431.27000000000004
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "title_region",
+        "provenance": [
+          "mtg-scanner-bughx:title:948"
+        ],
+        "bbox": [
+          144.34,
+          114.29,
+          360.2099999999999,
+          38.40999999999998
+        ],
+        "geometryQuality": "bbox-derived"
+      },
+      {
+        "category": "info_region",
+        "provenance": [
+          "mtg-scanner-bughx:main_info:947"
+        ],
+        "bbox": [
+          133.76,
+          481.59,
+          230.69,
+          50.79000000000002
+        ],
+        "geometryQuality": "bbox-derived"
+      }
+    ]
+  },
+  {
+    "recordId": "coco-84aec779aa58dc6e653e5523fe8105d35d4d4ceaa13e8b9ddbecaad3fa6e469b",
+    "archive": "card-scanner-seg.v3i.coco-segmentation.zip",
+    "annotations": [
+      {
+        "category": "card",
+        "provenance": [
+          "card-scanner-seg:card:353"
+        ],
+        "bbox": [
+          30.07,
+          161.73,
+          309.64,
+          433.98
+        ],
+        "geometryQuality": "source-polygon"
+      },
+      {
+        "category": "slab",
+        "provenance": [
+          "card-scanner-seg:slab:352"
+        ],
+        "bbox": [
+          0.0,
+          1.63,
+          377.0,
+          637.16
+        ],
+        "geometryQuality": "source-polygon"
+      }
+    ]
+  }
+]

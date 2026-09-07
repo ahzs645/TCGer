@@ -1,0 +1,13 @@
+{
+  "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+  "canonicalSha256": "aaf98c7f4c81bf36948dda98db905140bd785e964af9980a1d82aef2f905c2c6",
+  "bySplit": {
+    "test": {
+      "records": 502,
+      "recordsWithMultipleCardAnnotations": 22,
+      "instances:card": 561,
+      "knownCorners:card": 512
+    }
+  },
+  "affectedRecords": []
+}
