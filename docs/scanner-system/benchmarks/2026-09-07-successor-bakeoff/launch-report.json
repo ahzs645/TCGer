@@ -1,0 +1,92 @@
+{
+  "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+  "datasetRevision": "46049ce804ae235517d73ab7481850fc929ae487",
+  "experiments": {
+    "fastvit-t8-four-corner": {
+      "bakeoffId": "shared-card-geometry-successor-v1",
+      "candidate": "fastvit-t8-four-corner",
+      "checkpointPrefix": "geometry/fastvit-t8-four-corner/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/89592151487f0fcf950f322710acff6efd606ee5d3a5a42fe4a646553a202aae",
+      "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+      "experimentHash": "89592151487f0fcf950f322710acff6efd606ee5d3a5a42fe4a646553a202aae",
+      "fairnessHash": "d4a63a8df427316c676b994fc35599035ab61def360d3c2abbe06c795832ac9d",
+      "framework": "tcger-pytorch",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v4",
+      "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+      "resolvedConfigSha256": "89592151487f0fcf950f322710acff6efd606ee5d3a5a42fe4a646553a202aae",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolo11n-pose": {
+      "bakeoffId": "shared-card-geometry-successor-v1",
+      "candidate": "yolo11n-pose",
+      "checkpointPrefix": "geometry/yolo11n-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/02a49b7026fb546e5a6ab8d3882c8c74d60128295d1e5c15e90add85b5983645",
+      "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+      "experimentHash": "02a49b7026fb546e5a6ab8d3882c8c74d60128295d1e5c15e90add85b5983645",
+      "fairnessHash": "d4a63a8df427316c676b994fc35599035ab61def360d3c2abbe06c795832ac9d",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v4",
+      "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+      "resolvedConfigSha256": "02a49b7026fb546e5a6ab8d3882c8c74d60128295d1e5c15e90add85b5983645",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolo11s-pose": {
+      "bakeoffId": "shared-card-geometry-successor-v1",
+      "candidate": "yolo11s-pose",
+      "checkpointPrefix": "geometry/yolo11s-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+      "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+      "experimentHash": "3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+      "fairnessHash": "d4a63a8df427316c676b994fc35599035ab61def360d3c2abbe06c795832ac9d",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v4",
+      "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+      "resolvedConfigSha256": "3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    },
+    "yolox-pose": {
+      "bakeoffId": "shared-card-geometry-successor-v1",
+      "candidate": "yolox-pose",
+      "checkpointPrefix": "geometry/yolox-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/540e83deb3fcc3fbd4919a9dcc2d5d5ac50dd69c3099bdef2319a1b423b9d298",
+      "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+      "experimentHash": "540e83deb3fcc3fbd4919a9dcc2d5d5ac50dd69c3099bdef2319a1b423b9d298",
+      "fairnessHash": "22ce98f2804a6c286abb40f0f13a68e8abf50a813bd290a088cf959c080a961a",
+      "framework": "mmyolo",
+      "licenseRoute": "permissive",
+      "policyId": "training-minimums-v4",
+      "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+      "resolvedConfigSha256": "540e83deb3fcc3fbd4919a9dcc2d5d5ac50dd69c3099bdef2319a1b423b9d298",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "flavor": "l4x1",
+  "inputCommit": "10904992be84e6a3b8bbcee419cf5a04c1974477",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "jobs": [
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "id": "6a9e7f7d259f8e97255ea2ed",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7d259f8e97255ea2ed"
+    },
+    {
+      "candidate": "yolo11n-pose",
+      "id": "6a9e7f7de686246ca69a797f",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7de686246ca69a797f"
+    },
+    {
+      "candidate": "yolo11s-pose",
+      "id": "6a9e7f7e259f8e97255ea2ef",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7e259f8e97255ea2ef"
+    },
+    {
+      "candidate": "yolox-pose",
+      "id": "6a9e7f7f259f8e97255ea2f1",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7f259f8e97255ea2f1"
+    }
+  ],
+  "schema": "https://tcger.app/reports/card-geometry-bakeoff-launch/v1",
+  "submission": "hf jobs run (CLI) via submit-jobs.sh",
+  "submittedAt": "2026-09-07T02:11:00-07:00",
+  "timeout": "12h",
+  "toolingRevision": "63fcb55fc506c1081acb926eeb1d9a7346f06f28"
+}

@@ -3,7 +3,7 @@
   "scope": "Card geometry training, evaluation, corpus repair and diagnostic review; not a complete app architecture handoff",
   "codeThrough": "b3134c60",
   "branch": "claude/tcg-card-recognition-review-fkwkvl",
-  "status": "Analysis complete. Canonical category importer repair implemented and gated later on 2026-09-06 (TARGET_SEMANTICS preflight, policy v4); repaired real material recounted and shape-checked locally. A successor real candidate and a combined training candidate exist LOCALLY under amended policy v4 (see successorCorpusPrep); nothing is published to the Hub, no experiment config is frozen and no new training is launched.",
+  "status": "Analysis complete. Canonical category importer repair implemented and gated later on 2026-09-06 (TARGET_SEMANTICS preflight, policy v4); repaired real material recounted and shape-checked locally. A successor real candidate and a combined training candidate exist LOCALLY under amended policy v4 (see successorCorpusPrep); on 2026-09-07 the successor corpus was published, four configs were frozen under v4 and submitted as HF Jobs (see successorBakeoffLaunch); results are not yet recorded.",
   "trainingCorpus": {
     "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
     "datasetRepo": "ahzs645/tcger-scanner-images",
@@ -1250,13 +1250,50 @@
     "combinedTrainingCandidate": {
       "localPath": ".artifacts/card-geometry/releases/card-geometry-training-successor-candidate-v1",
       "policy": "training-minimums-v4",
-      "published": false,
-      "frozenExperiment": false,
+      "published": true,
+      "frozenExperiment": true,
       "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
       "records": 15744,
       "preflight": "20/20 pass, readyFor training",
       "crossReleaseLeaks": 0
     },
     "trainingLaunched": false
-  }
+  },
+  "successorBakeoffLaunch": {
+    "record": "docs/scanner-system/benchmarks/2026-09-07-successor-bakeoff/README.md",
+    "datasetRevision": "46049ce804ae235517d73ab7481850fc929ae487",
+    "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+    "inputCommit": "10904992be84e6a3b8bbcee419cf5a04c1974477",
+    "toolingRevision": "63fcb55fc506c1081acb926eeb1d9a7346f06f28",
+    "experiments": {
+      "fastvit-t8-four-corner": "89592151487f0fcf950f322710acff6efd606ee5d3a5a42fe4a646553a202aae",
+      "yolo11n-pose": "02a49b7026fb546e5a6ab8d3882c8c74d60128295d1e5c15e90add85b5983645",
+      "yolo11s-pose": "3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+      "yolox-pose": "540e83deb3fcc3fbd4919a9dcc2d5d5ac50dd69c3099bdef2319a1b423b9d298"
+    },
+    "jobs": [
+      {
+        "candidate": "fastvit-t8-four-corner",
+        "id": "6a9e7f7d259f8e97255ea2ed",
+        "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7d259f8e97255ea2ed"
+      },
+      {
+        "candidate": "yolo11n-pose",
+        "id": "6a9e7f7de686246ca69a797f",
+        "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7de686246ca69a797f"
+      },
+      {
+        "candidate": "yolo11s-pose",
+        "id": "6a9e7f7e259f8e97255ea2ef",
+        "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7e259f8e97255ea2ef"
+      },
+      {
+        "candidate": "yolox-pose",
+        "id": "6a9e7f7f259f8e97255ea2f1",
+        "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7f259f8e97255ea2f1"
+      }
+    ],
+    "status": "submitted 2026-09-07; not completed"
+  },
+  "trainingLaunched": true
 }
