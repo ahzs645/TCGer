@@ -31,14 +31,15 @@
     <div class="intro">
       <span id="record"></span>
       <p>
-        Each amber box is one queued card. Select a card, then either click its
-        corners <strong>TL → TR → BR → BL</strong> (top-left of the printed card
-        first, so a rotated card starts at its printed top-left) or press
-        <kbd>B</kbd> to seed the box and drag the handles. Corners hidden by
-        another card: press <kbd>O</kbd> on that corner. Corners beyond the photo
-        edge are marked automatically. <kbd>S</kbd> skips a target you cannot
-        label. Labels are saved to a separate journal; nothing here changes the
-        dataset.
+        Every queued card starts as a dashed amber outline you can move:
+        <strong>drag any handle</strong> onto the real corner. Scroll to zoom,
+        drag empty space to pan, double-click or <kbd>0</kbd> to reset. If a
+        box already fits, press <kbd>C</kbd> to accept it. For a rotated card
+        press <kbd>D</kbd> and click <strong>TL → TR → BR → BL</strong> of the
+        printed card. <kbd>O</kbd> marks a corner hidden by another card;
+        corners beyond the photo edge are marked automatically. <kbd>S</kbd>
+        skips a card you cannot label. Untouched boxes are never saved as
+        labels; nothing here changes the dataset.
       </p>
     </div>
     <main>
@@ -46,7 +47,8 @@
         <div class="toolbar">
           <select id="target" aria-label="Card to label"></select
           ><button id="draw">Draw corners (D)</button
-          ><button id="seed">Use box (B)</button
+          ><button id="accept">Accept box (C)</button
+          ><button id="seed">Reset to box (B)</button
           ><button id="clear">Clear corners</button
           ><select id="skip" aria-label="Skip reason">
             <option value="">Skip… (S)</option>
@@ -64,8 +66,8 @@
         <strong>Corner zoom</strong><canvas id="zoom" width="220" height="220"></canvas>
         <strong>Rectified card</strong><canvas id="crop" width="180" height="250"></canvas>
         <div class="legend">
-          <span>Amber: queued box · Green: labeled · Grey: skipped · Pink: selected</span>
-          <span>Keys: N next card · 1–4 select corner · arrows nudge (Shift ×5) · Enter save & next frame</span>
+          <span>Amber dashed: untouched box · Green ✓: labeled · Grey: skipped · Pink: selected</span>
+          <span>Keys: N next card · C accept · 1–4 select corner · arrows nudge (Shift ×5) · scroll zoom · Enter save & next</span>
         </div>
         <label>Reviewer
           <input id="reviewer" placeholder="Your name" maxlength="120" autocomplete="name" /></label>

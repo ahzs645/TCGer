@@ -17,15 +17,16 @@ Open <http://127.0.0.1:8768>. The queue is bound to the successor real candidate
 
 Frames are ordered grid first (90 frames, 778 cards), then scattered (108 / 1,061), then other (61 / 231). Keep **Incomplete only** checked and the layout filter on **Grid** for the first session.
 
-1. Select a card: click inside its amber box, use the card list on the right, or press **N** for the next unlabeled one.
-2. Give it corners either way:
-   - **D**, then click **TL → TR → BR → BL** of the *printed* card, so a rotated or upside-down card starts at its printed top-left; or
-   - **B** to seed the box, then drag the handles onto the real corners. Axis-aligned binder pockets are usually one B plus four small drags.
-3. Keys **1–4** select a corner, arrows nudge by one pixel (Shift for five), **O** marks the selected corner hidden by another card. Corners beyond the photo edge are marked outsideFrame automatically.
-4. **S** skips a card you cannot label honestly (mostly hidden, cut off, not a card, unsure). Skipped cards keep their box-only supervision.
-5. **Enter** or **Save & next** when every card on the page is labeled or skipped. A page saved with pending cards is kept as incomplete and shows again.
+Every queued card starts as a dashed amber outline seeded from its box, with handles you can grab directly. An outline becomes a label only once you move it or accept it; untouched boxes are never saved as human corners.
 
-Enter your name once as reviewer; it is stored with every save. Unsaved edits are kept as a browser draft per frame.
+1. **Drag any handle** onto the real card corner. Scroll to zoom around the cursor, drag empty space to pan, double-click or **0** to reset. Keys **1–4** pick a corner of the selected card, arrows nudge by one pixel (Shift for five).
+2. If a box already sits on the card edges, press **C** (Accept box) instead of touching it.
+3. For a rotated or tricky card press **D** and click **TL → TR → BR → BL** of the *printed* card, so an upside-down card starts at its printed top-left. **B** resets a card to its box.
+4. **O** marks the selected corner hidden by another card. Corners beyond the photo edge are marked outsideFrame automatically.
+5. **S** skips a card you cannot label honestly (mostly hidden, cut off, not a card, unsure). Skipped cards keep their box-only supervision.
+6. **N** jumps to the next unlabeled card; **Enter** or **Save & next** saves the page. A page saved with untouched cards is kept as incomplete and shows again.
+
+Green outlines with a ✓ are labeled, dashed amber ones are still pending, grey ones are skipped, pink is selected. Enter your name once as reviewer; it is stored with every save. Unsaved edits are kept as a browser draft per frame.
 
 ## Rules the server enforces
 
