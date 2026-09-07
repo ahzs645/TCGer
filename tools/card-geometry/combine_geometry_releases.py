@@ -32,7 +32,7 @@ APPROVED_POLICY_SHA256 = "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5
 ROUND_TWO_POLICY_SHA256 = "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da"
 # v4 keeps every v3 minimum and additionally requires verified whole-card
 # target semantics on every real archive record (TARGET_SEMANTICS).
-CATEGORY_REPAIR_POLICY_SHA256 = "31c7649e571bfaeba23aab77ca1305cca40df7765a92c309d2bbc71a0d0505a7"
+CATEGORY_REPAIR_POLICY_SHA256 = "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6"
 
 
 def link_or_copy(source: Path, destination: Path) -> str:

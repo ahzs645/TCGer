@@ -3,7 +3,7 @@
   "scope": "Card geometry training, evaluation, corpus repair and diagnostic review; not a complete app architecture handoff",
   "codeThrough": "b3134c60",
   "branch": "claude/tcg-card-recognition-review-fkwkvl",
-  "status": "Analysis complete. Canonical category importer repair implemented and gated later on 2026-09-06 (TARGET_SEMANTICS preflight, policy v4); repaired real material recounted and shape-checked locally. Successor corpus is NOT frozen or published and no new training is launched.",
+  "status": "Analysis complete. Canonical category importer repair implemented and gated later on 2026-09-06 (TARGET_SEMANTICS preflight, policy v4); repaired real material recounted and shape-checked locally. A successor real candidate and a combined training candidate exist LOCALLY under amended policy v4 (see successorCorpusPrep); nothing is published to the Hub, no experiment config is frozen and no new training is launched.",
   "trainingCorpus": {
     "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
     "datasetRepo": "ahzs645/tcger-scanner-images",
@@ -1150,8 +1150,8 @@
     "preflightCheck": "TARGET_SEMANTICS",
     "policyV4": {
       "path": "tools/card-geometry/policies/training-minimums-v4.json",
-      "sha256": "31c7649e571bfaeba23aab77ca1305cca40df7765a92c309d2bbc71a0d0505a7",
-      "changeFromV3": "requireTargetSemantics: true; count minimums unchanged"
+      "sha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+      "changeFromV3": "requireTargetSemantics: true; split totals unchanged; real archive slice minimums re-partitioned (single_card_archive train 4000, multi_card_grid_archive train 700, multi_card_scatter_archive train 1000, single_card_archive validation 1000)"
     },
     "repairedRealCandidate": {
       "localPath": ".artifacts/card-geometry/releases/real-geometry-category-repair-candidate-v1",
@@ -1198,6 +1198,64 @@
       "wrong": 1,
       "matchesYolo11sModelCrops": true,
       "pokemonIndexZeroNormVectors": 53
+    },
+    "trainingLaunched": false
+  },
+  "successorCorpusPrep": {
+    "record": "docs/scanner-system/benchmarks/2026-09-06-successor-corpus-prep/README.md",
+    "polygonFitAdapter": {
+      "id": "polygon-quad-fit-v2",
+      "module": "tools/card-geometry/polygon_quad_fit.py",
+      "acceptedInstances": 1252,
+      "rejected": {
+        "residual": 108,
+        "areaRatio": 15
+      }
+    },
+    "realSuccessorCandidate": {
+      "localPath": ".artifacts/card-geometry/releases/real-geometry-successor-candidate-v1",
+      "corpusHash": "8c709255183d446e6e5740bc4754767b80e01281e810904e1e8578ede667a855",
+      "records": 5744,
+      "cardTargets": 7667,
+      "trustedCorners": {
+        "train": 2829,
+        "validation": 793
+      },
+      "published": false
+    },
+    "sceneSlices": {
+      "heuristic": "grid-size-overlap-rotation-v1",
+      "mapping": {
+        "binder_page": "multi_card_grid_archive",
+        "duel_field": "multi_card_scatter_archive",
+        "other": "multi_card_other_archive"
+      },
+      "trainInstances": {
+        "single_card_archive": 4204,
+        "multi_card_grid_archive": 778,
+        "multi_card_scatter_archive": 1065,
+        "multi_card_other_archive": 234
+      }
+    },
+    "nearDuplicateAudit": {
+      "flaggedPairs": 0,
+      "maximumHammingDistance": 4
+    },
+    "humanCornerLabelQueue": {
+      "trainRecords": 259,
+      "trainTargets": 2070,
+      "sidecarSchema": "docs/scanner-system/schemas/card-geometry-archive-corner-labels.v1.schema.json",
+      "labelsCollected": false
+    },
+    "combinedTrainingCandidate": {
+      "localPath": ".artifacts/card-geometry/releases/card-geometry-training-successor-candidate-v1",
+      "policy": "training-minimums-v4",
+      "published": false,
+      "frozenExperiment": false,
+      "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+      "records": 15744,
+      "preflight": "20/20 pass, readyFor training",
+      "crossReleaseLeaks": 0
     },
     "trainingLaunched": false
   }

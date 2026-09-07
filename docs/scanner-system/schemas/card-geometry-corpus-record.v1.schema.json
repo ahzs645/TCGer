@@ -234,6 +234,10 @@
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "cornerFit": {
+          "description": "Versioned adapter that derived maskFit corners from the source mask: `conservative-mask-quad-v1` (lossless four-vertex masks only) or `polygon-quad-fit-v2` (gated line fit for many-vertex or square-stretched outlines). Absent when corners are not maskFit or on legacy records.",
+          "enum": ["conservative-mask-quad-v1", "polygon-quad-fit-v2"]
         }
       }
     },

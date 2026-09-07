@@ -40,6 +40,11 @@ from typing import Any, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from polygon_quad_fit import (  # noqa: E402
+    ADAPTER_ID as POLYGON_FIT_V2,
+    CONSERVATIVE_ADAPTER_ID,
+    fit_polygon_quad,
+)
 from corpus_release import (  # noqa: E402
     MANIFEST_SCHEMA_ID,
     POLICY_SCHEMA_ID,
@@ -72,6 +77,13 @@ MULTI_INSTANCE_SCHEMA = (
     Path(__file__).resolve().parents[2]
     / "docs/scanner-system/schemas/card-geometry-manual-multi-instance-labels.v1.schema.json"
 )
+ARCHIVE_CORNER_LABELS_SCHEMA = (
+    Path(__file__).resolve().parents[2]
+    / "docs/scanner-system/schemas/card-geometry-archive-corner-labels.v1.schema.json"
+)
+# A human quad must cover the canonical annotation box it refines; anything
+# looser is a mismatched annotation index, not a corner refinement.
+ARCHIVE_LABEL_MIN_BOX_IOU = 0.5
 CATEGORY_CONTRACT_PATH = (
     Path(__file__).resolve().parents[1] / "card-segmentation-data" / "source-config.json"
 )
@@ -80,6 +92,112 @@ TARGET_SEMANTICS_CONTRACT = "canonical-primary-card-targets-v1"
 # A slab annotation encloses a card when the card box lies inside the slab box
 # within this normalized tolerance on every side.
 SLAB_CONTAINMENT_TOLERANCE = 0.02
+POLYGON_FIT_ADAPTERS = (CONSERVATIVE_ADAPTER_ID, POLYGON_FIT_V2)
+# Provisional multi-card scene assignments from classify_canonical_scenes.py map
+# to archive-specific slices. The names describe the measured layout, not a
+# verified binder or duel scene, and never collide with synthetic or Dev Mode
+# slices so per-slice minimums stay separately enforceable.
+SCENE_ASSIGNMENT_SLICES = {
+    "binder_page": "multi_card_grid_archive",
+    "duel_field": "multi_card_scatter_archive",
+    "other": "multi_card_other_archive",
+}
+SINGLE_CARD_SLICE = "single_card_archive"
+
+
+def load_scene_assignments(path: Path, canonical_corpus: Path) -> dict[str, Any]:
+    """Read classifier assignments and bind them to the canonical corpus bytes."""
+    document = load_json(path)
+    declared = document.get("input", {}).get("sha256")
+    actual = sha256_file(canonical_corpus)
+    if declared != actual:
+        raise ValueError(
+            f"scene assignments were computed for canonical corpus {declared!r}, not {actual!r}"
+        )
+    by_record = {}
+    for item in document.get("assignments", []):
+        assignment = item.get("assignment")
+        if assignment not in SCENE_ASSIGNMENT_SLICES:
+            raise ValueError(f"unknown scene assignment {assignment!r} for {item.get('recordId')}")
+        by_record[item["recordId"]] = SCENE_ASSIGNMENT_SLICES[assignment]
+    return {
+        "path": path,
+        "sha256": sha256_file(path),
+        "heuristic": document.get("heuristic", {}).get("id"),
+        "byRecord": by_record,
+    }
+
+
+def load_archive_corner_labels(path: Path, canonical_corpus: Path) -> dict[str, Any]:
+    """Read human archive corner labels bound to the canonical corpus bytes."""
+    document = load_json(path)
+    errors = validation_errors(make_validator(load_schema(ARCHIVE_CORNER_LABELS_SCHEMA)), document)
+    if errors:
+        raise ValueError("invalid archive corner labels:\n- " + "\n- ".join(errors))
+    actual = sha256_file(canonical_corpus)
+    if document["canonicalCorpusSha256"] != actual:
+        raise ValueError(
+            f"archive corner labels were drawn on canonical corpus {document['canonicalCorpusSha256']!r}, not {actual!r}"
+        )
+    frames: dict[str, dict[str, Any]] = {}
+    for frame in document["frames"]:
+        if frame["canonicalRecordId"] in frames:
+            raise ValueError(f"duplicate archive corner label frame {frame['canonicalRecordId']}")
+        indices = [item["sourceAnnotationIndex"] for item in frame["instances"]]
+        if len(indices) != len(set(indices)):
+            raise ValueError(f"duplicate sourceAnnotationIndex in {frame['canonicalRecordId']}")
+        frames[frame["canonicalRecordId"]] = frame
+    return {"path": path, "sha256": sha256_file(path), "frames": frames}
+
+
+def _box_iou(first: dict[str, float], second: dict[str, float]) -> float:
+    width = max(0.0, min(first["right"], second["right"]) - max(first["left"], second["left"]))
+    height = max(0.0, min(first["bottom"], second["bottom"]) - max(first["top"], second["top"]))
+    inter = width * height
+    area = lambda box: max(0.0, box["right"] - box["left"]) * max(0.0, box["bottom"] - box["top"])  # noqa: E731
+    union = area(first) + area(second) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _apply_archive_corner_labels(
+    row: dict[str, Any],
+    instances: list[dict[str, Any]],
+    frame: dict[str, Any],
+    stats: Counter,
+) -> None:
+    """Replace box-only or fitted corners with human corners for labeled targets."""
+    if frame["imageSha256"] != row["sha256"]:
+        raise ValueError(f"archive corner labels for {row['id']} were drawn on different image bytes")
+    by_index = {instance["sourceAnnotationIndex"]: instance for instance in instances}
+    for label in frame["instances"]:
+        instance = by_index.get(label["sourceAnnotationIndex"])
+        if instance is None:
+            raise ValueError(
+                f"archive corner label {row['id']}:{label['sourceAnnotationIndex']} does not name a whole-card target"
+            )
+        xs = [point[0] for point in label["corners"]]
+        ys = [point[1] for point in label["corners"]]
+        quad_box = {
+            "left": max(0.0, min(xs)), "top": max(0.0, min(ys)),
+            "right": min(1.0, max(xs)), "bottom": min(1.0, max(ys)),
+        }
+        if _box_iou(quad_box, instance["box"]) < ARCHIVE_LABEL_MIN_BOX_IOU:
+            raise ValueError(
+                f"archive corner label {row['id']}:{label['sourceAnnotationIndex']} does not cover its annotation box"
+            )
+        instance["corners"] = [
+            {
+                "point": {"x": float(x), "y": float(y)},
+                "visibility": visibility,
+                "coordinateKnown": True,
+                "cornerSource": "human",
+            }
+            for (x, y), visibility in zip(label["corners"], label["cornerVisibility"], strict=True)
+        ]
+        instance["orientationKnown"] = bool(label["orientationKnown"])
+        instance.pop("cornerFit", None)
+        stats["archiveHumanCornerInstances"] += 1
+    stats["archiveHumanCornerRecords"] += 1
 
 
 def load_category_contract(path: Path = CATEGORY_CONTRACT_PATH) -> dict[str, Any]:
@@ -298,8 +416,15 @@ def _box_inside(inner: dict[str, float], outer: dict[str, float]) -> bool:
 
 
 def _mask_instance(
-    annotation: dict[str, Any], index: int, width: int, height: int, stats: Counter
+    annotation: dict[str, Any],
+    index: int,
+    width: int,
+    height: int,
+    stats: Counter,
+    polygon_fit: str = CONSERVATIVE_ADAPTER_ID,
 ) -> dict[str, Any] | None:
+    if polygon_fit not in POLYGON_FIT_ADAPTERS:
+        raise ValueError(f"unknown polygon fit adapter {polygon_fit!r}")
     quality = annotation.get("geometryQuality")
     visible_mask, polygon = _annotation_mask(annotation, width, height)
     box = _annotation_box(annotation, polygon, width, height)
@@ -307,8 +432,19 @@ def _mask_instance(
         stats["instancesMissingBox"] += 1
         return None
     corners = _unknown_corners()
+    adapter_used = None
     fit, outcome = (conservative_mask_quad(polygon) if polygon else (None, "rle")) if quality in {
         "source-polygon", "source-rle"} else (None, "box-only")
+    if fit:
+        adapter_used = CONSERVATIVE_ADAPTER_ID
+    elif polygon and polygon_fit == POLYGON_FIT_V2 and outcome in {"residual", "aspect"}:
+        # Only outlines the lossless adapter rejected for shape reasons reach
+        # the gated line fit; convexity/occlusion rejections stay rejected.
+        fit, v2_outcome, _metrics = fit_polygon_quad(polygon)
+        stats[f"polygonFitV2:{v2_outcome}"] += 1
+        if fit:
+            adapter_used = POLYGON_FIT_V2
+            outcome = f"accepted:{POLYGON_FIT_V2}"
     if quality not in {"source-polygon", "source-rle"}:
         # The rectangle encodes only extent, never a visible mask or a quad.
         visible_mask = None
@@ -335,6 +471,8 @@ def _mask_instance(
     }
     if visible_mask is not None:
         instance["visibleMask"] = visible_mask
+    if adapter_used is not None:
+        instance["cornerFit"] = adapter_used
     return instance
 
 
@@ -427,7 +565,10 @@ def _shippable_source_license(row: dict[str, Any]) -> str:
 
 
 def _card_instances(
-    row: dict[str, Any], roles: dict[str, str], stats: Counter
+    row: dict[str, Any],
+    roles: dict[str, str],
+    stats: Counter,
+    polygon_fit: str = CONSERVATIVE_ADAPTER_ID,
 ) -> tuple[list[dict[str, Any]], Counter] | None:
     """Whole-card targets of one canonical record, or None to exclude the image.
 
@@ -465,7 +606,9 @@ def _card_instances(
         if role != "primary":
             stats[f"annotationsNotTargets:{role}:{category}"] += 1
             continue
-        instance = _mask_instance(annotation, len(instances), width, height, stats)
+        instance = _mask_instance(
+            annotation, len(instances), width, height, stats, polygon_fit
+        )
         if instance is None:
             return None
         instance["sourceCategory"] = category
@@ -491,8 +634,13 @@ def add_canonical_archive(
     stats: Counter,
     max_records: int | None = None,
     contract: dict[str, Any] | None = None,
+    polygon_fit: str = CONSERVATIVE_ADAPTER_ID,
+    scene_assignments: dict[str, Any] | None = None,
+    corner_labels: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     roles = (contract or load_category_contract())["roles"]
+    scene_by_record = (scene_assignments or {}).get("byRecord", {})
+    label_frames = (corner_labels or {}).get("frames", {})
     entries = []
     source_archive_id = _safe_id(f"coco:{archive_path.stem}")
     with zipfile.ZipFile(archive_path) as archive:
@@ -506,7 +654,7 @@ def add_canonical_archive(
             if not row.get("annotations"):
                 stats["recordsExcludedNoGeometry"] += 1
                 continue
-            selected = _card_instances(row, roles, stats)
+            selected = _card_instances(row, roles, stats, polygon_fit)
             if selected is None:
                 stats["recordsExcludedMissingBox"] += 1
                 continue
@@ -514,6 +662,8 @@ def add_canonical_archive(
             if not instances:
                 stats["recordsExcludedNoCardAnnotations"] += 1
                 continue
+            if row["id"] in label_frames:
+                _apply_archive_corner_labels(row, instances, label_frames[row["id"]], stats)
             stats["canonicalInstancesRetained"] += len(instances)
             stats["canonicalCardAnnotationsRetained"] += len(instances)
             if len(instances) > 1:
@@ -549,10 +699,16 @@ def add_canonical_archive(
             record["source"]["licenseId"] = license_id
             stats[f"sourceLicense:{license_id}"] += 1
             suffix = Path(row["imageMember"]).suffix or ".jpg"
+            scene_slice = SINGLE_CARD_SLICE
+            if len(instances) > 1 and scene_assignments is not None:
+                if row["id"] not in scene_by_record:
+                    raise ValueError(
+                        f"multi-card canonical record {row['id']} has no scene assignment"
+                    )
+                scene_slice = scene_by_record[row["id"]]
+            stats[f"sceneSlice:{scene_slice}"] += 1
             entries.append(
-                _write_record(
-                    root, record, image_bytes, suffix, split, "single_card_archive"
-                )
+                _write_record(root, record, image_bytes, suffix, split, scene_slice)
             )
             stats["canonicalRecordsIncluded"] += 1
     return entries
@@ -899,9 +1055,24 @@ def build_release(
     release_id: str = "real-geometry-ingestion-smoke-v1",
     source_archive_aliases: dict[str, str] | None = None,
     category_contract: Path = CATEGORY_CONTRACT_PATH,
+    polygon_fit: str = CONSERVATIVE_ADAPTER_ID,
+    scene_assignments_path: Path | None = None,
+    archive_corner_labels_path: Path | None = None,
 ) -> dict[str, Any]:
     _validate_archive_splits(archive_splits)
+    corner_labels = (
+        load_archive_corner_labels(archive_corner_labels_path, canonical_corpus)
+        if archive_corner_labels_path is not None
+        else None
+    )
     contract = load_category_contract(category_contract)
+    if polygon_fit not in POLYGON_FIT_ADAPTERS:
+        raise ValueError(f"unknown polygon fit adapter {polygon_fit!r}")
+    scene_assignments = (
+        load_scene_assignments(scene_assignments_path, canonical_corpus)
+        if scene_assignments_path is not None
+        else None
+    )
     # Known archive identities are explicit. Additional archives/re-exports
     # require a reviewed table; do not silently declare unknown sources unique.
     canonical_fork = "coco:card-seg-j74w1.v3i.coco-segmentation"
@@ -942,6 +1113,9 @@ def build_release(
                 stats=stats,
                 max_records=max_records_per_archive,
                 contract=contract,
+                polygon_fit=polygon_fit,
+                scene_assignments=scene_assignments,
+                corner_labels=corner_labels,
             )
         )
     denylist: set[str] = set()
@@ -1008,6 +1182,23 @@ def build_release(
             "sha256": contract["sha256"],
             "roles": dict(sorted(contract["roles"].items())),
         },
+        "polygonFitAdapter": polygon_fit,
+        "archiveCornerLabels": (
+            {"path": str(corner_labels["path"]), "sha256": corner_labels["sha256"],
+             "frames": len(corner_labels["frames"])}
+            if corner_labels is not None
+            else None
+        ),
+        "sceneAssignments": (
+            {
+                "path": str(scene_assignments["path"]),
+                "sha256": scene_assignments["sha256"],
+                "heuristic": scene_assignments["heuristic"],
+                "sliceMapping": SCENE_ASSIGNMENT_SLICES,
+            }
+            if scene_assignments is not None
+            else None
+        ),
         "records": len(entries),
         "instances": stats["canonicalInstancesRetained"]
         + stats["devmodeQuadRecords"]
@@ -1082,6 +1273,18 @@ def main() -> int:
         "--category-contract", type=Path, default=CATEGORY_CONTRACT_PATH,
         help="canonical category contract whose `primary` categories become card targets",
     )
+    parser.add_argument(
+        "--polygon-fit", choices=POLYGON_FIT_ADAPTERS, default=CONSERVATIVE_ADAPTER_ID,
+        help="corner fit adapter; v2 additionally recovers gated line fits from many-vertex or square-stretched outlines",
+    )
+    parser.add_argument(
+        "--scene-assignments", type=Path,
+        help="classify_canonical_scenes.py report bound to this canonical corpus; multi-card records take archive scene slices",
+    )
+    parser.add_argument(
+        "--archive-corner-labels", type=Path,
+        help="human four-corner labels for canonical archive targets (card-geometry-archive-corner-labels v1)",
+    )
     args = parser.parse_args()
     archive_splits = dict(args.archive_split or [(DEFAULT_TCGX_ARCHIVE, "test")])
     if args.max_records_per_archive is not None and args.max_records_per_archive < 1:
@@ -1099,6 +1302,9 @@ def main() -> int:
         release_id=args.release_id,
         source_archive_aliases=load_json(args.source_archive_aliases) if args.source_archive_aliases else None,
         category_contract=args.category_contract,
+        polygon_fit=args.polygon_fit,
+        scene_assignments_path=args.scene_assignments,
+        archive_corner_labels_path=args.archive_corner_labels,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

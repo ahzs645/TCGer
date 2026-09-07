@@ -1,0 +1,74 @@
+{
+  "archiveSplits": {
+    "card-detector-wmbbb.v8i.coco-segmentation.zip": "train",
+    "card-scanner-seg.v3i.coco-segmentation.zip": "train",
+    "card-seg-j74w1-q8yst.v1i.coco-segmentation.zip": "validation",
+    "card-seg-j74w1.v3i.coco-segmentation.zip": "validation",
+    "card-segmentation-gldmt.v2i.coco-segmentation.zip": "train",
+    "carddetection-hegxe.v7i.coco.zip": "train",
+    "labelyolo.v4i.coco.zip": "validation",
+    "mtg-rqful.v1i.coco.zip": "train",
+    "mtg-scanner-bughx.v4i.coco.zip": "train",
+    "pk-detect.v3i.coco.zip": "train",
+    "pokefolio.v1i.coco.zip": "train",
+    "pokemon-card-outliner.v1i.coco-yolo.zip": "train",
+    "pokemon_card_detector.v1-versie-1.coco.zip": "validation"
+  },
+  "categoryContract": {
+    "path": "/Users/ahmadjalil/github/TCGer/tools/card-segmentation-data/source-config.json",
+    "roles": {
+      "card": "primary",
+      "collection_region": "auxiliary",
+      "info_region": "auxiliary",
+      "inner_border": "auxiliary",
+      "slab": "context",
+      "title_region": "auxiliary"
+    },
+    "sha256": "2b23dd188a641bdbfd751dcb6c8f176206aa803ed143f45a320189662d15e560"
+  },
+  "corpusHash": "8c709255183d446e6e5740bc4754767b80e01281e810904e1e8578ede667a855",
+  "devmodeLabelBackups": [],
+  "instances": 7667,
+  "maxRecordsPerArchive": null,
+  "multiInstanceLabelFiles": [],
+  "policySha256": "ba1a012dfdbdad48fb51e1be22723597889b7ca51ddcbbc01c2a32a2fd55c802",
+  "polygonFitAdapter": "polygon-quad-fit-v2",
+  "records": 5744,
+  "release": "../../.artifacts/card-geometry/releases/real-geometry-successor-candidate-v1",
+  "sceneAssignments": {
+    "heuristic": "grid-size-overlap-rotation-v1",
+    "path": "../../.artifacts/card-geometry/successor-prep/scene-assignments.json",
+    "sha256": "356659a395079232f6ab01c32d20541c1bbb3d43ca67c41ac3fd15d34d16240b",
+    "sliceMapping": {
+      "binder_page": "multi_card_grid_archive",
+      "duel_field": "multi_card_scatter_archive",
+      "other": "multi_card_other_archive"
+    }
+  },
+  "stats": {
+    "annotationsNotTargets:auxiliary:collection_region": 46,
+    "annotationsNotTargets:auxiliary:info_region": 211,
+    "annotationsNotTargets:auxiliary:inner_border": 235,
+    "annotationsNotTargets:auxiliary:title_region": 257,
+    "annotationsNotTargets:context:slab": 235,
+    "canonicalCardAnnotationsRetained": 7667,
+    "canonicalInstancesRetained": 7667,
+    "canonicalRecordsIncluded": 5744,
+    "cardsInsideSlab": 235,
+    "maskFit:accepted": 2370,
+    "maskFit:accepted:polygon-quad-fit-v2": 1252,
+    "maskFit:box-only": 3922,
+    "maskFit:residual": 123,
+    "polygonFitV2:accepted": 1252,
+    "polygonFitV2:areaRatio": 15,
+    "polygonFitV2:residual": 108,
+    "recordsExcludedNoGeometry": 32,
+    "recordsWithMultipleCards": 282,
+    "sceneSlice:multi_card_grid_archive": 93,
+    "sceneSlice:multi_card_other_archive": 67,
+    "sceneSlice:multi_card_scatter_archive": 122,
+    "sceneSlice:single_card_archive": 5462,
+    "sourceLicense:CC BY 4.0": 4944,
+    "sourceLicense:MIT": 800
+  }
+}

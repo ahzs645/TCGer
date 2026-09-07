@@ -822,5 +822,223 @@ class CategoryBoundaryTests(unittest.TestCase):
             self.assertEqual(report["failedChecks"], ["TARGET_SEMANTICS"])
 
 
+class FitAdapterAndSceneSliceTests(CategoryBoundaryTests):
+    """Opt-in v2 corner fit and provisional multi-card scene slices."""
+
+    def test_v2_fit_recovers_many_vertex_outline_and_records_adapter(self):
+        annotations = self._mixed_annotations()
+        card = annotations[1]
+        # Many-vertex outline of the same card: extra clicks along every edge.
+        card["segmentation"] = [[20, 15, 40, 15, 60, 15, 80, 15, 80, 40, 80, 60, 80, 85,
+                                 60, 85, 40, 85, 20, 85, 20, 60, 20, 40]]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, raw, row = self._mixed_source(root, annotations)
+            stats = Counter()
+            legacy = add_canonical_archive(
+                root=root / "legacy", rows=[row], archive_path=raw / row["archive"],
+                split="train", stats=stats,
+            )
+            legacy_instance = load_json(root / "legacy" / legacy[0]["path"])["instances"][0]
+            self.assertFalse(any(c["coordinateKnown"] for c in legacy_instance["corners"]))
+            self.assertNotIn("cornerFit", legacy_instance)
+            self.assertEqual(stats["maskFit:residual"], 1)
+
+            stats = Counter()
+            repaired = add_canonical_archive(
+                root=root / "v2", rows=[row], archive_path=raw / row["archive"],
+                split="train", stats=stats, polygon_fit="polygon-quad-fit-v2",
+            )
+            instance = load_json(root / "v2" / repaired[0]["path"])["instances"][0]
+            self.assertEqual(instance["cornerFit"], "polygon-quad-fit-v2")
+            self.assertEqual({c["cornerSource"] for c in instance["corners"]}, {"maskFit"})
+            points = [(round(c["point"]["x"], 3), round(c["point"]["y"], 3)) for c in instance["corners"]]
+            self.assertEqual(points, [(0.2, 0.15), (0.8, 0.15), (0.8, 0.85), (0.2, 0.85)])
+            self.assertEqual(stats["polygonFitV2:accepted"], 1)
+            self.assertEqual(stats["maskFit:accepted:polygon-quad-fit-v2"], 1)
+
+    def test_exact_quads_keep_the_conservative_adapter_under_v2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, raw, row = self._mixed_source(root, self._mixed_annotations())
+            entries = add_canonical_archive(
+                root=root / "v2", rows=[row], archive_path=raw / row["archive"],
+                split="train", stats=Counter(), polygon_fit="polygon-quad-fit-v2",
+            )
+            instance = load_json(root / "v2" / entries[0]["path"])["instances"][0]
+            self.assertEqual(instance["cornerFit"], "conservative-mask-quad-v1")
+            with self.assertRaisesRegex(ValueError, "unknown polygon fit adapter"):
+                add_canonical_archive(
+                    root=root / "bad", rows=[row], archive_path=raw / row["archive"],
+                    split="train", stats=Counter(), polygon_fit="guess",
+                )
+
+    def test_scene_assignments_bind_to_corpus_and_slice_multi_card_records(self):
+        from corpus_release import sha256_file, write_json
+
+        annotations = self._mixed_annotations()
+        annotations.append({"category": "card", "geometryQuality": "bbox-derived",
+                            "bbox": [0, 0, 10, 14], "provenance": ["card-scanner-seg:card:12"]})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, row = self._mixed_source(root, annotations)
+            report = root / "scenes.json"
+            write_json(report, {
+                "input": {"name": corpus.name, "sha256": sha256_file(corpus)},
+                "heuristic": {"id": "grid-size-overlap-rotation-v1"},
+                "assignments": [{"recordId": row["id"], "assignment": "binder_page"}],
+            })
+            output = root / "release"
+            summary = build_release(
+                canonical_corpus=corpus, raw_dir=raw,
+                archive_splits={"card-scanner-seg.v3i.coco-segmentation.zip": "train"},
+                devmode_sessions=[], output=output,
+                source_archive_aliases=self._aliases(), scene_assignments_path=report,
+            )
+            manifest = load_json(output / "manifest.json")
+            self.assertEqual(manifest["records"][0]["sceneSlice"], "multi_card_grid_archive")
+            self.assertEqual(summary["sceneAssignments"]["sha256"], sha256_file(report))
+            self.assertEqual(summary["stats"]["sceneSlice:multi_card_grid_archive"], 1)
+            self.assertEqual(run_preflight(output, tooling_revision="test")["failedChecks"], [])
+
+            # Assignments for a different corpus are refused, and a multi-card
+            # record without an assignment is an error rather than a default.
+            write_json(report, {"input": {"sha256": "0" * 64}, "assignments": []})
+            with self.assertRaisesRegex(ValueError, "computed for canonical corpus"):
+                build_release(
+                    canonical_corpus=corpus, raw_dir=raw,
+                    archive_splits={"card-scanner-seg.v3i.coco-segmentation.zip": "train"},
+                    devmode_sessions=[], output=root / "r2",
+                    source_archive_aliases=self._aliases(), scene_assignments_path=report,
+                )
+            write_json(report, {"input": {"sha256": sha256_file(corpus)}, "assignments": []})
+            with self.assertRaisesRegex(ValueError, "no scene assignment"):
+                build_release(
+                    canonical_corpus=corpus, raw_dir=raw,
+                    archive_splits={"card-scanner-seg.v3i.coco-segmentation.zip": "train"},
+                    devmode_sessions=[], output=root / "r3",
+                    source_archive_aliases=self._aliases(), scene_assignments_path=report,
+                )
+
+
+class ArchiveCornerLabelTests(CategoryBoundaryTests):
+    """Human corner labels attach to canonical archive targets by annotation index."""
+
+    def _labels(self, corpus: Path, row: dict, corners, index=1, image_sha=None, reviewer="Ahmad"):
+        from corpus_release import sha256_file
+        return {
+            "schema": "https://tcger.app/schemas/card-geometry-archive-corner-labels/v1",
+            "canonicalCorpusSha256": sha256_file(corpus),
+            "frames": [{
+                "canonicalRecordId": row["id"],
+                "imageSha256": image_sha or row["sha256"],
+                "reviewer": reviewer,
+                "labeledAt": "2026-09-06T20:00:00Z",
+                "instances": [{
+                    "sourceAnnotationIndex": index,
+                    "corners": corners,
+                    "cornerVisibility": ["visible", "visible", "visible", "occluded"],
+                    "orientationKnown": True,
+                }],
+            }],
+        }
+
+    def test_labels_replace_box_only_corners_with_human_corners(self):
+        from corpus_release import write_json
+
+        annotations = self._mixed_annotations()
+        annotations[1] = {**annotations[1], "geometryQuality": "bbox-derived"}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, row = self._mixed_source(root, annotations)
+            labels = root / "labels.json"
+            quad = [[0.21, 0.16], [0.79, 0.14], [0.81, 0.86], [0.19, 0.84]]
+            write_json(labels, self._labels(corpus, row, quad))
+            output = root / "release"
+            summary = build_release(
+                canonical_corpus=corpus, raw_dir=raw,
+                archive_splits={"card-scanner-seg.v3i.coco-segmentation.zip": "train"},
+                devmode_sessions=[], output=output,
+                source_archive_aliases=self._aliases(), archive_corner_labels_path=labels,
+            )
+            manifest = load_json(output / "manifest.json")
+            instance = load_json(output / manifest["records"][0]["path"])["instances"][0]
+            self.assertEqual({c["cornerSource"] for c in instance["corners"]}, {"human"})
+            self.assertEqual([c["visibility"] for c in instance["corners"]],
+                             ["visible", "visible", "visible", "occluded"])
+            self.assertEqual(instance["corners"][0]["point"], {"x": 0.21, "y": 0.16})
+            self.assertTrue(instance["orientationKnown"])
+            self.assertNotIn("cornerFit", instance)
+            self.assertEqual(instance["sourceAnnotationIndex"], 1)
+            self.assertEqual(summary["stats"]["archiveHumanCornerInstances"], 1)
+            self.assertEqual(summary["archiveCornerLabels"]["frames"], 1)
+            report = run_preflight(output, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], [])
+            self.assertEqual(report["cornerCounts"]["bySourceKind"]["real"]["metricEligible"], 4)
+
+    def test_labels_must_bind_to_corpus_image_and_target(self):
+        from corpus_release import write_json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, row = self._mixed_source(root, self._mixed_annotations())
+            labels = root / "labels.json"
+            quad = [[0.2, 0.15], [0.8, 0.15], [0.8, 0.85], [0.2, 0.85]]
+            kwargs = dict(
+                canonical_corpus=corpus, raw_dir=raw,
+                archive_splits={"card-scanner-seg.v3i.coco-segmentation.zip": "train"},
+                devmode_sessions=[], source_archive_aliases=self._aliases(),
+                archive_corner_labels_path=labels,
+            )
+            cases = [
+                ({"canonicalCorpusSha256": "0" * 64}, "drawn on canonical corpus"),
+                ({"frames": [dict(self._labels(corpus, row, quad)["frames"][0], imageSha256="1" * 64)]},
+                 "different image bytes"),
+                ({"frames": [dict(self._labels(corpus, row, quad, index=0)["frames"][0])]},
+                 "does not name a whole-card target"),
+                ({"frames": [dict(self._labels(corpus, row, [[0.0, 0.0], [0.1, 0.0], [0.1, 0.1], [0.0, 0.1]])["frames"][0])]},
+                 "does not cover its annotation box"),
+                ({"frames": [dict(self._labels(corpus, row, quad)["frames"][0], reviewer="")]},
+                 "invalid archive corner labels"),
+            ]
+            for number, (override, message) in enumerate(cases):
+                document = {**self._labels(corpus, row, quad), **override}
+                write_json(labels, document)
+                with self.subTest(case=message), self.assertRaisesRegex(ValueError, message):
+                    build_release(output=root / f"release-{number}", **kwargs)
+
+    def test_queue_lists_box_only_multi_card_train_targets(self):
+        from build_archive_corner_label_queue import build_queue
+        from corpus_release import sha256_file, write_json
+
+        annotations = self._mixed_annotations()
+        annotations.append({"category": "card", "geometryQuality": "bbox-derived",
+                            "bbox": [0, 0, 10, 14], "provenance": ["card-scanner-seg:card:12"]})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, row = self._mixed_source(root, annotations)
+            report = root / "scenes.json"
+            write_json(report, {"input": {"sha256": sha256_file(corpus)},
+                                "heuristic": {"id": "grid-size-overlap-rotation-v1"},
+                                "assignments": [{"recordId": row["id"], "assignment": "duel_field"}]})
+            output = root / "release"
+            build_release(
+                canonical_corpus=corpus, raw_dir=raw,
+                archive_splits={"card-scanner-seg.v3i.coco-segmentation.zip": "train"},
+                devmode_sessions=[], output=output,
+                source_archive_aliases=self._aliases(), scene_assignments_path=report,
+            )
+            queue = build_queue(output, splits=("train",), slices=("multi_card_scatter_archive",))
+            self.assertEqual(len(queue["frames"]), 1)
+            frame = queue["frames"][0]
+            self.assertEqual(frame["canonicalRecordId"], row["id"])
+            self.assertEqual(frame["imageSha256"], row["sha256"])
+            # Only the box-only card is queued; the fitted card already has corners.
+            self.assertEqual([i["sourceAnnotationIndex"] for i in frame["instances"]], [4])
+            self.assertEqual(queue["counts"]["targets:train/multi_card_scatter_archive"], 1)
+            empty = build_queue(output, splits=("validation",), slices=("multi_card_scatter_archive",))
+            self.assertEqual(empty["frames"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

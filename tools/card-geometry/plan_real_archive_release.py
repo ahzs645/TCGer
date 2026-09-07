@@ -159,6 +159,9 @@ def main():
     parser.add_argument("--evaluation", type=Path, action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--release-id", required=True)
+    parser.add_argument("--polygon-fit", default="conservative-mask-quad-v1")
+    parser.add_argument("--scene-assignments", type=Path)
+    parser.add_argument("--archive-corner-labels", type=Path)
     args = parser.parse_args()
     import json
 
@@ -185,6 +188,9 @@ def main():
         output=args.output,
         release_id=args.release_id,
         source_archive_aliases=plan["sourceArchiveAliases"],
+        polygon_fit=args.polygon_fit,
+        scene_assignments_path=args.scene_assignments,
+        archive_corner_labels_path=args.archive_corner_labels,
     )
     manifest = load_json(args.output / "manifest.json")
     manifest["splitAssignment"] = {

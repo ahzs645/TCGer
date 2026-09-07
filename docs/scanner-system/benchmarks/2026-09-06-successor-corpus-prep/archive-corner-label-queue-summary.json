@@ -1,0 +1,32 @@
+{
+  "corpusHash": "8c709255183d446e6e5740bc4754767b80e01281e810904e1e8578ede667a855",
+  "counts": {
+    "records:train/multi_card_grid_archive": 90,
+    "records:train/multi_card_other_archive": 61,
+    "records:train/multi_card_scatter_archive": 108,
+    "targets:coco:carddetection-hegxe.v7i.coco": 1207,
+    "targets:coco:mtg-scanner-bughx.v4i.coco": 209,
+    "targets:coco:pk-detect.v3i.coco": 212,
+    "targets:coco:pokefolio.v1i.coco": 226,
+    "targets:coco:pokemon-card-outliner.v1i.coco-yolo": 216,
+    "targets:train/multi_card_grid_archive": 778,
+    "targets:train/multi_card_other_archive": 231,
+    "targets:train/multi_card_scatter_archive": 1061
+  },
+  "frameCount": 259,
+  "labelSidecarSchema": "https://tcger.app/schemas/card-geometry-archive-corner-labels/v1",
+  "manifestSha256": "91a40cf6592073da243ef7d0aef7dbb571599ccdbf8039c2bdd1b2196f0752b4",
+  "releaseId": "real-geometry-successor-candidate-v1",
+  "schema": "https://tcger.app/manifests/card-geometry-archive-corner-label-queue/v1",
+  "selection": {
+    "rule": "real archive records without a capture session whose targets lack four known corners",
+    "sceneSlices": [
+      "multi_card_grid_archive",
+      "multi_card_scatter_archive",
+      "multi_card_other_archive"
+    ],
+    "splits": [
+      "train"
+    ]
+  }
+}

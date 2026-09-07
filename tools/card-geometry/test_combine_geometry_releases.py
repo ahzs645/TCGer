@@ -36,11 +36,21 @@ class CombineGeometryReleasesTests(unittest.TestCase):
         self.assertEqual(sha256_file(ROOT / "policies" / "training-minimums-v3.json"), ROUND_TWO_POLICY_SHA256)
         self.assertTrue(v4["requireTargetSemantics"])
         self.assertNotIn("requireTargetSemantics", v3)
-        # Count minimums are unchanged: v4 only adds the semantic requirement.
+        # Split totals are unchanged; v4 adds the semantic requirement and
+        # re-partitions the real archive slices by measured layout.
         for key in ("minimumRecordsPerSplit", "minimumInstancesPerSplit",
-                    "minimumMetricEligibleInstances", "requiredSceneSlices",
+                    "minimumMetricEligibleInstances",
                     "requiredLeakageKeys", "metricEligibleCornerSources", "allowedSourceTiers"):
             self.assertEqual(v4[key], v3[key], key)
+        slices = {(item["sceneSlice"], item["split"]): item["minimumInstances"] for item in v4["requiredSceneSlices"]}
+        self.assertEqual(slices[("single_card_archive", "train")], 4000)
+        self.assertEqual(slices[("multi_card_grid_archive", "train")], 700)
+        self.assertEqual(slices[("multi_card_scatter_archive", "train")], 1000)
+        self.assertEqual(slices[("single_card_archive", "validation")], 1000)
+        synthetic = {k: v for k, v in slices.items() if k[0] not in {
+            "single_card_archive", "multi_card_grid_archive", "multi_card_scatter_archive"}}
+        self.assertEqual(synthetic, {(item["sceneSlice"], item["split"]): item["minimumInstances"]
+                                     for item in v3["requiredSceneSlices"] if item["sceneSlice"] != "single_card_archive"})
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with self.assertRaisesRegex(ValueError, "separately pinned"):

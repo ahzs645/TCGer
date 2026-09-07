@@ -2,7 +2,7 @@
   "allowedSourceTiers": [
     "shippable"
   ],
-  "description": "Successor to training-minimums-v3 with identical count minimums. Adds requireTargetSemantics: every real archive record must carry verified primary-category (whole-card) target provenance under a declared targetSemantics contract, so slabs and card subregions can never re-enter a training corpus as cards. Declared 2026-09-06 after the canonical category import defect; frozen real v6-full and synthetic multigame evaluations remain separate pinned releases whose records must never be copied into this corpus. Real polygon fits support training but are not metric ground truth.",
+  "description": "Successor to training-minimums-v3 with the same split totals. Adds requireTargetSemantics: every real archive record must carry verified primary-category (whole-card) target provenance under a declared targetSemantics contract, so slabs and card subregions can never re-enter a training corpus as cards. Real archive scene slices follow the category-aware importer: single_card_archive holds single-card frames only, while multi-card frames are sliced by measured layout (multi_card_grid_archive, multi_card_scatter_archive, multi_card_other_archive) and never share a name with synthetic or Dev Mode slices. Minimums for the archive slices were set from the 2026-09-06 repaired candidate counts (4,204 / 778 / 1,065 train instances) after removing 749 train and 235 validation non-card targets. Frozen real v6-full and synthetic multigame evaluations remain separate pinned releases whose records must never be copied into this corpus. Real polygon fits support training but are not metric ground truth.",
   "metricEligibleCornerSources": [
     "human",
     "synthetic"
@@ -34,9 +34,21 @@
   },
   "requiredSceneSlices": [
     {
-      "minimumInstances": 5000,
+      "minimumInstances": 4000,
       "minimumMetricEligibleInstances": 0,
       "sceneSlice": "single_card_archive",
+      "split": "train"
+    },
+    {
+      "minimumInstances": 700,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "multi_card_grid_archive",
+      "split": "train"
+    },
+    {
+      "minimumInstances": 1000,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "multi_card_scatter_archive",
       "split": "train"
     },
     {
