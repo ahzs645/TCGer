@@ -1177,6 +1177,7 @@ def build_release(
         "release": str(output),
         "corpusHash": manifest["corpusHash"],
         "policySha256": manifest["readiness"]["readinessPolicySha256"],
+        "canonicalCorpusSha256": sha256_file(canonical_corpus),
         "categoryContract": {
             "path": str(contract["path"]),
             "sha256": contract["sha256"],

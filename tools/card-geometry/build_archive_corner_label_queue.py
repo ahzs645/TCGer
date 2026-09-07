@@ -24,10 +24,14 @@ SCHEMA = "https://tcger.app/manifests/card-geometry-archive-corner-label-queue/v
 DEFAULT_SLICES = ("multi_card_grid_archive", "multi_card_scatter_archive", "multi_card_other_archive")
 
 
-def build_queue(release: Path, *, splits: tuple[str, ...], slices: tuple[str, ...]) -> dict[str, Any]:
+def build_queue(release: Path, *, splits: tuple[str, ...], slices: tuple[str, ...],
+                canonical_corpus_sha256: str | None = None) -> dict[str, Any]:
     manifest = load_json(release / "manifest.json")
     if "targetSemantics" not in manifest:
         raise ValueError("queue requires a category-aware release with targetSemantics")
+    summary_path = release / "build-summary.json"
+    if canonical_corpus_sha256 is None and summary_path.exists():
+        canonical_corpus_sha256 = load_json(summary_path).get("canonicalCorpusSha256")
     frames = []
     counts: Counter = Counter()
     for entry in sorted(manifest["records"], key=lambda item: item["recordId"]):
@@ -71,6 +75,7 @@ def build_queue(release: Path, *, splits: tuple[str, ...], slices: tuple[str, ..
         "releaseId": manifest["releaseId"],
         "corpusHash": manifest["corpusHash"],
         "manifestSha256": sha256_file(release / "manifest.json"),
+        "canonicalCorpusSha256": canonical_corpus_sha256,
         "selection": {"splits": list(splits), "sceneSlices": list(slices),
                       "rule": "real archive records without a capture session whose targets lack four known corners"},
         "labelSidecarSchema": "https://tcger.app/schemas/card-geometry-archive-corner-labels/v1",
@@ -85,11 +90,13 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--split", action="append", default=None, choices=("train", "validation"))
     parser.add_argument("--scene-slice", action="append", default=None)
+    parser.add_argument("--canonical-corpus", type=Path, help="canonical corpus.jsonl; its hash binds the label sidecar")
     args = parser.parse_args()
     queue = build_queue(
         args.release,
         splits=tuple(args.split or ("train",)),
         slices=tuple(args.scene_slice or DEFAULT_SLICES),
+        canonical_corpus_sha256=sha256_file(args.canonical_corpus) if args.canonical_corpus else None,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(queue, indent=2, sort_keys=True) + "\n", encoding="utf-8")

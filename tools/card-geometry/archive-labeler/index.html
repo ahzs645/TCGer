@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Archive corner labeling</title>
+    <link rel="stylesheet" href="/labeler.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <small>TCGer · Training corner labels</small>
+        <h1>Label the four corners of each card</h1>
+      </div>
+      <div id="progress"></div>
+      <a href="/api/export" download="archive-corner-labels.json">Export sidecar ↓</a>
+    </header>
+    <nav>
+      <label>Layout
+        <select id="filter-scene">
+          <option value="all">All queued layouts</option>
+          <option value="multi_card_grid_archive">Grid (binder-like)</option>
+          <option value="multi_card_scatter_archive">Scattered</option>
+          <option value="multi_card_other_archive">Other</option>
+        </select></label
+      ><label><input type="checkbox" id="incomplete" checked />Incomplete only</label
+      ><button id="previous">← Previous</button
+      ><select id="frame" aria-label="Frame"></select
+      ><button id="next">Next →</button>
+    </nav>
+    <div class="intro">
+      <span id="record"></span>
+      <p>
+        Each amber box is one queued card. Select a card, then either click its
+        corners <strong>TL → TR → BR → BL</strong> (top-left of the printed card
+        first, so a rotated card starts at its printed top-left) or press
+        <kbd>B</kbd> to seed the box and drag the handles. Corners hidden by
+        another card: press <kbd>O</kbd> on that corner. Corners beyond the photo
+        edge are marked automatically. <kbd>S</kbd> skips a target you cannot
+        label. Labels are saved to a separate journal; nothing here changes the
+        dataset.
+      </p>
+    </div>
+    <main>
+      <section class="workspace">
+        <div class="toolbar">
+          <select id="target" aria-label="Card to label"></select
+          ><button id="draw">Draw corners (D)</button
+          ><button id="seed">Use box (B)</button
+          ><button id="clear">Clear corners</button
+          ><select id="skip" aria-label="Skip reason">
+            <option value="">Skip… (S)</option>
+            <option value="occluded">Mostly hidden</option>
+            <option value="cut-off">Cut off by the frame</option>
+            <option value="not-a-card">Not a card</option>
+            <option value="unsure">Not sure</option></select
+          ><button id="undo">Undo</button
+          ><label><input type="checkbox" id="orientation" checked />Printed top-left is first corner</label>
+        </div>
+        <p id="hint"></p>
+        <canvas id="editor" tabindex="0" aria-label="Corner editor"></canvas>
+      </section>
+      <aside>
+        <strong>Corner zoom</strong><canvas id="zoom" width="220" height="220"></canvas>
+        <strong>Rectified card</strong><canvas id="crop" width="180" height="250"></canvas>
+        <div class="legend">
+          <span>Amber: queued box · Green: labeled · Grey: skipped · Pink: selected</span>
+          <span>Keys: N next card · 1–4 select corner · arrows nudge (Shift ×5) · Enter save & next frame</span>
+        </div>
+        <label>Reviewer
+          <input id="reviewer" placeholder="Your name" maxlength="120" autocomplete="name" /></label>
+        <label class="notes">Notes
+          <textarea id="notes" placeholder="Anything odd about this frame…" maxlength="10000"></textarea></label>
+        <div id="targets" class="target-list"></div>
+      </aside>
+    </main>
+    <footer>
+      <span id="status" role="status">Loading…</span
+      ><button id="save">Save frame</button
+      ><button class="primary" id="save-next">Save & next →</button>
+    </footer>
+    <script src="/geometry.js"></script>
+    <script src="/labeler.js"></script>
+  </body>
+</html>
