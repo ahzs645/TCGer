@@ -317,6 +317,73 @@ def round_two_config(**kwargs: Any) -> dict[str, Any]:
     return resolve_config(config)
 
 
+SUCCESSOR_BAKEOFF_ID = "shared-card-geometry-successor-v1"
+SUCCESSOR_POLICY_ID = "training-minimums-v4"
+YOLOX_CORNER_LOSS = {"kind": "normalized-l1-v1", "lossWeight": 30.0}
+TRAINING_SELF_EVALUATION = {"minimumMatches": 1, "selection": "all-training-records"}
+
+
+def successor_config(**kwargs: Any) -> dict[str, Any]:
+    """Freeze the four-candidate measurement run on the category-repaired successor corpus.
+
+    Identical fairness to round two (640 input, 50 epochs, seed 20260905,
+    real context margin 0.15, no runtime augmentation) so the only intended
+    differences from round two are the corpus (policy v4, whole-card targets
+    only, recovered corners, layout slices) and two declared carry-overs: the
+    YOLOX normalized-L1 corner objective with train-split self-evaluation from
+    the loss-repair experiment, and evaluation contract version 2 (YOLO11
+    numpy input in BGR). Nothing here is a promotion decision.
+    """
+    config = base_config(**kwargs, resolve=False)
+    if config["corpus"].get("policyId") != SUCCESSOR_POLICY_ID:
+        raise ValueError(f"successor corpus must bind {SUCCESSOR_POLICY_ID}")
+    config["schema"] = "https://tcger.app/schemas/card-geometry-experiment-config/v2"
+    config["bakeoffId"] = SUCCESSOR_BAKEOFF_ID
+    config["fairness"]["seedPolicy"]["baseSeed"] = 20260905
+    config["fairness"]["realContextMarginPolicy"] = {
+        "kind": "fraction-of-long-side", "fraction": 0.15,
+        "rounding": "ceil", "application": "each-side",
+    }
+    config["evaluations"]["frozenReal"] = config["evaluations"].pop("frozenRealV3")
+    config["evaluations"]["syntheticMultigame"] = config["evaluations"].pop("syntheticDuelField")
+    config["deviations"] = [item for item in config["deviations"]
+                            if item["rule"] != "framework-internal-validation"]
+    config["deviations"].append({
+        "rule": "evaluation-script",
+        "candidateValue": {"evaluationContractVersion": 2, "yolo11NumpyInputColor": "bgr"},
+        "reason": (
+            "Evaluation contract version 2: the shared evaluator hands Ultralytics BGR "
+            "arrays, matching its file loader; round-two version-1 reports passed RGB and "
+            "remain as published. Applies identically to every candidate; only YOLO11 "
+            "inference pixels change."
+        ),
+    })
+    if config["candidate"] == "yolox-pose":
+        config["fairness"]["yoloxCornerLoss"] = dict(YOLOX_CORNER_LOSS)
+        config["fairness"]["trainingSelfEvaluation"] = dict(TRAINING_SELF_EVALUATION)
+        config["deviations"].append({
+            "rule": "training-objective",
+            "candidateValue": dict(YOLOX_CORNER_LOSS),
+            "reason": (
+                "Carry the completed loss-repair experiment forward: the original OKS "
+                "coordinate objective produced zero third-corner gradients; replace only "
+                "the coordinate objective with normalized L1 and retain the OKS assigner, "
+                "fresh detector-base initialization, original seed and 50-epoch budget."
+            ),
+        })
+        config["deviations"].append({
+            "rule": "evaluation-script",
+            "candidateValue": {"rawArrayColorOrder": "BGR",
+                               "trainingSelfEvaluation": dict(TRAINING_SELF_EVALUATION)},
+            "reason": (
+                "Match MMDetection file-loader BGR at the PIL/raw-array boundary and score "
+                "all training records before held-out scoring; the one-match gate is a "
+                "fitting sanity check, not a quality threshold."
+            ),
+        })
+    return resolve_config(config)
+
+
 def bootstrap_command(
     *,
     candidate: str,

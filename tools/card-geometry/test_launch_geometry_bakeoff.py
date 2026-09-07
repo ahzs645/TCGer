@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/card-geometry"))
 
-from launch_geometry_bakeoff import base_config, bootstrap_command, round_two_config  # noqa: E402
+from launch_geometry_bakeoff import successor_config, base_config, bootstrap_command, round_two_config  # noqa: E402
 from run_card_geometry_hf_job import descriptor, resolve_config  # noqa: E402
 
 
@@ -235,6 +235,47 @@ class LaunchGeometryBakeoffTests(unittest.TestCase):
         self.assertEqual(resumed["deviations"][-1]["rule"], "training-resume-lineage")
         self.assertNotEqual(descriptor(baseline)["experimentHash"], descriptor(resumed)["experimentHash"])
         self.assertEqual(descriptor(baseline)["fairnessHash"], descriptor(resumed)["fairnessHash"])
+
+
+class SuccessorConfigTests(unittest.TestCase):
+    def test_successor_config_binds_v4_and_carries_declared_repairs(self):
+        corpus = {**CORPUS, "policyId": "training-minimums-v4",
+                  "preflightReport": {"path": "geometry/preflights/x/y.json", "sha256": "1" * 64}}
+        evaluations = dict(real_evaluation={"datasetRepo": "ahzs645/tcger-scanner-images", "datasetRevision": "3" * 40,
+                                            "releasePath": "geometry/releases/real", "corpusHash": "4" * 64},
+                           synthetic_evaluation={"datasetRepo": "ahzs645/tcger-scanner-images", "datasetRevision": "3" * 40,
+                                                 "releasePath": "geometry/releases/synthetic", "corpusHash": "5" * 64})
+        with self.assertRaisesRegex(ValueError, "training-minimums-v4"):
+            successor_config(candidate="yolo11n-pose", corpus={**corpus, "policyId": "training-minimums-v3"},
+                             tooling_revision="a" * 40, epochs=50, **evaluations)
+        configs = {candidate: successor_config(candidate=candidate, corpus=corpus, tooling_revision="a" * 40,
+                                               epochs=50, **evaluations)
+                   for candidate in ("yolo11n-pose", "yolo11s-pose", "yolox-pose", "fastvit-t8-four-corner")}
+        for candidate, config in configs.items():
+            self.assertEqual(config["bakeoffId"], "shared-card-geometry-successor-v1")
+            self.assertEqual(config["corpus"]["policyId"], "training-minimums-v4")
+            self.assertEqual(config["fairness"]["seedPolicy"]["baseSeed"], 20260905)
+            self.assertEqual(config["fairness"]["realContextMarginPolicy"]["fraction"], 0.15)
+            self.assertIn("frozenReal", config["evaluations"])
+            rules = [item["rule"] for item in config["deviations"]]
+            self.assertIn("evaluation-script", rules)
+            self.assertNotIn("framework-internal-validation", rules)
+            if candidate == "yolox-pose":
+                self.assertEqual(config["fairness"]["yoloxCornerLoss"]["kind"], "normalized-l1-v1")
+                self.assertEqual(config["fairness"]["trainingSelfEvaluation"]["selection"], "all-training-records")
+                self.assertIn("training-objective", rules)
+            else:
+                self.assertNotIn("yoloxCornerLoss", config["fairness"])
+        # The three unrepaired candidates share round two's fairness contract;
+        # YOLOX differs only through its declared loss-repair fairness fields.
+        from run_card_geometry_hf_job import fairness_hash
+        shared = {fairness_hash(c) for name, c in configs.items() if name != "yolox-pose"}
+        self.assertEqual(len(shared), 1)
+        self.assertNotIn(fairness_hash(configs["yolox-pose"]), shared)
+        stripped = dict(configs["yolox-pose"])
+        stripped["fairness"] = {k: v for k, v in stripped["fairness"].items()
+                                if k not in {"yoloxCornerLoss", "trainingSelfEvaluation"}}
+        self.assertEqual(fairness_hash(stripped), next(iter(shared)))
 
 
 if __name__ == "__main__":
