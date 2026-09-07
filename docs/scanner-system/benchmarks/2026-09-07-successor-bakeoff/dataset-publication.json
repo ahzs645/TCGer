@@ -1,0 +1,12 @@
+{
+  "datasetRepo": "ahzs645/tcger-scanner-images",
+  "datasetRevision": "46049ce804ae235517d73ab7481850fc929ae487",
+  "releases": {
+    "geometry/releases/card-geometry-training-successor-candidate-v1": {
+      "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+      "files": 31503,
+      "manifestSha256": "eec70ef5f041b243be6951857d37efa3a53f0581a0c5e1782b149d1a09c6370c"
+    }
+  },
+  "schema": "https://tcger.app/reports/card-geometry-release-publication/v1"
+}
