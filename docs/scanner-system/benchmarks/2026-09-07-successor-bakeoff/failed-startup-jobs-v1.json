@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "candidate": "fastvit-t8-four-corner",
+      "id": "6a9e7f7d259f8e97255ea2ed",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7d259f8e97255ea2ed"
+    },
+    {
+      "candidate": "yolo11n-pose",
+      "id": "6a9e7f7de686246ca69a797f",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7de686246ca69a797f"
+    },
+    {
+      "candidate": "yolo11s-pose",
+      "id": "6a9e7f7e259f8e97255ea2ef",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7e259f8e97255ea2ef"
+    },
+    {
+      "candidate": "yolox-pose",
+      "id": "6a9e7f7f259f8e97255ea2f1",
+      "url": "https://huggingface.co/jobs/ahzs645/6a9e7f7f259f8e97255ea2f1"
+    }
+  ],
+  "reason": "hf jobs run parsed `-lc` as a CLI option, so the container received `bash <script text>` and exited 126 before any dependency install, download or training; no pinned input was touched",
+  "schema": "https://tcger.app/reports/card-geometry-failed-startup-jobs/v1",
+  "submittedWith": "submit-jobs.sh without the `--` separator"
+}

@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
-hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-fastvit-t8-four-corner-train pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee bash -lc 'set -euo pipefail
+# `--` ends hf option parsing so `bash -lc` reaches the container intact.
+hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-fastvit-t8-four-corner-train pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee -- bash -lc 'set -euo pipefail
 export HF_HUB_DOWNLOAD_TIMEOUT=120
 export HF_HUB_ETAG_TIMEOUT=30
 python -m pip install --no-cache-dir huggingface_hub==1.28.0 jsonschema==4.23.0 Pillow==11.1.0 numpy==1.26.4
@@ -34,7 +35,7 @@ PY
 export TCGER_GEOMETRY_PREFLIGHT_REPORT=/work/preflight-report.json
 cd /work/src
 python tools/card-geometry/run_card_geometry_hf_job.py --config /work/experiment.json --action train --workdir /work/tcger-card-geometry-fastvit-t8-four-corner'
-hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-yolo11n-pose-train pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee bash -lc 'set -euo pipefail
+hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-yolo11n-pose-train pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee -- bash -lc 'set -euo pipefail
 export HF_HUB_DOWNLOAD_TIMEOUT=120
 export HF_HUB_ETAG_TIMEOUT=30
 python -m pip install --no-cache-dir huggingface_hub==1.28.0 jsonschema==4.23.0 Pillow==11.1.0 numpy==1.26.4
@@ -69,7 +70,7 @@ PY
 export TCGER_GEOMETRY_PREFLIGHT_REPORT=/work/preflight-report.json
 cd /work/src
 python tools/card-geometry/run_card_geometry_hf_job.py --config /work/experiment.json --action train --workdir /work/tcger-card-geometry-yolo11n-pose'
-hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-yolo11s-pose-train pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee bash -lc 'set -euo pipefail
+hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-yolo11s-pose-train pytorch/pytorch@sha256:77f17f843507062875ce8be2a6f76aa6aa3df7f9ef1e31d9d7432f4b0f563dee -- bash -lc 'set -euo pipefail
 export HF_HUB_DOWNLOAD_TIMEOUT=120
 export HF_HUB_ETAG_TIMEOUT=30
 python -m pip install --no-cache-dir huggingface_hub==1.28.0 jsonschema==4.23.0 Pillow==11.1.0 numpy==1.26.4
@@ -104,7 +105,7 @@ PY
 export TCGER_GEOMETRY_PREFLIGHT_REPORT=/work/preflight-report.json
 cd /work/src
 python tools/card-geometry/run_card_geometry_hf_job.py --config /work/experiment.json --action train --workdir /work/tcger-card-geometry-yolo11s-pose'
-hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-yolox-pose-train pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806 bash -lc 'set -euo pipefail
+hf jobs run --detach --flavor l4x1 --timeout 12h --secrets HF_TOKEN --name geometry-successor-yolox-pose-train pytorch/pytorch@sha256:82e0d379a5dedd6303c89eda57bcc434c40be11f249ddfadfd5673b84351e806 -- bash -lc 'set -euo pipefail
 export HF_HUB_DOWNLOAD_TIMEOUT=120
 export HF_HUB_ETAG_TIMEOUT=30
 python -m pip install --no-cache-dir huggingface_hub==1.28.0 jsonschema==4.23.0 Pillow==11.1.0 numpy==1.26.4

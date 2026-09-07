@@ -35,6 +35,6 @@ lines = ['#!/bin/sh', 'set -eu']
 for candidate, spec in commands.items():
     script = spec['command'][2]
     lines.append(f"hf jobs run --detach --flavor {spec['flavor']} --timeout {spec['timeout']} --secrets HF_TOKEN "
-                 f"--name {spec['name']} {shlex.quote(spec['image'])} bash -lc {shlex.quote(script)}")
+                 f"--name {spec['name']} {shlex.quote(spec['image'])} -- bash -lc {shlex.quote(script)}")
 (root / 'submit-jobs.sh').write_text('\n'.join(lines) + '\n')
 print(pretty_json({k: v for k, v in report.items() if k != 'experiments'}))

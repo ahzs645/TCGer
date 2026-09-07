@@ -34,12 +34,12 @@ Jobs were submitted with the Hugging Face CLI (`submit-jobs.sh`, generated from 
 
 | Candidate | Job |
 |---|---|
-| fastvit-t8-four-corner | [6a9e7f7d259f8e97255ea2ed](https://huggingface.co/jobs/ahzs645/6a9e7f7d259f8e97255ea2ed) |
-| yolo11n-pose | [6a9e7f7de686246ca69a797f](https://huggingface.co/jobs/ahzs645/6a9e7f7de686246ca69a797f) |
-| yolo11s-pose | [6a9e7f7e259f8e97255ea2ef](https://huggingface.co/jobs/ahzs645/6a9e7f7e259f8e97255ea2ef) |
-| yolox-pose | [6a9e7f7f259f8e97255ea2f1](https://huggingface.co/jobs/ahzs645/6a9e7f7f259f8e97255ea2f1) |
+| fastvit-t8-four-corner | [6a9e8129e686246ca69a79ad](https://huggingface.co/jobs/ahzs645/6a9e8129e686246ca69a79ad) |
+| yolo11n-pose | [6a9e8129259f8e97255ea33c](https://huggingface.co/jobs/ahzs645/6a9e8129259f8e97255ea33c) |
+| yolo11s-pose | [6a9e812a259f8e97255ea33e](https://huggingface.co/jobs/ahzs645/6a9e812a259f8e97255ea33e) |
+| yolox-pose | [6a9e812b259f8e97255ea340](https://huggingface.co/jobs/ahzs645/6a9e812b259f8e97255ea340) |
 
-At submission all four were scheduling (one pulling its container, three waiting for hardware). YOLO11 candidates remain evaluation-only under the declared license route; no asset-store publication was requested.
+A first submission without the CLI's `--` option separator stored the command as `bash <script text>`; all four containers exited 126 before installing anything and are listed in `failed-startup-jobs-v1.json`. The jobs above are the resubmission with `--`, verified by inspecting the stored three-element command before any ran. At resubmission all four were scheduling. YOLO11 candidates remain evaluation-only under the declared license route; no asset-store publication was requested.
 
 ## Reproduce the freeze
 
