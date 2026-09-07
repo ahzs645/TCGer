@@ -1,5 +1,9 @@
 # Scanner Model AI Handoff
 
+For the latest **card-geometry experiments and next-agent instructions**, read
+[Card geometry agent handoff — 2026-09-06](scanner-system/card-geometry-agent-handoff-2026-09-06.md).
+This older document retains the broader scanner history.
+
 > **Historical engineering log.** This long-form handoff preserves experiment
 > detail and earlier implementation context. For the current architecture,
 > three-game release inventory, operational process, and open risks, start at

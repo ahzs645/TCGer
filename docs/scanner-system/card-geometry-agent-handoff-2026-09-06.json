@@ -1,0 +1,1143 @@
+{
+  "asOf": "2026-09-06",
+  "scope": "Card geometry training, evaluation, corpus repair and diagnostic review; not a complete app architecture handoff",
+  "codeThrough": "b3134c60",
+  "branch": "claude/tcg-card-recognition-review-fkwkvl",
+  "status": "Analysis complete; canonical category importer repair and successor corpus are NOT implemented. No new training is launched by this handoff.",
+  "trainingCorpus": {
+    "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "cabee73ac46a5901cc3060cfd17b7c63408bf66a",
+    "policyId": "training-minimums-v3",
+    "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+    "preflightReport": {
+      "path": "geometry/preflights/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d.json",
+      "sha256": "4759d06622e6b43401747eb68967cd632cf139b81ff2c8c0dcb6419026594e7d"
+    },
+    "releasePath": "geometry/releases/card-geometry-training-round-two-v1"
+  },
+  "evaluationPins": {
+    "frozenReal": {
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2"
+    },
+    "goldenFixtures": {
+      "path": "tools/card-geometry/fixtures/validation-nms.v1.json",
+      "sha256": "ec0f877af9d0f2afe4f6a76c7a4590c033fa0d35027815330adb24c540532168"
+    },
+    "recognitionModels": {
+      "games": {
+        "magic": {
+          "metadata": {
+            "path": "exports/magic/full/CardsIndexMetadata.json",
+            "sha256": "35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54"
+          },
+          "onnx": {
+            "path": "exports/magic/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "ebc725476ec2866cd054cd16ef9bcda257bbfdc5aa05326a79335abc4fdc0d3e"
+          },
+          "queryNormalization": "grey-world-autocontrast",
+          "strongThreshold": 0.7,
+          "vectors": {
+            "path": "exports/magic/full/CardsIndexVectors-arcface.bin",
+            "sha256": "4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8"
+          }
+        },
+        "pokemon": {
+          "metadata": {
+            "path": "exports/pokemon/full/CardsIndexMetadata.json",
+            "sha256": "5bcc886d58fca214800d366d080a438515d7820ffe03fcea7395496b5ef08117"
+          },
+          "onnx": {
+            "path": "exports/pokemon/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "bd7367284130639345efbe967e5e80b4aadf0ab5d5bc922968d2b06e497eea44"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/pokemon/full/CardsIndexVectors-arcface.bin",
+            "sha256": "d78e06b0909f39f57deab5c04c1bfb20671bf933f95033f143942e8cc388bdc3"
+          }
+        },
+        "yugioh": {
+          "metadata": {
+            "path": "exports/yugioh/full/CardsIndexMetadata.json",
+            "sha256": "0ab3fec12511b401244b1f80ac12ac432f10cdb2afdcfc59f7797568d50cca5e"
+          },
+          "onnx": {
+            "path": "exports/yugioh/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "b304bde2171d8ca4a824a4e0cab4bc22c3b31e425a8ba5e3ef91aab4ec6f9d58"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/yugioh/full/CardsIndexVectors-arcface.bin",
+            "sha256": "2de604679f08018e18fe3f3db188414add77fba51c6e8c52c4eb8b87cea8cbdd"
+          }
+        }
+      },
+      "modelRepo": "ahzs645/tcger-universal-arcface",
+      "modelRevision": "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
+    },
+    "recognitionReplay": {
+      "path": "docs/scanner-system/benchmarks/2026-09-02-shared-card-geometry/reports/device-geometry-outcomes.json",
+      "sha256": "05b56efb2ece661100fab8c935485174e5d59aae562704002e86349e008a5997"
+    },
+    "syntheticMultigame": {
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+    }
+  },
+  "roundTwoSource": {
+    "modelRepo": "ahzs645/tcger-universal-arcface",
+    "revision": "36f35b46b81da49458276fbfb1a3ebaa19c935c8",
+    "experiments": {
+      "fastvit-t8-four-corner": {
+        "bakeoffId": "shared-card-geometry-round-two-v1",
+        "candidate": "fastvit-t8-four-corner",
+        "checkpointPrefix": "geometry/fastvit-t8-four-corner/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/79fef26cbbd704f6d8d7b0a9e6bfeb7fa836f490339fba6ef23bae3a7a085049",
+        "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+        "experimentHash": "79fef26cbbd704f6d8d7b0a9e6bfeb7fa836f490339fba6ef23bae3a7a085049",
+        "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+        "framework": "tcger-pytorch",
+        "licenseRoute": "permissive",
+        "policyId": "training-minimums-v3",
+        "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+        "resolvedConfigSha256": "79fef26cbbd704f6d8d7b0a9e6bfeb7fa836f490339fba6ef23bae3a7a085049",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      },
+      "yolo11n-pose": {
+        "bakeoffId": "shared-card-geometry-round-two-v1",
+        "candidate": "yolo11n-pose",
+        "checkpointPrefix": "geometry/yolo11n-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/30e7226cc7a0137c5423a64036b106dd3237130e4b533d46ed7bb2a778a33475",
+        "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+        "experimentHash": "30e7226cc7a0137c5423a64036b106dd3237130e4b533d46ed7bb2a778a33475",
+        "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-minimums-v3",
+        "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+        "resolvedConfigSha256": "30e7226cc7a0137c5423a64036b106dd3237130e4b533d46ed7bb2a778a33475",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      },
+      "yolo11s-pose": {
+        "bakeoffId": "shared-card-geometry-round-two-v1",
+        "candidate": "yolo11s-pose",
+        "checkpointPrefix": "geometry/yolo11s-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/8b06b80db3e570bbb006a44027c7e21552b9fad5348cb21764e42abf17afebfc",
+        "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+        "experimentHash": "8b06b80db3e570bbb006a44027c7e21552b9fad5348cb21764e42abf17afebfc",
+        "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-minimums-v3",
+        "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+        "resolvedConfigSha256": "8b06b80db3e570bbb006a44027c7e21552b9fad5348cb21764e42abf17afebfc",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      },
+      "yolox-pose": {
+        "bakeoffId": "shared-card-geometry-round-two-v1",
+        "candidate": "yolox-pose",
+        "checkpointPrefix": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+        "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+        "experimentHash": "78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+        "fairnessHash": "64b2abc574cac41395b21945ce56f69bbd8c5173c7a2483529d1e72a65d041a5",
+        "framework": "mmyolo",
+        "licenseRoute": "permissive",
+        "policyId": "training-minimums-v3",
+        "policySha256": "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da",
+        "resolvedConfigSha256": "78cfaae3ba5e353820ce57b2bcfb5a12e1bb146a5171c50162ffdf7b02ae87cb",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      }
+    },
+    "scopeNote": "The source inventory preserves original configuration descriptors, including the original failed YOLOX bootstrap descriptor. For the completed fresh YOLOX repair use yoloxRepair and auditedModels.yolox-pose; do not infer its checkpoint prefix from that original descriptor."
+  },
+  "auditedModels": {
+    "yolo11s-pose": {
+      "checkpointSha256": "fee23a78a4a16b93fed51ff802dc620db4d88bcf55278f5db14f56f180f1b351",
+      "files": [
+        {
+          "hubPath": "geometry/yolo11s-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/8b06b80db3e570bbb006a44027c7e21552b9fad5348cb21764e42abf17afebfc/training-output/training/repeat-0/weights/best.pt",
+          "localPath": "training/repeat-0/weights/best.pt",
+          "sha256": "fee23a78a4a16b93fed51ff802dc620db4d88bcf55278f5db14f56f180f1b351"
+        }
+      ],
+      "revision": "36f35b46b81da49458276fbfb1a3ebaa19c935c8"
+    },
+    "yolox-pose": {
+      "checkpointSha256": "8ee7d280b65e438742f4d7a2c3684c3f00701b0204361a16616b836fedf4f41c",
+      "files": [
+        {
+          "hubPath": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2/training-output/training/repeat-0/epoch_50.pth",
+          "localPath": "training/repeat-0/epoch_50.pth",
+          "sha256": "8ee7d280b65e438742f4d7a2c3684c3f00701b0204361a16616b836fedf4f41c"
+        },
+        {
+          "hubPath": "geometry/yolox-pose/286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4/08c4024752c8b71b213f87ef1daa3fb3200470d9e681f951b7022e73670963d2/training-output/yolox-pose-card.py",
+          "localPath": "yolox-pose-card.py",
+          "sha256": "b1000ce5b26b8dba702e86632f575de06b1e8dcf4f5aeff4c8ffba4b34a855ae"
+        }
+      ],
+      "revision": "a6dc39fbf3c4dde47402a9b0ca28124330dd3507"
+    }
+  },
+  "yoloxRepair": {
+    "jobId": "6a9d91e8259f8e97255e75af",
+    "jobStatus": "COMPLETED",
+    "modelRepo": "ahzs645/tcger-universal-arcface",
+    "resultRevision": "a6dc39fbf3c4dde47402a9b0ca28124330dd3507",
+    "checkpointSha256": "8ee7d280b65e438742f4d7a2c3684c3f00701b0204361a16616b836fedf4f41c",
+    "files": {
+      "run-train.json": "6e2cbd1896809669b09236e6931960af1deb610238dddb27857e0ba00a20494b",
+      "trainer-summary.json": "21c99f33548063a6236a71270c731acff1661787ba7073fe271c3550827f8595",
+      "evaluation-summary.json": "df6343f76f1340bec61e8c0af011e1d27f0e17f401a6fae4e4857736c26228cc",
+      "real-v3.benchmark.json": "bba9ed1d86bb2f05fc7d5f7d19192ae8f87b8214d471a43c81d9aeec9d115f76",
+      "synthetic-duel-field.benchmark.json": "8468139a4bbdf010ff76924cc13477725b226150478cb54153a853679b0d86f1",
+      "recognition-replay.json": "1a248c84bfff0fa7b2f1facd012e60f3124f685329d14f557ceef6060229c8ea"
+    },
+    "trainingSelfEvaluationGatePassed": true,
+    "expectedBenchmarkRecordCountsVerified": true,
+    "pinnedCorpusHashesVerified": true,
+    "benchmarkAndReplayReportHashesVerified": true
+  },
+  "auditResults": {
+    "yolox-pose": {
+      "resultCommit": "538ef66e60e2e773e1fa07553fef6b59f74e8cc7",
+      "rawReportSha256": "c1b75a71d061e1b4a4afa06ddbd7d10a524cf185ca3851e11f916b525a742f25",
+      "evaluationRecords": 600,
+      "exactAcceptedPredictionParityRecords": 600,
+      "colorParity": null
+    },
+    "yolo11s-pose": {
+      "resultCommit": "5e707d3125dd93a9cc340e52182ea4e8730dd10d",
+      "rawReportSha256": "4ff7f76493bd41889e1c293a3338f6ea22fd9b4dc0878abfb92d3988ac4f14b8",
+      "evaluationRecords": 600,
+      "exactAcceptedPredictionParityRecords": 600,
+      "colorParity": {
+        "pilBgrPredictionParityPassed": true,
+        "recordId": "coco-8370531ed30dadc164573654dc8526d6d4c982e294ef27eddb0f922932a03c28"
+      }
+    }
+  },
+  "benchmarks": {
+    "fastvit-t8-four-corner": {
+      "real-v3.benchmark.json": {
+        "sha256": "29b2e00240c1eb8b901c553c34cfbd3738dd902bfc29cfa900f8122bb655c918",
+        "localReport": ".artifacts/card-geometry/round-two-current-results/fastvit-t8-four-corner/real-v3.benchmark.json",
+        "releaseId": "real-geometry-evaluation-v6-full-aliases-v2",
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "counts": {
+          "records": 600,
+          "scorableTruthInstances": 700,
+          "truthGeometrySource": {
+            "quad": 651,
+            "visibleMask": 49
+          },
+          "truthInstances": 700,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 3,
+          "duplicatePerImage": 0.005,
+          "extra": 316,
+          "extraPerImage": 0.526666666667,
+          "matches": 552,
+          "meanMatchedIoU": 0.766933774265,
+          "miss": 148,
+          "missPerImage": 0.246666666667,
+          "predictions": 871,
+          "recall@0.5": 0.788571428571,
+          "recall@0.75": 0.492857142857,
+          "recall@0.9": 0.132857142857,
+          "records": 600,
+          "truthInstances": 700
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 21,
+            "extraPerImage": 7.0,
+            "matches": 7,
+            "meanMatchedIoU": 0.601992120673,
+            "miss": 20,
+            "missPerImage": 6.666666666667,
+            "predictions": 28,
+            "recall@0.5": 0.259259259259,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "records": 3,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.055555555556,
+            "extra": 23,
+            "extraPerImage": 1.277777777778,
+            "matches": 16,
+            "meanMatchedIoU": 0.629441535811,
+            "miss": 17,
+            "missPerImage": 0.944444444444,
+            "predictions": 40,
+            "recall@0.5": 0.484848484848,
+            "recall@0.75": 0.090909090909,
+            "recall@0.9": 0.0,
+            "records": 18,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 2,
+            "duplicatePerImage": 0.003984063745,
+            "extra": 213,
+            "extraPerImage": 0.424302788845,
+            "matches": 469,
+            "meanMatchedIoU": 0.788022111663,
+            "miss": 92,
+            "missPerImage": 0.183266932271,
+            "predictions": 684,
+            "recall@0.5": 0.836007130125,
+            "recall@0.75": 0.584670231729,
+            "recall@0.9": 0.160427807487,
+            "records": 502,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 40,
+            "extraPerImage": 0.701754385965,
+            "matches": 47,
+            "meanMatchedIoU": 0.672782095734,
+            "miss": 10,
+            "missPerImage": 0.175438596491,
+            "predictions": 87,
+            "recall@0.5": 0.824561403509,
+            "recall@0.75": 0.228070175439,
+            "recall@0.9": 0.052631578947,
+            "records": 57,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 19,
+            "extraPerImage": 0.95,
+            "matches": 13,
+            "meanMatchedIoU": 0.604561931304,
+            "miss": 9,
+            "missPerImage": 0.45,
+            "predictions": 32,
+            "recall@0.5": 0.590909090909,
+            "recall@0.75": 0.045454545455,
+            "recall@0.9": 0.0,
+            "records": 20,
+            "truthInstances": 22
+          }
+        }
+      },
+      "synthetic-duel-field.benchmark.json": {
+        "sha256": "ca8e06317c56b210c77fb0e49275fb37f4bbdae0b2b4064ed6f39b097de8692c",
+        "localReport": ".artifacts/card-geometry/round-two-current-results/fastvit-t8-four-corner/synthetic-duel-field.benchmark.json",
+        "releaseId": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2",
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "counts": {
+          "records": 1000,
+          "scorableTruthInstances": 3651,
+          "truthGeometrySource": {
+            "quad": 3651
+          },
+          "truthInstances": 3651,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 0,
+          "duplicatePerImage": 0.0,
+          "extra": 2933,
+          "extraPerImage": 2.933,
+          "matches": 1506,
+          "meanMatchedIoU": 0.69459774667,
+          "miss": 2145,
+          "missPerImage": 2.145,
+          "predictions": 4439,
+          "recall@0.5": 0.412489728841,
+          "recall@0.75": 0.12434949329,
+          "recall@0.9": 0.000547795125,
+          "records": 1000,
+          "truthInstances": 3651
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 53,
+            "extraPerImage": 0.353333333333,
+            "matches": 1300,
+            "meanMatchedIoU": 0.705976909872,
+            "miss": 50,
+            "missPerImage": 0.333333333333,
+            "predictions": 1353,
+            "recall@0.5": 0.962962962963,
+            "recall@0.75": 0.325925925926,
+            "recall@0.9": 0.001481481481,
+            "records": 150,
+            "truthInstances": 1350
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 2471,
+            "extraPerImage": 7.06,
+            "matches": 52,
+            "meanMatchedIoU": 0.594002393351,
+            "miss": 1749,
+            "missPerImage": 4.997142857143,
+            "predictions": 2523,
+            "recall@0.5": 0.028872848418,
+            "recall@0.75": 0.00111049417,
+            "recall@0.9": 0.0,
+            "records": 350,
+            "truthInstances": 1801
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 169,
+            "extraPerImage": 0.845,
+            "matches": 68,
+            "meanMatchedIoU": 0.633714192312,
+            "miss": 132,
+            "missPerImage": 0.66,
+            "predictions": 237,
+            "recall@0.5": 0.34,
+            "recall@0.75": 0.03,
+            "recall@0.9": 0.0,
+            "records": 200,
+            "truthInstances": 200
+          },
+          "single_handheld_distractor_free": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 95,
+            "extraPerImage": 0.95,
+            "matches": 26,
+            "meanMatchedIoU": 0.621427868541,
+            "miss": 74,
+            "missPerImage": 0.74,
+            "predictions": 121,
+            "recall@0.5": 0.26,
+            "recall@0.75": 0.01,
+            "recall@0.9": 0.0,
+            "records": 100,
+            "truthInstances": 100
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 145,
+            "extraPerImage": 0.725,
+            "matches": 60,
+            "meanMatchedIoU": 0.635940158962,
+            "miss": 140,
+            "missPerImage": 0.7,
+            "predictions": 205,
+            "recall@0.5": 0.3,
+            "recall@0.75": 0.025,
+            "recall@0.9": 0.0,
+            "records": 200,
+            "truthInstances": 200
+          }
+        }
+      }
+    },
+    "yolo11n-pose": {
+      "real-v3.benchmark.json": {
+        "sha256": "75193fd8044f63e8377d7bd819a7eec3b4cbbf495a01f2b14640501e4029d330",
+        "localReport": ".artifacts/card-geometry/round-two-current-results/yolo11n-pose/real-v3.benchmark.json",
+        "releaseId": "real-geometry-evaluation-v6-full-aliases-v2",
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "counts": {
+          "records": 600,
+          "scorableTruthInstances": 700,
+          "truthGeometrySource": {
+            "quad": 651,
+            "visibleMask": 49
+          },
+          "truthInstances": 700,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 5,
+          "duplicatePerImage": 0.008333333333,
+          "extra": 403,
+          "extraPerImage": 0.671666666667,
+          "matches": 637,
+          "meanMatchedIoU": 0.839678389349,
+          "miss": 63,
+          "missPerImage": 0.105,
+          "predictions": 1045,
+          "recall@0.5": 0.91,
+          "recall@0.75": 0.708571428571,
+          "recall@0.9": 0.41,
+          "records": 600,
+          "truthInstances": 700
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 97,
+            "extraPerImage": 32.333333333333,
+            "matches": 13,
+            "meanMatchedIoU": 0.566965089126,
+            "miss": 14,
+            "missPerImage": 4.666666666667,
+            "predictions": 110,
+            "recall@0.5": 0.481481481481,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "records": 3,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 105,
+            "extraPerImage": 5.833333333333,
+            "matches": 16,
+            "meanMatchedIoU": 0.690854157962,
+            "miss": 17,
+            "missPerImage": 0.944444444444,
+            "predictions": 121,
+            "recall@0.5": 0.484848484848,
+            "recall@0.75": 0.121212121212,
+            "recall@0.9": 0.0,
+            "records": 18,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 2,
+            "duplicatePerImage": 0.003984063745,
+            "extra": 170,
+            "extraPerImage": 0.338645418327,
+            "matches": 541,
+            "meanMatchedIoU": 0.864795359113,
+            "miss": 20,
+            "missPerImage": 0.03984063745,
+            "predictions": 713,
+            "recall@0.5": 0.964349376114,
+            "recall@0.75": 0.827094474153,
+            "recall@0.9": 0.497326203209,
+            "records": 502,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.017543859649,
+            "extra": 16,
+            "extraPerImage": 0.280701754386,
+            "matches": 52,
+            "meanMatchedIoU": 0.746096930496,
+            "miss": 5,
+            "missPerImage": 0.087719298246,
+            "predictions": 69,
+            "recall@0.5": 0.912280701754,
+            "recall@0.75": 0.438596491228,
+            "recall@0.9": 0.122807017544,
+            "records": 57,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 2,
+            "duplicatePerImage": 0.1,
+            "extra": 15,
+            "extraPerImage": 0.75,
+            "matches": 15,
+            "meanMatchedIoU": 0.653306110915,
+            "miss": 7,
+            "missPerImage": 0.35,
+            "predictions": 32,
+            "recall@0.5": 0.681818181818,
+            "recall@0.75": 0.136363636364,
+            "recall@0.9": 0.045454545455,
+            "records": 20,
+            "truthInstances": 22
+          }
+        }
+      },
+      "synthetic-duel-field.benchmark.json": {
+        "sha256": "f01756064ac652ea82d4049a3ec19903ab35220e121d9e6cf702aa10fde22908",
+        "localReport": ".artifacts/card-geometry/round-two-current-results/yolo11n-pose/synthetic-duel-field.benchmark.json",
+        "releaseId": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2",
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "counts": {
+          "records": 1000,
+          "scorableTruthInstances": 3651,
+          "truthGeometrySource": {
+            "quad": 3651
+          },
+          "truthInstances": 3651,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 246,
+          "duplicatePerImage": 0.246,
+          "extra": 2700,
+          "extraPerImage": 2.7,
+          "matches": 3028,
+          "meanMatchedIoU": 0.79305329077,
+          "miss": 623,
+          "missPerImage": 0.623,
+          "predictions": 5974,
+          "recall@0.5": 0.82936181868,
+          "recall@0.75": 0.550260202684,
+          "recall@0.9": 0.199397425363,
+          "records": 1000,
+          "truthInstances": 3651
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 426,
+            "extraPerImage": 2.84,
+            "matches": 1349,
+            "meanMatchedIoU": 0.880906677919,
+            "miss": 1,
+            "missPerImage": 0.006666666667,
+            "predictions": 1775,
+            "recall@0.5": 0.999259259259,
+            "recall@0.75": 0.946666666667,
+            "recall@0.9": 0.475555555556,
+            "records": 150,
+            "truthInstances": 1350
+          },
+          "duel_field": {
+            "duplicate": 243,
+            "duplicatePerImage": 0.694285714286,
+            "extra": 1891,
+            "extraPerImage": 5.402857142857,
+            "matches": 1327,
+            "meanMatchedIoU": 0.718797576878,
+            "miss": 474,
+            "missPerImage": 1.354285714286,
+            "predictions": 3461,
+            "recall@0.5": 0.736812881732,
+            "recall@0.75": 0.310383120489,
+            "recall@0.9": 0.030538589672,
+            "records": 350,
+            "truthInstances": 1801
+          },
+          "single_handheld": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.005,
+            "extra": 164,
+            "extraPerImage": 0.82,
+            "matches": 136,
+            "meanMatchedIoU": 0.729480824152,
+            "miss": 64,
+            "missPerImage": 0.32,
+            "predictions": 301,
+            "recall@0.5": 0.68,
+            "recall@0.75": 0.31,
+            "recall@0.9": 0.08,
+            "records": 200,
+            "truthInstances": 200
+          },
+          "single_handheld_distractor_free": {
+            "duplicate": 2,
+            "duplicatePerImage": 0.02,
+            "extra": 70,
+            "extraPerImage": 0.7,
+            "matches": 66,
+            "meanMatchedIoU": 0.724442837897,
+            "miss": 34,
+            "missPerImage": 0.34,
+            "predictions": 138,
+            "recall@0.5": 0.66,
+            "recall@0.75": 0.29,
+            "recall@0.9": 0.04,
+            "records": 100,
+            "truthInstances": 100
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 149,
+            "extraPerImage": 0.745,
+            "matches": 150,
+            "meanMatchedIoU": 0.747701680237,
+            "miss": 50,
+            "missPerImage": 0.25,
+            "predictions": 299,
+            "recall@0.5": 0.75,
+            "recall@0.75": 0.405,
+            "recall@0.9": 0.055,
+            "records": 200,
+            "truthInstances": 200
+          }
+        }
+      }
+    },
+    "yolo11s-pose": {
+      "real-v3.benchmark.json": {
+        "sha256": "0d4473582d1a4667e29aca4f009a5967a9bc88fdbff598119cf9a2811f48146a",
+        "localReport": ".artifacts/card-geometry/round-two-current-results/yolo11s-pose/real-v3.benchmark.json",
+        "releaseId": "real-geometry-evaluation-v6-full-aliases-v2",
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "counts": {
+          "records": 600,
+          "scorableTruthInstances": 700,
+          "truthGeometrySource": {
+            "quad": 651,
+            "visibleMask": 49
+          },
+          "truthInstances": 700,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 26,
+          "duplicatePerImage": 0.043333333333,
+          "extra": 288,
+          "extraPerImage": 0.48,
+          "matches": 671,
+          "meanMatchedIoU": 0.851969230063,
+          "miss": 29,
+          "missPerImage": 0.048333333333,
+          "predictions": 985,
+          "recall@0.5": 0.958571428571,
+          "recall@0.75": 0.777142857143,
+          "recall@0.9": 0.458571428571,
+          "records": 600,
+          "truthInstances": 700
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 7,
+            "duplicatePerImage": 2.333333333333,
+            "extra": 34,
+            "extraPerImage": 11.333333333333,
+            "matches": 27,
+            "meanMatchedIoU": 0.658747073703,
+            "miss": 0,
+            "missPerImage": 0.0,
+            "predictions": 68,
+            "recall@0.5": 1.0,
+            "recall@0.75": 0.185185185185,
+            "recall@0.9": 0.0,
+            "records": 3,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 2,
+            "duplicatePerImage": 0.111111111111,
+            "extra": 57,
+            "extraPerImage": 3.166666666667,
+            "matches": 25,
+            "meanMatchedIoU": 0.721910735438,
+            "miss": 8,
+            "missPerImage": 0.444444444444,
+            "predictions": 84,
+            "recall@0.5": 0.757575757576,
+            "recall@0.75": 0.272727272727,
+            "recall@0.9": 0.030303030303,
+            "records": 18,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 14,
+            "duplicatePerImage": 0.027888446215,
+            "extra": 161,
+            "extraPerImage": 0.320717131474,
+            "matches": 554,
+            "meanMatchedIoU": 0.879508525553,
+            "miss": 7,
+            "missPerImage": 0.013944223108,
+            "predictions": 729,
+            "recall@0.5": 0.98752228164,
+            "recall@0.75": 0.891265597148,
+            "recall@0.9": 0.547237076649,
+            "records": 502,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 2,
+            "duplicatePerImage": 0.035087719298,
+            "extra": 26,
+            "extraPerImage": 0.456140350877,
+            "matches": 48,
+            "meanMatchedIoU": 0.771063327873,
+            "miss": 9,
+            "missPerImage": 0.157894736842,
+            "predictions": 76,
+            "recall@0.5": 0.842105263158,
+            "recall@0.75": 0.456140350877,
+            "recall@0.9": 0.210526315789,
+            "records": 57,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.05,
+            "extra": 10,
+            "extraPerImage": 0.5,
+            "matches": 17,
+            "meanMatchedIoU": 0.681097123642,
+            "miss": 5,
+            "missPerImage": 0.25,
+            "predictions": 28,
+            "recall@0.5": 0.772727272727,
+            "recall@0.75": 0.181818181818,
+            "recall@0.9": 0.045454545455,
+            "records": 20,
+            "truthInstances": 22
+          }
+        }
+      },
+      "synthetic-duel-field.benchmark.json": {
+        "sha256": "63fb8b0e2e7a7748d0ca874f5d6c42121c1d61e665cb7fb73083c78ff71b0c2b",
+        "localReport": ".artifacts/card-geometry/round-two-current-results/yolo11s-pose/synthetic-duel-field.benchmark.json",
+        "releaseId": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2",
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "counts": {
+          "records": 1000,
+          "scorableTruthInstances": 3651,
+          "truthGeometrySource": {
+            "quad": 3651
+          },
+          "truthInstances": 3651,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 64,
+          "duplicatePerImage": 0.064,
+          "extra": 1647,
+          "extraPerImage": 1.647,
+          "matches": 3321,
+          "meanMatchedIoU": 0.869077419177,
+          "miss": 330,
+          "missPerImage": 0.33,
+          "predictions": 5032,
+          "recall@0.5": 0.909613804437,
+          "recall@0.75": 0.797863599014,
+          "recall@0.9": 0.461791290058,
+          "records": 1000,
+          "truthInstances": 3651
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 63,
+            "extraPerImage": 0.42,
+            "matches": 1350,
+            "meanMatchedIoU": 0.941831343535,
+            "miss": 0,
+            "missPerImage": 0.0,
+            "predictions": 1413,
+            "recall@0.5": 1.0,
+            "recall@0.75": 0.998518518519,
+            "recall@0.9": 0.932592592593,
+            "records": 150,
+            "truthInstances": 1350
+          },
+          "duel_field": {
+            "duplicate": 63,
+            "duplicatePerImage": 0.18,
+            "extra": 1466,
+            "extraPerImage": 4.188571428571,
+            "matches": 1501,
+            "meanMatchedIoU": 0.815088375352,
+            "miss": 300,
+            "missPerImage": 0.857142857143,
+            "predictions": 3030,
+            "recall@0.5": 0.833425874514,
+            "recall@0.75": 0.646307606885,
+            "recall@0.9": 0.183231538034,
+            "records": 350,
+            "truthInstances": 1801
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 51,
+            "extraPerImage": 0.255,
+            "matches": 186,
+            "meanMatchedIoU": 0.830522140346,
+            "miss": 14,
+            "missPerImage": 0.07,
+            "predictions": 237,
+            "recall@0.5": 0.93,
+            "recall@0.75": 0.785,
+            "recall@0.9": 0.185,
+            "records": 200,
+            "truthInstances": 200
+          },
+          "single_handheld_distractor_free": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 27,
+            "extraPerImage": 0.27,
+            "matches": 92,
+            "meanMatchedIoU": 0.811561311087,
+            "miss": 8,
+            "missPerImage": 0.08,
+            "predictions": 119,
+            "recall@0.5": 0.92,
+            "recall@0.75": 0.75,
+            "recall@0.9": 0.1,
+            "records": 100,
+            "truthInstances": 100
+          },
+          "steep_playmat": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.005,
+            "extra": 40,
+            "extraPerImage": 0.2,
+            "matches": 192,
+            "meanMatchedIoU": 0.844507214511,
+            "miss": 8,
+            "missPerImage": 0.04,
+            "predictions": 233,
+            "recall@0.5": 0.96,
+            "recall@0.75": 0.845,
+            "recall@0.9": 0.25,
+            "records": 200,
+            "truthInstances": 200
+          }
+        }
+      }
+    },
+    "yolox-pose": {
+      "real-v3.benchmark.json": {
+        "sha256": "bba9ed1d86bb2f05fc7d5f7d19192ae8f87b8214d471a43c81d9aeec9d115f76",
+        "localReport": "docs/scanner-system/benchmarks/2026-09-06-yolox-loss-repair/reports/real-v3.benchmark.json",
+        "releaseId": "real-geometry-evaluation-v6-full-aliases-v2",
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "counts": {
+          "records": 600,
+          "scorableTruthInstances": 700,
+          "truthGeometrySource": {
+            "quad": 651,
+            "visibleMask": 49
+          },
+          "truthInstances": 700,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 0,
+          "duplicatePerImage": 0.0,
+          "extra": 7,
+          "extraPerImage": 0.011666666667,
+          "matches": 421,
+          "meanMatchedIoU": 0.945030806969,
+          "miss": 279,
+          "missPerImage": 0.465,
+          "predictions": 428,
+          "recall@0.5": 0.601428571429,
+          "recall@0.75": 0.582857142857,
+          "recall@0.9": 0.538571428571,
+          "records": 600,
+          "truthInstances": 700
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 0,
+            "extraPerImage": 0.0,
+            "matches": 0,
+            "meanMatchedIoU": null,
+            "miss": 27,
+            "missPerImage": 9.0,
+            "predictions": 0,
+            "recall@0.5": 0.0,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "records": 3,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 1,
+            "extraPerImage": 0.055555555556,
+            "matches": 6,
+            "meanMatchedIoU": 0.776740063657,
+            "miss": 27,
+            "missPerImage": 1.5,
+            "predictions": 7,
+            "recall@0.5": 0.181818181818,
+            "recall@0.75": 0.121212121212,
+            "recall@0.9": 0.0,
+            "records": 18,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 5,
+            "extraPerImage": 0.009960159363,
+            "matches": 376,
+            "meanMatchedIoU": 0.960849691613,
+            "miss": 185,
+            "missPerImage": 0.368525896414,
+            "predictions": 381,
+            "recall@0.5": 0.670231729055,
+            "recall@0.75": 0.666666666667,
+            "recall@0.9": 0.647058823529,
+            "records": 502,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 1,
+            "extraPerImage": 0.017543859649,
+            "matches": 31,
+            "meanMatchedIoU": 0.81200502141,
+            "miss": 26,
+            "missPerImage": 0.456140350877,
+            "predictions": 32,
+            "recall@0.5": 0.543859649123,
+            "recall@0.75": 0.421052631579,
+            "recall@0.9": 0.175438596491,
+            "records": 57,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 0,
+            "extraPerImage": 0.0,
+            "matches": 8,
+            "meanMatchedIoU": 0.84323620524,
+            "miss": 14,
+            "missPerImage": 0.7,
+            "predictions": 8,
+            "recall@0.5": 0.363636363636,
+            "recall@0.75": 0.272727272727,
+            "recall@0.9": 0.181818181818,
+            "records": 20,
+            "truthInstances": 22
+          }
+        }
+      },
+      "synthetic-duel-field.benchmark.json": {
+        "sha256": "8468139a4bbdf010ff76924cc13477725b226150478cb54153a853679b0d86f1",
+        "localReport": "docs/scanner-system/benchmarks/2026-09-06-yolox-loss-repair/reports/synthetic-duel-field.benchmark.json",
+        "releaseId": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2",
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "counts": {
+          "records": 1000,
+          "scorableTruthInstances": 3651,
+          "truthGeometrySource": {
+            "quad": 3651
+          },
+          "truthInstances": 3651,
+          "unscorableTruthInstances": 0
+        },
+        "overall": {
+          "duplicate": 4,
+          "duplicatePerImage": 0.004,
+          "extra": 97,
+          "extraPerImage": 0.097,
+          "matches": 3378,
+          "meanMatchedIoU": 0.947119307873,
+          "miss": 273,
+          "missPerImage": 0.273,
+          "predictions": 3479,
+          "recall@0.5": 0.925225965489,
+          "recall@0.75": 0.891262667762,
+          "recall@0.9": 0.802245960011,
+          "records": 1000,
+          "truthInstances": 3651
+        },
+        "bySceneSlice": {
+          "binder_page": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 0,
+            "extraPerImage": 0.0,
+            "matches": 1350,
+            "meanMatchedIoU": 0.991736895143,
+            "miss": 0,
+            "missPerImage": 0.0,
+            "predictions": 1350,
+            "recall@0.5": 1.0,
+            "recall@0.75": 1.0,
+            "recall@0.9": 1.0,
+            "records": 150,
+            "truthInstances": 1350
+          },
+          "duel_field": {
+            "duplicate": 4,
+            "duplicatePerImage": 0.011428571429,
+            "extra": 90,
+            "extraPerImage": 0.257142857143,
+            "matches": 1534,
+            "meanMatchedIoU": 0.90510979769,
+            "miss": 267,
+            "missPerImage": 0.762857142857,
+            "predictions": 1628,
+            "recall@0.5": 0.851749028318,
+            "recall@0.75": 0.784008883953,
+            "recall@0.9": 0.620210993892,
+            "records": 350,
+            "truthInstances": 1801
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 3,
+            "extraPerImage": 0.015,
+            "matches": 198,
+            "meanMatchedIoU": 0.958948975188,
+            "miss": 2,
+            "missPerImage": 0.01,
+            "predictions": 201,
+            "recall@0.5": 0.99,
+            "recall@0.75": 0.99,
+            "recall@0.9": 0.95,
+            "records": 200,
+            "truthInstances": 200
+          },
+          "single_handheld_distractor_free": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 1,
+            "extraPerImage": 0.01,
+            "matches": 99,
+            "meanMatchedIoU": 0.951203042603,
+            "miss": 1,
+            "missPerImage": 0.01,
+            "predictions": 100,
+            "recall@0.5": 0.99,
+            "recall@0.75": 0.98,
+            "recall@0.9": 0.9,
+            "records": 100,
+            "truthInstances": 100
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "duplicatePerImage": 0.0,
+            "extra": 3,
+            "extraPerImage": 0.015,
+            "matches": 197,
+            "meanMatchedIoU": 0.954542058832,
+            "miss": 3,
+            "missPerImage": 0.015,
+            "predictions": 200,
+            "recall@0.5": 0.985,
+            "recall@0.75": 0.98,
+            "recall@0.9": 0.91,
+            "records": 200,
+            "truthInstances": 200
+          }
+        }
+      }
+    }
+  }
+}
