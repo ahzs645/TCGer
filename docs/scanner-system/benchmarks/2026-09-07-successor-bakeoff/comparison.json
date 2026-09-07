@@ -1,0 +1,701 @@
+{
+  "candidates": {
+    "fastvit-t8-four-corner": {
+      "real": {
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "roundTwo": {
+          "cornerCount": 332,
+          "cornerP50": 0.198442780777,
+          "cornerP90": 0.472859091262,
+          "duplicate": 3,
+          "extra": 316,
+          "meanMatchedIoU": 0.766933774265,
+          "miss": 148,
+          "recall@0.5": 0.788571428571,
+          "recall@0.75": 0.492857142857,
+          "recall@0.9": 0.132857142857
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 340,
+          "cornerP50": 0.196223597047,
+          "cornerP90": 0.489311639757,
+          "duplicate": 12,
+          "extra": 462,
+          "meanMatchedIoU": 0.757585670385,
+          "miss": 141,
+          "recall@0.5": 0.798571428571,
+          "recall@0.75": 0.498571428571,
+          "recall@0.9": 0.012857142857
+        }
+      },
+      "realBySceneSlice": {
+        "roundTwo": {
+          "binder_page": {
+            "duplicate": 0,
+            "extra": 21,
+            "matches": 7,
+            "recall@0.5": 0.259259259259,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 1,
+            "extra": 23,
+            "matches": 16,
+            "recall@0.5": 0.484848484848,
+            "recall@0.75": 0.090909090909,
+            "recall@0.9": 0.0,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 2,
+            "extra": 213,
+            "matches": 469,
+            "recall@0.5": 0.836007130125,
+            "recall@0.75": 0.584670231729,
+            "recall@0.9": 0.160427807487,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "extra": 40,
+            "matches": 47,
+            "recall@0.5": 0.824561403509,
+            "recall@0.75": 0.228070175439,
+            "recall@0.9": 0.052631578947,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "extra": 19,
+            "matches": 13,
+            "recall@0.5": 0.590909090909,
+            "recall@0.75": 0.045454545455,
+            "recall@0.9": 0.0,
+            "truthInstances": 22
+          }
+        },
+        "successor": {
+          "binder_page": {
+            "duplicate": 0,
+            "extra": 27,
+            "matches": 9,
+            "recall@0.5": 0.333333333333,
+            "recall@0.75": 0.074074074074,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "extra": 31,
+            "matches": 17,
+            "recall@0.5": 0.515151515152,
+            "recall@0.75": 0.151515151515,
+            "recall@0.9": 0.0,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 9,
+            "extra": 332,
+            "matches": 474,
+            "recall@0.5": 0.844919786096,
+            "recall@0.75": 0.573975044563,
+            "recall@0.9": 0.016042780749,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 2,
+            "extra": 48,
+            "matches": 46,
+            "recall@0.5": 0.80701754386,
+            "recall@0.75": 0.315789473684,
+            "recall@0.9": 0.0,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 1,
+            "extra": 24,
+            "matches": 13,
+            "recall@0.5": 0.590909090909,
+            "recall@0.75": 0.090909090909,
+            "recall@0.9": 0.0,
+            "truthInstances": 22
+          }
+        }
+      },
+      "recognitionReplay": {
+        "roundTwo": {
+          "abstain": 13,
+          "correct": 0,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 44,
+          "wrong": 0
+        },
+        "successor": {
+          "abstain": 12,
+          "correct": 2,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 43,
+          "wrong": 0
+        }
+      },
+      "status": "complete",
+      "synthetic": {
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "roundTwo": {
+          "cornerCount": 6024,
+          "cornerP50": 0.165365854921,
+          "cornerP90": 0.335179410805,
+          "duplicate": 0,
+          "extra": 2933,
+          "meanMatchedIoU": 0.69459774667,
+          "miss": 2145,
+          "recall@0.5": 0.412489728841,
+          "recall@0.75": 0.12434949329,
+          "recall@0.9": 0.000547795125
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 5928,
+          "cornerP50": 0.189259807812,
+          "cornerP90": 0.383435745908,
+          "duplicate": 1,
+          "extra": 3821,
+          "meanMatchedIoU": 0.661114811785,
+          "miss": 2169,
+          "recall@0.5": 0.405916187346,
+          "recall@0.75": 0.059709668584,
+          "recall@0.9": 0.0
+        }
+      }
+    },
+    "yolo11n-pose": {
+      "real": {
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "roundTwo": {
+          "cornerCount": 384,
+          "cornerP50": 0.20043649433,
+          "cornerP90": 0.50943804807,
+          "duplicate": 5,
+          "extra": 403,
+          "meanMatchedIoU": 0.839678389349,
+          "miss": 63,
+          "recall@0.5": 0.91,
+          "recall@0.75": 0.708571428571,
+          "recall@0.9": 0.41
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 416,
+          "cornerP50": 0.18839694231,
+          "cornerP90": 0.418521442278,
+          "duplicate": 8,
+          "extra": 222,
+          "meanMatchedIoU": 0.852144875207,
+          "miss": 61,
+          "recall@0.5": 0.912857142857,
+          "recall@0.75": 0.714285714286,
+          "recall@0.9": 0.475714285714
+        }
+      },
+      "realBySceneSlice": {
+        "roundTwo": {
+          "binder_page": {
+            "duplicate": 0,
+            "extra": 97,
+            "matches": 13,
+            "recall@0.5": 0.481481481481,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "extra": 105,
+            "matches": 16,
+            "recall@0.5": 0.484848484848,
+            "recall@0.75": 0.121212121212,
+            "recall@0.9": 0.0,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 2,
+            "extra": 170,
+            "matches": 541,
+            "recall@0.5": 0.964349376114,
+            "recall@0.75": 0.827094474153,
+            "recall@0.9": 0.497326203209,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 1,
+            "extra": 16,
+            "matches": 52,
+            "recall@0.5": 0.912280701754,
+            "recall@0.75": 0.438596491228,
+            "recall@0.9": 0.122807017544,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 2,
+            "extra": 15,
+            "matches": 15,
+            "recall@0.5": 0.681818181818,
+            "recall@0.75": 0.136363636364,
+            "recall@0.9": 0.045454545455,
+            "truthInstances": 22
+          }
+        },
+        "successor": {
+          "binder_page": {
+            "duplicate": 0,
+            "extra": 55,
+            "matches": 6,
+            "recall@0.5": 0.222222222222,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 1,
+            "extra": 32,
+            "matches": 23,
+            "recall@0.5": 0.69696969697,
+            "recall@0.75": 0.212121212121,
+            "recall@0.9": 0.030303030303,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 4,
+            "extra": 116,
+            "matches": 535,
+            "recall@0.5": 0.953654188948,
+            "recall@0.75": 0.832442067736,
+            "recall@0.9": 0.58110516934,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "extra": 17,
+            "matches": 55,
+            "recall@0.5": 0.964912280702,
+            "recall@0.75": 0.385964912281,
+            "recall@0.9": 0.105263157895,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 3,
+            "extra": 2,
+            "matches": 20,
+            "recall@0.5": 0.909090909091,
+            "recall@0.75": 0.181818181818,
+            "recall@0.9": 0.0,
+            "truthInstances": 22
+          }
+        }
+      },
+      "recognitionReplay": {
+        "roundTwo": {
+          "abstain": 9,
+          "correct": 3,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 44,
+          "wrong": 1
+        },
+        "successor": {
+          "abstain": 7,
+          "correct": 4,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 45,
+          "wrong": 1
+        }
+      },
+      "status": "complete",
+      "synthetic": {
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "roundTwo": {
+          "cornerCount": 12112,
+          "cornerP50": 0.081539909551,
+          "cornerP90": 0.357179174235,
+          "duplicate": 246,
+          "extra": 2700,
+          "meanMatchedIoU": 0.79305329077,
+          "miss": 623,
+          "recall@0.5": 0.82936181868,
+          "recall@0.75": 0.550260202684,
+          "recall@0.9": 0.199397425363
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 12684,
+          "cornerP50": 0.09543175902,
+          "cornerP90": 0.294993988693,
+          "duplicate": 146,
+          "extra": 1184,
+          "meanMatchedIoU": 0.790797100991,
+          "miss": 480,
+          "recall@0.5": 0.86852917009,
+          "recall@0.75": 0.565598466174,
+          "recall@0.9": 0.161599561764
+        }
+      }
+    },
+    "yolo11s-pose": {
+      "real": {
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "roundTwo": {
+          "cornerCount": 468,
+          "cornerP50": 0.162002535198,
+          "cornerP90": 0.407918498664,
+          "duplicate": 26,
+          "extra": 288,
+          "meanMatchedIoU": 0.851969230063,
+          "miss": 29,
+          "recall@0.5": 0.958571428571,
+          "recall@0.75": 0.777142857143,
+          "recall@0.9": 0.458571428571
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 416,
+          "cornerP50": 0.141507555692,
+          "cornerP90": 0.411755961454,
+          "duplicate": 16,
+          "extra": 177,
+          "meanMatchedIoU": 0.869092552128,
+          "miss": 54,
+          "recall@0.5": 0.922857142857,
+          "recall@0.75": 0.768571428571,
+          "recall@0.9": 0.554285714286
+        }
+      },
+      "realBySceneSlice": {
+        "roundTwo": {
+          "binder_page": {
+            "duplicate": 7,
+            "extra": 34,
+            "matches": 27,
+            "recall@0.5": 1.0,
+            "recall@0.75": 0.185185185185,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 2,
+            "extra": 57,
+            "matches": 25,
+            "recall@0.5": 0.757575757576,
+            "recall@0.75": 0.272727272727,
+            "recall@0.9": 0.030303030303,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 14,
+            "extra": 161,
+            "matches": 554,
+            "recall@0.5": 0.98752228164,
+            "recall@0.75": 0.891265597148,
+            "recall@0.9": 0.547237076649,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 2,
+            "extra": 26,
+            "matches": 48,
+            "recall@0.5": 0.842105263158,
+            "recall@0.75": 0.456140350877,
+            "recall@0.9": 0.210526315789,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 1,
+            "extra": 10,
+            "matches": 17,
+            "recall@0.5": 0.772727272727,
+            "recall@0.75": 0.181818181818,
+            "recall@0.9": 0.045454545455,
+            "truthInstances": 22
+          }
+        },
+        "successor": {
+          "binder_page": {
+            "duplicate": 4,
+            "extra": 51,
+            "matches": 15,
+            "recall@0.5": 0.555555555556,
+            "recall@0.75": 0.037037037037,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "extra": 21,
+            "matches": 20,
+            "recall@0.5": 0.606060606061,
+            "recall@0.75": 0.212121212121,
+            "recall@0.9": 0.060606060606,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 12,
+            "extra": 84,
+            "matches": 542,
+            "recall@0.5": 0.966131907308,
+            "recall@0.75": 0.880570409982,
+            "recall@0.9": 0.655971479501,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "extra": 13,
+            "matches": 53,
+            "recall@0.5": 0.929824561404,
+            "recall@0.75": 0.543859649123,
+            "recall@0.9": 0.263157894737,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "extra": 8,
+            "matches": 16,
+            "recall@0.5": 0.727272727273,
+            "recall@0.75": 0.227272727273,
+            "recall@0.9": 0.136363636364,
+            "truthInstances": 22
+          }
+        }
+      },
+      "recognitionReplay": {
+        "roundTwo": {
+          "abstain": 8,
+          "correct": 4,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 44,
+          "wrong": 1
+        },
+        "successor": {
+          "abstain": 8,
+          "correct": 4,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 44,
+          "wrong": 1
+        }
+      },
+      "status": "complete",
+      "synthetic": {
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "roundTwo": {
+          "cornerCount": 13284,
+          "cornerP50": 0.043756101217,
+          "cornerP90": 0.170926127489,
+          "duplicate": 64,
+          "extra": 1647,
+          "meanMatchedIoU": 0.869077419177,
+          "miss": 330,
+          "recall@0.5": 0.909613804437,
+          "recall@0.75": 0.797863599014,
+          "recall@0.9": 0.461791290058
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 13180,
+          "cornerP50": 0.037594550144,
+          "cornerP90": 0.156913300129,
+          "duplicate": 53,
+          "extra": 729,
+          "meanMatchedIoU": 0.880873034563,
+          "miss": 356,
+          "recall@0.5": 0.902492467817,
+          "recall@0.75": 0.800876472199,
+          "recall@0.9": 0.492741714599
+        }
+      }
+    },
+    "yolox-pose": {
+      "real": {
+        "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+        "roundTwo": {
+          "cornerCount": 180,
+          "cornerP50": 0.073852368131,
+          "cornerP90": 0.295089248049,
+          "duplicate": 0,
+          "extra": 7,
+          "meanMatchedIoU": 0.945030806969,
+          "miss": 279,
+          "recall@0.5": 0.601428571429,
+          "recall@0.75": 0.582857142857,
+          "recall@0.9": 0.538571428571
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 228,
+          "cornerP50": 0.083293331624,
+          "cornerP90": 0.283292424761,
+          "duplicate": 0,
+          "extra": 9,
+          "meanMatchedIoU": 0.940276723608,
+          "miss": 248,
+          "recall@0.5": 0.645714285714,
+          "recall@0.75": 0.622857142857,
+          "recall@0.9": 0.56
+        }
+      },
+      "realBySceneSlice": {
+        "roundTwo": {
+          "binder_page": {
+            "duplicate": 0,
+            "extra": 0,
+            "matches": 0,
+            "recall@0.5": 0.0,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "extra": 1,
+            "matches": 6,
+            "recall@0.5": 0.181818181818,
+            "recall@0.75": 0.121212121212,
+            "recall@0.9": 0.0,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 0,
+            "extra": 5,
+            "matches": 376,
+            "recall@0.5": 0.670231729055,
+            "recall@0.75": 0.666666666667,
+            "recall@0.9": 0.647058823529,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "extra": 1,
+            "matches": 31,
+            "recall@0.5": 0.543859649123,
+            "recall@0.75": 0.421052631579,
+            "recall@0.9": 0.175438596491,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "extra": 0,
+            "matches": 8,
+            "recall@0.5": 0.363636363636,
+            "recall@0.75": 0.272727272727,
+            "recall@0.9": 0.181818181818,
+            "truthInstances": 22
+          }
+        },
+        "successor": {
+          "binder_page": {
+            "duplicate": 0,
+            "extra": 0,
+            "matches": 0,
+            "recall@0.5": 0.0,
+            "recall@0.75": 0.0,
+            "recall@0.9": 0.0,
+            "truthInstances": 27
+          },
+          "duel_field": {
+            "duplicate": 0,
+            "extra": 1,
+            "matches": 11,
+            "recall@0.5": 0.333333333333,
+            "recall@0.75": 0.242424242424,
+            "recall@0.9": 0.0,
+            "truthInstances": 33
+          },
+          "single_card_archive": {
+            "duplicate": 0,
+            "extra": 7,
+            "matches": 395,
+            "recall@0.5": 0.704099821747,
+            "recall@0.75": 0.695187165775,
+            "recall@0.9": 0.673796791444,
+            "truthInstances": 561
+          },
+          "single_handheld": {
+            "duplicate": 0,
+            "extra": 1,
+            "matches": 35,
+            "recall@0.5": 0.614035087719,
+            "recall@0.75": 0.508771929825,
+            "recall@0.9": 0.19298245614,
+            "truthInstances": 57
+          },
+          "steep_playmat": {
+            "duplicate": 0,
+            "extra": 0,
+            "matches": 11,
+            "recall@0.5": 0.5,
+            "recall@0.75": 0.409090909091,
+            "recall@0.9": 0.136363636364,
+            "truthInstances": 22
+          }
+        }
+      },
+      "recognitionReplay": {
+        "roundTwo": {
+          "abstain": 11,
+          "correct": 2,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 44,
+          "wrong": 0
+        },
+        "successor": {
+          "abstain": 11,
+          "correct": 3,
+          "correctReject": 0,
+          "frames": 57,
+          "unknown": 43,
+          "wrong": 0
+        }
+      },
+      "status": "complete",
+      "synthetic": {
+        "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+        "roundTwo": {
+          "cornerCount": 13512,
+          "cornerP50": 0.01044555837,
+          "cornerP90": 0.068168514769,
+          "duplicate": 4,
+          "extra": 97,
+          "meanMatchedIoU": 0.947119307873,
+          "miss": 273,
+          "recall@0.5": 0.925225965489,
+          "recall@0.75": 0.891262667762,
+          "recall@0.9": 0.802245960011
+        },
+        "sameEvaluation": true,
+        "successor": {
+          "cornerCount": 13536,
+          "cornerP50": 0.010250656428,
+          "cornerP90": 0.069635058902,
+          "duplicate": 2,
+          "extra": 120,
+          "meanMatchedIoU": 0.947666782199,
+          "miss": 267,
+          "recall@0.5": 0.926869350863,
+          "recall@0.75": 0.891810462887,
+          "recall@0.9": 0.800328677075
+        }
+      }
+    }
+  },
+  "roundTwoSource": {
+    "localReports": ".artifacts/card-geometry/round-two-current-results",
+    "yoloxLossRepairReports": "docs/scanner-system/benchmarks/2026-09-06-yolox-loss-repair/reports"
+  },
+  "schema": "https://tcger.app/reports/card-geometry-successor-comparison/v1"
+}

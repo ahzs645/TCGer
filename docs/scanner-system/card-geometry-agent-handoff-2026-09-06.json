@@ -3,7 +3,7 @@
   "scope": "Card geometry training, evaluation, corpus repair and diagnostic review; not a complete app architecture handoff",
   "codeThrough": "b3134c60",
   "branch": "claude/tcg-card-recognition-review-fkwkvl",
-  "status": "Analysis complete. Canonical category importer repair implemented and gated later on 2026-09-06 (TARGET_SEMANTICS preflight, policy v4); repaired real material recounted and shape-checked locally. A successor real candidate and a combined training candidate exist LOCALLY under amended policy v4 (see successorCorpusPrep); on 2026-09-07 the successor corpus was published, four configs were frozen under v4 and submitted as HF Jobs (see successorBakeoffLaunch); results are not yet recorded.",
+  "status": "Analysis complete. Canonical category importer repair implemented and gated later on 2026-09-06 (TARGET_SEMANTICS preflight, policy v4); repaired real material recounted and shape-checked locally. A successor real candidate and a combined training candidate exist LOCALLY under amended policy v4 (see successorCorpusPrep); on 2026-09-07 the successor corpus was published, four configs were frozen under v4 and submitted as HF Jobs (see successorBakeoffLaunch); all four completed and are verified in benchmarks/2026-09-07-successor-bakeoff/RESULTS.md; no promotion decision.",
   "trainingCorpus": {
     "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
     "datasetRepo": "ahzs645/tcger-scanner-images",
@@ -1293,8 +1293,116 @@
         "url": "https://huggingface.co/jobs/ahzs645/6a9e812b259f8e97255ea340"
       }
     ],
-    "status": "submitted 2026-09-07; not completed",
-    "failedStartupAttempt": "first submission exit 126 (CLI swallowed -lc); see failed-startup-jobs-v1.json"
+    "status": "completed 2026-09-07; verified",
+    "failedStartupAttempt": "first submission exit 126 (CLI swallowed -lc); see failed-startup-jobs-v1.json",
+    "results": "docs/scanner-system/benchmarks/2026-09-07-successor-bakeoff/RESULTS.md",
+    "resultRevision": "d12848068f590ad2c3d42b4eabd89b317103c2f4",
+    "realOverall": {
+      "fastvit-t8-four-corner": {
+        "roundTwo": {
+          "cornerCount": 332,
+          "cornerP50": 0.198442780777,
+          "cornerP90": 0.472859091262,
+          "duplicate": 3,
+          "extra": 316,
+          "meanMatchedIoU": 0.766933774265,
+          "miss": 148,
+          "recall@0.5": 0.788571428571,
+          "recall@0.75": 0.492857142857,
+          "recall@0.9": 0.132857142857
+        },
+        "successor": {
+          "cornerCount": 340,
+          "cornerP50": 0.196223597047,
+          "cornerP90": 0.489311639757,
+          "duplicate": 12,
+          "extra": 462,
+          "meanMatchedIoU": 0.757585670385,
+          "miss": 141,
+          "recall@0.5": 0.798571428571,
+          "recall@0.75": 0.498571428571,
+          "recall@0.9": 0.012857142857
+        }
+      },
+      "yolo11n-pose": {
+        "roundTwo": {
+          "cornerCount": 384,
+          "cornerP50": 0.20043649433,
+          "cornerP90": 0.50943804807,
+          "duplicate": 5,
+          "extra": 403,
+          "meanMatchedIoU": 0.839678389349,
+          "miss": 63,
+          "recall@0.5": 0.91,
+          "recall@0.75": 0.708571428571,
+          "recall@0.9": 0.41
+        },
+        "successor": {
+          "cornerCount": 416,
+          "cornerP50": 0.18839694231,
+          "cornerP90": 0.418521442278,
+          "duplicate": 8,
+          "extra": 222,
+          "meanMatchedIoU": 0.852144875207,
+          "miss": 61,
+          "recall@0.5": 0.912857142857,
+          "recall@0.75": 0.714285714286,
+          "recall@0.9": 0.475714285714
+        }
+      },
+      "yolo11s-pose": {
+        "roundTwo": {
+          "cornerCount": 468,
+          "cornerP50": 0.162002535198,
+          "cornerP90": 0.407918498664,
+          "duplicate": 26,
+          "extra": 288,
+          "meanMatchedIoU": 0.851969230063,
+          "miss": 29,
+          "recall@0.5": 0.958571428571,
+          "recall@0.75": 0.777142857143,
+          "recall@0.9": 0.458571428571
+        },
+        "successor": {
+          "cornerCount": 416,
+          "cornerP50": 0.141507555692,
+          "cornerP90": 0.411755961454,
+          "duplicate": 16,
+          "extra": 177,
+          "meanMatchedIoU": 0.869092552128,
+          "miss": 54,
+          "recall@0.5": 0.922857142857,
+          "recall@0.75": 0.768571428571,
+          "recall@0.9": 0.554285714286
+        }
+      },
+      "yolox-pose": {
+        "roundTwo": {
+          "cornerCount": 180,
+          "cornerP50": 0.073852368131,
+          "cornerP90": 0.295089248049,
+          "duplicate": 0,
+          "extra": 7,
+          "meanMatchedIoU": 0.945030806969,
+          "miss": 279,
+          "recall@0.5": 0.601428571429,
+          "recall@0.75": 0.582857142857,
+          "recall@0.9": 0.538571428571
+        },
+        "successor": {
+          "cornerCount": 228,
+          "cornerP50": 0.083293331624,
+          "cornerP90": 0.283292424761,
+          "duplicate": 0,
+          "extra": 9,
+          "meanMatchedIoU": 0.940276723608,
+          "miss": 248,
+          "recall@0.5": 0.645714285714,
+          "recall@0.75": 0.622857142857,
+          "recall@0.9": 0.56
+        }
+      }
+    }
   },
   "trainingLaunched": true
 }

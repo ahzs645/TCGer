@@ -1,0 +1,138 @@
+{
+  "artifacts": {
+    "epoch_48.pth": {
+      "path": "training/repeat-0/epoch_48.pth",
+      "sha256": "4abf9ea486999aaef4ea7af1bd18dfa942a2dc61cd498306958e9247c0006a3c"
+    },
+    "epoch_49.pth": {
+      "path": "training/repeat-0/epoch_49.pth",
+      "sha256": "747bd648b52049af7d512e8bde1a91af5b8b2dcc1374932c5c05ed7b701311e8"
+    },
+    "epoch_50.pth": {
+      "path": "training/repeat-0/epoch_50.pth",
+      "sha256": "7c993ac6f207b0b189aca75dc48c286a739dc43da686b5424c4670baebfaf416"
+    }
+  },
+  "baseCheckpoint": {
+    "sha256": "3a8dfbd76b4493580449925f6cd01d1ae3b2b7425c6d1ed168dbe5282920c9b3",
+    "url": "https://download.openmmlab.com/mmyolo/v0/yolox/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco/yolox_s_fast_8xb32-300e-rtmdet-hyp_coco_20230210_134645-3a8dfbd7.pth"
+  },
+  "candidate": "yolox-pose",
+  "checkpointPersistence": {
+    "errors": {},
+    "pathPrefix": "geometry/yolox-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/540e83deb3fcc3fbd4919a9dcc2d5d5ac50dd69c3099bdef2319a1b423b9d298",
+    "uploaded": {
+      "epoch_1.pth": "9f2ae1215f87d02d2a1d99cd2e3aaae2e32cd0f1",
+      "epoch_10.pth": "8b24b6c530d59b0f480f7c9a0b91af9f1dad6eb0",
+      "epoch_11.pth": "ed16281d84b382717fbaf18810a12daece1b7c18",
+      "epoch_12.pth": "f5b1df2525c96b4a2e563b7d72ca9e8faeac7911",
+      "epoch_13.pth": "3d6aa94614864a52294158c489881fba960a8ebd",
+      "epoch_14.pth": "66850008e8c15057ecb4841a16b2143e94385fa9",
+      "epoch_15.pth": "16d8886d6a33b750ae465c166ad892388ff03441",
+      "epoch_16.pth": "7fdd3f09971dd98827acb3a54427d5f8865ac7c5",
+      "epoch_17.pth": "d1bf823c17b9ab7cfafd7e3c9d30bc4bdd40b133",
+      "epoch_18.pth": "81eff9842e334d6376c2458d06c4a4bb8f0327b4",
+      "epoch_19.pth": "7082e70a4092b0ae94a8868a54558a50e5e435a5",
+      "epoch_2.pth": "168820f0cf7811b4c102796b2481f2e474a9b95c",
+      "epoch_20.pth": "a9337866fec0aec92269b11c5a36c2ede0d154f4",
+      "epoch_21.pth": "b46247bf946174bbeaff1300eb6a7306f6d24b11",
+      "epoch_22.pth": "025a3bd161d914b4c1e1a926eca55f9a0880504a",
+      "epoch_23.pth": "0310dfa5cac9303caca911263f436c16849c7d34",
+      "epoch_24.pth": "814274895ef585054df2b16a0de0c86c4f9201d0",
+      "epoch_25.pth": "c43852f00598acdeb567442b0158757bc1c70792",
+      "epoch_26.pth": "cd4e3d8ce84b0cbf3d643db6e3b9fffb5cf30bce",
+      "epoch_27.pth": "2a0d6412c0088ea544f304036f7bbd8bd86dc845",
+      "epoch_28.pth": "cce128c2cd1bab40c1ca99fd6e750a500c6d76d4",
+      "epoch_29.pth": "ffb81e1a65cf0c5a9a137bfba94b57131cf4623e",
+      "epoch_3.pth": "baf4ae5bd6af456c8d7fae24a0dbb242865f09a6",
+      "epoch_30.pth": "7d85fa6c7eb443f73560c40491b7c77e1d09b84b",
+      "epoch_31.pth": "b5cd7051e14497d0154b3dba027ee4333bf265ed",
+      "epoch_32.pth": "57d636e8ef8f7dacfab09a1bbd5e0ea3ea3ebe70",
+      "epoch_33.pth": "81b9eb5c97d396c4e0485f202ce1e3ea638425f5",
+      "epoch_34.pth": "f202f231a8929fe72a70dd29d281ddd48cd7ef20",
+      "epoch_35.pth": "2a459cb7e442a2d2cb3d9bb104e7ec63d8d65543",
+      "epoch_36.pth": "58214e45721031e7b81f749bb6e05007cb6df2f1",
+      "epoch_37.pth": "0d6f4cf995a93d1ded05e2de080b1161a24617ce",
+      "epoch_38.pth": "bc4261393d178d18414231f0a311ab22d877ad7f",
+      "epoch_39.pth": "adb39e9c3c9c22903813d18d066eef005b31459d",
+      "epoch_4.pth": "1d8f6a174d38cc452918d112b338f448065510a9",
+      "epoch_40.pth": "3baa5f940a3f9e554b1fbd1d0136625f5132ca61",
+      "epoch_41.pth": "d9e049bf6507a67c873bad8ce19ebbc69f684504",
+      "epoch_42.pth": "40755dae3eb230724823162e2c5410accde69138",
+      "epoch_43.pth": "d33586503ce1194098225e1e7833a8e3f4099fe8",
+      "epoch_44.pth": "1e2865c8e326ebdf62b1e632f2a8f6d6d195500e",
+      "epoch_45.pth": "f61644b3b678c31977f0f6f605fe289a51302002",
+      "epoch_46.pth": "2c3531747c6da953d818181b8e8f8e14e211301e",
+      "epoch_47.pth": "c7efd033398896ad4b64f61e3164821c01dafb2f",
+      "epoch_48.pth": "0a62bb15d0c7b0f629a5334403415803900fda77",
+      "epoch_49.pth": "309a4fe1a10cae8eef76d684946945ee208657fa",
+      "epoch_5.pth": "9eb797c0229af5c23db82608976ddd5414f2f01f",
+      "epoch_50.pth": "b7e7fccbe925de66bc98c26917a310ac1066834e",
+      "epoch_6.pth": "b19b8547c38adfb44b84564da7aef0531c9ff04d",
+      "epoch_7.pth": "6d2b4c4bbc88648f83c444bbc87323112171375e",
+      "epoch_8.pth": "234b7bc90ebeb1344daf71211aa9384e7b5bcfc8",
+      "epoch_9.pth": "80c89ab51496456c369afbfb83aac8ac5ee752c8"
+    }
+  },
+  "experimentHash": "540e83deb3fcc3fbd4919a9dcc2d5d5ac50dd69c3099bdef2319a1b423b9d298",
+  "materialization": {
+    "contextPadding": {
+      "cornerMapping": "(x*sourceWidth+left)/(sourceWidth+left+right)",
+      "fillRgb": [
+        0,
+        0,
+        0
+      ],
+      "order": "source -> black context padding -> MMYOLO letterbox"
+    },
+    "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+    "counts": {
+      "instances:train": 39185,
+      "instances:validation": 5003,
+      "records:train": 13465,
+      "records:validation": 2279
+    },
+    "realContextMarginPolicy": {
+      "application": "each-side",
+      "fraction": 0.15,
+      "kind": "fraction-of-long-side",
+      "rounding": "ceil"
+    }
+  },
+  "mmyolo": {
+    "revision": "8c4d9dc503dc8e327bec8147e8dc97124052f693",
+    "root": "/work/mmyolo",
+    "sourceRepair": {
+      "changes": [
+        "bind missing local cfg to self.test_cfg",
+        "clamp visibility-loss denominator for box-only batches",
+        "preserve all pre-NMS keypoint candidates and select exactly the returned boxes"
+      ],
+      "originalSha256": "701ccb1c2e7bebc4e56848ce181ded2710d5b007c783bc78bbea52142a992af3",
+      "path": "mmyolo/models/dense_heads/yolox_pose_head.py",
+      "repairedSha256": "9b2cb9e6bac72d87ab42924ababe984ba0783cda3ddaba4b3a3165c1df42b186"
+    }
+  },
+  "resume": null,
+  "schema": "https://tcger.app/reports/yolox-pose-training/v1",
+  "training": {
+    "augmentationProfile": "canonical-corpus-baked-v1:no-runtime-augmentation",
+    "batch": 16,
+    "cornerLoss": {
+      "kind": "normalized-l1-v1",
+      "lossWeight": 30.0
+    },
+    "epochs": 50,
+    "inputResolution": 640,
+    "learningRate": 0.00025,
+    "learningRateScaling": {
+      "referenceBatch": 256,
+      "referenceLearningRate": 0.004,
+      "worldSize": 1
+    },
+    "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
+    "pythonVersion": "3.10.11",
+    "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+    "seed": 20260905
+  }
+}

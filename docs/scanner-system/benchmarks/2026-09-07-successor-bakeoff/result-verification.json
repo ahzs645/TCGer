@@ -1,0 +1,122 @@
+{
+  "candidates": {
+    "fastvit-t8-four-corner": {
+      "benchmarkRecordCounts": {
+        "real": 600,
+        "synthetic": 1000
+      },
+      "checkpointPrefix": "geometry/fastvit-t8-four-corner/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/89592151487f0fcf950f322710acff6efd606ee5d3a5a42fe4a646553a202aae",
+      "checkpointSha256": "00653cb30d04059b8cc5faa41f14af8b471c065d06e16ea237b7f2f1fd4bd6b3",
+      "evaluationContractVersion": 2,
+      "experimentHashVerified": true,
+      "fileSha256": {
+        "cross-release-leakage.json": "01aab0b8dd5eef2ef5c90f52a0e2d5fcc8fe4cedc46a1716ae268b41ef070f9c",
+        "evaluation-summary.json": "51de193d0d09558a87147fc1b109b043393b10701c341b896c12fe54199c8482",
+        "preflight-report.json": "a29216264f59e510178111a8c84fcd9524f72229fd63e06b86c262712d513088",
+        "real-v3.benchmark.json": "9a3fce30f474a5591871cc5c211a7a121ce9a1a36616be27547e4c72fa4215f0",
+        "recognition-replay.json": "1e0c433a1bee24c91bc6f23fcde9f1c25c651558fd421882e4d6d3a1d94f780b",
+        "resolved-config.json": "5b65059be64da2c17bc0c91439eb231a18b3f290a297cb4c5668d417c4c7dd23",
+        "run-train.json": "59afaadbdd49c0a6fecb8e449e678c498ad2cbe49ed92b2b8c1273afa12b1de0",
+        "synthetic-duel-field.benchmark.json": "e47f72fed366e928237667a09865f301a5683de2e5db4acca45792acb4737093",
+        "trainer-summary.json": "1cbe2cca291dddb1a00de95a661ba73a61402698317bba7296715a7ecc43cfc3"
+      },
+      "inJobPreflightFailedChecks": [],
+      "jobId": "6a9e8129e686246ca69a79ad",
+      "realCorpusHashVerified": true,
+      "syntheticCorpusHashVerified": true,
+      "toolingRevisionInReports": "63fcb55fc506c1081acb926eeb1d9a7346f06f28",
+      "trainingSelfEvaluation": null
+    },
+    "yolo11n-pose": {
+      "benchmarkRecordCounts": {
+        "real": 600,
+        "synthetic": 1000
+      },
+      "checkpointPrefix": "geometry/yolo11n-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/02a49b7026fb546e5a6ab8d3882c8c74d60128295d1e5c15e90add85b5983645",
+      "checkpointSha256": "5e09161c749c05c71f2b23232c2fa8cda104888f3111d459796740cb2309d6da",
+      "evaluationContractVersion": 2,
+      "experimentHashVerified": true,
+      "fileSha256": {
+        "cross-release-leakage.json": "01aab0b8dd5eef2ef5c90f52a0e2d5fcc8fe4cedc46a1716ae268b41ef070f9c",
+        "evaluation-summary.json": "31c746ee85c8fef5614b6768fd76e4b6a783b4d1d1bf53885dda120c731b3d4b",
+        "preflight-report.json": "2dc072d73106fa0b8c01d2513af07d9ed2db884e7e17ed235c79e6a65a7be716",
+        "real-v3.benchmark.json": "b6ca18886ba51bba82300bbd3b1a66fe241bc8eca3f913f70449682e17cd293a",
+        "recognition-replay.json": "0f24e4576cd4514610b46606e2aa0cadebde2d8aa6da274e5dc71b44b84bcb13",
+        "resolved-config.json": "9800936e97166064f1b2764e22266317044199d8f7e36c29f3454196fb4730d4",
+        "run-train.json": "a2a3fcb0f68b5d564f645b2e64394aec52a18c8c28e4969d7849ee47afd6f38d",
+        "synthetic-duel-field.benchmark.json": "6ae00b89d0ab83fb7cdd51368e5bc9d7ef68e5200969080c0198c53aaaaddecf",
+        "trainer-summary.json": "75b314cb22c91c0dc2f32448ba38c11fdcdc83c2d80a8b568d71af76961c95ee"
+      },
+      "inJobPreflightFailedChecks": [],
+      "jobId": "6a9e8129259f8e97255ea33c",
+      "realCorpusHashVerified": true,
+      "syntheticCorpusHashVerified": true,
+      "toolingRevisionInReports": "63fcb55fc506c1081acb926eeb1d9a7346f06f28",
+      "trainingSelfEvaluation": null
+    },
+    "yolo11s-pose": {
+      "benchmarkRecordCounts": {
+        "real": 600,
+        "synthetic": 1000
+      },
+      "checkpointPrefix": "geometry/yolo11s-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+      "checkpointSha256": "bf1b972b96a6908e6f80ef1d45934d5dec67f8c48dba3890c2cbd91a66489677",
+      "evaluationContractVersion": 2,
+      "experimentHashVerified": true,
+      "fileSha256": {
+        "cross-release-leakage.json": "01aab0b8dd5eef2ef5c90f52a0e2d5fcc8fe4cedc46a1716ae268b41ef070f9c",
+        "evaluation-summary.json": "5b812f44d2b7ef19d0ec2265738092ecfbdabbdb67f3b22defd18abe74f00f59",
+        "preflight-report.json": "28dc74f0da92db88ecd2f34f582c78aa109fd2e135397ce632e4eb13413e56ff",
+        "real-v3.benchmark.json": "24833f4ed0cd3fabec09149375fc078414f44cbf4005ad6c67ecb4af5f472674",
+        "recognition-replay.json": "5fe1dad4c82d2cdd8c86dac32d6d184d2eeac5979e67bf991c0c5339d5660dc5",
+        "resolved-config.json": "d89ad5632623f177c0331caf6123f98f2a30e4f040213e93f00eee4c11730241",
+        "run-train.json": "301d405cdb29bd1d5c8e18049e21efe7f20b29a28ac411147fb62c89ea1c67a0",
+        "synthetic-duel-field.benchmark.json": "5a1df49d1bc2edd1a11d7419b1fc721af2caefe8fc78692d8c5bc34f366df02b",
+        "trainer-summary.json": "e3792ea46618fea8e0931b964bd4fb1d558ea42b6ea7fbc8b89012deb654da4f"
+      },
+      "inJobPreflightFailedChecks": [],
+      "jobId": "6a9e812a259f8e97255ea33e",
+      "realCorpusHashVerified": true,
+      "syntheticCorpusHashVerified": true,
+      "toolingRevisionInReports": "63fcb55fc506c1081acb926eeb1d9a7346f06f28",
+      "trainingSelfEvaluation": null
+    },
+    "yolox-pose": {
+      "benchmarkRecordCounts": {
+        "real": 600,
+        "synthetic": 1000
+      },
+      "checkpointPrefix": "geometry/yolox-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/540e83deb3fcc3fbd4919a9dcc2d5d5ac50dd69c3099bdef2319a1b423b9d298",
+      "checkpointSha256": "7c993ac6f207b0b189aca75dc48c286a739dc43da686b5424c4670baebfaf416",
+      "evaluationContractVersion": 2,
+      "experimentHashVerified": true,
+      "fileSha256": {
+        "cross-release-leakage.json": "01aab0b8dd5eef2ef5c90f52a0e2d5fcc8fe4cedc46a1716ae268b41ef070f9c",
+        "evaluation-summary.json": "14a4d886fc7e025237990abdb868be0c43a61cbad9a9bcc1859bfc11484a58fb",
+        "preflight-report.json": "5a64dcc41308f34e8b0da26a192502354ff0fd97a79a78c1fe8475aebf5c1ced",
+        "real-v3.benchmark.json": "eddf02934416720e744c581c542b9bf6ab10f1819d3f5ab0afee3fb5eff77331",
+        "recognition-replay.json": "53891756cdf02257a51ed30bd1e1bc4fe984b6f0332510a5904cfe206b5a4172",
+        "resolved-config.json": "17db56b500122a1df160f7530b31b04a464b355bd4ade524d8dca5b0281d9dfd",
+        "run-train.json": "b6703fca9beb1695071e1140eab639eac4b5724a1974ee6fa8de0f9bf007a1b3",
+        "synthetic-duel-field.benchmark.json": "9fb83b743c1484d48c75ef34b4261f21eff4694c7ba47c329a3a07705a7c16e6",
+        "train-self-evaluation-summary.json": "91d0f8093eb8b25cc7533109a405fff810723d63853bacf72d9ec0f24378fc9c",
+        "trainer-summary.json": "21b34ca139fc2f77faf374d7baac556946daac5696ed94b962ee8a0032cc8e0b"
+      },
+      "inJobPreflightFailedChecks": [],
+      "jobId": "6a9e812b259f8e97255ea340",
+      "realCorpusHashVerified": true,
+      "syntheticCorpusHashVerified": true,
+      "toolingRevisionInReports": "63fcb55fc506c1081acb926eeb1d9a7346f06f28",
+      "trainingSelfEvaluation": {
+        "fullReportSha256": "886663ba6351c2c26e953c40329d890028840efc2cc4eb08419f0d76ad83d607",
+        "gatePassed": true,
+        "matches": 35228,
+        "minimumMatches": 1
+      }
+    }
+  },
+  "modelRepo": "ahzs645/tcger-universal-arcface",
+  "resultRevision": "d12848068f590ad2c3d42b4eabd89b317103c2f4",
+  "resultRevisionFirstThree": "309a4fe1a10cae8eef76d684946945ee208657fa",
+  "schema": "https://tcger.app/reports/card-geometry-successor-result-verification/v1"
+}

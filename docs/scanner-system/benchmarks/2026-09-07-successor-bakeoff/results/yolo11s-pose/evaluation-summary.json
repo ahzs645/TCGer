@@ -1,0 +1,53 @@
+{
+  "candidate": "yolo11s-pose",
+  "checkpointSha256": "bf1b972b96a6908e6f80ef1d45934d5dec67f8c48dba3890c2cbd91a66489677",
+  "decoderConfig": {
+    "aspectRatioBands": {
+      "rawCard": [
+        0.5,
+        3.0
+      ],
+      "slab": [
+        0.5,
+        3.0
+      ],
+      "unknown": [
+        0.5,
+        3.0
+      ]
+    },
+    "exteriorMargin": 0.25,
+    "minimumConfidence": 0.05,
+    "minimumQuadArea": 0.001,
+    "nmsIouThreshold": 0.5
+  },
+  "evaluationContract": {
+    "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+    "fastvitInputColor": "rgb",
+    "version": 2,
+    "yolo11InputColor": "bgr",
+    "yoloxInputColor": "bgr"
+  },
+  "evaluations": {
+    "real-v3": {
+      "predictionsSha256": "20f7d1aa634cf0a85f35e1204f75ea6879c5cc1194c14f71f9a9a2e376159ab6",
+      "reportSha256": "24833f4ed0cd3fabec09149375fc078414f44cbf4005ad6c67ecb4af5f472674"
+    },
+    "recognitionReplay": {
+      "counts": {
+        "abstain": 8,
+        "correct": 4,
+        "correctReject": 0,
+        "frames": 57,
+        "unknown": 44,
+        "wrong": 1
+      },
+      "reportSha256": "5fe1dad4c82d2cdd8c86dac32d6d184d2eeac5979e67bf991c0c5339d5660dc5"
+    },
+    "synthetic-duel-field": {
+      "predictionsSha256": "7235433aa5dd492695b54784b4961d9ab898f9b98310b5e7eab59730d4ba3abe",
+      "reportSha256": "5a1df49d1bc2edd1a11d7419b1fc721af2caefe8fc78692d8c5bc34f366df02b"
+    }
+  },
+  "schema": "https://tcger.app/reports/card-geometry-candidate-evaluation/v1"
+}

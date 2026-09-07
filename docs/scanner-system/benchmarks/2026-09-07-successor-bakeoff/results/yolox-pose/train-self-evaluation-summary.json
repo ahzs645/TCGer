@@ -1,0 +1,64 @@
+{
+  "candidate": "yolox-pose",
+  "checkpointSha256": "7c993ac6f207b0b189aca75dc48c286a739dc43da686b5424c4670baebfaf416",
+  "device": "cuda",
+  "diagnosticOnly": true,
+  "fullReport": {
+    "note": "per-record rows retained on the Hub only",
+    "path": "training-output/train-self-evaluation.json",
+    "sha256": "886663ba6351c2c26e953c40329d890028840efc2cc4eb08419f0d76ad83d607"
+  },
+  "gate": {
+    "failedChecks": [],
+    "matches": 35228,
+    "meaning": "Nonzero fitting sanity check; not a held-out quality or deployment gate",
+    "minimumMatches": 1
+  },
+  "inputHashes": {
+    "entries": 13465,
+    "note": "per-record hashes retained on the Hub only"
+  },
+  "metrics": {
+    "counts": {
+      "records": 13465,
+      "scorableTruthInstances": 35751,
+      "truthGeometrySource": {
+        "quad": 35733,
+        "unscorable": 3434,
+        "visibleMask": 18
+      },
+      "truthInstances": 39185,
+      "unscorableTruthInstances": 3434
+    },
+    "orientation": {
+      "accuracy": 0.9999074388324951,
+      "correctPairs": 32408,
+      "eligiblePairs": 32411,
+      "evaluatedPairs": 32411,
+      "excludedUnknownOrientation": 2817,
+      "insufficientKnownCorners": 0
+    }
+  },
+  "metricsKeys": [
+    "cornerError",
+    "counts",
+    "detection",
+    "orientation"
+  ],
+  "realContextMarginPolicy": {
+    "application": "each-side",
+    "fraction": 0.15,
+    "kind": "fraction-of-long-side",
+    "rounding": "ceil"
+  },
+  "schema": "https://tcger.app/reports/historical-train-split-diagnostic/v1",
+  "selection": {
+    "allTrainingRecords": true,
+    "ordering": "sha256(recordId)",
+    "perScene": null,
+    "records": 13465,
+    "sampleHash": "f5a94feff885fd32ecc465f11479b78af6f870627b3e02773b8de9e162282453",
+    "split": "train"
+  },
+  "sourceCorpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf"
+}
