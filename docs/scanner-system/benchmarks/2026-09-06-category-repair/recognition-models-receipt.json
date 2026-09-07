@@ -1,0 +1,60 @@
+{
+  "games": {
+    "magic": {
+      "metadata": {
+        "path": "exports/magic/full/CardsIndexMetadata.json",
+        "sha256": "35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54"
+      },
+      "onnx": {
+        "path": "exports/magic/full/card-embeddings-arcface-fp32.onnx",
+        "sha256": "ebc725476ec2866cd054cd16ef9bcda257bbfdc5aa05326a79335abc4fdc0d3e"
+      },
+      "policy": {
+        "queryNormalization": "grey-world-autocontrast",
+        "strongThreshold": 0.7
+      },
+      "vectors": {
+        "path": "exports/magic/full/CardsIndexVectors-arcface.bin",
+        "sha256": "4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8"
+      }
+    },
+    "pokemon": {
+      "metadata": {
+        "path": "exports/pokemon/full/CardsIndexMetadata.json",
+        "sha256": "5bcc886d58fca214800d366d080a438515d7820ffe03fcea7395496b5ef08117"
+      },
+      "onnx": {
+        "path": "exports/pokemon/full/card-embeddings-arcface-fp32.onnx",
+        "sha256": "bd7367284130639345efbe967e5e80b4aadf0ab5d5bc922968d2b06e497eea44"
+      },
+      "policy": {
+        "queryNormalization": "none",
+        "strongThreshold": 0.65
+      },
+      "vectors": {
+        "path": "exports/pokemon/full/CardsIndexVectors-arcface.bin",
+        "sha256": "d78e06b0909f39f57deab5c04c1bfb20671bf933f95033f143942e8cc388bdc3"
+      }
+    },
+    "yugioh": {
+      "metadata": {
+        "path": "exports/yugioh/full/CardsIndexMetadata.json",
+        "sha256": "0ab3fec12511b401244b1f80ac12ac432f10cdb2afdcfc59f7797568d50cca5e"
+      },
+      "onnx": {
+        "path": "exports/yugioh/full/card-embeddings-arcface-fp32.onnx",
+        "sha256": "b304bde2171d8ca4a824a4e0cab4bc22c3b31e425a8ba5e3ef91aab4ec6f9d58"
+      },
+      "policy": {
+        "queryNormalization": "none",
+        "strongThreshold": 0.65
+      },
+      "vectors": {
+        "path": "exports/yugioh/full/CardsIndexVectors-arcface.bin",
+        "sha256": "2de604679f08018e18fe3f3db188414add77fba51c6e8c52c4eb8b87cea8cbdd"
+      }
+    }
+  },
+  "modelRepo": "ahzs645/tcger-universal-arcface",
+  "modelRevision": "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
+}

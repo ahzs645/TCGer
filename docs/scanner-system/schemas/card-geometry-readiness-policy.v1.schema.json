@@ -81,6 +81,10 @@
         }
       }
     },
+    "requireTargetSemantics": {
+      "description": "When true, preflight TARGET_SEMANTICS fails unless the manifest declares a targetSemantics contract and every real archive record carries verified primary-category provenance. Legacy releases built before the category-aware importer omit the declaration and can only bind policies that leave this false.",
+      "type": "boolean"
+    },
     "metricEligibleCornerSources": {
       "description": "Corner provenance values whose known coordinates may enter corner-error metrics. The schema limits this to `human` and `synthetic`; `maskFit` and `detector` corners are reported but can never become ground truth through policy configuration.",
       "type": "array",

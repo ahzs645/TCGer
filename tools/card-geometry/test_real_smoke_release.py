@@ -14,6 +14,8 @@ from build_real_smoke_release import (  # noqa: E402
     build_release,
     add_canonical_archive,
     conservative_mask_quad,
+    load_category_contract,
+    target_semantics,
 )
 from corpus_release import load_json, sha256_bytes  # noqa: E402
 from preflight import Expectations, run_preflight  # noqa: E402
@@ -60,12 +62,16 @@ class RealReleaseAdapterTests(unittest.TestCase):
             "provenance": [{"source": "tcgx-annotations", "license": "CC BY 4.0"}],
             "annotations": [
                 {
+                    "category": "card",
                     "geometryQuality": "source-polygon",
                     "segmentation": [[2, 1, 8, 1, 8, 9, 2, 9, 2, 1]],
+                    "provenance": ["tcgx-annotations:Pokemon_Card:1"],
                 },
                 {
+                    "category": "card",
                     "geometryQuality": "bbox-derived",
                     "segmentation": [[0, 0, 10, 0, 10, 10, 0, 10]],
+                    "provenance": ["tcgx-annotations:Pokemon_Card:2"],
                 },
             ],
         }
@@ -78,7 +84,7 @@ class RealReleaseAdapterTests(unittest.TestCase):
             root = Path(tmp)
             corpus, raw, _ = self._canonical_source(root)
             row = json.loads(corpus.read_text())
-            row["annotations"].append({"geometryQuality": "bbox-derived"})
+            row["annotations"].append({"category": "card", "geometryQuality": "bbox-derived"})
             stats = Counter()
             entries = add_canonical_archive(root=root / "output", rows=[row],
                 archive_path=raw / row["archive"], split="train", stats=stats)
@@ -544,6 +550,276 @@ class RealReleaseAdapterTests(unittest.TestCase):
                     for item in manifest["records"]
                 )
             )
+
+
+class CategoryBoundaryTests(unittest.TestCase):
+    """Only canonical `card` annotations may become whole-card targets."""
+
+    def _mixed_source(self, root: Path, annotations: list[dict]) -> tuple[Path, Path, dict]:
+        raw = root / "raw"
+        raw.mkdir(exist_ok=True)
+        image = tiny_png(100, 100, (30, 30, 30))
+        archive_name = "card-scanner-seg.v3i.coco-segmentation.zip"
+        member = "train/slabbed.png"
+        with zipfile.ZipFile(raw / archive_name, "w") as archive:
+            archive.writestr(member, image)
+        row = {
+            "id": sha256_bytes(image),
+            "sha256": sha256_bytes(image),
+            "archive": archive_name,
+            "imageMember": member,
+            "width": 100,
+            "height": 100,
+            "provenance": [{"source": "card-scanner-seg", "license": "CC BY 4.0"}],
+            "annotations": annotations,
+        }
+        corpus = root / "corpus.jsonl"
+        corpus.write_text(json.dumps(row) + "\n", encoding="utf-8")
+        return corpus, raw, row
+
+    @staticmethod
+    def _mixed_annotations() -> list[dict]:
+        return [
+            {
+                "category": "slab",
+                "geometryQuality": "source-polygon",
+                "bbox": [10, 5, 80, 90],
+                "segmentation": [[10, 5, 90, 5, 90, 95, 10, 95]],
+                "provenance": ["card-scanner-seg:slab:7"],
+            },
+            {
+                "category": "card",
+                "geometryQuality": "source-polygon",
+                "bbox": [20, 15, 60, 70],
+                "segmentation": [[20, 15, 80, 15, 80, 85, 20, 85]],
+                "provenance": ["card-scanner-seg:card:8"],
+            },
+            {
+                "category": "title_region",
+                "geometryQuality": "bbox-derived",
+                "bbox": [22, 17, 56, 8],
+                "segmentation": [[22, 17, 78, 17, 78, 25, 22, 25]],
+                "provenance": ["card-detector-wmbbb:Name:9"],
+            },
+            {
+                "category": "inner_border",
+                "geometryQuality": "source-polygon",
+                "bbox": [24, 19, 52, 62],
+                "segmentation": [[24, 19, 76, 19, 76, 81, 24, 81]],
+                "provenance": ["card-seg-j74w1:inner-border:10"],
+            },
+        ]
+
+    @staticmethod
+    def _aliases() -> dict[str, str]:
+        archive_id = "coco:card-scanner-seg.v3i.coco-segmentation"
+        return {archive_id: archive_id}
+
+    def _build(self, root: Path, corpus: Path, raw: Path) -> Path:
+        output = root / "release"
+        build_release(
+            canonical_corpus=corpus,
+            raw_dir=raw,
+            archive_splits={"card-scanner-seg.v3i.coco-segmentation.zip": "train"},
+            devmode_sessions=[],
+            output=output,
+            source_archive_aliases=self._aliases(),
+        )
+        return output
+
+    def _import(self, root: Path, raw: Path, row: dict) -> tuple[list[dict], Counter]:
+        stats = Counter()
+        entries = add_canonical_archive(
+            root=root / "output", rows=[row], archive_path=raw / row["archive"],
+            split="train", stats=stats,
+        )
+        return entries, stats
+
+    def test_only_the_card_annotation_becomes_a_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, _ = self._mixed_source(root, self._mixed_annotations())
+            output = self._build(root, corpus, raw)
+            summary = load_json(output / "build-summary.json")
+            manifest = load_json(output / "manifest.json")
+            record = load_json(output / manifest["records"][0]["path"])
+            self.assertEqual(len(record["instances"]), 1)
+            instance = record["instances"][0]
+            self.assertEqual(instance["instanceId"], "card-0")
+            self.assertEqual(instance["occlusionOrder"], 0)
+            self.assertEqual(instance["sourceCategory"], "card")
+            self.assertEqual(instance["sourceAnnotationIndex"], 1)
+            self.assertEqual(instance["sourceProvenance"], ["card-scanner-seg:card:8"])
+            # The slab is context: it never becomes a card but does describe the container.
+            self.assertEqual(instance["container"], "slab")
+            self.assertEqual(
+                {corner["cornerSource"] for corner in instance["corners"]}, {"maskFit"}
+            )
+            self.assertEqual(
+                record["source"]["annotationCategories"],
+                {"card": 1, "inner_border": 1, "slab": 1, "title_region": 1},
+            )
+            stats = summary["stats"]
+            self.assertEqual(stats["canonicalInstancesRetained"], 1)
+            self.assertEqual(stats["annotationsNotTargets:context:slab"], 1)
+            self.assertEqual(stats["annotationsNotTargets:auxiliary:title_region"], 1)
+            self.assertEqual(stats["annotationsNotTargets:auxiliary:inner_border"], 1)
+            self.assertEqual(stats["cardsInsideSlab"], 1)
+            self.assertNotIn("recordsWithMultipleCards", stats)
+            contract = load_category_contract()
+            self.assertEqual(manifest["targetSemantics"], target_semantics(contract))
+            self.assertEqual(manifest["targetSemantics"]["primaryCategories"], ["card"])
+            self.assertEqual(summary["categoryContract"]["sha256"], contract["sha256"])
+            report = run_preflight(output, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], [])
+            semantics = next(c for c in report["checks"] if c["code"] == "TARGET_SEMANTICS")
+            self.assertEqual(semantics["status"], "pass")
+            self.assertEqual(semantics["details"]["archiveRecordsChecked"], 1)
+
+    def test_box_only_card_beside_a_slab_keeps_unknown_corners(self):
+        annotations = self._mixed_annotations()
+        annotations[1] = {**annotations[1], "geometryQuality": "bbox-derived"}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, raw, row = self._mixed_source(root, annotations)
+            entries, stats = self._import(root, raw, row)
+            instance = load_json(root / "output" / entries[0]["path"])["instances"][0]
+            self.assertFalse(any(c["coordinateKnown"] for c in instance["corners"]))
+            self.assertNotIn("visibleMask", instance)
+            self.assertEqual(instance["box"], {"left": 0.2, "top": 0.15, "right": 0.8, "bottom": 0.85})
+            self.assertEqual(instance["sourceCategory"], "card")
+            self.assertEqual(instance["container"], "slab")
+            self.assertEqual(stats["maskFit:box-only"], 1)
+
+    def test_context_annotation_without_a_box_does_not_drop_the_image(self):
+        annotations = self._mixed_annotations()
+        annotations[0] = {"category": "slab", "geometryQuality": "source-rle",
+                          "provenance": ["card-scanner-seg:slab:7"]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, raw, row = self._mixed_source(root, annotations)
+            entries, stats = self._import(root, raw, row)
+            self.assertEqual(len(entries), 1)
+            self.assertEqual(stats["contextAnnotationsWithoutBox"], 1)
+            self.assertNotIn("recordsExcludedMissingBox", stats)
+            record = load_json(root / "output" / entries[0]["path"])
+            self.assertEqual(record["instances"][0]["container"], "unknown")
+
+    def test_card_without_a_box_still_drops_the_image(self):
+        annotations = self._mixed_annotations()
+        annotations.append({"category": "card", "geometryQuality": "bbox-derived",
+                            "provenance": ["card-scanner-seg:card:11"]})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, raw, row = self._mixed_source(root, annotations)
+            entries, stats = self._import(root, raw, row)
+            self.assertEqual(entries, [])
+            self.assertEqual(stats["recordsExcludedMissingBox"], 1)
+
+    def test_record_with_only_auxiliary_annotations_is_excluded(self):
+        annotations = [item for item in self._mixed_annotations() if item["category"] != "card"]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, raw, row = self._mixed_source(root, annotations)
+            entries, stats = self._import(root, raw, row)
+            self.assertEqual(entries, [])
+            self.assertEqual(stats["recordsExcludedNoCardAnnotations"], 1)
+            self.assertEqual(stats["annotationsNotTargets:context:slab"], 1)
+
+    def test_unknown_or_missing_category_fails_instead_of_guessing(self):
+        for category in ("hologram", None):
+            annotations = self._mixed_annotations()
+            if category is None:
+                annotations[2].pop("category")
+            else:
+                annotations[2]["category"] = category
+            with self.subTest(category=category), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                _, raw, row = self._mixed_source(root, annotations)
+                with self.assertRaisesRegex(ValueError, "unknown category"):
+                    self._import(root, raw, row)
+
+    def test_multiple_cards_are_counted_and_reindexed(self):
+        annotations = self._mixed_annotations()
+        annotations.append({
+            "category": "card",
+            "geometryQuality": "bbox-derived",
+            "bbox": [0, 0, 10, 14],
+            "provenance": ["card-scanner-seg:card:12"],
+        })
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, raw, row = self._mixed_source(root, annotations)
+            entries, stats = self._import(root, raw, row)
+            record = load_json(root / "output" / entries[0]["path"])
+            self.assertEqual(
+                [(i["instanceId"], i["sourceAnnotationIndex"], i["container"]) for i in record["instances"]],
+                [("card-0", 1, "slab"), ("card-1", 4, "unknown")],
+            )
+            self.assertEqual(stats["recordsWithMultipleCards"], 1)
+            self.assertEqual(stats["cardsInsideSlab"], 1)
+
+    def test_preflight_rejects_a_slab_relabeled_as_a_card(self):
+        from corpus_release import corpus_hash, sha256_file, write_json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, _ = self._mixed_source(root, self._mixed_annotations())
+            output = self._build(root, corpus, raw)
+            manifest = load_json(output / "manifest.json")
+            entry = manifest["records"][0]
+            record = load_json(output / entry["path"])
+            record["instances"][0]["sourceCategory"] = "slab"
+            record["instances"][0]["sourceAnnotationIndex"] = 0
+            write_json(output / entry["path"], record)
+            entry["sha256"] = sha256_file(output / entry["path"])
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(output / "manifest.json", manifest)
+            report = run_preflight(output, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], ["TARGET_SEMANTICS"])
+            check = next(c for c in report["checks"] if c["code"] == "TARGET_SEMANTICS")
+            self.assertIn(
+                "is not a primary category",
+                " ".join(check["details"]["failures"][entry["recordId"]]),
+            )
+
+            # Dropping the declaration is not an escape hatch either.
+            manifest.pop("targetSemantics")
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(output / "manifest.json", manifest)
+            report = run_preflight(output, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], ["TARGET_SEMANTICS"])
+
+    def test_policy_can_require_the_declaration(self):
+        from corpus_release import corpus_hash, sha256_file, write_json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus, raw, _ = self._mixed_source(root, self._mixed_annotations())
+            output = self._build(root, corpus, raw)
+            policy = load_json(output / "policy.json")
+            policy["requireTargetSemantics"] = True
+            write_json(output / "policy.json", policy)
+            manifest = load_json(output / "manifest.json")
+            manifest["readiness"]["readinessPolicySha256"] = sha256_file(output / "policy.json")
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(output / "manifest.json", manifest)
+            self.assertEqual(run_preflight(output, tooling_revision="test")["failedChecks"], [])
+
+            # A legacy manifest without the declaration and without provenance fails.
+            for entry in manifest["records"]:
+                record = load_json(output / entry["path"])
+                record["source"].pop("annotationCategories")
+                for instance in record["instances"]:
+                    for key in ("sourceCategory", "sourceAnnotationIndex", "sourceProvenance"):
+                        instance.pop(key, None)
+                write_json(output / entry["path"], record)
+                entry["sha256"] = sha256_file(output / entry["path"])
+            manifest.pop("targetSemantics")
+            manifest["corpusHash"] = corpus_hash(manifest)
+            write_json(output / "manifest.json", manifest)
+            report = run_preflight(output, tooling_revision="test")
+            self.assertEqual(report["failedChecks"], ["TARGET_SEMANTICS"])
 
 
 if __name__ == "__main__":

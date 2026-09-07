@@ -1,0 +1,344 @@
+{
+  "frozenTrainingRealPortion": {
+    "train|ALL": {
+      "records": 4465,
+      "instances": 7030,
+      "multiCardRecords": 537,
+      "knownCorners": 2402,
+      "containerSlab": 0,
+      "boxOnly": 4628
+    },
+    "train|coco:card-detector-wmbbb.v8i.coco-segmentation": {
+      "records": 43,
+      "instances": 140,
+      "multiCardRecords": 41,
+      "knownCorners": 46,
+      "containerSlab": 0,
+      "boxOnly": 94
+    },
+    "train|coco:card-scanner-seg.v3i.coco-segmentation": {
+      "records": 2721,
+      "instances": 2956,
+      "multiCardRecords": 235,
+      "knownCorners": 2355,
+      "containerSlab": 0,
+      "boxOnly": 601
+    },
+    "train|coco:card-segmentation-gldmt.v2i.coco-segmentation": {
+      "records": 78,
+      "instances": 78,
+      "multiCardRecords": 0,
+      "knownCorners": 1,
+      "containerSlab": 0,
+      "boxOnly": 77
+    },
+    "train|coco:carddetection-hegxe.v7i.coco": {
+      "records": 117,
+      "instances": 1209,
+      "multiCardRecords": 115,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 1209
+    },
+    "train|coco:mtg-rqful.v1i.coco": {
+      "records": 800,
+      "instances": 800,
+      "multiCardRecords": 0,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 800
+    },
+    "train|coco:mtg-scanner-bughx.v4i.coco": {
+      "records": 36,
+      "instances": 633,
+      "multiCardRecords": 36,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 633
+    },
+    "train|coco:pk-detect.v3i.coco": {
+      "records": 48,
+      "instances": 227,
+      "multiCardRecords": 33,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 227
+    },
+    "train|coco:pokefolio.v1i.coco": {
+      "records": 282,
+      "instances": 464,
+      "multiCardRecords": 44,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 464
+    },
+    "train|coco:pokemon-card-outliner.v1i.coco-yolo": {
+      "records": 340,
+      "instances": 523,
+      "multiCardRecords": 33,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 523
+    },
+    "validation|ALL": {
+      "records": 1279,
+      "instances": 1621,
+      "multiCardRecords": 256,
+      "knownCorners": 393,
+      "containerSlab": 0,
+      "boxOnly": 1228
+    },
+    "validation|coco:card-seg-j74w1.v3i.coco-segmentation": {
+      "records": 898,
+      "instances": 1133,
+      "multiCardRecords": 235,
+      "knownCorners": 393,
+      "containerSlab": 0,
+      "boxOnly": 740
+    },
+    "validation|coco:labelyolo.v4i.coco": {
+      "records": 93,
+      "instances": 99,
+      "multiCardRecords": 5,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 99
+    },
+    "validation|coco:pokemon_card_detector.v1-versie-1.coco": {
+      "records": 288,
+      "instances": 389,
+      "multiCardRecords": 16,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 389
+    }
+  },
+  "repairedCandidate": {
+    "train|ALL": {
+      "records": 4465,
+      "instances": 6281,
+      "multiCardRecords": 261,
+      "knownCorners": 2176,
+      "containerSlab": 235,
+      "boxOnly": 4105
+    },
+    "train|coco:card-detector-wmbbb.v8i.coco-segmentation": {
+      "records": 43,
+      "instances": 48,
+      "multiCardRecords": 2,
+      "knownCorners": 38,
+      "containerSlab": 0,
+      "boxOnly": 10
+    },
+    "train|coco:card-scanner-seg.v3i.coco-segmentation": {
+      "records": 2721,
+      "instances": 2721,
+      "multiCardRecords": 0,
+      "knownCorners": 2137,
+      "containerSlab": 235,
+      "boxOnly": 584
+    },
+    "train|coco:card-segmentation-gldmt.v2i.coco-segmentation": {
+      "records": 78,
+      "instances": 78,
+      "multiCardRecords": 0,
+      "knownCorners": 1,
+      "containerSlab": 0,
+      "boxOnly": 77
+    },
+    "train|coco:carddetection-hegxe.v7i.coco": {
+      "records": 117,
+      "instances": 1209,
+      "multiCardRecords": 115,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 1209
+    },
+    "train|coco:mtg-rqful.v1i.coco": {
+      "records": 800,
+      "instances": 800,
+      "multiCardRecords": 0,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 800
+    },
+    "train|coco:mtg-scanner-bughx.v4i.coco": {
+      "records": 36,
+      "instances": 211,
+      "multiCardRecords": 34,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 211
+    },
+    "train|coco:pk-detect.v3i.coco": {
+      "records": 48,
+      "instances": 227,
+      "multiCardRecords": 33,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 227
+    },
+    "train|coco:pokefolio.v1i.coco": {
+      "records": 282,
+      "instances": 464,
+      "multiCardRecords": 44,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 464
+    },
+    "train|coco:pokemon-card-outliner.v1i.coco-yolo": {
+      "records": 340,
+      "instances": 523,
+      "multiCardRecords": 33,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 523
+    },
+    "validation|ALL": {
+      "records": 1279,
+      "instances": 1386,
+      "multiCardRecords": 21,
+      "knownCorners": 194,
+      "containerSlab": 0,
+      "boxOnly": 1192
+    },
+    "validation|coco:card-seg-j74w1.v3i.coco-segmentation": {
+      "records": 898,
+      "instances": 898,
+      "multiCardRecords": 0,
+      "knownCorners": 194,
+      "containerSlab": 0,
+      "boxOnly": 704
+    },
+    "validation|coco:labelyolo.v4i.coco": {
+      "records": 93,
+      "instances": 99,
+      "multiCardRecords": 5,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 99
+    },
+    "validation|coco:pokemon_card_detector.v1-versie-1.coco": {
+      "records": 288,
+      "instances": 389,
+      "multiCardRecords": 16,
+      "knownCorners": 0,
+      "containerSlab": 0,
+      "boxOnly": 389
+    }
+  },
+  "delta": {
+    "train|ALL": {
+      "boxOnly": -523,
+      "containerSlab": 235,
+      "instances": -749,
+      "knownCorners": -226,
+      "multiCardRecords": -276,
+      "records": 0
+    },
+    "train|coco:card-detector-wmbbb.v8i.coco-segmentation": {
+      "boxOnly": -84,
+      "containerSlab": 0,
+      "instances": -92,
+      "knownCorners": -8,
+      "multiCardRecords": -39,
+      "records": 0
+    },
+    "train|coco:card-scanner-seg.v3i.coco-segmentation": {
+      "boxOnly": -17,
+      "containerSlab": 235,
+      "instances": -235,
+      "knownCorners": -218,
+      "multiCardRecords": -235,
+      "records": 0
+    },
+    "train|coco:card-segmentation-gldmt.v2i.coco-segmentation": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    },
+    "train|coco:carddetection-hegxe.v7i.coco": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    },
+    "train|coco:mtg-rqful.v1i.coco": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    },
+    "train|coco:mtg-scanner-bughx.v4i.coco": {
+      "boxOnly": -422,
+      "containerSlab": 0,
+      "instances": -422,
+      "knownCorners": 0,
+      "multiCardRecords": -2,
+      "records": 0
+    },
+    "train|coco:pk-detect.v3i.coco": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    },
+    "train|coco:pokefolio.v1i.coco": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    },
+    "train|coco:pokemon-card-outliner.v1i.coco-yolo": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    },
+    "validation|ALL": {
+      "boxOnly": -36,
+      "containerSlab": 0,
+      "instances": -235,
+      "knownCorners": -199,
+      "multiCardRecords": -235,
+      "records": 0
+    },
+    "validation|coco:card-seg-j74w1.v3i.coco-segmentation": {
+      "boxOnly": -36,
+      "containerSlab": 0,
+      "instances": -235,
+      "knownCorners": -199,
+      "multiCardRecords": -235,
+      "records": 0
+    },
+    "validation|coco:labelyolo.v4i.coco": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    },
+    "validation|coco:pokemon_card_detector.v1-versie-1.coco": {
+      "boxOnly": 0,
+      "containerSlab": 0,
+      "instances": 0,
+      "knownCorners": 0,
+      "multiCardRecords": 0,
+      "records": 0
+    }
+  }
+}

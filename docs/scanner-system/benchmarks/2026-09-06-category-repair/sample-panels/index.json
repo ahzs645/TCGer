@@ -1,0 +1,134 @@
+{
+  "coco:card-detector-wmbbb.v8i.coco-segmentation": {
+    "panel": "coco_card-detector-wmbbb_v8i_coco-segmentation.jpg",
+    "records": [
+      "coco-013a142fac43d7c65d23e69d44295781c20ee3571cdd51e1bb1778ddd0666bb4",
+      "coco-04bb9a96c3069582e2f720c297ec089208afbe1ebdcca4d84e655b1c7a671dc7",
+      "coco-05416344fd80971bb03059ebbf2914f5486578794ffe87b311f071136514cd00",
+      "coco-0abc03371a2d68f0f78927a4d861ffbbe0272870cb54922f60264c534746ea51",
+      "coco-0b851ff1f832506e79193bd3e66f462347f5ea2f3e73f611f9dc29088534abe4",
+      "coco-0c13ba8dba1aef2f9d9d45c7d5ba7afefc1244434321b3142bda9d3f0f1d2917"
+    ]
+  },
+  "coco:card-scanner-seg.v3i.coco-segmentation": {
+    "panel": "coco_card-scanner-seg_v3i_coco-segmentation.jpg",
+    "records": [
+      "coco-0001809889362d0c60dc30e323fff8da7a645260ab542dde461f26b7d59c2a15",
+      "coco-0005f70cc6478d085363cce836a7ddf516a0d891a4db383f1133f791d4b6f3d9",
+      "coco-0008fb09373a4774af2e56ee572755aa4fe4d1e6e10007da99441d786d99870d",
+      "coco-001324c520385f32b0337f55fc2d87b08be08263b2b8d4b0d17c077699fd4344",
+      "coco-001c57d4c4dee26d2fea15b4a8e680eb622a5c8087ef416cc50502084f184518",
+      "coco-001d8a32217f9ece18610bb185718a07f61719a4ff0aa1eb89ccaef1799385a2"
+    ]
+  },
+  "coco:card-seg-j74w1.v3i.coco-segmentation": {
+    "panel": "coco_card-seg-j74w1_v3i_coco-segmentation.jpg",
+    "records": [
+      "coco-005bf58faa595ea07ff51d3ca0443de7c0135528e5af3f943cc3e45ee9c4145d",
+      "coco-00b48d562124d81c48142da163958e540e09c7a8790c76231d03558a8d966407",
+      "coco-00debbec3ba209305075e397c823bfedaeb49d54a2980088c91d6554880c6abd",
+      "coco-011b23eb0fce21ed68ede8ef1098d9cd906a4a60b95feb1d537dc7df772ce78a",
+      "coco-016c8387d04e8a84ce4f14f49655bfbbcd6f174132358969ff4e02bf10580ff6",
+      "coco-017312ae44fe28c0589c29750315b69e0139153419be607d0e1a91d8bb535103"
+    ]
+  },
+  "coco:card-segmentation-gldmt.v2i.coco-segmentation": {
+    "panel": "coco_card-segmentation-gldmt_v2i_coco-segmentation.jpg",
+    "records": [
+      "coco-0056c9ed1a5376c36447c6f0f0886c3c3276dce396dbb5748ea4d93baddad430",
+      "coco-02f06be34abd6881ae4f0a95f68928e78c141a9edf3f12cbc020d71a7c965827",
+      "coco-03b791a2912cfafd6048d6b45700beebf0809744cffd66a31028683774ed62c2",
+      "coco-03f0183235ea4269e5d4f4e44b46e55bcc8246b0950120b345817893bb269d80",
+      "coco-057feb5736f0b30b3a23a22c6a1d79aa0adc05f52dcfa837f531761c4a1ad62b",
+      "coco-05edfa798f8c9bbd0d4364ce48d942e1eba42c43ed0ec0006e04d81362411201"
+    ]
+  },
+  "coco:carddetection-hegxe.v7i.coco": {
+    "panel": "coco_carddetection-hegxe_v7i_coco.jpg",
+    "records": [
+      "coco-007f7c61db9b61813f5d1c14b9a077f678e3d230aafe86f0f4c8c9170ce4048c",
+      "coco-00c147dc5e33839035ad1d27b61ecad8a50a1bef6436099a2c9c23d267754e3d",
+      "coco-03451dc3b83ee8fdb2bcae178758aac67e745180b820f2d9988254e3628d27fe",
+      "coco-0567f0a0169d022675720bd668b180620e1ba411bdd262d3fa42b3080eb0f2d1",
+      "coco-05693d927c139d96b537c91ab78bc9be31e0e8e481e1521506cb192a43e1cd5e",
+      "coco-06539a8ba80a5f771d00f433d5d4864bd77048ad027acc62132e684393c3e20b"
+    ]
+  },
+  "coco:labelyolo.v4i.coco": {
+    "panel": "coco_labelyolo_v4i_coco.jpg",
+    "records": [
+      "coco-01cba12de30f14e5fcabe1b4be71c5083831bcda26c54d958e776c6cdbd79572",
+      "coco-044c29d03bf8c687eb99f9ae656f860031655434d8bcd67b2a6ad585d1543bbf",
+      "coco-0497335fc45c93021cd8041973a02d84d4ae8e6e2d8f3be8a8e889efb303b406",
+      "coco-05756183b32683332c916a48fbb4a795650176a50cf3fdd257d98741fb7d0ddc",
+      "coco-084383d60517379856f12a209f5f2d8b05ea7e207d5243e2f6d5b39535c43495",
+      "coco-0a20b9f7ee88301d8e805bae917da254f0ea8ffc3e81d2c0106801ae685197a6"
+    ]
+  },
+  "coco:mtg-rqful.v1i.coco": {
+    "panel": "coco_mtg-rqful_v1i_coco.jpg",
+    "records": [
+      "coco-000ef0db261977d38a6b7296a61e925c0c8ef99c07528a9ac2f0d3b7cf7d0229",
+      "coco-003d3b1a090194f0fd8aafb64008f5dcec9b868301be2a5682b36402e6783a5c",
+      "coco-0057805ae248c3606c37888d0ba6531ad7af67ff1b6d25b37ead718913e00a7f",
+      "coco-005fc596e8acf25d325e4cd9dd3d5129d5348d27ae3c7a16ff3aaf655b5f45c6",
+      "coco-006140a5b4579e2fac0f680e1fc1104f6908141c92dd1bdaebabb85e1700e140",
+      "coco-0085dd752d80bbc8d67de714848490d43ed76675cdc7beea8712d257a5741ad7"
+    ]
+  },
+  "coco:mtg-scanner-bughx.v4i.coco": {
+    "panel": "coco_mtg-scanner-bughx_v4i_coco.jpg",
+    "records": [
+      "coco-01e3fe9195322fbbe55994a4b94c61921447e31dd8875a3b6cbc0c530f5861f1",
+      "coco-0d02d2e9e83cf6b6ae397b62a0f3e8a9e6c1fdd8ab2935e9d3d71f032318eeb3",
+      "coco-0e67de240bd08629538fdf0cc40634563b6881c82871685158a48591da0d05c0",
+      "coco-17041f38dbf6c58d35a6024c47654d9bc915041a6d32592d1be628de3e6aa941",
+      "coco-199cac1a614cb1b180ea7402595bb9d1e26e811008a352db7d18299e580f29c6",
+      "coco-1af15422fe8367b7b81ae100bbbf306518073047f6ed60b2539ea2033206bca6"
+    ]
+  },
+  "coco:pk-detect.v3i.coco": {
+    "panel": "coco_pk-detect_v3i_coco.jpg",
+    "records": [
+      "coco-005ff234dd856fd0d5d2bfb099409f3b4e0100dcdaa0bd9cec566eacf205d9de",
+      "coco-008924e9d4e4ec9a2a70544362ae336be179474b541bc97d7a494cb3bf3fe992",
+      "coco-0815721648332fd2d78d4dba33432d16f7ae76e3a55c2a6247b204f560fd9e64",
+      "coco-0a91c9aaa6bfad49d4f1a5250ef1ecc2005041f87caca75994144001f14ad1fb",
+      "coco-0de3bb42f0ba386a8a4d0a730545f89cb038683aab20f3c0bf00321674e60bd3",
+      "coco-0ec0cb01f6a7bb6ab3e1cd35c887d9b705ed4e43468f0e9175be5b5a842ecb12"
+    ]
+  },
+  "coco:pokefolio.v1i.coco": {
+    "panel": "coco_pokefolio_v1i_coco.jpg",
+    "records": [
+      "coco-0087f2fc1dca0873d4c7bccff44aa0950d04ff26fe3324415e8b50d293e23477",
+      "coco-00fad13e7125c5dcf8bb7d32a0e333161d2540bbb81efd356e46e687ed2de0a7",
+      "coco-01456d52816031957b15aa99e9eec47f3b48e38b7cd3708ad5105143e8e0c0de",
+      "coco-01de79051c2c7ea574999310898e4f6b168b1111d8f97bc84e47f7e8e87ba207",
+      "coco-025a377172381730c1c676c0b346fee8e2edd65afa1ab54941e9b4fa1109eba8",
+      "coco-02607c138884e4a99aa3e157151d5285b0c630466a091f6a52d2ae2728054b2d"
+    ]
+  },
+  "coco:pokemon-card-outliner.v1i.coco-yolo": {
+    "panel": "coco_pokemon-card-outliner_v1i_coco-yolo.jpg",
+    "records": [
+      "coco-008c9b23a890bb8b5f9b8dc7d10c7dd8060e718833eea58ed8a7dd9256624e70",
+      "coco-0123c4d6e64342579ad6b3d9fbb71c528dab4e6e11ad54adfcef3efd6e9e0fd1",
+      "coco-02462109a66616cf434191f6e5828fc1b51050d1a0bffec52a83e5523be63b45",
+      "coco-030ce5446be3f7d4e1609072979b94c2c9fcf6c51989d3e929d1b1e3ac700cb9",
+      "coco-0399ce68659303fa45d4c4cc15eeb74468a2e4275a2ccb7e2b295fa0fb78e6b2",
+      "coco-03bd713d1582afc117edf1401725388898e3c6df1be4f01e1d4f60c779490e9e"
+    ]
+  },
+  "coco:pokemon_card_detector.v1-versie-1.coco": {
+    "panel": "coco_pokemon_card_detector_v1-versie-1_coco.jpg",
+    "records": [
+      "coco-002faf7947b5133bc565365998a631a5dfa8a912079b439ea798f06b6fccc3a5",
+      "coco-005b2d1ba63c2e20145a542451fc9822e978b9922dfcdf0315cce48d8566c1ef",
+      "coco-008f1b445fc6202e134c6761ac023263b3504e8138bd65811b5f1ab563baf674",
+      "coco-0090229c409f98ceec0d84327ec68cd2ee942aaaea88c2e310962f277a993023",
+      "coco-00a5cc89afb1f7d7041ed42f171aabbf0c48cf3302ccf4b8bea442e91b7f88a2",
+      "coco-01273449ce7f55fced5eeaea74a51dbd90674794727ec89320bb350440700a0f"
+    ]
+  }
+}

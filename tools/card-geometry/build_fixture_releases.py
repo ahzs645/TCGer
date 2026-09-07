@@ -337,6 +337,8 @@ def materialize(
         "evaluationSessionDenylist": release["evaluationSessionDenylist"],
         "records": entries,
     }
+    if "targetSemantics" in release:
+        manifest["targetSemantics"] = release["targetSemantics"]
     manifest["corpusHash"] = corpus_hash_override or corpus_hash(manifest)
     (root / MANIFEST_FILENAME).write_text(pretty_json(manifest), encoding="utf-8")
     return manifest
@@ -415,6 +417,52 @@ def build_invalid_record_schema(root: Path) -> None:
     materialize(root, release)
 
 
+FIXTURE_TARGET_SEMANTICS: dict[str, Any] = {
+    "contract": "canonical-primary-card-targets-v1",
+    "primaryCategories": ["card"],
+    "auxiliaryCategories": ["collection_region", "info_region", "inner_border", "title_region"],
+    "contextCategories": ["slab"],
+    "categoryContractSha256": sha256_bytes(b"fixture category contract"),
+}
+
+
+def _target_semantics_release(*, misclassified: bool) -> dict[str, Any]:
+    """A declared category contract with one real archive record.
+
+    The validation record becomes an archive record (no capture session) whose
+    source frame carried one card and one slab annotation. The valid variant
+    keeps the card as the only target; the invalid variant claims the slab was
+    the card, which is exactly the importer defect TARGET_SEMANTICS exists to
+    catch.
+    """
+    release = base_release()
+    release["releaseId"] = (
+        "invalid-target-semantics" if misclassified else "valid-target-semantics"
+    )
+    release["targetSemantics"] = copy.deepcopy(FIXTURE_TARGET_SEMANTICS)
+    # Archive records have no session, so the fixture policy must not demand one.
+    release["policy"]["requiredLeakageKeys"]["real"] = ["physicalCardIds"]
+    record = _record(release, "fx-validation-real-001")
+    record["grouping"] = {"sourceArchiveId": "fixture-canonical-archive"}
+    record["source"]["annotationCategories"] = {"card": 1, "slab": 1}
+    instance = record["instances"][0]
+    instance["container"] = "slab"
+    instance["sourceCategory"] = "slab" if misclassified else "card"
+    instance["sourceAnnotationIndex"] = 1 if misclassified else 0
+    instance["sourceProvenance"] = [
+        f"fixture-source:{instance['sourceCategory']}:1"
+    ]
+    return release
+
+
+def build_valid_target_semantics(root: Path) -> None:
+    materialize(root, _target_semantics_release(misclassified=False))
+
+
+def build_invalid_target_semantics(root: Path) -> None:
+    materialize(root, _target_semantics_release(misclassified=True))
+
+
 def build_empty_training(root: Path) -> None:
     release = base_release()
     release["releaseId"] = "empty-training-release"
@@ -475,6 +523,8 @@ BUILDERS = {
     "invalid-corpus-hash": build_invalid_corpus_hash,
     "invalid-denylist": build_invalid_denylist,
     "invalid-record-schema": build_invalid_record_schema,
+    "valid-target-semantics": build_valid_target_semantics,
+    "invalid-target-semantics": build_invalid_target_semantics,
     "empty-training": build_empty_training,
 }
 
@@ -493,6 +543,8 @@ EXPECTED_FAILED_CHECKS: dict[str, frozenset[str]] = {
     "invalid-corpus-hash": frozenset({"CORPUS_HASH"}),
     "invalid-denylist": frozenset({"EVAL_DENYLIST"}),
     "invalid-record-schema": frozenset({"RECORD_SCHEMA"}),
+    "valid-target-semantics": frozenset(),
+    "invalid-target-semantics": frozenset({"TARGET_SEMANTICS"}),
     "empty-training": frozenset({"READINESS_MINIMUMS"}),
 }
 
@@ -509,6 +561,8 @@ EXPECTED_READY_FOR: dict[str, str] = {
     "invalid-corpus-hash": "none",
     "invalid-denylist": "none",
     "invalid-record-schema": "none",
+    "valid-target-semantics": "tooling",
+    "invalid-target-semantics": "none",
     "empty-training": "none",
 }
 

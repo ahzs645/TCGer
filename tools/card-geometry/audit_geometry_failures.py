@@ -130,14 +130,14 @@ def run(args):
         if args.candidate == "yolo11s-pose" and sample["scope"] == "validation":
             variants.append("bgr-corrected")
         for variant in variants:
-            supplied = (
-                image
-                if variant == "frozen"
-                else Image.fromarray(np.asarray(image)[:, :, ::-1])
-            )
+            supplied = image
             if args.candidate == "yolox-pose":
                 raw = predictor.predict_yolox(supplied, w, h)
             else:
+                # The frozen (evaluation version 1) reports handed Ultralytics
+                # RGB arrays; the corrected variant uses the BGR contract that
+                # became the evaluator default in version 2.
+                predictor.yolo_input_color = "rgb" if variant == "frozen" else "bgr"
                 raw = predictor.predict_yolo(supplied, w, h)
             native = []
             for box, score in zip(captured["boxes"], captured["scores"]):

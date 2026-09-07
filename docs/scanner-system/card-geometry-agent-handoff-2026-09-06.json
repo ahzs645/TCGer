@@ -3,7 +3,7 @@
   "scope": "Card geometry training, evaluation, corpus repair and diagnostic review; not a complete app architecture handoff",
   "codeThrough": "b3134c60",
   "branch": "claude/tcg-card-recognition-review-fkwkvl",
-  "status": "Analysis complete; canonical category importer repair and successor corpus are NOT implemented. No new training is launched by this handoff.",
+  "status": "Analysis complete. Canonical category importer repair implemented and gated later on 2026-09-06 (TARGET_SEMANTICS preflight, policy v4); repaired real material recounted and shape-checked locally. Successor corpus is NOT frozen or published and no new training is launched.",
   "trainingCorpus": {
     "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
     "datasetRepo": "ahzs645/tcger-scanner-images",
@@ -1139,5 +1139,66 @@
         }
       }
     }
+  },
+  "categoryRepair": {
+    "record": "docs/scanner-system/benchmarks/2026-09-06-category-repair/README.md",
+    "categoryContract": {
+      "path": "tools/card-segmentation-data/source-config.json",
+      "sha256": "2b23dd188a641bdbfd751dcb6c8f176206aa803ed143f45a320189662d15e560"
+    },
+    "targetSemanticsContract": "canonical-primary-card-targets-v1",
+    "preflightCheck": "TARGET_SEMANTICS",
+    "policyV4": {
+      "path": "tools/card-geometry/policies/training-minimums-v4.json",
+      "sha256": "31c7649e571bfaeba23aab77ca1305cca40df7765a92c309d2bbc71a0d0505a7",
+      "changeFromV3": "requireTargetSemantics: true; count minimums unchanged"
+    },
+    "repairedRealCandidate": {
+      "localPath": ".artifacts/card-geometry/releases/real-geometry-category-repair-candidate-v1",
+      "releasePurpose": "smoke",
+      "published": false,
+      "corpusHash": "1dd3a9d86552c5c2d47fd54c0b37376bc3f89a2e45e9d9510f64375e841a5d7c",
+      "train": {
+        "records": 4465,
+        "cardTargets": 6281,
+        "trustedCorners": 2176,
+        "containerSlab": 235
+      },
+      "validation": {
+        "records": 1279,
+        "cardTargets": 1386,
+        "trustedCorners": 194
+      }
+    },
+    "frozenRoundTwoRealPortion": {
+      "train": {
+        "instances": 7030,
+        "trustedCorners": 2402
+      },
+      "validation": {
+        "instances": 1621,
+        "trustedCorners": 393
+      }
+    },
+    "v3PolicySimulation": {
+      "combinedWith": "synthetic-geometry-round-two-v1",
+      "corpusHash": "0d2e687f81d114085fb49315ae7f441cbf50379df53a29b4fb24a039a557de64",
+      "readyFor": "training",
+      "frozenExperiment": false
+    },
+    "evaluationContract": {
+      "version": 2,
+      "yolo11InputColor": "bgr",
+      "note": "version-1 reports remain as published"
+    },
+    "labelCropRecognitionReplay": {
+      "identifiedFrames": 11,
+      "correct": 4,
+      "abstain": 6,
+      "wrong": 1,
+      "matchesYolo11sModelCrops": true,
+      "pokemonIndexZeroNormVectors": 53
+    },
+    "trainingLaunched": false
   }
 }

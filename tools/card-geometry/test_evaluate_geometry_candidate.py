@@ -10,6 +10,7 @@ import numpy as np
 from PIL import Image
 
 from evaluate_geometry_candidate import (
+    EVALUATION_CONTRACT,
     AttributeDict,
     as_numpy,
     candidate_result,
@@ -34,6 +35,39 @@ class EvaluateGeometryCandidateTests(unittest.TestCase):
         with patch.dict(sys.modules, {'mmdet.apis':SimpleNamespace(inference_detector=infer)}):
             self.assertEqual(predictor.predict_yolox(Image.new('RGB',(2,2),(10,20,200)),2,2),[])
         np.testing.assert_array_equal(observed[0][0,0],[200,20,10])
+
+    def test_yolo11_numpy_input_matches_the_file_loader_color_order(self):
+        import cv2
+
+        observed = []
+
+        def predict(**kwargs):
+            observed.append(kwargs["source"].copy())
+            return [SimpleNamespace(keypoints=None, boxes=None)]
+
+        predictor = Predictor.__new__(Predictor)
+        predictor.model = SimpleNamespace(predict=predict)
+        predictor.resolution = 640
+        image = Image.new("RGB", (3, 2), (10, 20, 200))
+        image.putpixel((0, 0), (255, 0, 0))
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "frame.png"
+            image.save(source)
+            file_pixels = cv2.imread(str(source), cv2.IMREAD_COLOR)
+        self.assertEqual(EVALUATION_CONTRACT["version"], 2)
+        self.assertEqual(Predictor.yolo_input_color, "bgr")
+        self.assertEqual(predictor.predict_yolo(image, 3, 2), [])
+        # PIL, file and numpy paths now agree: the array is what cv2.imread returns.
+        np.testing.assert_array_equal(observed[0], file_pixels)
+        np.testing.assert_array_equal(observed[0][0, 0], [0, 0, 255])
+        self.assertTrue(observed[0].flags["C_CONTIGUOUS"])
+        # The frozen version-1 behaviour stays reproducible for diagnostics only.
+        predictor.yolo_input_color = "rgb"
+        predictor.predict_yolo(image, 3, 2)
+        np.testing.assert_array_equal(observed[1][0, 0], [255, 0, 0])
+        predictor.yolo_input_color = "grey"
+        with self.assertRaisesRegex(ValueError, "unknown yolo input color"):
+            predictor.predict_yolo(image, 3, 2)
 
     def test_array_pipeline_retains_transforms_without_mutating_labeled_metadata(self):
         pipeline = [dict(type='LoadImageFromFile', to_float32=True),

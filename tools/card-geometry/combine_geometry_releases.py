@@ -30,6 +30,9 @@ from corpus_release import (  # noqa: E402
 APPROVED_POLICY_ID = "training-minimums-v2"
 APPROVED_POLICY_SHA256 = "b86ce9823667212afdb0158113539a81c79e3a7cfe1509acea88f5afb186816d"
 ROUND_TWO_POLICY_SHA256 = "679dd02c8e6280f2043978e007ea16d9608eba9a0c74ea2766477b885c4e56da"
+# v4 keeps every v3 minimum and additionally requires verified whole-card
+# target semantics on every real archive record (TARGET_SEMANTICS).
+CATEGORY_REPAIR_POLICY_SHA256 = "31c7649e571bfaeba23aab77ca1305cca40df7765a92c309d2bbc71a0d0505a7"
 
 
 def link_or_copy(source: Path, destination: Path) -> str:
@@ -56,10 +59,13 @@ def combine(
     if errors:
         raise ValueError("invalid readiness policy:\n- " + "\n- ".join(errors))
     expected = {APPROVED_POLICY_ID: APPROVED_POLICY_SHA256,
-                "training-minimums-v3": ROUND_TWO_POLICY_SHA256}.get(policy.get("policyId"))
+                "training-minimums-v3": ROUND_TWO_POLICY_SHA256,
+                "training-minimums-v4": CATEGORY_REPAIR_POLICY_SHA256}.get(policy.get("policyId"))
     if expected is None or sha256_bytes(policy_bytes) != expected:
-        raise ValueError("training policy bytes do not match the frozen v2 or v3 hash")
-    round_two = policy["policyId"] == "training-minimums-v3"
+        raise ValueError("training policy bytes do not match the frozen v2, v3 or v4 hash")
+    # v4 follows the v3 assembly contract (pinned external evaluations, no
+    # embedded test records, provenance inventory, cross-release gate).
+    round_two = policy["policyId"] in {"training-minimums-v3", "training-minimums-v4"}
     if round_two and set(evaluation_releases or {}) != {"frozenReal", "syntheticMultigame"}:
         raise ValueError("v3 requires separately pinned frozenReal and syntheticMultigame evaluations")
     if round_two:
@@ -77,11 +83,21 @@ def combine(
     seen_records: set[str] = set()
     seen_paths: set[str] = {"policy.json", "manifest.json"}
     aliases: dict[str, str] = {}
+    target_semantics: dict[str, Any] | None = None
     for root in inputs:
-        for archive_id, canonical_id in load_json(root / "manifest.json")["sourceArchiveAliases"].items():
+        part = load_json(root / "manifest.json")
+        for archive_id, canonical_id in part["sourceArchiveAliases"].items():
             if archive_id in aliases and aliases[archive_id] != canonical_id:
                 raise ValueError(f"conflicting archive alias: {archive_id}")
             aliases[archive_id] = canonical_id
+        # A declared category contract travels with the combined corpus so the
+        # preflight can still verify every archive record's target provenance.
+        # Two parts may not disagree about which categories are whole cards.
+        declared = part.get("targetSemantics")
+        if declared is not None:
+            if target_semantics is not None and declared != target_semantics:
+                raise ValueError(f"conflicting targetSemantics in {part['releaseId']}")
+            target_semantics = declared
     for root in sorted((path.resolve() for path in inputs), key=str):
         manifest = load_json(root / "manifest.json")
         denylist.update(manifest["evaluationSessionDenylist"])
@@ -127,6 +143,8 @@ def combine(
         "sourceArchiveAliases": aliases,
         "records": sorted(entries, key=lambda entry: entry["recordId"]),
     }
+    if target_semantics is not None:
+        manifest["targetSemantics"] = target_semantics
     manifest["corpusHash"] = corpus_hash(manifest)
     if round_two:
         from corpus_release import canonical_json

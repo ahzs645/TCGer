@@ -4,7 +4,7 @@
 
 This handoff covers the recent card-outline training, corpus/tooling repairs, benchmarks and failure analysis. It is current through **`b3134c60`** on branch **`claude/tcg-card-recognition-review-fkwkvl`**. It does not replace the [scanner architecture index](README.md) for the broader app, catalog and per-game recognition system.
 
-**Current conclusion:** the experiments and diagnosis are complete, but the candidate models are not ready for promotion. A confirmed importer defect trained on slabs and card subregions as if they were whole cards. **That defect has been diagnosed and quantified, NOT repaired yet.** The next agent should repair that boundary and validate the corrected training material before preparing another frozen experiment. Do not restart the same old run, claim a new corpus exists, or ask the user to relabel hundreds of evaluation frames.
+**Current conclusion:** the experiments and diagnosis are complete, but the candidate models are not ready for promotion. A confirmed importer defect trained on slabs and card subregions as if they were whole cards. **Update, later on 2026-09-06: that import boundary is now repaired, fixture-tested and gated by a new `TARGET_SEMANTICS` preflight check; the repaired material has been recounted and shape-checked against policy, but no successor corpus has been frozen, published or trained.** Read the [category repair record](benchmarks/2026-09-06-category-repair/README.md) first. Do not restart the same old run, claim a frozen successor exists, or ask the user to relabel hundreds of evaluation frames.
 
 Read these next:
 
@@ -56,6 +56,7 @@ Keep these requirements:
 | YOLO11s color probe | Existing numpy input is RGB where Ultralytics expects BGR. Validation-only corrected variant checked against PIL input. | PIL/BGR parity passed. Real-validation IoU .50/.75/.90 counts stayed **31/27/13**; not the main explanation. **Default YOLO11 adapter has not been changed yet.** |
 | Human review interface | User offered to compare models in a familiar four-corner editor. Built side-by-side stages, crop previews, optional corner edits and durable review journal. | [Viewer instructions](benchmarks/2026-09-06-real-failure-audit/README.md). User then asked the agent to analyze instead. Do not ask them to redraw existing evaluation labels. |
 | Completed automatic + visual analysis | Traced misses and canonical categories; inspected binder, duel, crops and real training examples. | `b3134c60`; [analysis](benchmarks/2026-09-06-real-failure-audit/ANALYSIS.md). **Category defect identified, not fixed.** |
+| Category import repair | Importer filtered to canonical `card`; slabs/regions counted, slab sets `container`; per-instance provenance; `targetSemantics` manifest declaration; `TARGET_SEMANTICS` preflight check; policy v4; YOLO11 BGR evaluation contract v2; label-crop recognition replay. | [Repair record](benchmarks/2026-09-06-category-repair/README.md). Repaired real candidate: train 6,281 cards / 2,176 trusted corners, validation 1,386 / 194; audit aligned 5,744/5,744 records with zero misclassified targets; v3 minimums still pass on a local combined shape. Label crops give the same 4 / 6 / 1 recognition outcome as YOLO11s model crops, so recognition, not geometry, caps those frames. **Not frozen, not published, not trained.** |
 
 ## What we have been using
 
@@ -131,7 +132,7 @@ Recognition denominator correction: of 57 replay frames, **11 have verified iden
 
 ## Confirmed new defect versus hypotheses
 
-**Confirmed:** `build_real_smoke_release.add_canonical_archive` sends all `row.annotations` to `_mask_instance`, which emits `detectionClass: card`, `container: unknown`. The canonical builder and source config preserved category distinctions correctly; the geometry importer lost them.
+**Confirmed:** `build_real_smoke_release.add_canonical_archive` sent all `row.annotations` to `_mask_instance`, which emitted `detectionClass: card`, `container: unknown`. The canonical builder and source config preserved category distinctions correctly; the geometry importer lost them. **Repaired later the same day**; the trace below describes the frozen round-two release, which is unchanged.
 
 Trace on the frozen training release:
 
@@ -223,4 +224,4 @@ Important code map: `corpus_release.py` / `preflight.py` enforce release integri
 
 ## First action for the next agent
 
-Read the category audit and importer, write a mixed-category regression fixture, and repair the import boundary. Keep the old corpus and benchmarks untouched. Recompute what the repair changes before planning a successor release. There is no outstanding reason to wait for the user to compare these same images.
+The import boundary is repaired and gated (see the [category repair record](benchmarks/2026-09-06-category-repair/README.md)); path-forward step 1 is done and step 3's adapter and label-crop diagnostics are done. Next: decide the real-scene corner supervision question for TRAIN binder/sleeve/multi-card sources (step 2), then recompute archive assignments, exact and perceptual leakage, background provenance and the near-duplicate audit against the current evaluation releases, bind `training-minimums-v4`, and freeze the successor corpus and configuration before any result (step 4). The repaired candidate under `.artifacts/card-geometry/releases/real-geometry-category-repair-candidate-v1` is a local smoke build, not a published input; rebuild or publish it from the recorded commands with a receipt. Separately, check the recognition encoder/index findings (wrong-family accept from a human label crop; 53 zero-norm Pokémon index vectors) before interpreting any recognition replay. Keep the old corpus and benchmarks untouched. There is no outstanding reason to wait for the user to compare these same images.

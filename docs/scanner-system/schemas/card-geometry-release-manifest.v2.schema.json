@@ -79,6 +79,35 @@
       "items": { "$ref": "#/$defs/id" },
       "uniqueItems": true
     },
+    "targetSemantics": {
+      "description": "Declares which canonical source categories may become whole-card geometry targets. When present, preflight TARGET_SEMANTICS requires every real archive record to carry per-instance sourceCategory/sourceAnnotationIndex provenance from a primary category and a source.annotationCategories count whose primary total equals the instance count. Absent only on legacy releases built before the category-aware importer; a policy may set requireTargetSemantics to forbid that. Covered by corpusHash.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "primaryCategories", "auxiliaryCategories", "contextCategories", "categoryContractSha256"],
+      "properties": {
+        "contract": { "const": "canonical-primary-card-targets-v1" },
+        "primaryCategories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "auxiliaryCategories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "contextCategories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "categoryContractSha256": {
+          "description": "SHA-256 of the canonical category contract file (tools/card-segmentation-data/source-config.json) the importer read.",
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
     "records": {
       "type": "array",
       "items": { "$ref": "#/$defs/recordEntry" }

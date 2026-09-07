@@ -91,7 +91,13 @@
         "width": { "type": "integer", "minimum": 1 },
         "height": { "type": "integer", "minimum": 1 },
         "licenseId": { "type": "string", "minLength": 1, "maxLength": 160 },
-        "licenseUrl": { "type": "string", "format": "uri", "maxLength": 2048 }
+        "licenseUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "annotationCategories": {
+          "description": "Count of every canonical source annotation on this frame by canonical category, including auxiliary and context annotations (inner borders, title/info/collection regions, slabs) that deliberately did not become geometry targets. Emitted by the category-aware archive importer; absent on legacy and non-archive records. Preflight TARGET_SEMANTICS requires the primary-category total to equal the number of instances.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
       }
     },
     "grouping": {
@@ -213,7 +219,22 @@
         },
         "occlusionOrder": { "type": "integer", "minimum": 0 },
         "physicalCardId": { "$ref": "#/$defs/id" },
-        "sourceAssetId": { "$ref": "#/$defs/id" }
+        "sourceAssetId": { "$ref": "#/$defs/id" },
+        "sourceCategory": {
+          "description": "Canonical category of the source annotation this whole-card target came from. A geometry target may only come from a primary (whole-card) category; auxiliary regions and context objects are counted in source.annotationCategories instead of becoming instances.",
+          "$ref": "#/$defs/id"
+        },
+        "sourceAnnotationIndex": {
+          "description": "Zero-based index of the source annotation in the canonical record's annotation list. Lets an audit align this instance with canonical provenance exactly instead of inferring alignment from ordering.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "sourceProvenance": {
+          "description": "Canonical provenance strings (`source:category:rawAnnotationId`) of the source annotation.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+        }
       }
     },
     "pixelMargins": {

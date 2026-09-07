@@ -23,6 +23,18 @@ from train_yolo_pose import load_json, sha256_file
 
 
 CONTEXT_MARGIN = {"left": 192, "top": 192, "right": 192, "bottom": 192}
+# Version 1 handed Ultralytics an RGB numpy array although its numpy input
+# contract is BGR (the file loader is OpenCV). Version 2 flips to BGR, matching
+# what `YOLO.predict` sees for a file or PIL input. Original v1 reports stay as
+# published; a re-evaluation must declare a new experiment with this version.
+EVALUATION_CONTRACT = {
+    "version": 2,
+    "yolo11InputColor": "bgr",
+    "yoloxInputColor": "bgr",
+    "fastvitInputColor": "rgb",
+    "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+}
+YOLO_INPUT_COLORS = ("bgr", "rgb")
 DECODER_CONFIG = {
     "minimumConfidence": 0.05,
     "minimumQuadArea": 0.001,
@@ -146,6 +158,11 @@ def candidate_result(
 
 
 class Predictor:
+    # Color order of the numpy array handed to Ultralytics. "bgr" is the
+    # correct contract (evaluation version 2); "rgb" reproduces the frozen
+    # version-1 behaviour for diagnostics only.
+    yolo_input_color = "bgr"
+
     def __init__(self, candidate: str, output: Path, artifact_sha256: str, resolution: int, device: str = "cuda") -> None:
         self.device = device
         self.candidate = candidate
@@ -180,9 +197,19 @@ class Predictor:
             configure_yolox_test(self.model)
             self.yolox_pipeline = Compose(yolox_array_pipeline(self.model.cfg.inference_pipeline))
 
+    def yolo_pixels(self, image: Image.Image) -> np.ndarray:
+        """Numpy input for Ultralytics in the declared color order."""
+        if self.yolo_input_color not in YOLO_INPUT_COLORS:
+            raise ValueError(f"unknown yolo input color {self.yolo_input_color!r}")
+        pixels = np.asarray(image.convert("RGB"))
+        if self.yolo_input_color == "bgr":
+            # Ultralytics treats numpy input as BGR, like its OpenCV file loader.
+            pixels = pixels[:, :, ::-1]
+        return np.ascontiguousarray(pixels)
+
     def predict_yolo(self, image: Image.Image, width: int, height: int) -> list[dict[str, Any]]:
         result = self.model.predict(
-            source=np.asarray(image),
+            source=self.yolo_pixels(image),
             imgsz=self.resolution,
             conf=0.01,
             iou=0.99,
@@ -554,6 +581,7 @@ def evaluate(candidate: str) -> dict[str, Any]:
         "candidate": candidate,
         "checkpointSha256": checkpoint_sha,
         "decoderConfig": DECODER_CONFIG,
+        "evaluationContract": EVALUATION_CONTRACT,
         "evaluations": results,
     }
     (evaluation_dir / "evaluation-summary.json").write_text(

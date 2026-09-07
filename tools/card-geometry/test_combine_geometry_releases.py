@@ -25,6 +25,28 @@ class CombineGeometryReleasesTests(unittest.TestCase):
                 combine(inputs=[RELEASES_DIR / "valid-fixture"], output=root / "test",
                         release_id="v3", policy_path=policy, evaluation_releases=evaluations)
 
+    def test_v4_policy_is_pinned_and_requires_target_semantics(self):
+        from corpus_release import sha256_file
+        from combine_geometry_releases import CATEGORY_REPAIR_POLICY_SHA256, ROUND_TWO_POLICY_SHA256
+
+        v3 = load_json(ROOT / "policies" / "training-minimums-v3.json")
+        v4_path = ROOT / "policies" / "training-minimums-v4.json"
+        v4 = load_json(v4_path)
+        self.assertEqual(sha256_file(v4_path), CATEGORY_REPAIR_POLICY_SHA256)
+        self.assertEqual(sha256_file(ROOT / "policies" / "training-minimums-v3.json"), ROUND_TWO_POLICY_SHA256)
+        self.assertTrue(v4["requireTargetSemantics"])
+        self.assertNotIn("requireTargetSemantics", v3)
+        # Count minimums are unchanged: v4 only adds the semantic requirement.
+        for key in ("minimumRecordsPerSplit", "minimumInstancesPerSplit",
+                    "minimumMetricEligibleInstances", "requiredSceneSlices",
+                    "requiredLeakageKeys", "metricEligibleCornerSources", "allowedSourceTiers"):
+            self.assertEqual(v4[key], v3[key], key)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaisesRegex(ValueError, "separately pinned"):
+                combine(inputs=[RELEASES_DIR / "valid-target-semantics"], output=root / "missing",
+                        release_id="v4", policy_path=v4_path)
+
     def test_link_or_copy_preserves_exact_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -72,6 +94,33 @@ class CombineGeometryReleasesTests(unittest.TestCase):
                     inputs=[RELEASES_DIR / "valid-fixture", other],
                     output=root / "combined", release_id="conflict",
                     policy_path=ROOT / "policies" / "training-minimums-v2.json",
+                )
+
+    def test_target_semantics_travel_with_the_combined_corpus(self):
+        policy = ROOT / "policies" / "training-minimums-v2.json"
+        declared = load_json(RELEASES_DIR / "valid-target-semantics" / "manifest.json")["targetSemantics"]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = combine(
+                inputs=[RELEASES_DIR / "valid-target-semantics"],
+                output=root / "combined", release_id="semantics", policy_path=policy,
+            )
+            self.assertEqual(manifest["targetSemantics"], declared)
+            legacy = combine(
+                inputs=[RELEASES_DIR / "valid-fixture"],
+                output=root / "legacy", release_id="legacy", policy_path=policy,
+            )
+            self.assertNotIn("targetSemantics", legacy)
+            other = root / "other"
+            shutil.copytree(RELEASES_DIR / "valid-target-semantics", other)
+            conflicting = load_json(other / "manifest.json")
+            conflicting["releaseId"] = "other-semantics"
+            conflicting["targetSemantics"]["contextCategories"] = []
+            write_json(other / "manifest.json", conflicting)
+            with self.assertRaisesRegex(ValueError, "conflicting targetSemantics"):
+                combine(
+                    inputs=[RELEASES_DIR / "valid-target-semantics", other],
+                    output=root / "conflict", release_id="conflict", policy_path=policy,
                 )
 
 

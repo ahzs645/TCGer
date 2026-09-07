@@ -2,6 +2,15 @@
 
 The adapter intentionally has a narrow trust boundary:
 
+* only canonical annotations whose category has the `primary` role in the
+  category contract (`tools/card-segmentation-data/source-config.json`) become
+  whole-card geometry targets. `auxiliary` regions (inner borders, title,
+  information and collection regions) and `context` objects (slabs) are counted
+  in `source.annotationCategories` and never become instances; a slab that
+  encloses a card only sets that card's `container`. Unknown or missing
+  categories fail the build instead of being guessed. Every emitted instance
+  records its `sourceCategory` and `sourceAnnotationIndex`, and the manifest
+  declares the `targetSemantics` contract so preflight can verify the boundary;
 * standardized COCO `source-polygon` and `source-rle` annotations contribute
   visible masks; `bbox-derived` annotations retain boxes with unknown corners;
 * a polygon contributes `maskFit` corners only when an explicit conservative
@@ -63,6 +72,50 @@ MULTI_INSTANCE_SCHEMA = (
     Path(__file__).resolve().parents[2]
     / "docs/scanner-system/schemas/card-geometry-manual-multi-instance-labels.v1.schema.json"
 )
+CATEGORY_CONTRACT_PATH = (
+    Path(__file__).resolve().parents[1] / "card-segmentation-data" / "source-config.json"
+)
+CATEGORY_ROLES = ("primary", "auxiliary", "context")
+TARGET_SEMANTICS_CONTRACT = "canonical-primary-card-targets-v1"
+# A slab annotation encloses a card when the card box lies inside the slab box
+# within this normalized tolerance on every side.
+SLAB_CONTAINMENT_TOLERANCE = 0.02
+
+
+def load_category_contract(path: Path = CATEGORY_CONTRACT_PATH) -> dict[str, Any]:
+    """Read the canonical category roles that decide what becomes a card target.
+
+    The canonicalizer already resolved every raw source label into one of these
+    canonical categories. This adapter must not re-interpret them: `primary`
+    categories are whole cards, `auxiliary` categories are card subregions and
+    `context` categories are objects that hold cards.
+    """
+    data = path.read_bytes()
+    document = json.loads(data)
+    roles: dict[str, str] = {}
+    for item in document.get("canonicalCategories", []):
+        name = item.get("name") if isinstance(item, dict) else None
+        role = item.get("role") if isinstance(item, dict) else None
+        if not isinstance(name, str) or role not in CATEGORY_ROLES:
+            raise ValueError(f"invalid canonical category entry in {path}: {item!r}")
+        if name in roles:
+            raise ValueError(f"duplicate canonical category {name!r} in {path}")
+        roles[name] = role
+    if "card" not in roles or roles["card"] != "primary":
+        raise ValueError(f"category contract {path} does not declare `card` as primary")
+    return {"path": path, "sha256": sha256_bytes(data), "roles": roles}
+
+
+def target_semantics(contract: dict[str, Any]) -> dict[str, Any]:
+    """Manifest declaration preflight verifies against every archive record."""
+    roles = contract["roles"]
+    return {
+        "contract": TARGET_SEMANTICS_CONTRACT,
+        "primaryCategories": sorted(n for n, r in roles.items() if r == "primary"),
+        "auxiliaryCategories": sorted(n for n, r in roles.items() if r == "auxiliary"),
+        "contextCategories": sorted(n for n, r in roles.items() if r == "context"),
+        "categoryContractSha256": contract["sha256"],
+    }
 
 
 def _json_lines(path: Path) -> Iterable[dict[str, Any]]:
@@ -210,11 +263,13 @@ def _unknown_corners() -> list[dict[str, Any]]:
     return [dict(corner) for corner in UNKNOWN_CORNERS]
 
 
-def _mask_instance(
-    annotation: dict[str, Any], index: int, width: int, height: int, stats: Counter
-) -> dict[str, Any] | None:
-    quality = annotation.get("geometryQuality")
-    visible_mask, polygon = _annotation_mask(annotation, width, height)
+def _annotation_box(
+    annotation: dict[str, Any],
+    polygon: list[tuple[float, float]],
+    width: int,
+    height: int,
+) -> dict[str, float] | None:
+    """Normalized extent of an annotation from its bbox, else its polygon."""
     box = None
     raw_box = annotation.get("bbox")
     if isinstance(raw_box, list) and len(raw_box) == 4:
@@ -228,6 +283,27 @@ def _mask_instance(
                "right": min(1.0, max(p[0] for p in polygon) / width),
                "bottom": min(1.0, max(p[1] for p in polygon) / height)}
     if box is None or box["right"] <= box["left"] or box["bottom"] <= box["top"]:
+        return None
+    return box
+
+
+def _box_inside(inner: dict[str, float], outer: dict[str, float]) -> bool:
+    tolerance = SLAB_CONTAINMENT_TOLERANCE
+    return (
+        inner["left"] >= outer["left"] - tolerance
+        and inner["top"] >= outer["top"] - tolerance
+        and inner["right"] <= outer["right"] + tolerance
+        and inner["bottom"] <= outer["bottom"] + tolerance
+    )
+
+
+def _mask_instance(
+    annotation: dict[str, Any], index: int, width: int, height: int, stats: Counter
+) -> dict[str, Any] | None:
+    quality = annotation.get("geometryQuality")
+    visible_mask, polygon = _annotation_mask(annotation, width, height)
+    box = _annotation_box(annotation, polygon, width, height)
+    if box is None:
         stats["instancesMissingBox"] += 1
         return None
     corners = _unknown_corners()
@@ -350,6 +426,62 @@ def _shippable_source_license(row: dict[str, Any]) -> str:
     return license_id
 
 
+def _card_instances(
+    row: dict[str, Any], roles: dict[str, str], stats: Counter
+) -> tuple[list[dict[str, Any]], Counter] | None:
+    """Whole-card targets of one canonical record, or None to exclude the image.
+
+    Every annotation is classified through the category contract before any
+    geometry is read. Auxiliary and context annotations are counted but never
+    become instances, and a missing box on them cannot exclude the image; a
+    primary annotation without a usable box still excludes the whole image so a
+    visible card never becomes an unlabeled negative.
+    """
+    width, height = int(row["width"]), int(row["height"])
+    annotations = row.get("annotations", [])
+    categories: Counter = Counter()
+    for index, annotation in enumerate(annotations):
+        category = annotation.get("category") if isinstance(annotation, dict) else None
+        if not isinstance(category, str) or category not in roles:
+            raise ValueError(
+                f"canonical record {row.get('id')} annotation {index} has unknown "
+                f"category {category!r}; extend the category contract instead of guessing"
+            )
+        categories[category] += 1
+    slab_boxes = []
+    for annotation in annotations:
+        if roles[annotation["category"]] != "context":
+            continue
+        _, polygon = _annotation_mask(annotation, width, height)
+        slab_box = _annotation_box(annotation, polygon, width, height)
+        if slab_box is None:
+            stats["contextAnnotationsWithoutBox"] += 1
+        elif annotation["category"] == "slab":
+            slab_boxes.append(slab_box)
+    instances: list[dict[str, Any]] = []
+    for index, annotation in enumerate(annotations):
+        category = annotation["category"]
+        role = roles[category]
+        if role != "primary":
+            stats[f"annotationsNotTargets:{role}:{category}"] += 1
+            continue
+        instance = _mask_instance(annotation, len(instances), width, height, stats)
+        if instance is None:
+            return None
+        instance["sourceCategory"] = category
+        instance["sourceAnnotationIndex"] = index
+        provenance = annotation.get("provenance")
+        if isinstance(provenance, list) and provenance:
+            instance["sourceProvenance"] = sorted(
+                {str(value) for value in provenance if isinstance(value, str) and value}
+            )
+        if any(_box_inside(instance["box"], slab) for slab in slab_boxes):
+            instance["container"] = "slab"
+            stats["cardsInsideSlab"] += 1
+        instances.append(instance)
+    return instances, categories
+
+
 def add_canonical_archive(
     *,
     root: Path,
@@ -358,7 +490,9 @@ def add_canonical_archive(
     split: str,
     stats: Counter,
     max_records: int | None = None,
+    contract: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    roles = (contract or load_category_contract())["roles"]
     entries = []
     source_archive_id = _safe_id(f"coco:{archive_path.stem}")
     with zipfile.ZipFile(archive_path) as archive:
@@ -369,20 +503,21 @@ def add_canonical_archive(
                 selected_rows
             )
         for row in selected_rows:
-            instances = []
-            for index, annotation in enumerate(row.get("annotations", [])):
-                instance = _mask_instance(
-                    annotation, index, int(row["width"]), int(row["height"]), stats
-                )
-                if instance:
-                    instances.append(instance)
-            if len(instances) != len(row.get("annotations", [])):
-                stats["recordsExcludedMissingBox"] += 1
-                continue
-            if not instances:
+            if not row.get("annotations"):
                 stats["recordsExcludedNoGeometry"] += 1
                 continue
+            selected = _card_instances(row, roles, stats)
+            if selected is None:
+                stats["recordsExcludedMissingBox"] += 1
+                continue
+            instances, categories = selected
+            if not instances:
+                stats["recordsExcludedNoCardAnnotations"] += 1
+                continue
             stats["canonicalInstancesRetained"] += len(instances)
+            stats["canonicalCardAnnotationsRetained"] += len(instances)
+            if len(instances) > 1:
+                stats["recordsWithMultipleCards"] += 1
             image_bytes = archive.read(row["imageMember"])
             image_hash = sha256_bytes(image_bytes)
             if image_hash != row["sha256"]:
@@ -399,6 +534,7 @@ def add_canonical_archive(
                     "kind": "real",
                     "width": dimensions[0],
                     "height": dimensions[1],
+                    "annotationCategories": dict(sorted(categories.items())),
                 },
                 "grouping": {
                     "sourceArchiveId": source_archive_id,
@@ -762,8 +898,10 @@ def build_release(
     multi_instance_label_files: list[Path] | None = None,
     release_id: str = "real-geometry-ingestion-smoke-v1",
     source_archive_aliases: dict[str, str] | None = None,
+    category_contract: Path = CATEGORY_CONTRACT_PATH,
 ) -> dict[str, Any]:
     _validate_archive_splits(archive_splits)
+    contract = load_category_contract(category_contract)
     # Known archive identities are explicit. Additional archives/re-exports
     # require a reviewed table; do not silently declare unknown sources unique.
     canonical_fork = "coco:card-seg-j74w1.v3i.coco-segmentation"
@@ -803,6 +941,7 @@ def build_release(
                 split=archive_splits[archive_name],
                 stats=stats,
                 max_records=max_records_per_archive,
+                contract=contract,
             )
         )
     denylist: set[str] = set()
@@ -855,6 +994,7 @@ def build_release(
         "splitAssignment": {"method": "whole-source-archive-explicit-v1", "seed": 0},
         "evaluationSessionDenylist": sorted(denylist),
         "sourceArchiveAliases": aliases,
+        "targetSemantics": target_semantics(contract),
         "records": sorted(entries, key=lambda entry: entry["recordId"]),
     }
     manifest["corpusHash"] = corpus_hash(manifest)
@@ -863,6 +1003,11 @@ def build_release(
         "release": str(output),
         "corpusHash": manifest["corpusHash"],
         "policySha256": manifest["readiness"]["readinessPolicySha256"],
+        "categoryContract": {
+            "path": str(contract["path"]),
+            "sha256": contract["sha256"],
+            "roles": dict(sorted(contract["roles"].items())),
+        },
         "records": len(entries),
         "instances": stats["canonicalInstancesRetained"]
         + stats["devmodeQuadRecords"]
@@ -933,6 +1078,10 @@ def main() -> int:
         "--source-archive-aliases", type=Path,
         help="JSON object mapping record sourceArchiveId values to canonical IDs; required for archives beyond the built-in TCGX and card-seg fork mapping",
     )
+    parser.add_argument(
+        "--category-contract", type=Path, default=CATEGORY_CONTRACT_PATH,
+        help="canonical category contract whose `primary` categories become card targets",
+    )
     args = parser.parse_args()
     archive_splits = dict(args.archive_split or [(DEFAULT_TCGX_ARCHIVE, "test")])
     if args.max_records_per_archive is not None and args.max_records_per_archive < 1:
@@ -949,6 +1098,7 @@ def main() -> int:
         multi_instance_label_files=args.multi_instance_labels,
         release_id=args.release_id,
         source_archive_aliases=load_json(args.source_archive_aliases) if args.source_archive_aliases else None,
+        category_contract=args.category_contract,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

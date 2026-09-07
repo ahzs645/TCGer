@@ -85,6 +85,7 @@ CHECK_ORDER = (
     "RECORD_HASH",
     "IMAGE_HASH",
     "MANIFEST_RECORD_CONSISTENCY",
+    "TARGET_SEMANTICS",
     "LEAKAGE_KEYS_PRESENT",
     "LEAKAGE_DISJOINT",
     "EVAL_DENYLIST",
@@ -466,6 +467,158 @@ def _entries_with_records(
     return [
         (entry, ctx.records.get(entry["recordId"])) for entry in ctx.manifest["records"]
     ]
+
+
+PROVENANCE_INSTANCE_KEYS = ("sourceCategory", "sourceAnnotationIndex", "sourceProvenance")
+
+
+def _record_category_problems(
+    entry: dict[str, Any],
+    record: dict[str, Any],
+    semantics: dict[str, Any],
+) -> list[str]:
+    """Why one real archive record violates the declared target semantics."""
+    primary = set(semantics["primaryCategories"])
+    allowed = primary | set(semantics["auxiliaryCategories"]) | set(semantics["contextCategories"])
+    problems: list[str] = []
+    categories = record.get("source", {}).get("annotationCategories")
+    instances = record.get("instances", [])
+    if not isinstance(categories, dict):
+        problems.append("source.annotationCategories is missing")
+        categories = None
+    else:
+        unknown = sorted(set(categories) - allowed)
+        if unknown:
+            problems.append(f"undeclared source categories: {unknown}")
+        primary_total = sum(
+            count for name, count in categories.items() if name in primary
+        )
+        if primary_total != len(instances):
+            problems.append(
+                f"{len(instances)} instances but {primary_total} primary-category annotations"
+            )
+    indices: set[int] = set()
+    total_annotations = sum(categories.values()) if categories else None
+    for instance in instances:
+        if not isinstance(instance, dict):
+            continue
+        label = instance.get("instanceId", "<instance>")
+        category = instance.get("sourceCategory")
+        if category not in primary:
+            problems.append(f"{label}: sourceCategory {category!r} is not a primary category")
+        index = instance.get("sourceAnnotationIndex")
+        if not isinstance(index, int) or isinstance(index, bool):
+            problems.append(f"{label}: sourceAnnotationIndex is missing")
+        elif index in indices:
+            problems.append(f"{label}: duplicate sourceAnnotationIndex {index}")
+        else:
+            indices.add(index)
+            if total_annotations is not None and index >= total_annotations:
+                problems.append(
+                    f"{label}: sourceAnnotationIndex {index} exceeds {total_annotations} annotations"
+                )
+    return problems
+
+
+def check_target_semantics(ctx: Context) -> None:
+    """Verify whole-card target provenance against the declared category contract.
+
+    Hashes and counts cannot tell a slab or a title region from a card. When a
+    manifest declares `targetSemantics`, every real archive record (real source,
+    no capture session) must carry per-instance primary-category provenance and
+    a category count that accounts for every source annotation. Records from a
+    legacy importer carry no such fields; a policy with `requireTargetSemantics`
+    refuses them outright.
+    """
+    if not ctx.manifest_valid:
+        ctx.add("TARGET_SEMANTICS", SKIP, "manifest invalid")
+        return
+    assert ctx.manifest is not None
+    semantics = ctx.manifest.get("targetSemantics")
+    required = bool(ctx.policy_valid and ctx.policy and ctx.policy.get("requireTargetSemantics"))
+    failures: dict[str, list[str]] = {}
+    if semantics is not None:
+        role_sets = [
+            set(semantics["primaryCategories"]),
+            set(semantics["auxiliaryCategories"]),
+            set(semantics["contextCategories"]),
+        ]
+        if sum(len(item) for item in role_sets) != len(set().union(*role_sets)):
+            failures["<manifest>"] = ["a category is declared under more than one role"]
+    checked = 0
+    for entry, record in _entries_with_records(ctx):
+        if not isinstance(record, dict):
+            continue
+        record_id = entry["recordId"]
+        instances = record.get("instances", [])
+        carries_provenance = isinstance(
+            record.get("source", {}).get("annotationCategories"), dict
+        ) or any(
+            isinstance(instance, dict) and any(key in instance for key in PROVENANCE_INSTANCE_KEYS)
+            for instance in instances
+        )
+        keys = entry["leakageKeys"]
+        archive_record = keys["sourceKind"] == "real" and not keys.get("sessionId")
+        if semantics is None:
+            if carries_provenance:
+                failures[record_id] = [
+                    "record carries category provenance but the manifest declares no targetSemantics"
+                ]
+            continue
+        if not archive_record:
+            if carries_provenance:
+                failures[record_id] = [
+                    "category provenance is defined only for real archive records"
+                ]
+            continue
+        checked += 1
+        problems = _record_category_problems(entry, record, semantics)
+        if problems:
+            failures[record_id] = problems
+    details = {
+        "declared": semantics,
+        "requiredByPolicy": required,
+        "archiveRecordsChecked": checked,
+    }
+    if semantics is None:
+        if required:
+            ctx.add(
+                "TARGET_SEMANTICS",
+                FAIL,
+                "policy requires a targetSemantics declaration but the manifest has none",
+                failures=failures,
+                **details,
+            )
+        elif failures:
+            ctx.add(
+                "TARGET_SEMANTICS",
+                FAIL,
+                f"{len(failures)} records carry category provenance without a declared contract",
+                failures=failures,
+                **details,
+            )
+        else:
+            ctx.add(
+                "TARGET_SEMANTICS",
+                SKIP,
+                "manifest declares no target-semantics contract (legacy importer); category provenance not verified",
+                **details,
+            )
+    elif failures:
+        ctx.add(
+            "TARGET_SEMANTICS",
+            FAIL,
+            f"{len(failures)} records violate the declared whole-card target semantics",
+            failures=failures,
+            **details,
+        )
+    else:
+        ctx.add(
+            "TARGET_SEMANTICS",
+            PASS,
+            f"all {checked} real archive records carry primary-category target provenance",
+            **details,
+        )
 
 
 def check_leakage(ctx: Context) -> None:
@@ -970,6 +1123,7 @@ def run_preflight(
     check_policy(ctx)
     check_corpus_hash(ctx)
     check_records(ctx)
+    check_target_semantics(ctx)
     check_leakage(ctx)
     check_shared_fixtures(ctx)
     counts = corner_counts(ctx)

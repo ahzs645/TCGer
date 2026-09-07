@@ -1,0 +1,45 @@
+{
+  "corpusHash": "1dd3a9d86552c5c2d47fd54c0b37376bc3f89a2e45e9d9510f64375e841a5d7c",
+  "canonicalSha256": "aaf98c7f4c81bf36948dda98db905140bd785e964af9980a1d82aef2f905c2c6",
+  "targetSemantics": {
+    "auxiliaryCategories": [
+      "collection_region",
+      "info_region",
+      "inner_border",
+      "title_region"
+    ],
+    "categoryContractSha256": "2b23dd188a641bdbfd751dcb6c8f176206aa803ed143f45a320189662d15e560",
+    "contextCategories": [
+      "slab"
+    ],
+    "contract": "canonical-primary-card-targets-v1",
+    "primaryCategories": [
+      "card"
+    ]
+  },
+  "alignment": {
+    "provenance": 5744
+  },
+  "bySplit": {
+    "train": {
+      "records": 4465,
+      "recordsWithMultipleCardAnnotations": 261,
+      "canonicalAnnotations:card": 6281,
+      "instances:card": 6281,
+      "knownCorners:card": 2176,
+      "canonicalAnnotations:slab": 235,
+      "canonicalAnnotations:title_region": 257,
+      "canonicalAnnotations:collection_region": 46,
+      "canonicalAnnotations:info_region": 211
+    },
+    "validation": {
+      "records": 1279,
+      "recordsWithMultipleCardAnnotations": 21,
+      "canonicalAnnotations:card": 1386,
+      "instances:card": 1386,
+      "knownCorners:card": 194,
+      "canonicalAnnotations:inner_border": 235
+    }
+  },
+  "affectedRecords": []
+}
