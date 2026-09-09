@@ -1,0 +1,9 @@
+{
+  "candidate": "yolo11s-pose",
+  "failedJobId": "6aa0489c32d5d0c22c5adf86",
+  "failure": "connector-injected credential rejected when saving resolved config (403); no training epochs ran",
+  "checkedAt": "2026-09-08T20:36:29.009394+00:00",
+  "experimentHash": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+  "writeCheckCommit": "6409ee03f73dabc14a3afe05052d02ec59d4a037",
+  "writeCheckSha256": "52c50abce822b189a0ad48a92b2d739e5b04ea466f0cfa9e152aad4d244b9ae8"
+}

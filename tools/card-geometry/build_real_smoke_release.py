@@ -40,6 +40,7 @@ from typing import Any, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from card_layer_order import ordered_indices, validate_relations  # noqa: E402
 from polygon_quad_fit import (  # noqa: E402
     ADAPTER_ID as POLYGON_FIT_V2,
     CONSERVATIVE_ADAPTER_ID,
@@ -129,7 +130,7 @@ def load_scene_assignments(path: Path, canonical_corpus: Path) -> dict[str, Any]
 
 
 def load_archive_corner_labels(path: Path, canonical_corpus: Path) -> dict[str, Any]:
-    """Read human archive corner labels bound to the canonical corpus bytes."""
+    """Read archive corner labels and their provenance, bound to corpus bytes."""
     document = load_json(path)
     errors = validation_errors(make_validator(load_schema(ARCHIVE_CORNER_LABELS_SCHEMA)), document)
     if errors:
@@ -146,6 +147,7 @@ def load_archive_corner_labels(path: Path, canonical_corpus: Path) -> dict[str, 
         indices = [item["sourceAnnotationIndex"] for item in frame["instances"]]
         if len(indices) != len(set(indices)):
             raise ValueError(f"duplicate sourceAnnotationIndex in {frame['canonicalRecordId']}")
+        validate_relations(frame.get("occlusionRelations", []), indices)
         frames[frame["canonicalRecordId"]] = frame
     return {"path": path, "sha256": sha256_file(path), "frames": frames}
 
@@ -159,22 +161,49 @@ def _box_iou(first: dict[str, float], second: dict[str, float]) -> float:
     return inter / union if union > 0 else 0.0
 
 
+def _validate_archive_quad_order(quad: list[list[float]]) -> None:
+    """Require image-space clockwise TL,TR,BR,BL ordering.
+
+    Image coordinates have y increasing downward, so the canonical card order
+    has positive shoelace/cross products.  Cyclic rotations retain that order;
+    reversing the winding would make the perspective crop mirrored.
+    """
+    crosses = []
+    for i, a in enumerate(quad):
+        b = quad[(i + 1) % 4]
+        c = quad[(i + 2) % 4]
+        crosses.append(
+            (b[0] - a[0]) * (c[1] - b[1])
+            - (b[1] - a[1]) * (c[0] - b[0])
+        )
+    if not all(cross > 1e-8 for cross in crosses):
+        raise ValueError(
+            "archive corner labels must use clockwise TL,TR,BR,BL order"
+        )
+
+
 def _apply_archive_corner_labels(
     row: dict[str, Any],
     instances: list[dict[str, Any]],
     frame: dict[str, Any],
     stats: Counter,
 ) -> None:
-    """Replace box-only or fitted corners with human corners for labeled targets."""
+    """Replace box-only or fitted corners, retaining human or model provenance."""
     if frame["imageSha256"] != row["sha256"]:
         raise ValueError(f"archive corner labels for {row['id']} were drawn on different image bytes")
     by_index = {instance["sourceAnnotationIndex"]: instance for instance in instances}
+    sources = set()
     for label in frame["instances"]:
+        source = label.get("cornerSource", "human")
+        if source not in ("human", "detector"):
+            raise ValueError("archive cornerSource must be human or detector")
+        sources.add(source)
         instance = by_index.get(label["sourceAnnotationIndex"])
         if instance is None:
             raise ValueError(
                 f"archive corner label {row['id']}:{label['sourceAnnotationIndex']} does not name a whole-card target"
             )
+        _validate_archive_quad_order(label["corners"])
         xs = [point[0] for point in label["corners"]]
         ys = [point[1] for point in label["corners"]]
         quad_box = {
@@ -190,14 +219,25 @@ def _apply_archive_corner_labels(
                 "point": {"x": float(x), "y": float(y)},
                 "visibility": visibility,
                 "coordinateKnown": True,
-                "cornerSource": "human",
+                "cornerSource": source,
             }
             for (x, y), visibility in zip(label["corners"], label["cornerVisibility"], strict=True)
         ]
         instance["orientationKnown"] = bool(label["orientationKnown"])
         instance.pop("cornerFit", None)
-        stats["archiveHumanCornerInstances"] += 1
-    stats["archiveHumanCornerRecords"] += 1
+        stats["archiveHumanCornerInstances" if source == "human" else "archiveBotCornerInstances"] += 1
+    for source in sources:
+        stats["archiveHumanCornerRecords" if source == "human" else "archiveBotCornerRecords"] += 1
+    if frame.get("occlusionRelations"):
+        relations = validate_relations(frame["occlusionRelations"], [i["sourceAnnotationIndex"] for i in frame["instances"]])
+        # Legacy total order needs a deterministic tie-break for unrelated cards.
+        # cardsAbove retains only the explicitly reviewed partial relationships.
+        for rank, index in enumerate(ordered_indices(by_index, relations)):
+            by_index[index]["occlusionOrder"] = rank
+        for relation in relations:
+            below = by_index[relation["below"]]
+            below.setdefault("cardsAbove", []).append(by_index[relation["above"]]["instanceId"])
+        stats["archiveHumanLayerRelations"] += len(relations)
 
 
 def load_category_contract(path: Path = CATEGORY_CONTRACT_PATH) -> dict[str, Any]:

@@ -93,6 +93,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     case collectionsSmartFolders = "collections.smartFolders"
     case accountManagement = "account.management"
     case scannerBinderReview = "scanner.binderReview"
+    case pricingGradingWorkspace = "pricing.gradingWorkspace"
 
     static let implemented: Set<ParityFeatureID> = [
         .homeDashboard,
@@ -186,6 +187,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .collectionsSmartFolders,
         .accountManagement,
         .scannerBinderReview,
+        .pricingGradingWorkspace,
     ]
 
     var screenIdentifier: String { "feature.\(rawValue)" }

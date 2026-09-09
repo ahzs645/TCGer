@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tcger.app/schemas/card-geometry-archive-corner-labels/v1",
   "title": "TCGer archive corner labels v1",
-  "description": "Human four-corner labels for whole-card annotations of canonical archive records. Each labeled instance names the canonical annotation it refines by index, so the importer attaches human corners to the same target it would otherwise import box-only. Labels are bound to the canonical corpus bytes and to the image bytes they were drawn on.",
+  "description": "Four-corner labels for whole-card annotations of canonical archive records. Each labeled instance names the canonical annotation it refines by index and retains human or detector provenance. Legacy labels without cornerSource are human. Labels are bound to the canonical corpus bytes and to the image bytes they were drawn on.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "canonicalCorpusSha256", "frames"],
@@ -22,6 +22,17 @@
           "imageSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "reviewer": { "type": "string", "minLength": 1, "maxLength": 120 },
           "labeledAt": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "occlusionRelations": {
+            "description": "Explicit partial layer order. Above/below reference sourceAnnotationIndex, regardless of geometric overlap. Unlisted relationships are unknown.",
+            "type": "array", "uniqueItems": true,
+            "items": {
+              "type": "object", "additionalProperties": false, "required": ["above", "below"],
+              "properties": {
+                "above": { "type": "integer", "minimum": 0 },
+                "below": { "type": "integer", "minimum": 0 }
+              }
+            }
+          },
           "instances": {
             "type": "array",
             "minItems": 1,
@@ -32,6 +43,7 @@
               "properties": {
                 "sourceAnnotationIndex": { "type": "integer", "minimum": 0 },
                 "orientationKnown": { "type": "boolean" },
+                "cornerSource": { "enum": ["human", "detector"], "default": "human", "description": "Use detector for bot-reviewed labels; these are not human metric ground truth." },
                 "corners": {
                   "description": "Normalized TL, TR, BR, BL corners in the source image; values may lie slightly outside [0, 1] for corners beyond the frame.",
                   "type": "array",

@@ -1,0 +1,55 @@
+appId: ${APP_ID}
+name: "[pricing.gradingWorkspace] Grading economics work offline"
+tags: [parity, grading]
+properties:
+  featureId: "pricing.gradingWorkspace"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- runFlow:
+    when:
+      visible: "System UI isn't responding"
+    commands:
+      - tapOn: "Wait"
+- runFlow:
+    when:
+      notVisible: "Install a Game"
+    commands:
+      - tapOn: "Settings"
+      - scrollUntilVisible:
+          element:
+            text: "[Ll]ibrary [Oo]perations"
+          direction: DOWN
+      - tapOn: "[Ll]ibrary [Oo]perations"
+- tapOn: "Grading planner"
+- scrollUntilVisible:
+    element:
+      id: "grading.raw"
+    direction: DOWN
+- tapOn:
+    id: "grading.raw"
+- inputText: "50"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "grading.psa10.price"
+    direction: DOWN
+- tapOn:
+    id: "grading.psa10.price"
+- inputText: "100"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "grading.psa10.weight"
+    direction: DOWN
+- tapOn:
+    id: "grading.psa10.weight"
+- inputText: "1"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "grading.verdict"
+    direction: UP
+- assertVisible: "Worth grading under these assumptions"

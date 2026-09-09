@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 
 from crop_parity import EncoderRuntime, warp_reference
+from recognition_orientation import POLICY as FOUR_WAY_POLICY, recognize_quad
 from export_geometry_candidate import find_one
 from reference_geometry import process_candidates
 from train_fastvit_four_corner import letterbox_geometry
@@ -163,7 +164,8 @@ class Predictor:
     # version-1 behaviour for diagnostics only.
     yolo_input_color = "bgr"
 
-    def __init__(self, candidate: str, output: Path, artifact_sha256: str, resolution: int, device: str = "cuda") -> None:
+    def __init__(self, candidate: str, output: Path, artifact_sha256: str, resolution: int,
+                 device: str = "cuda", checkpoint_path: Path | None = None) -> None:
         self.device = device
         self.candidate = candidate
         self.output = output
@@ -176,14 +178,16 @@ class Predictor:
         if candidate.startswith("yolo11"):
             from ultralytics import YOLO
 
-            checkpoint = verified(find_one(output, ("training/repeat-0/weights/best.pt", "**/weights/best.pt")))
+            checkpoint = verified(checkpoint_path if checkpoint_path is not None else
+                                  find_one(output, ("training/repeat-0/weights/best.pt", "**/weights/best.pt")))
             self.model = YOLO(str(checkpoint))
         elif candidate == "fastvit-t8-four-corner":
             import torch
 
             from export_geometry_candidate import load_fastvit
 
-            checkpoint = verified(find_one(output, ("training/repeat-0/best.pt", "**/best.pt")))
+            checkpoint = verified(checkpoint_path if checkpoint_path is not None else
+                                  find_one(output, ("training/repeat-0/best.pt", "**/best.pt")))
             self.model = load_fastvit(checkpoint).to(device)
             self.model.eval()
             self.torch = torch
@@ -191,7 +195,8 @@ class Predictor:
             from mmcv.transforms import Compose
             from mmdet.apis import init_detector
 
-            checkpoint = verified(find_one(output, ("training/repeat-0/*.pth", "**/*.pth")))
+            checkpoint = verified(checkpoint_path if checkpoint_path is not None else
+                                  find_one(output, ("training/repeat-0/*.pth", "**/*.pth")))
             config = find_one(output, ("yolox-pose-card.py", "**/yolox-pose-card.py"))
             self.model = init_detector(str(config), str(checkpoint), device=device)
             configure_yolox_test(self.model)
@@ -392,8 +397,11 @@ def classify_replay_outcome(
 
 
 def evaluate_recognition_replay(
-    *, release: Path, predictions_path: Path, models_root: Path, output: Path
+    *, release: Path, predictions_path: Path, models_root: Path, output: Path,
+    orientation_policy: str = "two-way-v1",
 ) -> dict[str, Any]:
+    if orientation_policy not in ("two-way-v1", FOUR_WAY_POLICY):
+        raise ValueError(f"unknown recognition orientation policy: {orientation_policy}")
     replay_path = release / "recognition-replay.json"
     if not replay_path.is_file():
         raise ValueError(f"real evaluation release lacks {replay_path.name}")
@@ -407,6 +415,7 @@ def evaluate_recognition_replay(
     entries = {entry["recordId"]: entry for entry in manifest["records"]}
     runtimes = {}
     families = {}
+    model_pins = {}
     for game in ("pokemon", "magic", "yugioh"):
         root = models_root / game
         policy = load_json(root / "policy.json")
@@ -419,6 +428,15 @@ def evaluate_recognition_replay(
         )
         metadata = json.loads((root / "CardsIndexMetadata.json").read_text(encoding="utf-8"))
         families[game] = _families_by_card(metadata)
+        if orientation_policy == FOUR_WAY_POLICY:
+            model_pins[game] = {
+                "excludedNonfiniteIndexRows": int((~np.isfinite(runtimes[game].vectors).all(axis=1)).sum()),
+                "files": {name: sha256_file(root / name) for name in (
+                    "card-embeddings-arcface-fp32.onnx", "CardsIndexMetadata.json",
+                    "CardsIndexVectors-arcface.bin", "policy.json")},
+                "strongThreshold": float(policy["strongThreshold"]),
+                "queryNormalization": str(policy["queryNormalization"]),
+            }
     rows = []
     for case in replay["records"]:
         record_id = case["recordId"]
@@ -430,27 +448,31 @@ def evaluate_recognition_replay(
         family = None
         top_score = None
         margin = None
+        rotation = None
         if top_result is not None:
             record = load_json(release / entries[record_id]["path"])
+            if orientation_policy == FOUR_WAY_POLICY:
+                if sha256_file(release / entries[record_id]["path"]) != entries[record_id]["sha256"]:
+                    raise ValueError(f"record hash mismatch: {record_id}")
+                if sha256_file(release / record["source"]["path"]) != record["source"]["sha256"]:
+                    raise ValueError(f"source image hash mismatch: {record_id}")
             with Image.open(release / record["source"]["path"]) as opened:
                 image = np.asarray(opened.convert("RGB"))
             quad = [
                 [corner["point"]["x"], corner["point"]["y"]]
                 for corner in top_result["corners"]
             ]
-            crop = Image.fromarray(
-                warp_reference(
-                    image,
-                    quad,
-                    mapping="imageEdge",
-                    kernel="bilinear",
-                    inset=0.0,
-                    border="black",
+            if orientation_policy == FOUR_WAY_POLICY:
+                rotation = recognize_quad(runtimes[game], image, quad)
+                family, accepted, top_score, margin = (
+                    rotation[k] for k in ("family", "accepted", "topScore", "rivalMargin")
                 )
-            )
-            family, accepted, top_score, margin = _recognition_decision(
-                runtimes[game], [crop, crop.rotate(180)]
-            )
+            else:
+                crop = Image.fromarray(warp_reference(image, quad, mapping="imageEdge",
+                    kernel="bilinear", inset=0.0, border="black"))
+                family, accepted, top_score, margin = _recognition_decision(
+                    runtimes[game], [crop, crop.rotate(180)]
+                )
         expected = families[game].get(str(case["expectedCardId"]), set())
         forbidden = families[game].get(str(case["forbiddenCardId"]), set())
         outcome = classify_replay_outcome(
@@ -471,6 +493,7 @@ def evaluate_recognition_replay(
                 "topScore": top_score,
                 "rivalMargin": margin,
                 "outcome": outcome,
+                **({"rotation": rotation} if orientation_policy == FOUR_WAY_POLICY else {}),
             }
         )
     counts = collections.Counter(row["outcome"] for row in rows)
@@ -501,13 +524,23 @@ def evaluate_recognition_replay(
         ),
         "frames": rows,
     }
+    if orientation_policy == FOUR_WAY_POLICY:
+        report["recognitionModels"] = model_pins
+        report["schema"] = "https://tcger.app/reports/card-geometry-recognition-replay/v2"
+        report["cropContract"].update(orientation="source quad phases 0,2,1,3; clockwise winding preserved",
+            decisionPolicy=FOUR_WAY_POLICY, minimumRivalMargin=0.05,
+            competitor="strongest different family across every orientation")
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
 
 
-def evaluate(candidate: str) -> dict[str, Any]:
+def evaluate(candidate: str, *, checkpoint_path: Path | None = None,
+             checkpoint_sha256: str | None = None, evaluation_output: Path | None = None,
+             orientation_policy: str = "two-way-v1") -> dict[str, Any]:
     output = Path(os.environ["TCGER_GEOMETRY_OUTPUT_DIR"])
-    checkpoint = find_one(
+    if (checkpoint_path is None) != (checkpoint_sha256 is None):
+        raise ValueError("explicit checkpoint requires its expected SHA-256")
+    checkpoint = checkpoint_path if checkpoint_path is not None else find_one(
         output,
         (
             "training/repeat-0/weights/best.pt",
@@ -516,13 +549,16 @@ def evaluate(candidate: str) -> dict[str, Any]:
         ),
     )
     checkpoint_sha = sha256_file(checkpoint)
+    if checkpoint_sha256 is not None and checkpoint_sha != checkpoint_sha256:
+        raise ValueError("evaluation checkpoint SHA-256 mismatch")
     predictor = Predictor(
         candidate,
         output,
         checkpoint_sha,
         int(os.environ["TCGER_GEOMETRY_INPUT_RESOLUTION"]),
+        checkpoint_path=checkpoint,
     )
-    evaluation_dir = output / "evaluation"
+    evaluation_dir = evaluation_output if evaluation_output is not None else output / "evaluation"
     evaluation_dir.mkdir()
     results = {}
     real_release = None
@@ -571,6 +607,7 @@ def evaluate(candidate: str) -> dict[str, Any]:
         predictions_path=real_predictions,
         models_root=Path(os.environ["TCGER_GEOMETRY_RECOGNITION_MODELS_ROOT"]),
         output=recognition_report_path,
+        orientation_policy=orientation_policy,
     )
     results["recognitionReplay"] = {
         "reportSha256": sha256_file(recognition_report_path),
@@ -597,8 +634,16 @@ def main() -> int:
         required=True,
         choices=("yolo11n-pose", "yolo11s-pose", "yolox-pose", "fastvit-t8-four-corner"),
     )
+    parser.add_argument("--checkpoint", type=Path, help="Evaluate any saved epoch without renaming it best.pt")
+    parser.add_argument("--checkpoint-sha256")
+    parser.add_argument("--evaluation-output", type=Path, help="Fresh output directory for this checkpoint/policy")
+    parser.add_argument("--recognition-orientation-policy", choices=("two-way-v1", FOUR_WAY_POLICY), default="two-way-v1")
     args = parser.parse_args()
-    print(json.dumps(evaluate(args.candidate), indent=2, sort_keys=True))
+    if (args.checkpoint is None) != (args.checkpoint_sha256 is None):
+        parser.error("--checkpoint and --checkpoint-sha256 must be supplied together")
+    print(json.dumps(evaluate(args.candidate, checkpoint_path=args.checkpoint,
+        checkpoint_sha256=args.checkpoint_sha256, evaluation_output=args.evaluation_output,
+        orientation_policy=args.recognition_orientation_policy), indent=2, sort_keys=True))
     return 0
 
 

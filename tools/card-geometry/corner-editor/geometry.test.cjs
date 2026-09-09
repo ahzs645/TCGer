@@ -57,6 +57,20 @@ test('invalid, non-finite and crossed quads fail closed', () => {
   }
 });
 
+test('label quads require TL, TR, BR, BL winding but allow cyclic rotations', () => {
+  const ordered = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  for (let turn = 0; turn < 4; turn++) {
+    const rotated = ordered.slice(turn).concat(ordered.slice(0, turn));
+    assert.equal(G.labelQuadError(rotated), null);
+  }
+  assert.match(
+    G.labelQuadError([[0, 1], [1, 1], [1, 0], [0, 0]]),
+    /ordered TL, TR, BR, BL/
+  );
+  // Generic projective preview math still accepts either winding.
+  assert.doesNotThrow(() => G.squareToQuad([[0, 1], [1, 1], [1, 0], [0, 0]]));
+});
+
 test('card presets retain their stated ratio and game-specific default', () => {
   near(G.PROFILES.standard.width/G.PROFILES.standard.height,63/88);
   near(G.PROFILES.small.width/G.PROFILES.small.height,59/86);

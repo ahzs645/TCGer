@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from build_fixture_releases import tiny_png  # noqa: E402
 from build_real_smoke_release import (  # noqa: E402
+    _apply_archive_corner_labels,
     build_release,
     add_canonical_archive,
     conservative_mask_quad,
@@ -42,6 +43,44 @@ class MaskFitTests(unittest.TestCase):
 
 
 class RealReleaseAdapterTests(unittest.TestCase):
+    def test_archive_corner_import_rejects_reversed_winding(self):
+        row = {"id": "frame", "sha256": "image"}
+        instances = [{
+            "sourceAnnotationIndex": 0,
+            "box": {"left": .1, "top": .1, "right": .4, "bottom": .5},
+        }]
+        frame = {
+            "imageSha256": "image",
+            "instances": [{
+                "sourceAnnotationIndex": 0,
+                # Same convex outline, but counter-clockwise in image space.
+                "corners": [[.1, .1], [.1, .5], [.4, .5], [.4, .1]],
+                "cornerVisibility": ["visible"] * 4,
+                "orientationKnown": False,
+            }],
+        }
+        with self.assertRaisesRegex(ValueError, "clockwise TL,TR,BR,BL"):
+            _apply_archive_corner_labels(row, instances, frame, Counter())
+
+    def test_archive_corner_import_keeps_cyclic_and_out_of_frame_quad(self):
+        row = {"id": "frame", "sha256": "image"}
+        instances = [{
+            "sourceAnnotationIndex": 0,
+            "box": {"left": .1, "top": .1, "right": .4, "bottom": 1.0},
+        }]
+        frame = {
+            "imageSha256": "image",
+            "instances": [{
+                "sourceAnnotationIndex": 0,
+                # A cyclic TL/TR/BR/BL rotation with the bottom edge outside.
+                "corners": [[.4, .1], [.4, 1.1], [.1, 1.1], [.1, .1]],
+                "cornerVisibility": ["visible", "outsideFrame", "outsideFrame", "visible"],
+                "orientationKnown": False,
+            }],
+        }
+        _apply_archive_corner_labels(row, instances, frame, Counter())
+        self.assertEqual(instances[0]["corners"][0]["point"], {"x": .4, "y": .1})
+
     def _canonical_source(self, root: Path) -> tuple[Path, Path, bytes]:
         raw = root / "raw"
         raw.mkdir()

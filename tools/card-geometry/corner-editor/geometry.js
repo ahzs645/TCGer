@@ -43,6 +43,21 @@
     return null;
   }
 
+  // Human labels have a semantic corner order: TL, TR, BR, BL. In image
+  // coordinates that order has positive signed area. Keep validQuad() broad
+  // for generic homography callers, and use this stricter contract at label
+  // boundaries where reversing the winding would mirror the crop.
+  function labelQuadError(quad) {
+    const error = validQuad(quad);
+    if (error) return error;
+    const area2 = quad.reduce((sum, point, index) => {
+      const next = quad[(index + 1) % quad.length];
+      return sum + point[0] * next[1] - next[0] * point[1];
+    }, 0);
+    if (area2 <= 1e-5) return "Corners must be ordered TL, TR, BR, BL around the card; redraw clockwise";
+    return null;
+  }
+
   // Map a rectified unit square back into the source quad: true projective
   // homography, not a bilinear deformation. Source coordinates are image-edge.
   function squareToQuad(quad) {
@@ -65,17 +80,33 @@
     return [(a * u + b * v + c) / w, (d * u + e * v + f) / w];
   }
 
-  function rectify(source, quad, width, height) {
+  function pointInQuad([x, y], quad) {
+    let positive = false, negative = false;
+    for (let i = 0; i < 4; i++) {
+      const a = quad[i], b = quad[(i + 1) % 4];
+      const cross = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+      if (cross > 1e-10) positive = true;
+      if (cross < -1e-10) negative = true;
+    }
+    return !(positive && negative);
+  }
+
+  function rectify(source, quad, width, height, coveringQuads = []) {
     if (width < 2 || height < 2) throw new Error("Preview dimensions must be at least two pixels");
     const matrix = squareToQuad(quad);
     const data = new Uint8ClampedArray(width * height * 4);
-    let outside = 0;
+    const covers = coveringQuads.filter((q) => !validQuad(q));
+    let outside = 0, covered = 0;
     for (let row = 0; row < height; row++) {
       for (let col = 0; col < width; col++) {
         const [nx, ny] = project(matrix, col / (width - 1), row / (height - 1));
         if (!Number.isFinite(nx) || !Number.isFinite(ny) || nx < 0 || ny < 0 || nx > 1 || ny > 1) {
           outside++;
           continue; // transparent => checkerboard, never invented image content
+        }
+        if (covers.some((q) => pointInQuad([nx, ny], q))) {
+          covered++;
+          continue;
         }
         const x = Math.min(source.width - 1, nx * source.width);
         const y = Math.min(source.height - 1, ny * source.height);
@@ -93,10 +124,49 @@
         data[dst + 3] = 255;
       }
     }
-    return {data, width, height, outsideFraction: outside / (width * height)};
+    return {data, width, height, outsideFraction: outside / (width * height), coveredFraction: covered / (width * height)};
   }
 
-  const api = {PROFILES, defaultProfile, cycleCard, nearestActiveHandle, validQuad, squareToQuad, project, rectify};
+  function quadsOverlap(first, second) {
+    if (validQuad(first) || validQuad(second)) return false;
+    for (const q of [first, second]) {
+      for (let i = 0; i < 4; i++) {
+        const a = q[i], b = q[(i + 1) % 4], normal = [a[1] - b[1], b[0] - a[0]];
+        const projectPoint = ([x, y]) => x * normal[0] + y * normal[1];
+        const p = first.map(projectPoint), r = second.map(projectPoint);
+        if (Math.min(Math.max(...p), Math.max(...r)) - Math.max(Math.min(...p), Math.min(...r)) <= 1e-10) return false;
+      }
+    }
+    return true;
+  }
+
+  function layerPreview(source, quad, width, height, aboveQuads = [], belowQuads = [], mode = "masked") {
+    const result = rectify(source, quad, width, height), matrix = squareToQuad(quad);
+    const upper = aboveQuads.filter((q) => !validQuad(q)), lower = belowQuads.filter((q) => !validQuad(q));
+    let covered = 0, onTop = 0;
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        const offset = (row * width + col) * 4;
+        if (!result.data[offset + 3]) continue;
+        const point = project(matrix, col / (width - 1), row / (height - 1));
+        const hidden = upper.some((q) => pointInQuad(point, q));
+        const front = !hidden && lower.some((q) => pointInQuad(point, q));
+        if (hidden) covered++;
+        if (front) onTop++;
+        if (mode === "masked" && hidden) result.data[offset + 3] = 0;
+        if (mode === "layers" && (hidden || front)) {
+          const color = hidden ? [242, 91, 150] : [61, 222, 162];
+          const opacity = hidden ? ((row + col) % 12 < 4 ? .85 : .45) : .4;
+          for (let channel = 0; channel < 3; channel++) result.data[offset + channel] = result.data[offset + channel] * (1 - opacity) + color[channel] * opacity;
+        }
+      }
+    }
+    result.coveredFraction = covered / (width * height);
+    result.onTopFraction = onTop / (width * height);
+    return result;
+  }
+
+  const api = {PROFILES, defaultProfile, cycleCard, nearestActiveHandle, validQuad, labelQuadError, squareToQuad, project, pointInQuad, quadsOverlap, rectify, layerPreview};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CardEditorGeometry = api;
 })(typeof window !== "undefined" ? window : {});

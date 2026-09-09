@@ -16,7 +16,7 @@ struct CardCopyEditorValues: Sendable {
     let storageLocation: String?
 }
 
-struct CardEditorDraft {
+struct CardEditorDraft: Equatable {
     var quantity: Int
     var condition: String
     var language: String

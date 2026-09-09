@@ -1,0 +1,297 @@
+[
+  {
+    "name": "all costs and asymmetric selling fees",
+    "input": {
+      "rawValue": 50,
+      "costs": {
+        "grading": 25,
+        "shipping": 5,
+        "insurance": 2,
+        "upcharge": 3,
+        "sellingFeePercent": 10,
+        "sellingFixed": 2,
+        "rawSellingFeePercent": 5,
+        "rawSellingFixed": 1
+      },
+      "outcomes": [
+        {
+          "key": "psa9",
+          "label": "PSA 9",
+          "grade": 9,
+          "population": 70,
+          "source": "manual",
+          "history": [],
+          "price": 100
+        },
+        {
+          "key": "psa10",
+          "label": "PSA 10",
+          "grade": 10,
+          "population": 30,
+          "source": "manual",
+          "history": [],
+          "price": 200
+        }
+      ],
+      "interpolate": false
+    },
+    "expected": {
+      "verdict": "grade",
+      "totalCost": 35,
+      "rawNet": 46.5,
+      "expectedValue": 130,
+      "expectedGain": 33.5,
+      "population": 100,
+      "pricedPopulation": 100,
+      "breakEven": "PSA 9"
+    }
+  },
+  {
+    "name": "unpriced outcomes withhold verdict",
+    "input": {
+      "rawValue": 50,
+      "costs": {
+        "grading": 20,
+        "shipping": 0,
+        "insurance": 0,
+        "upcharge": 0,
+        "sellingFeePercent": 0,
+        "sellingFixed": 0,
+        "rawSellingFeePercent": 0,
+        "rawSellingFixed": 0
+      },
+      "outcomes": [
+        {
+          "key": "psa8",
+          "label": "PSA 8",
+          "grade": 8,
+          "population": 10,
+          "source": "manual",
+          "history": []
+        },
+        {
+          "key": "psa9",
+          "label": "PSA 9",
+          "grade": 9,
+          "population": 90,
+          "source": "manual",
+          "history": [],
+          "price": 100
+        }
+      ],
+      "interpolate": false
+    },
+    "expected": {
+      "verdict": "insufficient",
+      "expectedGain": null,
+      "population": 100,
+      "pricedPopulation": 90
+    }
+  },
+  {
+    "name": "interpolation within anchors",
+    "input": {
+      "rawValue": 50,
+      "costs": {
+        "grading": 20,
+        "shipping": 0,
+        "insurance": 0,
+        "upcharge": 0,
+        "sellingFeePercent": 0,
+        "sellingFixed": 0,
+        "rawSellingFeePercent": 0,
+        "rawSellingFixed": 0
+      },
+      "outcomes": [
+        {
+          "key": "psa8",
+          "label": "PSA 8",
+          "grade": 8,
+          "population": 10,
+          "source": "manual",
+          "history": [],
+          "price": 40
+        },
+        {
+          "key": "psa9",
+          "label": "PSA 9",
+          "grade": 9,
+          "population": 20,
+          "source": "manual",
+          "history": []
+        },
+        {
+          "key": "psa10",
+          "label": "PSA 10",
+          "grade": 10,
+          "population": 10,
+          "source": "manual",
+          "history": [],
+          "price": 160
+        }
+      ],
+      "interpolate": true
+    },
+    "expected": {
+      "verdict": "grade",
+      "expectedValue": 90,
+      "expectedGain": 20,
+      "population": 40,
+      "pricedPopulation": 40,
+      "breakEven": "PSA 9"
+    }
+  },
+  {
+    "name": "no extrapolation below anchors",
+    "input": {
+      "rawValue": 50,
+      "costs": {
+        "grading": 0,
+        "shipping": 0,
+        "insurance": 0,
+        "upcharge": 0,
+        "sellingFeePercent": 0,
+        "sellingFixed": 0,
+        "rawSellingFeePercent": 0,
+        "rawSellingFixed": 0
+      },
+      "outcomes": [
+        {
+          "key": "psa7",
+          "label": "PSA 7",
+          "grade": 7,
+          "population": 10,
+          "source": "manual",
+          "history": []
+        },
+        {
+          "key": "psa8",
+          "label": "PSA 8",
+          "grade": 8,
+          "population": 10,
+          "source": "manual",
+          "history": [],
+          "price": 40
+        },
+        {
+          "key": "psa10",
+          "label": "PSA 10",
+          "grade": 10,
+          "population": 10,
+          "source": "manual",
+          "history": [],
+          "price": 160
+        }
+      ],
+      "interpolate": true
+    },
+    "expected": {
+      "verdict": "insufficient",
+      "expectedGain": null,
+      "population": 30,
+      "pricedPopulation": 20
+    }
+  },
+  {
+    "name": "zero price is explicit",
+    "input": {
+      "rawValue": 0,
+      "costs": {
+        "grading": 0,
+        "shipping": 0,
+        "insurance": 0,
+        "upcharge": 0,
+        "sellingFeePercent": 0,
+        "sellingFixed": 0,
+        "rawSellingFeePercent": 0,
+        "rawSellingFixed": 0
+      },
+      "outcomes": [
+        {
+          "key": "psa9",
+          "label": "PSA 9",
+          "grade": 9,
+          "population": 10,
+          "source": "manual",
+          "history": [],
+          "price": 0
+        }
+      ],
+      "interpolate": false
+    },
+    "expected": {
+      "verdict": "borderline",
+      "expectedGain": 0,
+      "population": 10,
+      "pricedPopulation": 10
+    }
+  },
+  {
+    "name": "manual prices without weights",
+    "input": {
+      "rawValue": 50,
+      "costs": {
+        "grading": 0,
+        "shipping": 0,
+        "insurance": 0,
+        "upcharge": 0,
+        "sellingFeePercent": 0,
+        "sellingFixed": 0,
+        "rawSellingFeePercent": 0,
+        "rawSellingFixed": 0
+      },
+      "outcomes": [
+        {
+          "key": "psa10",
+          "label": "PSA 10",
+          "grade": 10,
+          "population": 0,
+          "source": "manual",
+          "history": [],
+          "price": 200
+        }
+      ],
+      "interpolate": false
+    },
+    "expected": {
+      "verdict": "insufficient",
+      "expectedGain": null,
+      "population": 0,
+      "pricedPopulation": 0
+    }
+  },
+  {
+    "name": "loss after grading",
+    "input": {
+      "rawValue": 50,
+      "costs": {
+        "grading": 25,
+        "shipping": 0,
+        "insurance": 0,
+        "upcharge": 0,
+        "sellingFeePercent": 0,
+        "sellingFixed": 0,
+        "rawSellingFeePercent": 0,
+        "rawSellingFixed": 0
+      },
+      "outcomes": [
+        {
+          "key": "psa9",
+          "label": "PSA 9",
+          "grade": 9,
+          "population": 100,
+          "source": "manual",
+          "history": [],
+          "price": 40
+        }
+      ],
+      "interpolate": false
+    },
+    "expected": {
+      "verdict": "keep",
+      "expectedGain": -35,
+      "population": 100,
+      "pricedPopulation": 100
+    }
+  }
+]

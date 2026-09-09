@@ -351,6 +351,7 @@ export default function PricesPage() {
           </div>
           {mounted && isAuthenticated && showPricing && (
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild><Link href="/prices/grading">Grading planner</Link></Button>
               <Button variant="outline" size="sm" asChild>
                 <Link href="/prices/cost-returns">
                   <WalletCards className="mr-2 h-4 w-4" aria-hidden />

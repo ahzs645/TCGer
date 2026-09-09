@@ -24,6 +24,20 @@ from evaluate_geometry_candidate import (
 
 
 class EvaluateGeometryCandidateTests(unittest.TestCase):
+    def test_explicit_saved_epoch_is_loaded_and_its_hash_is_required(self):
+        from train_yolo_pose import sha256_file
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/"last.pt"
+            path.write_bytes(b"saved epoch")
+            loader = Mock()
+            with patch.dict(sys.modules, {"ultralytics":SimpleNamespace(YOLO=loader)}):
+                Predictor("yolo11s-pose", Path(folder), sha256_file(path), 640,
+                          device="cpu", checkpoint_path=path)
+                loader.assert_called_once_with(str(path))
+                with self.assertRaisesRegex(ValueError, "SHA-256"):
+                    Predictor("yolo11s-pose", Path(folder), "bad", 640, checkpoint_path=path)
+
     def test_yolox_converts_pil_rgb_to_file_loader_bgr(self):
         observed = []
         def infer(model, pixels, **kwargs):

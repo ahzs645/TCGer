@@ -1,0 +1,59 @@
+{
+  "source": ".artifacts/card-geometry/archive-corner-labels/review-complete-20260908T164446Z/archive-corner-labels.json",
+  "sourceSha256": "f088e154196a50b2d8197e382ac4d8ff36bfbdff9e196276a6879afbd6558957",
+  "outputSha256": "499edf70b7d56a096b360e5d9a76bbe0215f54cf6c2efb24d7d924180936a848",
+  "method": "visible-corners-inside-explicit-or-transitive-reviewed-covering-quad-v1",
+  "changes": [
+    {
+      "canonicalRecordId": "12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+      "sourceAnnotationIndex": 1,
+      "cornerIndex": 0,
+      "from": "visible",
+      "to": "occluded",
+      "coveringAnnotationIndices": [
+        6
+      ]
+    },
+    {
+      "canonicalRecordId": "12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+      "sourceAnnotationIndex": 3,
+      "cornerIndex": 0,
+      "from": "visible",
+      "to": "occluded",
+      "coveringAnnotationIndices": [
+        5
+      ]
+    },
+    {
+      "canonicalRecordId": "12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+      "sourceAnnotationIndex": 5,
+      "cornerIndex": 3,
+      "from": "visible",
+      "to": "occluded",
+      "coveringAnnotationIndices": [
+        2
+      ]
+    },
+    {
+      "canonicalRecordId": "12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+      "sourceAnnotationIndex": 10,
+      "cornerIndex": 3,
+      "from": "visible",
+      "to": "occluded",
+      "coveringAnnotationIndices": [
+        6
+      ]
+    },
+    {
+      "canonicalRecordId": "12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+      "sourceAnnotationIndex": 12,
+      "cornerIndex": 2,
+      "from": "visible",
+      "to": "occluded",
+      "coveringAnnotationIndices": [
+        6
+      ]
+    }
+  ],
+  "orientationUnknownRetained": 14
+}

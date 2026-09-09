@@ -3,6 +3,7 @@ import SwiftUI
 struct SmartFolderEditorSheet: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmingDiscard = false
     @State private var name: String
     @State private var selectedColor: Color
     @State private var matchMode: SmartFolder.MatchMode
@@ -18,6 +19,13 @@ struct SmartFolderEditorSheet: View {
         _selectedColor = State(initialValue: Color.fromHex(folder?.colorHex))
         _matchMode = State(initialValue: folder?.matchMode ?? .all)
         _rules = State(initialValue: folder?.rules ?? [])
+    }
+
+    private var hasChanges: Bool {
+        name != (existingFolder?.name ?? "") ||
+        selectedColor.toHex() != Color.fromHex(existingFolder?.colorHex).toHex() ||
+        matchMode != (existingFolder?.matchMode ?? .all) ||
+        rules != (existingFolder?.rules ?? [])
     }
 
     var body: some View {
@@ -79,7 +87,9 @@ struct SmartFolderEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        if hasChanges { confirmingDiscard = true } else { dismiss() }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -97,6 +107,7 @@ struct SmartFolderEditorSheet: View {
                 }
             }
         }
+        .modifier(UnsavedChangesGuard(hasChanges: hasChanges, confirmingDiscard: $confirmingDiscard))
     }
 
     private func addRule(type: SmartFolderRule.RuleType) {

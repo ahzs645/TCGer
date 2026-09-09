@@ -109,7 +109,7 @@ struct StatItem: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(color.opacity(0.10))
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

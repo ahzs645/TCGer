@@ -14,6 +14,8 @@ struct EditCollectionCardSheet: View {
     let onCreateTag: ((String) async throws -> CollectionCardTag)?
     let onSave: @Sendable (SavePayload) -> Void
 
+    @State private var confirmingDiscard = false
+    @State private var initialDraft: CardEditorDraft
     @State private var draft: CardEditorDraft
     @State private var localTags: [CollectionCardTag]
 
@@ -48,7 +50,7 @@ struct EditCollectionCardSheet: View {
         self.onCreateTag = onCreateTag
         self.onSave = onSave
 
-        _draft = State(initialValue: CardEditorDraft(
+        let initialDraft = CardEditorDraft(
             quantity: max(1, card.quantity),
             condition: (copyDetails?.condition ?? card.condition).map(CardCondition.canonicalize) ?? "",
             language: copyDetails?.language ?? card.language ?? "",
@@ -67,7 +69,9 @@ struct EditCollectionCardSheet: View {
             certNumber: copyDetails?.certNumber ?? "",
             storageLocation: copyDetails?.storageLocation ?? "",
             selectedTagIds: Set(selectedTagIds)
-        ))
+        )
+        _draft = State(initialValue: initialDraft)
+        _initialDraft = State(initialValue: initialDraft)
         _localTags = State(initialValue: availableTags.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending })
     }
 
@@ -115,13 +119,15 @@ struct EditCollectionCardSheet: View {
                     onCreateTag: onCreateTag
                 )
             }
+            .disabled(isSaving)
             .navigationTitle("Edit Card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if draft != initialDraft { confirmingDiscard = true } else { dismiss() }
                     }
+                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "Saving..." : "Save", action: save)
@@ -129,6 +135,7 @@ struct EditCollectionCardSheet: View {
                 }
             }
         }
+        .modifier(UnsavedChangesGuard(hasChanges: draft != initialDraft, isSaving: isSaving, confirmingDiscard: $confirmingDiscard))
     }
 
     private func save() {

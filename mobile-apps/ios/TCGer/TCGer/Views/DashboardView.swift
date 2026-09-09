@@ -6,9 +6,10 @@ struct DashboardView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.showingSearch) private var showingSearch
     @State private var collections: [Collection] = []
-    @State private var isLoading = true
+    @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var activeSheet: ActiveSheet?
+    @State private var selectedCollection: Collection?
+    @State private var hasLoaded = false
 
     private let apiService = APIService()
     private var recentCollections: [Collection] {
@@ -37,14 +38,26 @@ struct DashboardView: View {
     private var dashboardContent: some View {
         ScrollView {
             VStack(spacing: 20) {
-                    if isLoading {
-                        ProgressView("Loading your collection...")
-                            .padding()
-                    } else if let error = errorMessage {
+                    if !hasLoaded && errorMessage == nil {
+                        StatsSection(collections: [], showPricing: environmentStore.showPricing, onOpenCollections: {})
+                            .redacted(reason: .placeholder)
+                            .disabled(true)
+                            .accessibilityLabel("Loading your collection")
+                    } else if let error = errorMessage, !hasLoaded {
                         ErrorView(title: "Error Loading Data", message: error) {
                             Task { await loadData() }
                         }
                     } else {
+                        if let error = errorMessage {
+                            VStack(alignment: .leading, spacing: AppSpacing.small) {
+                                Label("Couldn't refresh your collection", systemImage: "exclamationmark.triangle")
+                                    .font(.headline)
+                                Text(error).font(.subheadline).foregroundStyle(.secondary)
+                                Button("Retry") { Task { await loadData() } }
+                                    .disabled(isLoading)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         // Stats Section
                         StatsSection(
                             collections: collections,
@@ -54,17 +67,6 @@ struct DashboardView: View {
                             }
                         )
 
-                        // Frontend entry for the tilt demo is disabled for now.
-                        // Button {
-                        //     activeSheet = .tiltTester
-                        // } label: {
-                        //     Label("Open Tilt Card Demo", systemImage: "sparkles")
-                        //         .font(.headline)
-                        //         .frame(maxWidth: .infinity)
-                        // }
-                        // .buttonStyle(.borderedProminent)
-                        // .tint(.accentColor)
-
                         // Recent Collections
                         if recentCollections.isEmpty {
                             EmptyStateView()
@@ -73,7 +75,7 @@ struct DashboardView: View {
                                 collections: recentCollections,
                                 showPricing: environmentStore.showPricing,
                                 onSelect: { collection in
-                                    activeSheet = .collection(collection)
+                                    selectedCollection = collection
                                 }
                             )
                         }
@@ -98,21 +100,20 @@ struct DashboardView: View {
             .refreshable {
                 await loadData()
             }
-            .sheet(item: $activeSheet) { sheet in
-                switch sheet {
-                case .collection(let collection):
-                    CollectionDetailView(collection: collection)
-                        .onDisappear {
-                            Task { await loadData() }
-                        }
-                case .tiltTester:
-                    TiltTesterView(cards: collections.flatMap { $0.cards })
+            .navigationDestination(isPresented: Binding(
+                get: { selectedCollection != nil },
+                set: { if !$0 { selectedCollection = nil } }
+            )) {
+                if let collection = selectedCollection {
+                    CollectionDetailView(collection: collection, parentProvidesNavigation: true)
+                        .onDisappear { Task { await loadData() } }
                 }
-        }
+            }
     }
 
     @MainActor
     private func loadData() async {
+        guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
 
@@ -122,6 +123,7 @@ struct DashboardView: View {
                 token: environmentStore.authToken,
                 useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
+            hasLoaded = true
             environmentStore.updateWidgetData(collections: collections)
             isLoading = false
         } catch {
@@ -135,22 +137,10 @@ struct DashboardView: View {
     }
 }
 
-private enum ActiveSheet: Identifiable {
-    case collection(Collection)
-    case tiltTester
-
-    var id: String {
-        switch self {
-        case .collection(let collection):
-            return "collection-\(collection.id)"
-        case .tiltTester:
-            return "tiltTester"
-        }
-    }
-}
-
 // MARK: - Stats Section
 private struct StatsSection: View {
+    @EnvironmentObject private var environmentStore: EnvironmentStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let collections: [Collection]
     let showPricing: Bool
     let onOpenCollections: () -> Void
@@ -178,23 +168,29 @@ private struct StatsSection: View {
             Text("Overview")
                 .font(.headline)
 
-            HStack(spacing: 12) {
-                statButton(StatItem(title: "Binders", value: "\(binderCount)", color: .blue, icon: "folder.fill"))
-                statButton(StatItem(title: "Unique Cards", value: "\(totalCards)", color: .indigo, icon: "rectangle.stack.fill"))
+            statLayout {
+                statButton(StatItem(title: "Binders", value: "\(binderCount)", color: environmentStore.accentColorChoice.color, icon: "folder.fill"))
+                statButton(StatItem(title: "Unique Cards", value: "\(totalCards)", color: environmentStore.accentColorChoice.color, icon: "rectangle.stack.fill"))
             }
 
-            HStack(spacing: 12) {
-                statButton(StatItem(title: "Total Copies", value: "\(totalCopies)", color: .orange, icon: "square.on.square"))
+            statLayout {
+                statButton(StatItem(title: "Total Copies", value: "\(totalCopies)", color: environmentStore.accentColorChoice.color, icon: "square.on.square"))
                 if showPricing {
                     statButton(StatItem(
                         title: "Est. Value",
                         value: totalValue.priceText,
-                        color: .green,
+                        color: environmentStore.accentColorChoice.color,
                         icon: "dollarsign.circle.fill"
                     ))
                 }
             }
         }
+    }
+
+    private var statLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: AppSpacing.medium))
+            : AnyLayout(HStackLayout(spacing: AppSpacing.medium))
     }
 
     private func statButton(_ item: StatItem) -> some View {

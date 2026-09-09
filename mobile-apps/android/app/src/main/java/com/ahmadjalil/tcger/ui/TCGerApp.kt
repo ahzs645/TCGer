@@ -501,7 +501,14 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
                     )
                 }
                 composable(BottomNavigationItem.PRICES.route) {
+                    val gradingRepository = remember(state.preferences.serverUrl, state.preferences.authToken, state.preferences.dataSourceMode) {
+                        val token = state.preferences.authToken
+                        if (state.preferences.dataSourceMode == DataSourceMode.SERVER && !token.isNullOrBlank()) {
+                            runCatching { com.ahmadjalil.tcger.feature.libraryoperations.RemoteLibraryOperationsRepository.create(state.preferences.serverUrl, token) }.getOrNull()
+                        } else null
+                    }
                     PricesScreen(
+                        gradingRepository = gradingRepository,
                         repository = portfolioRepository,
                         binders = state.binders,
                         showPricing = state.preferences.showPricing,

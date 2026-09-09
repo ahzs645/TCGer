@@ -4,6 +4,8 @@ import SwiftUI
 /// used by the collections screen and binder-selection flows.
 struct CreateBinderSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmingDiscard = false
+    @State private var isCreating = false
     @State private var name = ""
     @State private var description = ""
     @State private var selectedColor: Color = Color.binderColors[0]
@@ -31,6 +33,12 @@ struct CreateBinderSheet: View {
     ) {
         includesPresentationFields = true
         self.onCreate = onCreateWithPresentation
+    }
+
+    private var hasChanges: Bool {
+        !name.isEmpty || !description.isEmpty || !defaultCondition.isEmpty ||
+        !containerType.isEmpty || !imageUrl.isEmpty ||
+        selectedColor.toHex() != Color.binderColors[0].toHex()
     }
 
     private var coverURLIsValid: Bool {
@@ -71,17 +79,21 @@ struct CreateBinderSheet: View {
                     }
                 }
             }
+            .disabled(isCreating)
             .navigationTitle("New Binder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if hasChanges { confirmingDiscard = true } else { dismiss() }
                     }
+                    .disabled(isCreating)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
+                    Button(isCreating ? "Creating…" : "Create") {
+                        isCreating = true
                         Task {
+                            defer { isCreating = false }
                             await onCreate(
                                 name,
                                 description.isEmpty ? nil : description,
@@ -95,11 +107,12 @@ struct CreateBinderSheet: View {
                             dismiss()
                         }
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !coverURLIsValid)
+                    .disabled(isCreating || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !coverURLIsValid)
                     .accessibilityIdentifier(ParityControlID.actionCollectionsConfirmCreate)
                 }
             }
         }
+        .modifier(UnsavedChangesGuard(hasChanges: hasChanges, isSaving: isCreating, confirmingDiscard: $confirmingDiscard))
         .accessibilityIdentifier(ParityFeatureID.collectionsCreate.screenIdentifier)
     }
 }

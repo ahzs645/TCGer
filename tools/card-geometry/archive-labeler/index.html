@@ -9,87 +9,160 @@
   <body>
     <header>
       <div>
-        <small>TCGer · Training corner labels</small>
-        <h1>Label the four corners of each card</h1>
+        <small id="studio-subtitle">TCGer · Training corner labels</small>
+        <h1 id="studio-title">Label the four corners of each card</h1>
       </div>
       <div id="progress"></div>
       <div class="header-actions">
         <button id="help" type="button" aria-expanded="false" title="How to label">? Help</button>
-        <a href="/api/export" download="archive-corner-labels.json">Export sidecar ↓</a>
+        <details class="compact-menu"><summary>More</summary><div class="menu-content header-menu">
+          <a id="model-review-link" href="/model-review.html">Try trained model →</a>
+          <a href="/api/export" download="archive-corner-labels.json">Export sidecar ↓</a>
+        </div></details>
       </div>
       <div id="help-panel" hidden>
+        <section id="reference-intro" hidden><p id="reference-description"></p>
+          <p>The editable outline controls the crop. <strong>Source polygon</strong> in More tools adds the original reference as a second line for comparison.</p>
+        </section>
         <p>
           Every queued card starts as a dashed amber outline you can move:
-          <strong>drag any handle</strong> onto the real corner. Scroll to zoom,
+          <strong>drag any handle</strong> onto the real corner. A changed card is a draft until you press <kbd>C</kbd> to confirm. Scroll to zoom,
           drag empty space to pan, double-click or <kbd>0</kbd> to reset. If a
-          box already fits, press <kbd>C</kbd> to accept it. <kbd>R</kbd>
+          box already fits, check the preview and press <kbd>C</kbd> to confirm it. <kbd>R</kbd>
           rotates a card's corner order by a quarter turn; set <em>Printed top
           points</em> once per page so seeded boxes start with the right
           orientation, and check the thumbnails below the photo: every card
-          should appear upright there. For a skewed card press <kbd>D</kbd> and
+          should appear upright when its orientation is known. For a skewed card press <kbd>D</kbd> and
           click <strong>TL → TR → BR → BL</strong> of the printed card.
           <kbd>O</kbd> marks a corner hidden by another card; corners beyond the
           photo edge are marked automatically. <kbd>S</kbd> skips a card you
           cannot label. <kbd>N</kbd> next card, <kbd>1–4</kbd> pick a corner,
-          arrows nudge (Shift ×5), <kbd>Enter</kbd> saves and moves on.
-          Untouched boxes are never saved as labels; nothing here changes the
-          dataset.
+          arrows nudge (Shift ×5), <kbd>Enter</kbd> saves confirmed cards and moves on.
+          Save also stores unconfirmed edits as drafts on the local server. Use <em>Reflected padding</em>
+          to skip artificial card fragments repeated along an image border.
+          With <em>Approve on Save / Next</em> enabled, Save frame, Next, Save &amp; next, or Enter
+          approve and save every unskipped outline on the page. <kbd>N</kbd>
+          approves and saves the selected card before advancing. Turn it off
+          to require <kbd>C</kbd> for each card.
+          Skipping excludes human corners; the original box remains available as supervision.
+          <a href="/draft-recovery.html" target="_blank">Back up browser drafts</a> before moving to another browser.
         </p>
       </div>
     </header>
     <nav>
+      <button id="previous">← Previous</button>
+      <select id="frame" aria-label="Frame"></select>
+      <button id="next">Next →</button>
+      <button id="copy-reference" type="button" title="Copy the current frame/card reference">Copy ref</button>
+      <details class="compact-menu"><summary>Filters</summary><div class="menu-content filter-menu">
       <label>Layout
         <select id="filter-scene">
           <option value="all">All queued layouts</option>
           <option value="multi_card_grid_archive">Grid (binder-like)</option>
           <option value="multi_card_scatter_archive">Scattered</option>
           <option value="multi_card_other_archive">Other</option>
+          <option value="single_card_archive">Single-card archive</option>
         </select></label
+      ><label>Photos
+        <select id="filter-color">
+          <option value="color">Color only</option>
+          <option value="all">Color + grayscale</option>
+          <option value="grayscale">Grayscale only</option>
+        </select></label
+      ><label><input type="checkbox" id="filter-multiple" />Multiple cards only</label
       ><label><input type="checkbox" id="incomplete" checked />Incomplete only</label
-      ><button id="previous">← Previous</button
-      ><select id="frame" aria-label="Frame"></select
-      ><button id="next">Next →</button>
+      ></div></details>
+      <label title="Save frame, Next, Save & next, or Enter approve and save all unskipped outlines on this page. N approves and saves the selected card."><input type="checkbox" id="approve-next" />Approve on Save / Next</label>
     </nav>
+    <section id="review-batch" class="review-batch" aria-label="Review batch" hidden>
+      <div><strong id="review-position"></strong>
+        <p>Check corners, upright previews, and skipped cards. Save &amp; next saves this photo and moves through the batch. Previous brings you back.</p>
+      </div>
+      <button id="review-all" type="button">Show all photos</button>
+    </section>
     <main>
-      <section class="workspace">
+      <div class="editor-controls">
         <div class="toolbar">
-          <select id="target" aria-label="Card to label"></select
-          ><button id="draw">Draw corners (D)</button
-          ><button id="accept">Accept box (C)</button
-          ><button id="seed">Reset to box (B)</button
-          ><button id="clear">Clear corners</button
-          ><select id="skip" aria-label="Skip reason">
+          <select id="target" aria-label="Card to label"></select>
+          <button id="accept">Confirm & next (C)</button>
+          <button id="rotate" title="Rotate this card's corner order a quarter turn">Rotate (R)</button>
+          <button id="undo">Undo</button>
+          <label title="Uncheck if you cannot tell which corner is the printed top-left"><input type="checkbox" id="orientation" checked />Orientation certain</label>
+          <details id="more-tools" class="compact-menu"><summary>More tools</summary><div class="menu-content tools-menu">
+          <button id="draw">Draw corners (D)</button>
+          <button id="seed">Reset to box (B)</button>
+          <button id="clear">Clear corners</button>
+          <label id="reference-overlay-control" hidden><input type="checkbox" id="reference-overlay" />Source polygon</label>
+          <select id="skip" aria-label="Skip reason">
             <option value="">Skip… (S)</option>
             <option value="occluded">Mostly hidden</option>
             <option value="cut-off">Cut off by the frame</option>
             <option value="not-a-card">Not a card</option>
-            <option value="unsure">Not sure</option></select
-          ><button id="undo">Undo</button
-          ><button id="rotate" title="Rotate this card's corner order a quarter turn">Rotate (R)</button
+            <option value="unsure">Not sure</option>
+            <option value="reflected-padding">Reflected padding</option></select
           ><label title="Direction the printed top of the cards points in this photo; applied to every untouched box">Printed top points
             <select id="direction">
               <option value="0">↑ up</option>
               <option value="1">→ right</option>
               <option value="2">↓ down</option>
               <option value="3">← left</option></select></label
-          ><label title="Uncheck if you cannot tell which corner is the printed top-left"><input type="checkbox" id="orientation" checked />Orientation certain</label
-          ><span id="done" class="done-count"></span>
+          ></div></details>
+          <span id="done" class="done-count"></span>
         </div>
         <p id="hint"></p>
+      </div>
+      <section class="workspace">
         <canvas id="editor" tabindex="0" aria-label="Corner editor"></canvas>
         <div id="strip" class="strip" aria-label="Rectified cards on this page"></div>
+        <details id="card-layers" class="layers">
+          <summary>Card layers</summary>
+          <div class="layer-controls">
+            <strong id="layer-selected"></strong>
+            <select id="layer-relation" aria-label="Layer relation"><option value="above">Above</option><option value="below">Below</option></select>
+            <select id="layer-other" aria-label="Other card"></select>
+            <button id="layer-set" type="button">Set layer</button>
+            <button id="mark-covered" type="button">Mark covered corners hidden</button>
+          </div>
+          <p>Set order even when cards do not touch. Full outlines stay editable; preview clipping only affects intersecting areas. Save frame saves layer changes.</p>
+          <p id="layer-empty">No layer relationships set. Unspecified order stays unknown.</p>
+          <div id="layer-list" aria-label="Layer relationships"></div>
+        </details>
       </section>
       <aside>
+        <section class="rectified-panel" aria-label="Rectified layer previews">
+          <strong>Rectified card</strong>
+          <label title="Preview shape only. Auto uses the current corner order and edge lengths; override it for strong perspective. It does not rotate or confirm the card.">Shape
+            <select id="crop-shape" aria-label="Crop shape"><option value="auto">Auto</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+          </label>
+          <label id="preview-mode-control">Preview
+            <select id="preview-mode" aria-label="Preview mode"><option value="masked">Masked</option><option value="layers">Layer colors</option><option value="original">Original</option></select>
+          </label>
+          <figure class="combined-preview"><figcaption id="crop-title">Selected card</figcaption><canvas id="crop" width="180" height="250" aria-label="Selected rectified card"></canvas></figure>
+          <p id="preview-legend"></p>
+          <p id="preview-coverage"></p>
+          <p id="overlap-summary" aria-live="polite"></p>
+          <div id="overlap-list" aria-label="All cards overlapping the selected card"></div>
+          <div id="overlap-audit" class="overlap-audit"><p id="frame-overlaps"></p><button id="next-overlap" type="button">Next unknown overlap →</button></div>
+          <details id="any-card-comparison" class="any-card-comparison">
+            <summary>Compare any card</summary>
+            <label>Relative to <select id="preview-other" aria-label="Compare with card"></select></label>
+            <figure class="combined-preview"><figcaption id="other-crop-title">Other card</figcaption><canvas id="other-crop" width="180" height="250" aria-label="Other rectified card"></canvas></figure>
+            <p id="preview-relationship"></p>
+            <div class="layer-move-buttons"><button id="layer-forward" type="button">Bring forward ↑</button><button id="layer-backward" type="button">Send backward ↓</button></div>
+          </details>
+        </section>
         <strong>Corner zoom</strong><canvas id="zoom" width="220" height="220"></canvas>
-        <strong>Rectified card</strong><canvas id="crop" width="180" height="250"></canvas>
         <div class="legend">
-          <span>Amber dashed: untouched · Green ✓: labeled · Grey: skipped · Pink: selected</span>
+          <span>Amber dashed: untouched · Amber solid: draft · Green ✓: confirmed · Grey: skipped · Pink: selected · ?: orientation unknown</span>
         </div>
-        <label>Reviewer
-          <input id="reviewer" placeholder="Your name" maxlength="120" autocomplete="name" /></label>
-        <label class="notes">Notes
-          <textarea id="notes" placeholder="Anything odd about this frame…" maxlength="10000"></textarea></label>
         <div id="targets" class="target-list"></div>
+        <details class="meta">
+          <summary>Reviewer <span id="reviewer-name"></span> · notes</summary>
+          <label>Reviewer
+            <input id="reviewer" placeholder="Defaults to this computer's account" maxlength="120" autocomplete="name" /></label>
+          <label class="notes">Notes for this frame
+            <textarea id="notes" placeholder="Optional" maxlength="10000"></textarea></label>
+        </details>
       </aside>
     </main>
     <footer>
@@ -98,6 +171,7 @@
       ><button class="primary" id="save-next">Save & next →</button>
     </footer>
     <script src="/geometry.js"></script>
+    <script src="/layers.js"></script>
     <script src="/labeler.js"></script>
   </body>
 </html>

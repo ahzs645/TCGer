@@ -16,8 +16,14 @@
     {
       "name": "archive-corner-labeler",
       "runtimeExecutable": ".artifacts/card-geometry/trainer-validation-venv/bin/python",
-      "runtimeArgs": ["tools/card-geometry/archive_corner_label_server.py", "--queue", ".artifacts/card-geometry/successor-prep/archive-corner-label-queue.json", "--release", ".artifacts/card-geometry/releases/real-geometry-successor-candidate-v1", "--journal", ".artifacts/card-geometry/archive-corner-labels/journal.jsonl", "--port", "8768"],
+      "runtimeArgs": ["tools/card-geometry/archive_corner_label_server.py", "--queue", ".artifacts/card-geometry/successor-prep/archive-corner-label-queue-padding-fixed.json", "--release", ".artifacts/card-geometry/releases/real-geometry-successor-padding-fixed-v1", "--journal", ".artifacts/card-geometry/archive-corner-labels/journal-padding-fixed.jsonl", "--model-review-config", ".artifacts/card-geometry/model-review/reviewed-yolo11s-20260908/config.json", "--port", "8768"],
       "port": 8768
+    },
+    {
+      "name": "reference-corner-labeler",
+      "runtimeExecutable": ".artifacts/card-geometry/trainer-validation-venv/bin/python",
+      "runtimeArgs": ["tools/card-geometry/archive_corner_label_server.py", "--queue", ".artifacts/card-geometry/reference-corner-review/queue-v1.json", "--release", ".artifacts/card-geometry/releases/real-geometry-evaluation-v6-full-aliases-v2", "--journal", ".artifacts/card-geometry/reference-corner-review/journal-v1.jsonl", "--port", "8770"],
+      "port": 8770
     }
   ]
 }

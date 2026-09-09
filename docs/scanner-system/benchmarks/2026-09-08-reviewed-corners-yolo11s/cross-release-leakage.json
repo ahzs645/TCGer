@@ -1,0 +1,14 @@
+{
+  "archiveAliasConflicts": {},
+  "corpusHashes": {
+    "frozenReal": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "syntheticMultigame": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+    "training": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf"
+  },
+  "failedChecks": [],
+  "leaks": {
+    "frozenReal": [],
+    "syntheticMultigame": []
+  },
+  "schema": "https://tcger.app/reports/card-geometry-cross-release-leakage/v1"
+}

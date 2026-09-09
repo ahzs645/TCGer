@@ -26,6 +26,8 @@ struct GameInstallationView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    NavigationLink("Grading planner") { GradingWorkspaceView() }
+                        .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: 320)
             }

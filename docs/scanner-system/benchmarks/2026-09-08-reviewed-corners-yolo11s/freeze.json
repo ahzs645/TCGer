@@ -1,0 +1,147 @@
+{
+  "authorization": "User requested complete reviewed-data preparation and retraining only the most promising model. One YOLO11s-pose 50-epoch job on one L4, followed by the same frozen geometry benchmarks and recognition replay.",
+  "bakeoffId": "shared-card-geometry-reviewed-corners-v1",
+  "baseline": {
+    "bakeoffId": "shared-card-geometry-successor-v1",
+    "candidate": "yolo11s-pose",
+    "checkpointPrefix": "geometry/yolo11s-pose/74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf/3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+    "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+    "experimentHash": "3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+    "fairnessHash": "d4a63a8df427316c676b994fc35599035ab61def360d3c2abbe06c795832ac9d",
+    "framework": "ultralytics",
+    "licenseRoute": "evaluation-only",
+    "policyId": "training-minimums-v4",
+    "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+    "resolvedConfigSha256": "3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+    "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+  },
+  "comparison": {
+    "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/collect_results.py",
+    "path": "geometry/reviewed-label-inputs/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/collect_results.py",
+    "sha256": "7d5ba2a5ac5621cff79c5f9b13c81ffaab56438dbb9267102a49d65f36aa61a7"
+  },
+  "configFiles": {
+    "yolo11s-pose": {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/yolo11s-pose.json",
+      "path": "geometry/bakeoffs/9a96e11fb09aa82693eff9b0301e24b1dda9a734/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/yolo11s-pose.json",
+      "sha256": "a3e8601de2a72bf11194087a3b72090ec1914c3f292d1b4ed52c817d24124ebc"
+    }
+  },
+  "corpus": {
+    "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+    "datasetRepo": "ahzs645/tcger-scanner-images",
+    "datasetRevision": "3759819e007e6ee755b530652c3d72abbd96963f",
+    "policyId": "training-minimums-v4",
+    "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+    "preflightReport": {
+      "path": "geometry/preflights/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/8e315f1b5fb18643f97a30fd159b904324e21181ed45c69e6ce20624b53d336a.json",
+      "sha256": "8e315f1b5fb18643f97a30fd159b904324e21181ed45c69e6ce20624b53d336a"
+    },
+    "releasePath": "geometry/releases/card-geometry-training-reviewed-corners-v1"
+  },
+  "evaluations": {
+    "frozenReal": {
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2"
+    },
+    "goldenFixtures": {
+      "path": "tools/card-geometry/fixtures/validation-nms.v1.json",
+      "sha256": "ec0f877af9d0f2afe4f6a76c7a4590c033fa0d35027815330adb24c540532168"
+    },
+    "recognitionModels": {
+      "games": {
+        "magic": {
+          "metadata": {
+            "path": "exports/magic/full/CardsIndexMetadata.json",
+            "sha256": "35759a1443c6466847ec584b3ad6581d23e4624c91bc6f943f77f2a595461e54"
+          },
+          "onnx": {
+            "path": "exports/magic/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "ebc725476ec2866cd054cd16ef9bcda257bbfdc5aa05326a79335abc4fdc0d3e"
+          },
+          "queryNormalization": "grey-world-autocontrast",
+          "strongThreshold": 0.7,
+          "vectors": {
+            "path": "exports/magic/full/CardsIndexVectors-arcface.bin",
+            "sha256": "4449c186a23ceef512a7786d73f32c8322dc45c7279e90f3dfbc75d7cdc135e8"
+          }
+        },
+        "pokemon": {
+          "metadata": {
+            "path": "exports/pokemon/full/CardsIndexMetadata.json",
+            "sha256": "5bcc886d58fca214800d366d080a438515d7820ffe03fcea7395496b5ef08117"
+          },
+          "onnx": {
+            "path": "exports/pokemon/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "bd7367284130639345efbe967e5e80b4aadf0ab5d5bc922968d2b06e497eea44"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/pokemon/full/CardsIndexVectors-arcface.bin",
+            "sha256": "d78e06b0909f39f57deab5c04c1bfb20671bf933f95033f143942e8cc388bdc3"
+          }
+        },
+        "yugioh": {
+          "metadata": {
+            "path": "exports/yugioh/full/CardsIndexMetadata.json",
+            "sha256": "0ab3fec12511b401244b1f80ac12ac432f10cdb2afdcfc59f7797568d50cca5e"
+          },
+          "onnx": {
+            "path": "exports/yugioh/full/card-embeddings-arcface-fp32.onnx",
+            "sha256": "b304bde2171d8ca4a824a4e0cab4bc22c3b31e425a8ba5e3ef91aab4ec6f9d58"
+          },
+          "queryNormalization": "none",
+          "strongThreshold": 0.65,
+          "vectors": {
+            "path": "exports/yugioh/full/CardsIndexVectors-arcface.bin",
+            "sha256": "2de604679f08018e18fe3f3db188414add77fba51c6e8c52c4eb8b87cea8cbdd"
+          }
+        }
+      },
+      "modelRepo": "ahzs645/tcger-universal-arcface",
+      "modelRevision": "3e51bbba70c6fbc6d07bdc6d1f4ea4ac7a00f7cb"
+    },
+    "recognitionReplay": {
+      "path": "docs/scanner-system/benchmarks/2026-09-02-shared-card-geometry/reports/device-geometry-outcomes.json",
+      "sha256": "05b56efb2ece661100fab8c935485174e5d59aae562704002e86349e008a5997"
+    },
+    "syntheticMultigame": {
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "datasetRepo": "ahzs645/tcger-scanner-images",
+      "datasetRevision": "3e03b753158b602b9f4ec3bdace2de05a5b2e5f2",
+      "releasePath": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2"
+    }
+  },
+  "experiments": {
+    "yolo11s-pose": {
+      "bakeoffId": "shared-card-geometry-reviewed-corners-v1",
+      "candidate": "yolo11s-pose",
+      "checkpointPrefix": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+      "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+      "experimentHash": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+      "fairnessHash": "a7ab3dc227e84af451db0c3048e0e245c87da17fc52cda47b2c055c15da3c1ff",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v4",
+      "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+      "resolvedConfigSha256": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "launchStatus": "not-submitted",
+  "preflight": {
+    "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/preflight-report.json",
+    "path": "geometry/preflights/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/8e315f1b5fb18643f97a30fd159b904324e21181ed45c69e6ce20624b53d336a.json",
+    "sha256": "8e315f1b5fb18643f97a30fd159b904324e21181ed45c69e6ce20624b53d336a"
+  },
+  "schema": "https://tcger.app/reports/card-geometry-successor-freeze/v1",
+  "tooling": {
+    "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/tooling.tar.gz",
+    "path": "geometry/tooling/9a96e11fb09aa82693eff9b0301e24b1dda9a734/card-geometry-tooling.tar.gz",
+    "sha256": "7a38b2563458397e378b5d1a9fdbb0e30a39643243f6471d2d3a1932d41c64bb"
+  },
+  "toolingRevision": "9a96e11fb09aa82693eff9b0301e24b1dda9a734"
+}

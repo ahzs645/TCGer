@@ -92,6 +92,7 @@ export const ParityFeatureIDs = {
   collectionsSmartFolders: "collections.smartFolders",
   accountManagement: "account.management",
   scannerBinderReview: "scanner.binderReview",
+  pricingGradingWorkspace: "pricing.gradingWorkspace",
 } as const;
 
 export type ParityFeatureID = (typeof ParityFeatureIDs)[keyof typeof ParityFeatureIDs];
@@ -165,6 +166,7 @@ export const implementedParityFeatureIDs: ReadonlySet<ParityFeatureID> = new Set
   ParityFeatureIDs.collectionsSmartFolders,
   ParityFeatureIDs.accountManagement,
   ParityFeatureIDs.scannerBinderReview,
+  ParityFeatureIDs.pricingGradingWorkspace,
 ]);
 
 export const parityScreenID = (featureID: ParityFeatureID): string => `feature.${featureID}`;

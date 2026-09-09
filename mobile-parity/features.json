@@ -2658,6 +2658,54 @@
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
         ]
       }
+    },
+    {
+      "id": "pricing.gradingWorkspace",
+      "title": "Grading planner: prices, costs, decision, population, history and receipts",
+      "policy": "track",
+      "web": {
+        "status": "implemented",
+        "sources": [
+          "frontend/src/components/grading/grading-workspace.tsx",
+          "frontend/app/prices/grading/page.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "playwright",
+            "id": "pricing.gradingWorkspace",
+            "path": "frontend/tests/parity/grading-workspace.spec.ts"
+          }
+        ]
+      },
+      "ios": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/GradingWorkspaceView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Models/GradingModels.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "pricing.gradingWorkspace",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/GradingContractTests.swift"
+          }
+        ]
+      },
+      "android": {
+        "status": "implemented",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/GradingWorkspaceScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/GradingModels.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "pricing.gradingWorkspace",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/libraryoperations/GradingContractTest.kt"
+          }
+        ]
+      },
+      "flow": "maestro/flows/grading-workspace.yaml"
     }
   ],
   "controls": [

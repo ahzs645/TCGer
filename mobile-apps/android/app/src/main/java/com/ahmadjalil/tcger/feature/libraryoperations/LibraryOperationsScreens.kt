@@ -81,6 +81,7 @@ private enum class OperationsDestination(val title: String) {
     PSA("PSA Intake"),
     PRINTED_IDENTITY("Printed Identity"),
     PRICING("Price Provenance"),
+    GRADING("Grading planner"),
 }
 
 private sealed interface AsyncState {
@@ -114,12 +115,16 @@ fun LibraryOperationsHostScreen(
             )
         },
     ) { padding ->
+        if (destination == OperationsDestination.GRADING) {
+            GradingWorkspaceScreen(repository, padding)
+            return@Scaffold
+        }
         if (repository == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(
-                    "Connect and sign in to a TCGer server to use synchronized library operations.",
-                    modifier = Modifier.padding(24.dp),
-                )
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Button(onClick = { destination = OperationsDestination.GRADING }) { Text("Grading planner") }
+                    Text("Connect and sign in to a TCGer server to use synchronized library operations. The grading planner works offline.")
+                }
             }
             return@Scaffold
         }
@@ -132,6 +137,7 @@ fun LibraryOperationsHostScreen(
             OperationsDestination.PSA -> PsaIntakeScreen(repository, padding)
             OperationsDestination.PRINTED_IDENTITY -> PrintedIdentityScreen(repository, padding)
             OperationsDestination.PRICING -> PriceProvenanceScreen(repository, padding)
+            OperationsDestination.GRADING -> GradingWorkspaceScreen(repository, padding)
         }
     }
 }
@@ -145,6 +151,7 @@ private fun OperationsMenu(padding: PaddingValues, onDestination: (OperationsDes
         Triple(OperationsDestination.COST_SPLIT, "Allocate exact cents with an audit receipt", Icons.Default.Calculate),
         Triple(OperationsDestination.PSA, "Look up a cert and confirm exact printing", Icons.Default.Verified),
         Triple(OperationsDestination.PRINTED_IDENTITY, "Localized names and search aliases", Icons.Default.Language),
+        Triple(OperationsDestination.GRADING, "Grade values, costs, population, and history", Icons.Default.Calculate),
         Triple(OperationsDestination.PRICING, "Native quotes, FX source, confidence, and coverage", Icons.Default.Paid),
     )
     LazyColumn(

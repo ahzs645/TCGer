@@ -88,12 +88,40 @@
         "kind": { "enum": ["real", "synthetic"] },
         "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "sha256": { "$ref": "#/$defs/sha256" },
+        "reviewedNonCardAnnotations": {
+          "description": "Original whole-card annotations rejected as not-a-card in a saved review. Original category totals and annotation indices remain unchanged.",
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["sourceAnnotationIndex", "reason", "reviewer", "savedAt", "journalSha256"],
+            "properties": {
+              "sourceAnnotationIndex": { "type": "integer", "minimum": 0 },
+              "reason": { "const": "not-a-card" },
+              "reviewer": { "type": "string", "minLength": 1 },
+              "savedAt": { "type": "string", "format": "date-time" },
+              "journalSha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        },
+        "paddingCorrection": {
+          "description": "Verified reflected borders replaced with constant pixels at identical dimensions. Interior coordinates and original annotation identities are unchanged.",
+          "type": "object", "additionalProperties": false,
+          "required": ["method", "originalImageSha256", "contentBounds", "fillRGB", "removedAnnotationIndices", "clippedAnnotationIndices"],
+          "properties": {
+            "method": { "const": "reflected-border-to-constant-v1" },
+            "originalImageSha256": { "$ref": "#/$defs/sha256" },
+            "contentBounds": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "type": "integer", "minimum": 0 } },
+            "fillRGB": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "integer", "minimum": 0, "maximum": 255 } },
+            "removedAnnotationIndices": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 0 } },
+            "clippedAnnotationIndices": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 0 } }
+          }
+        },
         "width": { "type": "integer", "minimum": 1 },
         "height": { "type": "integer", "minimum": 1 },
         "licenseId": { "type": "string", "minLength": 1, "maxLength": 160 },
         "licenseUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
         "annotationCategories": {
-          "description": "Count of every canonical source annotation on this frame by canonical category, including auxiliary and context annotations (inner borders, title/info/collection regions, slabs) that deliberately did not become geometry targets. Emitted by the category-aware archive importer; absent on legacy and non-archive records. Preflight TARGET_SEMANTICS requires the primary-category total to equal the number of instances.",
+          "description": "Count of every original canonical source annotation by category, including auxiliary and context annotations. Preflight TARGET_SEMANTICS requires the primary-category total, less explicitly recorded reflected-padding removals, to equal the number of instances. Counts retain original source annotation index bounds after a padding repair.",
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/id" },
           "additionalProperties": { "type": "integer", "minimum": 0 }
@@ -218,6 +246,11 @@
           }
         },
         "occlusionOrder": { "type": "integer", "minimum": 0 },
+        "cardsAbove": {
+          "description": "Instance IDs explicitly reviewed as above this card; geometric overlap is not required. Only these relations and their transitive consequences are known. Legacy occlusionOrder breaks remaining ties without asserting a reviewed relationship.",
+          "type": "array", "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
         "physicalCardId": { "$ref": "#/$defs/id" },
         "sourceAssetId": { "$ref": "#/$defs/id" },
         "sourceCategory": {

@@ -346,6 +346,9 @@ export default function PricesPage() {
             </p>
           </div>
           <Button variant="outline" size="sm" asChild>
+            <Link href="/demo/prices/grading">Grading planner</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
             <Link href="/demo/prices/cost-returns">
               <WalletCards className="mr-2 h-4 w-4" aria-hidden />
               Cost &amp; Returns

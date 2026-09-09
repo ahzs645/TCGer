@@ -17,6 +17,7 @@ import {
   PsaCertificateIntake,
   RapidSetEntry,
 } from "@/components/collections/intake-tools";
+import { GradingWorkspace } from "@/components/grading/grading-workspace";
 import { StorageEditor } from "@/components/collections/storage-editor";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,6 +64,7 @@ export default function CollectionOrganizationPage() {
               <BadgeDollarSign className="mr-2 h-4 w-4" />
               Cost split
             </TabsTrigger>
+            <TabsTrigger value="grading">Grading planner</TabsTrigger>
             <TabsTrigger value="psa">
               <ShieldCheck className="mr-2 h-4 w-4" />
               PSA intake
@@ -76,6 +78,9 @@ export default function CollectionOrganizationPage() {
           </TabsContent>
           <TabsContent value="cost">
             <AcquisitionCostSplitter />
+          </TabsContent>
+          <TabsContent value="grading">
+            <GradingWorkspace />
           </TabsContent>
           <TabsContent value="psa">
             <PsaCertificateIntake />

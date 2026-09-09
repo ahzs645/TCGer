@@ -6,11 +6,15 @@ struct LibraryOperationsView: View {
     var body: some View {
         Group {
             if environmentStore.serverConfiguration.isOnDevice {
-                ContentUnavailableView(
-                    "Connect a Server",
-                    systemImage: "externaldrive.badge.wifi",
-                    description: Text("Physical storage, checkout, certification, and audit workflows sync through a TCGer server.")
-                )
+                VStack(spacing: 16) {
+                    NavigationLink("Grading planner") { GradingWorkspaceView() }
+                        .buttonStyle(.borderedProminent)
+                    ContentUnavailableView(
+                        "Connect a Server",
+                        systemImage: "externaldrive.badge.wifi",
+                        description: Text("Physical storage, checkout, certification, and audit workflows sync through a TCGer server. The grading planner works offline.")
+                    )
+                }
             } else {
                 List {
                     Section("Organize") {
@@ -65,6 +69,7 @@ struct LibraryOperationsView: View {
                     }
 
                     Section("Pricing") {
+                        NavigationLink("Grading planner") { GradingWorkspaceView() }
                         NavigationLink {
                             PricingProvenanceView()
                         } label: {

@@ -48,8 +48,8 @@ function bucketPrice(bucket: JsonRecord | null): number | undefined {
   return undefined;
 }
 
-async function query(params: Record<string, string>): Promise<unknown> {
-  const url = new URL(`${env.POKEMON_PRICE_TRACKER_API_BASE_URL.replace(/\/$/, '')}/cards`);
+export async function queryGradingProvider(params: Record<string, string>, endpoint = 'cards'): Promise<unknown> {
+  const url = new URL(`${env.POKEMON_PRICE_TRACKER_API_BASE_URL.replace(/\/$/, '')}/${endpoint}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   const response = await fetchWithProviderPolicy(
     'pokemon-price-tracker',
@@ -99,11 +99,11 @@ export async function fetchGradedPrice(input: GradedPriceInput) {
   }
 
   let matches = input.tcgPlayerId
-    ? cards(await query({ tcgPlayerId: input.tcgPlayerId, includeEbay: 'true', limit: '1' }))
+    ? cards(await queryGradingProvider({ tcgPlayerId: input.tcgPlayerId, includeEbay: 'true', limit: '1' }))
     : [];
   if (!matches.length && input.name) {
     matches = cards(
-      await query({
+      await queryGradingProvider({
         search: input.name,
         ...(input.setName ? { setName: input.setName } : {}),
         includeEbay: 'true',

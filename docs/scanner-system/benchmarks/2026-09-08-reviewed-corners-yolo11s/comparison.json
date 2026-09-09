@@ -1,0 +1,223 @@
+{
+  "baselineCheckpointSha256": "bf1b972b96a6908e6f80ef1d45934d5dec67f8c48dba3890c2cbd91a66489677",
+  "baselineExperimentHash": "3ed309ce4adf93c5b88288d1ac40e422ded6c5d8eb7f0b48a1c6ab89580050ee",
+  "candidate": "yolo11s-pose",
+  "limitations": "One seed. The frozen binder slice has only three images and 27 cards. This compares the complete reviewed-data preparation, including the small padding adjustment, rather than isolating label changes alone.",
+  "real": {
+    "baseline": {
+      "cornerCount": 416,
+      "cornerP50": 0.141507555692,
+      "cornerP90": 0.411755961454,
+      "duplicate": 16,
+      "extra": 177,
+      "meanMatchedIoU": 0.869092552128,
+      "miss": 54,
+      "recall@0.5": 0.922857142857,
+      "recall@0.75": 0.768571428571,
+      "recall@0.9": 0.554285714286
+    },
+    "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "counts": {
+      "records": 600,
+      "scorableTruthInstances": 700,
+      "truthGeometrySource": {
+        "quad": 651,
+        "visibleMask": 49
+      },
+      "truthInstances": 700,
+      "unscorableTruthInstances": 0
+    },
+    "delta": {
+      "cornerCount": 96,
+      "cornerP50": -0.072882949664,
+      "cornerP90": -0.147160312904,
+      "duplicate": -14,
+      "extra": -130,
+      "meanMatchedIoU": 0.04505314704200003,
+      "miss": -31,
+      "recall@0.5": 0.04428571428599992,
+      "recall@0.75": 0.135714285715,
+      "recall@0.9": 0.18999999999999995
+    },
+    "reviewed": {
+      "cornerCount": 512,
+      "cornerP50": 0.068624606028,
+      "cornerP90": 0.26459564855,
+      "duplicate": 2,
+      "extra": 47,
+      "meanMatchedIoU": 0.91414569917,
+      "miss": 23,
+      "recall@0.5": 0.967142857143,
+      "recall@0.75": 0.904285714286,
+      "recall@0.9": 0.744285714286
+    }
+  },
+  "realBySceneSlice": {
+    "baseline": {
+      "binder_page": {
+        "duplicate": 4,
+        "extra": 51,
+        "matches": 15,
+        "recall@0.5": 0.555555555556,
+        "recall@0.75": 0.037037037037,
+        "recall@0.9": 0.0,
+        "truthInstances": 27
+      },
+      "duel_field": {
+        "duplicate": 0,
+        "extra": 21,
+        "matches": 20,
+        "recall@0.5": 0.606060606061,
+        "recall@0.75": 0.212121212121,
+        "recall@0.9": 0.060606060606,
+        "truthInstances": 33
+      },
+      "single_card_archive": {
+        "duplicate": 12,
+        "extra": 84,
+        "matches": 542,
+        "recall@0.5": 0.966131907308,
+        "recall@0.75": 0.880570409982,
+        "recall@0.9": 0.655971479501,
+        "truthInstances": 561
+      },
+      "single_handheld": {
+        "duplicate": 0,
+        "extra": 13,
+        "matches": 53,
+        "recall@0.5": 0.929824561404,
+        "recall@0.75": 0.543859649123,
+        "recall@0.9": 0.263157894737,
+        "truthInstances": 57
+      },
+      "steep_playmat": {
+        "duplicate": 0,
+        "extra": 8,
+        "matches": 16,
+        "recall@0.5": 0.727272727273,
+        "recall@0.75": 0.227272727273,
+        "recall@0.9": 0.136363636364,
+        "truthInstances": 22
+      }
+    },
+    "reviewed": {
+      "binder_page": {
+        "duplicate": 0,
+        "extra": 0,
+        "matches": 27,
+        "recall@0.5": 1.0,
+        "recall@0.75": 1.0,
+        "recall@0.9": 1.0,
+        "truthInstances": 27
+      },
+      "duel_field": {
+        "duplicate": 1,
+        "extra": 9,
+        "matches": 27,
+        "recall@0.5": 0.818181818182,
+        "recall@0.75": 0.606060606061,
+        "recall@0.9": 0.242424242424,
+        "truthInstances": 33
+      },
+      "single_card_archive": {
+        "duplicate": 1,
+        "extra": 29,
+        "matches": 549,
+        "recall@0.5": 0.978609625668,
+        "recall@0.75": 0.948306595365,
+        "recall@0.9": 0.846702317291,
+        "truthInstances": 561
+      },
+      "single_handheld": {
+        "duplicate": 0,
+        "extra": 7,
+        "matches": 55,
+        "recall@0.5": 0.964912280702,
+        "recall@0.75": 0.80701754386,
+        "recall@0.9": 0.157894736842,
+        "truthInstances": 57
+      },
+      "steep_playmat": {
+        "duplicate": 0,
+        "extra": 2,
+        "matches": 19,
+        "recall@0.5": 0.863636363636,
+        "recall@0.75": 0.363636363636,
+        "recall@0.9": 0.090909090909,
+        "truthInstances": 22
+      }
+    }
+  },
+  "recognitionReplay": {
+    "baseline": {
+      "abstain": 8,
+      "correct": 4,
+      "correctReject": 0,
+      "frames": 57,
+      "unknown": 44,
+      "wrong": 1
+    },
+    "reviewed": {
+      "abstain": 7,
+      "correct": 4,
+      "correctReject": 0,
+      "frames": 57,
+      "unknown": 45,
+      "wrong": 1
+    }
+  },
+  "resultRevision": "6254006b866a24c16b9df9c1a95e43ddb2595a34",
+  "reviewedCheckpointSha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327",
+  "reviewedExperimentHash": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+  "sameTrainingRecipe": false,
+  "synthetic": {
+    "baseline": {
+      "cornerCount": 13180,
+      "cornerP50": 0.037594550144,
+      "cornerP90": 0.156913300129,
+      "duplicate": 53,
+      "extra": 729,
+      "meanMatchedIoU": 0.880873034563,
+      "miss": 356,
+      "recall@0.5": 0.902492467817,
+      "recall@0.75": 0.800876472199,
+      "recall@0.9": 0.492741714599
+    },
+    "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+    "counts": {
+      "records": 1000,
+      "scorableTruthInstances": 3651,
+      "truthGeometrySource": {
+        "quad": 3651
+      },
+      "truthInstances": 3651,
+      "unscorableTruthInstances": 0
+    },
+    "delta": {
+      "cornerCount": 308,
+      "cornerP50": -0.013822474224999996,
+      "cornerP90": -0.05405298473600001,
+      "duplicate": -31,
+      "extra": 114,
+      "meanMatchedIoU": 0.03572590651099994,
+      "miss": -77,
+      "recall@0.5": 0.021090112298000063,
+      "recall@0.75": 0.06683100520399998,
+      "recall@0.9": 0.196932347302
+    },
+    "reviewed": {
+      "cornerCount": 13488,
+      "cornerP50": 0.023772075919,
+      "cornerP90": 0.102860315393,
+      "duplicate": 22,
+      "extra": 843,
+      "meanMatchedIoU": 0.916598941074,
+      "miss": 279,
+      "recall@0.5": 0.923582580115,
+      "recall@0.75": 0.867707477403,
+      "recall@0.9": 0.689674061901
+    }
+  },
+  "trainingRecipeChange": "Real training context padding increased from 15% to 16% to preserve one reviewed outside-frame corner. Other training settings and all evaluation settings are unchanged.",
+  "wrapperElapsedHours": 2.723915134
+}

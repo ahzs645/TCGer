@@ -93,6 +93,7 @@ object ParityFeatureIDs {
     const val COLLECTIONS_SMART_FOLDERS = "collections.smartFolders"
     const val ACCOUNT_MANAGEMENT = "account.management"
     const val SCANNER_BINDER_REVIEW = "scanner.binderReview"
+    const val PRICING_GRADING_WORKSPACE = "pricing.gradingWorkspace"
 
     val implemented: Set<String> = setOf(
         HOME_DASHBOARD,
@@ -171,6 +172,7 @@ object ParityFeatureIDs {
         COLLECTIONS_SMART_FOLDERS,
         ACCOUNT_MANAGEMENT,
         SCANNER_BINDER_REVIEW,
+        PRICING_GRADING_WORKSPACE,
     )
 
     fun screen(featureId: String): String = "feature.$featureId"

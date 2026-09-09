@@ -5,6 +5,7 @@ import SwiftUI
 /// (main search, add-to-binder search, binder-scan match correction) uses
 /// these instead of maintaining its own fork.
 struct CardSearchResultsList: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let cards: [Card]
     let selectedGame: TCGGame
     let enabledGames: [TCGGame]
@@ -63,10 +64,7 @@ struct CardSearchResultsList: View {
     }
 
     private func cardsGrid(_ cards: [Card]) -> some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible())
-        ], spacing: 16) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2), spacing: AppSpacing.large) {
             ForEach(cards) { card in
                 Button {
                     onCardTap(card)
@@ -118,7 +116,7 @@ private struct CardSearchGameSectionHeader: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12)
-        .frame(height: 36)
+        .frame(minHeight: 36)
         .glassEffect(
             .regular.tint((game?.brandColor ?? .accentColor).opacity(0.08)),
             in: .capsule
@@ -132,6 +130,8 @@ private struct CardSearchGameSectionHeader: View {
 
 // MARK: - Result Cell
 struct CardSearchResultCell: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let card: Card
     let showPricing: Bool
     let showCardNumbers: Bool
@@ -173,9 +173,9 @@ struct CardSearchResultCell: View {
             // Card Info
             VStack(alignment: .leading, spacing: 4) {
                 if let worlds = card.pokemonPrint?.worldChampionship {
-                    HStack(spacing: 4) {
+                    MetadataFlowLayout {
                         Text("Worlds \(worlds.year)")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
@@ -183,9 +183,9 @@ struct CardSearchResultCell: View {
                             .clipShape(Capsule())
 
                         Text(worlds.playerName)
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                     }
                 }
 
@@ -193,21 +193,12 @@ struct CardSearchResultCell: View {
                     PokemonRarityBadge(rarity: rarity, tcg: card.tcg, symbol: card.gamePresentation?.symbols?.first { $0.kind == "rarity" && $0.id == rarity })
                 }
 
-                HStack(alignment: .top, spacing: 4) {
-                    Text(card.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .lineLimit(2)
-
-                    Spacer(minLength: 0)
-
-                    if showCardNumbers {
-                        if let collectorNumberDisplay {
-                            Text(collectorNumberDisplay)
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
-                                .fixedSize()
+                ViewThatFits(in: .horizontal) {
+                    cardTitleRow
+                    VStack(alignment: .leading, spacing: AppSpacing.compact) {
+                        Text(card.name).font(.caption.weight(.medium))
+                        if showCardNumbers, let collectorNumberDisplay {
+                            Text(collectorNumberDisplay).font(.caption2.weight(.semibold))
                         }
                     }
                 }
@@ -216,15 +207,15 @@ struct CardSearchResultCell: View {
                     Text(setDisplayName ?? " ")
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                 }
 
                 // Pokemon TCG format legality & dex number
                 if card.tcg == "pokemon" {
-                    HStack(spacing: 4) {
+                    MetadataFlowLayout {
                         if let supertype = card.supertype {
                             Text(supertype)
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
                                 .background(Color(.systemGray4))
@@ -232,7 +223,7 @@ struct CardSearchResultCell: View {
                         }
                         if card.sanctionedPlayLegal == false {
                             Text("Not tournament legal")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundColor(.orange)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
@@ -240,7 +231,7 @@ struct CardSearchResultCell: View {
                                 .cornerRadius(3)
                         } else if card.formatLegality?.standard == true {
                             Text("Standard")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundColor(.green)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
@@ -249,7 +240,7 @@ struct CardSearchResultCell: View {
                         }
                         if card.formatLegality?.expanded == true {
                             Text("Expanded")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundColor(.blue)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
@@ -258,7 +249,7 @@ struct CardSearchResultCell: View {
                         }
                         if let dexNum = card.pokedexNumber {
                             Text("#\(dexNum)")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 1)
@@ -282,6 +273,23 @@ struct CardSearchResultCell: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var cardTitleRow: some View {
+        HStack(alignment: .top, spacing: AppSpacing.compact) {
+            Text(card.name)
+                .font(.caption.weight(.medium))
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+
+            Spacer(minLength: 0)
+
+            if showCardNumbers, let collectorNumberDisplay {
+                Text(collectorNumberDisplay)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .fixedSize()
+            }
+        }
     }
 
     private var unavailableImagePlaceholder: some View {

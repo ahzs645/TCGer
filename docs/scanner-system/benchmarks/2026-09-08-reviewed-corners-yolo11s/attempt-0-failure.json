@@ -1,0 +1,10 @@
+{
+  "jobId": "6aa0489c32d5d0c22c5adf86",
+  "status": "ERROR",
+  "queueSeconds": 4264,
+  "runtimeSeconds": 32,
+  "trainingStarted": false,
+  "reason": "403 saving resolved config: connector-injected credential lacked model-repository write access",
+  "replacementJobId": "6aa0721b32d5d0c22c5ae7fd",
+  "verifiedLocalWriteCommit": "6409ee03f73dabc14a3afe05052d02ec59d4a037"
+}

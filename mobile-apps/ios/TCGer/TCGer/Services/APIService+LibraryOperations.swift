@@ -1,6 +1,14 @@
 import Foundation
 
 extension APIService {
+    func searchGradingCards(config: ServerConfiguration, token: String, request: GradingSearchRequest) async throws -> GradingSearchResult {
+        try await libraryOperationsResponse(config: config, path: "grading/search", method: "POST", token: token, body: request, as: GradingSearchResult.self)
+    }
+
+    func getGradingSnapshot(config: ServerConfiguration, token: String, request: GradingSnapshotRequest) async throws -> GradingSnapshot {
+        try await libraryOperationsResponse(config: config, path: "grading/snapshot", method: "POST", token: token, body: request, as: GradingSnapshot.self)
+    }
+
     func getStorageContainers(config: ServerConfiguration, token: String) async throws -> [StorageContainer] {
         try await libraryOperationsResponse(
             config: config,

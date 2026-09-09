@@ -1,0 +1,12 @@
+{
+  "datasetRepo": "ahzs645/tcger-scanner-images",
+  "datasetRevision": "3759819e007e6ee755b530652c3d72abbd96963f",
+  "releases": {
+    "geometry/releases/card-geometry-training-reviewed-corners-v1": {
+      "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+      "files": 31507,
+      "manifestSha256": "583e256b01de55e06260107b53c3bdc5f6511771491a59251e2f9f845cafa764"
+    }
+  },
+  "schema": "https://tcger.app/reports/card-geometry-release-publication/v1"
+}

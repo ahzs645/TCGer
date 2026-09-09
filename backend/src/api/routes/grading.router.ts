@@ -1,5 +1,15 @@
 import { Router } from 'express';
-import { gradedPriceEstimateInputSchema, psaCertLookupResponseSchema } from '@tcg/api-types';
+import {
+  gradedPriceEstimateInputSchema,
+  psaCertLookupResponseSchema,
+  gradingSnapshotRequestSchema,
+  gradingSnapshotSchema,
+  gradingSearchRequestSchema,
+} from '@tcg/api-types';
+import {
+  fetchGradingSnapshot,
+  searchGradingCards,
+} from '../../modules/grading/grading-snapshot.service';
 import { env } from '../../config/env';
 import { requireAuth, type AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../../utils/async-handler';
@@ -85,6 +95,39 @@ gradingRouter.post(
           .status(error.status)
           .json({ error: 'GRADING_PROVIDER_ERROR', message: error.message });
       }
+      throw error;
+    }
+  }),
+);
+
+// One exact product request returns every grader; no N-per-grade provider fan-out.
+gradingRouter.post(
+  '/snapshot',
+  asyncHandler(async (req, res) => {
+    try {
+      const result = await fetchGradingSnapshot(gradingSnapshotRequestSchema.parse(req.body));
+      res.json(gradingSnapshotSchema.parse(result));
+    } catch (error) {
+      if (error instanceof GradingProviderError) {
+        return res
+          .status(error.status)
+          .json({ error: 'GRADING_PROVIDER_ERROR', message: error.message });
+      }
+      throw error;
+    }
+  }),
+);
+
+gradingRouter.post(
+  '/search',
+  asyncHandler(async (req, res) => {
+    try {
+      res.json(await searchGradingCards(gradingSearchRequestSchema.parse(req.body)));
+    } catch (error) {
+      if (error instanceof GradingProviderError)
+        return res
+          .status(error.status)
+          .json({ error: 'GRADING_PROVIDER_ERROR', message: error.message });
       throw error;
     }
   }),

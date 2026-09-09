@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Back up card drafts</title>
+<link rel="stylesheet" href="/labeler.css">
+<header><div><h1>Back up card drafts</h1>
+<p>Copy this browser's card drafts to a backup beside the review journal. This keeps your edits and saved labels unchanged.</p>
+<button id="backup">Back up browser drafts</button>
+<a href="/">Return to labeler</a>
+<p id="result" role="status"></p></div></header>
+<script>
+document.querySelector('#backup').onclick = async () => {
+  const result = document.querySelector('#result');
+  try {
+    const framesResponse = await fetch('/api/frames');
+    if (!framesResponse.ok) throw Error('Cannot load the review queue');
+    const {frames} = await framesResponse.json(), drafts = {};
+    for (const {id} of frames) {
+      const value = localStorage.getItem(`archive-draft:${id}`);
+      if (value !== null) drafts[id] = value;
+    }
+    const response = await fetch('/api/draft-backup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({drafts})});
+    const saved = await response.json();
+    if (!response.ok) throw Error(saved.error);
+    result.textContent = `Backed up drafts for ${saved.frames} photos. Backup: ${saved.backupFile}`;
+  } catch (error) { result.textContent = error.message; }
+};
+</script>
+</html>

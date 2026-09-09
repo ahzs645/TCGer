@@ -1,0 +1,70 @@
+{
+  "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+  "experiments": {
+    "yolo11s-pose": {
+      "bakeoffId": "shared-card-geometry-reviewed-corners-v1",
+      "candidate": "yolo11s-pose",
+      "checkpointPrefix": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+      "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+      "experimentHash": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+      "fairnessHash": "a7ab3dc227e84af451db0c3048e0e245c87da17fc52cda47b2c055c15da3c1ff",
+      "framework": "ultralytics",
+      "licenseRoute": "evaluation-only",
+      "policyId": "training-minimums-v4",
+      "policySha256": "d1f38ac331ef3eef1e632f6f3874cd1f33967c073ca33dbbec26c8547a9080f6",
+      "resolvedConfigSha256": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+      "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+    }
+  },
+  "files": [
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/tooling.tar.gz",
+      "path": "geometry/tooling/9a96e11fb09aa82693eff9b0301e24b1dda9a734/card-geometry-tooling.tar.gz",
+      "sha256": "7a38b2563458397e378b5d1a9fdbb0e30a39643243f6471d2d3a1932d41c64bb"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/preflight-report.json",
+      "path": "geometry/preflights/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/8e315f1b5fb18643f97a30fd159b904324e21181ed45c69e6ce20624b53d336a.json",
+      "sha256": "8e315f1b5fb18643f97a30fd159b904324e21181ed45c69e6ce20624b53d336a"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/collect_results.py",
+      "path": "geometry/reviewed-label-inputs/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/collect_results.py",
+      "sha256": "7d5ba2a5ac5621cff79c5f9b13c81ffaab56438dbb9267102a49d65f36aa61a7"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/yolo11s-pose.json",
+      "path": "geometry/bakeoffs/9a96e11fb09aa82693eff9b0301e24b1dda9a734/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/yolo11s-pose.json",
+      "sha256": "a3e8601de2a72bf11194087a3b72090ec1914c3f292d1b4ed52c817d24124ebc"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/data-validation.json",
+      "path": "geometry/reviewed-label-inputs/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/data-validation.json",
+      "sha256": "d036afd4633763951476cd6b65b66f17dd07c07ef84d3f10cb419713bb8a797c"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/visibility-derivation.json",
+      "path": "geometry/reviewed-label-inputs/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/visibility-derivation.json",
+      "sha256": "7b35f5d11c388fa946579918f366546e125950b76e8e3b87956c9b55982c6483"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/training-corner-labels.json",
+      "path": "geometry/reviewed-label-inputs/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/training-corner-labels.json",
+      "sha256": "499edf70b7d56a096b360e5d9a76bbe0215f54cf6c2efb24d7d924180936a848"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/cross-release-leakage.json",
+      "path": "geometry/reviewed-label-inputs/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/cross-release-leakage.json",
+      "sha256": "a7df19efe9307b1879fb6bcfbacf85f691962ce8c440c497cc224e17f15d6177"
+    },
+    {
+      "localPath": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/freeze.json",
+      "path": "geometry/reviewed-label-inputs/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/freeze.json",
+      "sha256": "41d4564fe60a85aa5a8db34b5eb9519043580b9bd084552c7919672058ae256d"
+    }
+  ],
+  "inputCommit": "3016a7f6edfdcdb3e9abd6ec1fecc7125b22b7a8",
+  "inputRepo": "ahzs645/tcger-universal-arcface",
+  "jobSpecSha256": "587896b33a46d423815678d7e036d506aa0135dbd192f7d66295d2cf830bafd6",
+  "toolingRevision": "9a96e11fb09aa82693eff9b0301e24b1dda9a734"
+}

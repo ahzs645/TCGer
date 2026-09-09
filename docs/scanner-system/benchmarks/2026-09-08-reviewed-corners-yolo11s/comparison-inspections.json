@@ -1,0 +1,700 @@
+{
+  "author": "Codex",
+  "method": "Visual inspection of source-photo overlays for all 75 flagged photos and all 3 binder pages; these notes are separate from user labels.",
+  "catalogSha256": "85b0bf361c7dab44fc819d8338bbd0b8b3d20baec8ac43c261adbf5ae6d45958",
+  "modelSha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327",
+  "examples": [
+    "R504",
+    "R512",
+    "R515",
+    "R519",
+    "R526",
+    "R535",
+    "R564",
+    "R581",
+    "R019",
+    "R161",
+    "R308",
+    "R490"
+  ],
+  "entries": [
+    {
+      "reference": "R008",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R011",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R019",
+      "outcome": "model-issue",
+      "note": "On an upside-down Trainer card, both predictions select interior regions instead of the complete card.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R022",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R059",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R071",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R078",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R080",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R141",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R143",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R161",
+      "outcome": "model-issue",
+      "note": "The sideways card is split into upright interior regions. The full physical border is missed.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R168",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R170",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R180",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R183",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R214",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R216",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R217",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R226",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R233",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R235",
+      "outcome": "model-issue",
+      "note": "The real card is detected; extra predictions select the stand/sign below it.",
+      "tags": [
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R281",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R308",
+      "outcome": "model-issue",
+      "note": "The actual slabbed card is detected. The grading label above it is incorrectly detected as another card.",
+      "tags": [
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R314",
+      "outcome": "model-issue",
+      "note": "All three cards have detections, but the two side outlines do not precisely follow their visible borders.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R321",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R366",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R368",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R370",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R374",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R383",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R387",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R408",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R434",
+      "outcome": "model-issue",
+      "note": "The card is sideways or upside down. The model produces a skewed/partial outline or selects an inner card region instead of consistently following the complete border.",
+      "tags": [
+        "sideways-or-upside-down",
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R445",
+      "outcome": "model-issue",
+      "note": "The held slab card is found, while small reference cards in the background are missed. Two extra outlines land on the slab grading label.",
+      "tags": [
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R457",
+      "outcome": "model-issue",
+      "note": "Both cards are detected; the outline on the rotated foreground card includes background and misses its edges.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R490",
+      "outcome": "model-issue",
+      "note": "The card is detected correctly, but the rectangular object beside it is also detected as a card.",
+      "tags": [
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R504",
+      "outcome": "model-issue",
+      "note": "The predicted quadrilateral does not follow the slanted physical card. It includes table/background and trims the opposite edge; the saved border follows the card much better.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R505",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R507",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R509",
+      "outcome": "close-agreement",
+      "note": "All nine card outlines closely follow the saved human borders. No missing or extra detections; no repeat corner labeling is needed.",
+      "tags": []
+    },
+    {
+      "reference": "R510",
+      "outcome": "close-agreement",
+      "note": "All nine card outlines closely follow the saved human borders. No missing or extra detections; no repeat corner labeling is needed.",
+      "tags": []
+    },
+    {
+      "reference": "R511",
+      "outcome": "close-agreement",
+      "note": "All nine card outlines closely follow the saved human borders. No missing or extra detections; no repeat corner labeling is needed.",
+      "tags": []
+    },
+    {
+      "reference": "R512",
+      "outcome": "model-issue",
+      "note": "A single predicted outline spans two overlapping cards. The Palafin and the covered card need distinct quadrilaterals.",
+      "tags": [
+        "border-geometry",
+        "missed-or-badly-localized-card"
+      ]
+    },
+    {
+      "reference": "R515",
+      "outcome": "model-issue",
+      "note": "The middle Rivers Charm is missed. Two overlapping detections appear on the small rear card. That rear object is a real card absent from the reference labels, so not every unmatched prediction is a false card.",
+      "tags": [
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R516",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R517",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry",
+        "missed-or-badly-localized-card"
+      ]
+    },
+    {
+      "reference": "R519",
+      "outcome": "model-issue",
+      "note": "Several predicted regions cut through the blue Palafin card; its border and printed-top order are wrong. The rear Rivers Charm reference is missed. The partly covered card underneath is also real but is not a separate reference target here.",
+      "tags": [
+        "border-geometry",
+        "missed-or-badly-localized-card",
+        "unmatched-regions",
+        "printed-top"
+      ]
+    },
+    {
+      "reference": "R520",
+      "outcome": "model-issue",
+      "note": "The partially cropped card at the top is real but unlabelled; overlapping predictions there exaggerate the extra count. The blue foreground card also has a border mismatch.",
+      "tags": [
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R521",
+      "outcome": "model-issue",
+      "note": "The partly cropped blue foreground card is missed while the two rear cards are detected.",
+      "tags": [
+        "missed-or-badly-localized-card"
+      ]
+    },
+    {
+      "reference": "R522",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R524",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R526",
+      "outcome": "model-issue",
+      "note": "The front Palafin border is close. The partly covered card behind it has no separate detection.",
+      "tags": [
+        "missed-or-badly-localized-card"
+      ]
+    },
+    {
+      "reference": "R527",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R529",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R530",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R531",
+      "outcome": "model-issue",
+      "note": "The upper, partially cropped card is real but has no reference target. The lower blue-card outline still does not follow its slant; this frame mixes a model error with incomplete reference coverage.",
+      "tags": [
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R532",
+      "outcome": "model-issue",
+      "note": "The blue foreground card gets multiple overlapping regions. The separate partial card at the top is real and unlabelled, so the benchmark extra count is not a pure false-positive count.",
+      "tags": [
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R533",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R534",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R535",
+      "outcome": "model-issue",
+      "note": "The partially cropped rear Riveteers Charm is missed. This is an edge-of-frame detection example.",
+      "tags": [
+        "missed-or-badly-localized-card"
+      ]
+    },
+    {
+      "reference": "R536",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R537",
+      "outcome": "model-issue",
+      "note": "The outline covers only the inner portion of the steep card, trimming its physical border. The saved far-left corner is an extrapolation, so use the photo itself when interpreting the numeric error.",
+      "tags": [
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R541",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R542",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "missed-or-badly-localized-card"
+      ]
+    },
+    {
+      "reference": "R548",
+      "outcome": "model-issue",
+      "note": "An extra outline selects the artwork/text inside the same card; the outer outline also drifts from the physical border.",
+      "tags": [
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R552",
+      "outcome": "model-issue",
+      "note": "The predicted upright box extends over the table instead of following the partly cropped, sharply slanted card.",
+      "tags": [
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R553",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R555",
+      "outcome": "model-issue",
+      "note": "The prediction covers much of the stack and background instead of tracing the Crobat card on top.",
+      "tags": [
+        "missed-or-badly-localized-card",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R557",
+      "outcome": "model-issue",
+      "note": "The model predicts both an outer region and an inner text/artwork region on one card.",
+      "tags": [
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R558",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R561",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R562",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R564",
+      "outcome": "model-issue",
+      "note": "Three nested predictions select parts of one Darkrai card. The outer geometry also misses its slant.",
+      "tags": [
+        "border-geometry",
+        "unmatched-regions"
+      ]
+    },
+    {
+      "reference": "R565",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R572",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R575",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R577",
+      "outcome": "model-issue",
+      "note": "Visual inspection confirms that the predicted corners do not follow the physical card perspective. See the green outline against the gold saved reference.",
+      "tags": [
+        "border-geometry"
+      ]
+    },
+    {
+      "reference": "R581",
+      "outcome": "model-issue",
+      "note": "The Marshadow card is physically upside down. The prediction order does not follow its printed top, and an additional nested region appears. The separate slabbed card in the background is real but not the reference target.",
+      "tags": [
+        "unmatched-regions",
+        "printed-top"
+      ]
+    }
+  ]
+}

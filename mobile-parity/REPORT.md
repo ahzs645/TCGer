@@ -4,16 +4,16 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 
 - Platforms: Web, iOS, Android.
 - 7 features are parity-required.
-- 84 features are explicitly tracked.
+- 85 features are explicitly tracked.
 - A declaration is backed by source paths in the manifest. “Verified” additionally requires passing current JUnit evidence on every declared platform; a declared test that was not supplied is “Not run.”
 
 ## Declaration summary
 
 | Platform | Implemented | Partial | Planned | Unavailable | Not applicable | Waived |
 |---|---|---|---|---|---|---|
-| Web | 68 | 8 | 15 | 0 | 0 | 0 |
-| iOS | 91 | 0 | 0 | 0 | 0 | 0 |
-| Android | 76 | 6 | 9 | 0 | 0 | 0 |
+| Web | 69 | 8 | 15 | 0 | 0 | 0 |
+| iOS | 92 | 0 | 0 | 0 | 0 | 0 |
+| Android | 77 | 6 | 9 | 0 | 0 | 0 |
 
 ## Feature matrix
 
@@ -110,3 +110,4 @@ Generated from [features.json](features.json). Do not edit this report by hand.
 | collections.smartFolders | Condition and tag smart folders | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
 | account.management | Profile password signup deletion and preferences | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.binderReview | Save selected cards and reopen saved binder photos | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
+| pricing.gradingWorkspace | Grading planner: prices, costs, decision, population, history and receipts | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |

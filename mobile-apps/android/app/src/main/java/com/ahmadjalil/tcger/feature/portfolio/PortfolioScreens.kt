@@ -51,7 +51,16 @@ fun PricesScreen(
     showPricing: Boolean,
     displayCurrency: String,
     contentPadding: PaddingValues = PaddingValues(),
+    gradingRepository: com.ahmadjalil.tcger.feature.libraryoperations.LibraryOperationsRepository? = null,
 ) {
+    var grading by remember { mutableStateOf(false) }
+    if (grading) {
+        Column(Modifier.fillMaxSize().padding(contentPadding)) {
+            TextButton(onClick = { grading = false }) { Text("Back to Prices") }
+            com.ahmadjalil.tcger.feature.libraryoperations.GradingWorkspaceScreen(gradingRepository)
+        }
+        return
+    }
     val scope = rememberCoroutineScope()
     var portfolio by remember { mutableStateOf<PricePortfolio?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -93,6 +102,7 @@ fun PricesScreen(
         contentPadding = featurePadding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item { TextButton(onClick = { grading = true }) { Text("Grading planner") } }
         item { FeatureHeader("Prices", "Saved prices work offline; refresh checks your configured providers") { refresh(true) } }
         portfolio?.let { result ->
             item {

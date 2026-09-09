@@ -367,6 +367,7 @@ struct PricesView: View {
             }
         }
         .navigationTitle("Prices")
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { GradingWorkspaceView() } label: { Label("Grading planner", systemImage: "checkmark.seal") } } }
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),

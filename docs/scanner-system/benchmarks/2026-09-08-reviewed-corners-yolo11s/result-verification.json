@@ -1,0 +1,62 @@
+{
+  "checkpointPrefix": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+  "checkpointSha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327",
+  "checksPassed": true,
+  "experimentHash": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+  "files": {
+    "best.pt": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/training/repeat-0/weights/best.pt",
+      "sha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327"
+    },
+    "cross-release-leakage.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/cross-release-leakage.json",
+      "sha256": "a7df19efe9307b1879fb6bcfbacf85f691962ce8c440c497cc224e17f15d6177"
+    },
+    "evaluation-summary.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/evaluation/evaluation-summary.json",
+      "sha256": "d2200e960f6b4a3bd1e18a6968abb0644983a2abc6e754636fbf00396a6a969f"
+    },
+    "preflight-report.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/preflight-report.json",
+      "sha256": "0bf393db2eb6ddc06e036698713067cbdf0248987e221a548e239fac3ace08cd"
+    },
+    "real-v3.benchmark.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/evaluation/real-v3.benchmark.json",
+      "sha256": "a9274edeca5336ab5122858faac338cc2ca9865e3bb7f02487d1ee64e921ca76"
+    },
+    "real-v3.predictions.jsonl": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/evaluation/real-v3.predictions.jsonl",
+      "sha256": "c25017bde80bdafcdf87468499ebe14a59be2946ba5a0d186f51543fa923eb5d"
+    },
+    "recognition-replay.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/evaluation/recognition-replay.json",
+      "sha256": "e41941427e4ceae0103ac03daa807a7cf2393081d94e7205f6d381ae2724d247"
+    },
+    "resolved-config.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/resolved-config.json",
+      "sha256": "a3e8601de2a72bf11194087a3b72090ec1914c3f292d1b4ed52c817d24124ebc"
+    },
+    "results.csv": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/training/repeat-0/results.csv",
+      "sha256": "c0d8d22174cff28e94a30ad62a8b26ddc98089ebc3fb4c8229f3126b318837b8"
+    },
+    "run-train.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/run-train.json",
+      "sha256": "3c8b8f47726d8134c7868e6ff1469ae4ea3fa718403a2987504313ea201b8d6a"
+    },
+    "synthetic-duel-field.benchmark.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/evaluation/synthetic-duel-field.benchmark.json",
+      "sha256": "373ad1ab42eeb236915abedc85e2a0dc3bd2a9e06a0d8fd827d4968c9def3c48"
+    },
+    "synthetic-duel-field.predictions.jsonl": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/evaluation/synthetic-duel-field.predictions.jsonl",
+      "sha256": "55d953af02f736706ff460675af2d9d63f42fea21b1ca93ad139b9ef1ac98c14"
+    },
+    "trainer-summary.json": {
+      "path": "geometry/yolo11s-pose/41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf/0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba/training-output/trainer-summary.json",
+      "sha256": "b1e8dc72ce6d3ab3bc4d4d88f40613d60449930e5509525b95ad4dca9d8eb7f8"
+    }
+  },
+  "modelRepo": "ahzs645/tcger-universal-arcface",
+  "modelRevision": "6254006b866a24c16b9df9c1a95e43ddb2595a34"
+}

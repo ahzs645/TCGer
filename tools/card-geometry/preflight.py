@@ -483,6 +483,27 @@ def _record_category_problems(
     problems: list[str] = []
     categories = record.get("source", {}).get("annotationCategories")
     instances = record.get("instances", [])
+    correction = record.get("source", {}).get("paddingCorrection", {})
+    if not isinstance(correction, dict):
+        problems.append("source.paddingCorrection must be an object")
+        correction = {}
+    removed_indices = correction.get("removedAnnotationIndices", [])
+    if not isinstance(removed_indices, list) or any(type(i) is not int or i < 0 for i in removed_indices):
+        problems.append("removedAnnotationIndices must contain non-negative integer indices")
+        removed_indices = []
+    reviews = record.get("source", {}).get("reviewedNonCardAnnotations", [])
+    if (not isinstance(reviews, list) or any(not isinstance(r, dict)
+            or type(r.get("sourceAnnotationIndex")) is not int or r["sourceAnnotationIndex"] < 0
+            or r.get("reason") != "not-a-card" or not r.get("reviewer")
+            or not r.get("savedAt") or not r.get("journalSha256") for r in reviews)):
+        problems.append("reviewedNonCardAnnotations must bind not-a-card decisions to their review journal")
+        reviews = []
+    reviewed_indices = [r["sourceAnnotationIndex"] for r in reviews]
+    if reviews and entry.get("split") != "train":
+        problems.append("reviewed non-card exclusions are restricted to the training split")
+    excluded_indices = removed_indices + reviewed_indices
+    if len(set(excluded_indices)) != len(excluded_indices):
+        problems.append("duplicate or overlapping annotation exclusions")
     if not isinstance(categories, dict):
         problems.append("source.annotationCategories is missing")
         categories = None
@@ -493,12 +514,17 @@ def _record_category_problems(
         primary_total = sum(
             count for name, count in categories.items() if name in primary
         )
-        if primary_total != len(instances):
+        if primary_total - len(excluded_indices) != len(instances):
             problems.append(
                 f"{len(instances)} instances but {primary_total} primary-category annotations"
+                + (f" minus {len(removed_indices)} reflected-padding targets" if removed_indices else "")
+                + (f" minus {len(reviewed_indices)} reviewed non-card targets" if reviewed_indices else "")
             )
     indices: set[int] = set()
     total_annotations = sum(categories.values()) if categories else None
+    for index in excluded_indices:
+        if total_annotations is not None and index >= total_annotations:
+            problems.append(f"removed sourceAnnotationIndex {index} exceeds {total_annotations} annotations")
     for instance in instances:
         if not isinstance(instance, dict):
             continue
@@ -513,6 +539,8 @@ def _record_category_problems(
             problems.append(f"{label}: duplicate sourceAnnotationIndex {index}")
         else:
             indices.add(index)
+            if index in excluded_indices:
+                problems.append(f"{label}: sourceAnnotationIndex {index} is also declared removed by padding or review")
             if total_annotations is not None and index >= total_annotations:
                 problems.append(
                     f"{label}: sourceAnnotationIndex {index} exceeds {total_annotations} annotations"

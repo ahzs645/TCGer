@@ -47,6 +47,7 @@ def build_queue(release: Path, *, splits: tuple[str, ...], slices: tuple[str, ..
         ]
         if not pending:
             continue
+        correction = record["source"].get("paddingCorrection")
         frames.append({
             "recordId": entry["recordId"],
             "canonicalRecordId": entry["recordId"].removeprefix("coco-"),
@@ -55,6 +56,8 @@ def build_queue(release: Path, *, splits: tuple[str, ...], slices: tuple[str, ..
             "sourceArchiveId": keys["sourceArchiveId"],
             "imagePath": record["source"]["path"],
             "imageSha256": record["source"]["sha256"],
+            **({"canonicalImageSha256": correction["originalImageSha256"],
+                "paddingCorrection": correction} if correction else {}),
             "width": record["source"]["width"],
             "height": record["source"]["height"],
             "instances": [
@@ -63,6 +66,7 @@ def build_queue(release: Path, *, splits: tuple[str, ...], slices: tuple[str, ..
                     "sourceAnnotationIndex": instance["sourceAnnotationIndex"],
                     "seedBox": instance["box"],
                     "container": instance.get("container", "unknown"),
+                    **({"displayCardNumber": instance["sourceAnnotationIndex"] + 1} if correction else {}),
                 }
                 for instance in pending
             ],

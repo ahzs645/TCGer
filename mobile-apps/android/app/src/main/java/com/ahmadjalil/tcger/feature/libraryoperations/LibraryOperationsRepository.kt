@@ -17,6 +17,8 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface LibraryOperationsRepository {
+    suspend fun searchGradingCards(request: GradingSearchRequest): GradingSearchResult = error("Grading card search unavailable")
+    suspend fun getGradingSnapshot(request: GradingSnapshotRequest): GradingSnapshot = error("Grading data unavailable")
     suspend fun getStorageContainers(): List<StorageContainer>
     suspend fun createStorageContainer(request: CreateStorageContainerRequest): StorageContainer
     suspend fun updateStorageContainer(containerId: String, request: UpdateStorageContainerRequest): StorageContainer
@@ -38,6 +40,10 @@ interface LibraryOperationsRepository {
 }
 
 private interface LibraryOperationsApi {
+    @POST("grading/search")
+    suspend fun searchGradingCards(@Header("Authorization") auth: String, @Body request: GradingSearchRequest): GradingSearchResult
+    @POST("grading/snapshot")
+    suspend fun getGradingSnapshot(@Header("Authorization") auth: String, @Body request: GradingSnapshotRequest): GradingSnapshot
     @GET("storage/containers")
     suspend fun getStorageContainers(@Header("Authorization") auth: String): List<StorageContainer>
 
@@ -174,6 +180,8 @@ class RemoteLibraryOperationsRepository private constructor(
         }
     }
 
+    override suspend fun searchGradingCards(request: GradingSearchRequest) = api.searchGradingCards(authorization, request)
+    override suspend fun getGradingSnapshot(request: GradingSnapshotRequest) = api.getGradingSnapshot(authorization, request)
     override suspend fun getStorageContainers() = api.getStorageContainers(authorization)
     override suspend fun createStorageContainer(request: CreateStorageContainerRequest) =
         api.createStorageContainer(authorization, request)

@@ -1,0 +1,22 @@
+{
+  "jobId": "6aa0489c32d5d0c22c5adf86",
+  "url": "https://huggingface.co/jobs/ahzs645/6aa0489c32d5d0c22c5adf86",
+  "submittedAt": "2026-09-08T17:40:44.104Z",
+  "statusAtSubmission": "SCHEDULING",
+  "candidate": "yolo11s-pose",
+  "flavor": "l4x1",
+  "timeoutSeconds": 14400,
+  "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+  "experimentHash": "0c78006b4b116bcdc7ebf3fb29c99de48780f6c43441d85d80b2eac67c3960ba",
+  "datasetRevision": "3759819e007e6ee755b530652c3d72abbd96963f",
+  "inputRevision": "3016a7f6edfdcdb3e9abd6ec1fecc7125b22b7a8",
+  "automaticSteps": [
+    "train",
+    "frozen geometry evaluations",
+    "recognition replay",
+    "verified baseline comparison"
+  ],
+  "secretNamesVerified": [
+    "HF_TOKEN"
+  ]
+}

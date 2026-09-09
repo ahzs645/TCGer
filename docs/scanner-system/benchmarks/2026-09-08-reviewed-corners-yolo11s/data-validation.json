@@ -1,0 +1,41 @@
+{
+  "allYoloPoseTargetsValid": true,
+  "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+  "counts": {
+    "train:records": 13465,
+    "train:targets": 39149,
+    "validation:records": 2279,
+    "validation:targets": 5003
+  },
+  "nearDuplicatePairs": 0,
+  "nonCardExclusions": {
+    "corpusHash": "971359677eebde0dd14220ac994a9309bf9150a87a2dfbdc0d5eadb2e2aba1b1",
+    "journalSha256": "565ed494998606b8ee5a487869e4acaeeaa51e60218e1102e1d82cfe97f2581e",
+    "method": "saved-not-a-card-review-exclusions-v1",
+    "records": {
+      "coco-32ce5c9ad6c8d6b3cf6d06e72fe1e43b3597fa2911744955723d48463e799098": [
+        10
+      ],
+      "coco-7fdbe80aa2307cf86c7a52ba6e32119bfa7b02a611e0cf6a038671b53b2c14d6": [
+        4
+      ],
+      "coco-c6286a7288711af6934f168719f1904562d0fad6d89e7aa601214dd8bea7583b": [
+        4,
+        5
+      ]
+    },
+    "removedTargets": 4,
+    "sourceCorpusHash": "edcc7a8a2d2d7314b61d35d2387af18df940aafee1cc6455bb5b62bc382d8d68"
+  },
+  "realContextMarginPolicy": {
+    "application": "each-side",
+    "fraction": 0.16,
+    "kind": "fraction-of-long-side",
+    "rounding": "ceil"
+  },
+  "realValidationRecordsUnchanged": 1279,
+  "reviewedLabelsRoundTripped": 1378,
+  "reviewedLayerRelationsRoundTripped": 7,
+  "toolingRevision": "9a96e11fb09aa82693eff9b0301e24b1dda9a734",
+  "visibilityDerivationSha256": "7b35f5d11c388fa946579918f366546e125950b76e8e3b87956c9b55982c6483"
+}
