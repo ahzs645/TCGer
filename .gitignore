@@ -88,6 +88,10 @@ tmp/
 **/xcuserdata/
 *.xcuserstate
 
+# Generated Fastlane reports and lane documentation
+mobile-apps/ios/fastlane/report.xml
+mobile-apps/ios/fastlane/README.md
+
 # Xcode build and test products
 **/DerivedData/
 mobile-parity/build/

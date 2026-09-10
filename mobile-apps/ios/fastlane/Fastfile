@@ -10,6 +10,11 @@ platform :ios do
   lane :submit_release do |options|
     version = options[:version].to_s
     build_number = options[:build_number].to_s
+    verify_option = options[:verify_only].to_s
+    unless ["", "false", "true"].include?(verify_option)
+      UI.user_error!("verify_only must be true or false")
+    end
+    verify_only = verify_option == "true"
 
     unless version.match?(/\A\d+\.\d+\.\d+\z/)
       UI.user_error!("version must use three numeric components, for example 1.0.1")
@@ -74,6 +79,11 @@ platform :ios do
     release_notes_path = File.expand_path("metadata/en-US/release_notes.txt", __dir__)
     release_notes = File.read(release_notes_path, encoding: "UTF-8").strip
     UI.user_error!("Release notes cannot be empty") if release_notes.empty?
+
+    if verify_only
+      UI.success("Verified TCGer #{version} (#{build_number}): API access, processed build, and release notes. No metadata or submission was changed.")
+      next
+    end
 
     upload_to_app_store(
       api_key: api_key,

@@ -130,6 +130,8 @@ Validate the submission guards locally without contacting Apple:
 python3 -m unittest discover -s mobile-apps/ios/scripts -p 'test_xcode_cloud_release.py'
 ```
 
+For an end-to-end Xcode Cloud verification without submitting to Apple, temporarily set `TCGER_RELEASE_MODE=verify` and `TCGER_RELEASE_TAG=ios-v<version>-b<existing-build>` on **Submit Release**, then manually start it from a branch containing these scripts and the matching project version. This runs the real simulator build, installs the locked dependencies, authenticates with Apple, and finds the processed TestFlight build. It stops before updating metadata or creating a review submission. Restore `TCGER_RELEASE_MODE=submit` after verification. `TCGER_RELEASE_TAG` is ignored in submit mode, which always requires a real Git tag from `CI_TAG`.
+
 Xcode Cloud also runs `TCGer/ci_scripts/ci_pre_xcodebuild.sh` before every archive action. The guard rejects inconsistent app/widget versions, a version that is not newer than `APP_STORE_LIVE_VERSION` or the highest `ios-v…-b…` release tag, and any commit that decreases the marketing version from its parent. This prevents an archive from being uploaded to a closed App Store version train without interfering with pull-request test actions. Keep `APP_STORE_LIVE_VERSION` as the bootstrap version already on the store; release tags become the authoritative floor after subsequent submissions.
 
 ## Run on a physical device

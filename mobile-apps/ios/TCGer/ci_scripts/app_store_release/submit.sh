@@ -17,7 +17,15 @@ fi
 [[ "${CI_XCODEBUILD_ACTION:-}" == "build" ]] || fail "Submit Release requires exactly one Build action, not Archive or Test."
 [[ "${CI_PRODUCT_PLATFORM:-}" == "iOS" ]] || fail "Submit Release requires an iOS Build action."
 
-if [[ "${CI_TAG:-}" =~ ^ios-v([0-9]+\.[0-9]+\.[0-9]+)-b([0-9]+)$ ]]; then
+release_mode="${TCGER_RELEASE_MODE:-submit}"
+[[ "$release_mode" == "submit" || "$release_mode" == "verify" ]] || fail "TCGER_RELEASE_MODE must be submit or verify."
+release_tag="${CI_TAG:-}"
+# A manual branch run may verify an existing upload, but it can never submit.
+if [[ "$release_mode" == "verify" && -z "$release_tag" ]]; then
+  release_tag="${TCGER_RELEASE_TAG:-}"
+fi
+
+if [[ "$release_tag" =~ ^ios-v([0-9]+\.[0-9]+\.[0-9]+)-b([0-9]+)$ ]]; then
   release_version="${BASH_REMATCH[1]}"
   build_number="${BASH_REMATCH[2]}"
 else
@@ -37,7 +45,7 @@ for secret_name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_ID APP_STOR
   [[ -n "${!secret_name:-}" ]] || fail "Configure $secret_name as a secret in the Submit Release Xcode Cloud workflow."
 done
 
-echo "Validated App Store release $release_version ($build_number) from $CI_TAG."
+echo "Validated App Store release $release_version ($build_number) from $release_tag; mode: $release_mode."
 if [[ "${1:-}" == "--validate-only" ]]; then
   exit 0
 fi
@@ -64,7 +72,12 @@ export FASTLANE_DISABLE_COLORS=1
 export FASTLANE_SKIP_UPDATE_CHECK=1
 export FASTLANE_SKIP_PLUGINS_UPDATE_CHECK=1
 export FASTLANE_OPT_OUT_USAGE=1
+export FASTLANE_SKIP_DOCS=1
 
 cd "$support_dir"
 bundle install --jobs 4 --retry 3
-bundle exec fastlane ios submit_release "version:$release_version" "build_number:$build_number"
+lane_options=("version:$release_version" "build_number:$build_number")
+if [[ "$release_mode" == "verify" ]]; then
+  lane_options+=("verify_only:true")
+fi
+bundle exec fastlane ios submit_release "${lane_options[@]}"

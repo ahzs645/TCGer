@@ -74,6 +74,15 @@ class XcodeCloudReleaseTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.calls.exists())
 
+    def test_manual_branch_verification_cannot_submit(self):
+        result = self.run_hook(
+            "ci_post_xcodebuild.sh", CI_TAG="", TCGER_RELEASE_MODE="verify",
+            TCGER_RELEASE_TAG="ios-v1.2.3-b241",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls.read_text().splitlines()[-1],
+                         "exec fastlane ios submit_release version:1.2.3 build_number:241 verify_only:true")
+
     def test_other_workflows_never_submit(self):
         for workflow in ("Release", "PR Fast Tests", ""):
             with self.subTest(workflow=workflow):
@@ -84,6 +93,9 @@ class XcodeCloudReleaseTests(unittest.TestCase):
     def test_invalid_release_context_stops_before_network_or_tools(self):
         for changes in (
             {"CI_TAG": ""},
+            {"CI_TAG": "", "TCGER_RELEASE_TAG": "ios-v1.2.3-b241"},
+            {"TCGER_RELEASE_MODE": "verfy"},
+            {"CI_TAG": "", "TCGER_RELEASE_MODE": "verify"},
             {"CI_TAG": "ios-v1.2.3-blatest"},
             {"CI_TAG": "ios-v1.2-b241"},
             {"CI_TAG": "ios-v9.9.9-b241"},
