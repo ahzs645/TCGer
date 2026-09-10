@@ -36,6 +36,9 @@ import sys
 import zipfile
 from collections import Counter
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from scanner_recording_images import default_input_cache, materialize_input
 from typing import Any, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -861,7 +864,7 @@ def add_devmode_session(
             root=root,
             session_id=session_id,
             record_suffix=f"{index:05d}",
-            image_path=session / str(frame.get("imageFile")),
+            image_path=materialize_input(session, frame, default_input_cache()),
             quad=quad,
             fixed_quad_source=frame.get("fixedQuadSource"),
             capture_mode=frame.get("captureMode"),

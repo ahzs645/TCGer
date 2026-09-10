@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -50,6 +51,8 @@ from performance import (
 
 
 TOOL_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(TOOL_DIR.parents[1] / "scripts"))
+from scanner_recording_images import crop_rect, materialize_input
 DEFAULT_STATE_DIR = TOOL_DIR / ".fiftyone"
 DEFAULT_DATASET_NAME = "tcger-scanner-ios-replay"
 DEFAULT_PREVIEW_DATASET_NAME = "tcger-scanner-rectification-previews"
@@ -1325,10 +1328,16 @@ def _image_size(path: Path) -> tuple[int, int] | None:
 def locate_scanner_crop(
     scanner_path: Path,
     media_path: Path,
+    transform: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Locates the archived guide crop inside its full-resolution photo."""
+    """Use captured geometry when available; register legacy JPEG pairs."""
     scanner_size = _image_size(scanner_path)
     media_size = _image_size(media_path)
+    if transform is not None:
+        rect = crop_rect(transform)
+        if media_size != (transform["sourcePixelWidth"], transform["sourcePixelHeight"]) or scanner_size != rect[2:]:
+            raise ValueError("Recorded crop dimensions do not match review images")
+        return {"mode": "recorded_input_crop", "rect": rect, "confidence": 1.0}
     if not scanner_size or not media_size:
         return {"mode": "unavailable", "rect": None, "confidence": None}
     scanner_width, scanner_height = scanner_size
@@ -1793,7 +1802,9 @@ def build_shutter_dataset(
                 continue
             image_file = str(item.get("imageFile") or "")
             frame = frames_by_image.get(image_file) or {}
-            scanner_input_path = session_dir / image_file
+            scanner_input_path = materialize_input(
+                session_dir, {**item, **frame}, DEFAULT_STATE_DIR / "scanner-inputs"
+            )
             original_name = str(item.get("originalImageFile") or "")
             original_path = session_dir / original_name if original_name else None
             has_original = bool(original_path and original_path.is_file())
@@ -1809,7 +1820,7 @@ def build_shutter_dataset(
             scanner_size = _image_size(scanner_input_path) if scanner_input_path.is_file() else None
             media_size = _image_size(media_path)
             crop_mapping = (
-                locate_scanner_crop(scanner_input_path, media_path)
+                locate_scanner_crop(scanner_input_path, media_path, item.get("inputImageTransform"))
                 if scanner_input_path.is_file()
                 else {"mode": "unavailable", "rect": None, "confidence": None}
             )
@@ -2200,7 +2211,9 @@ def build_session_dataset(
             original_name = frame_evidence.get("originalImageFile")
             if original_name:
                 files.append(("real_camera_original", session_dir / original_name, None, None))
-            selected_path = session_dir / image_file
+            selected_path = materialize_input(
+                session_dir, {**frame_evidence, **frame}, DEFAULT_STATE_DIR / "scanner-inputs"
+            )
             files.append(("selected_scanner_crop", selected_path, None, None))
             attempts = frame_evidence.get("attempts") or []
             attempt_by_index: dict[int, dict[str, Any]] = {}

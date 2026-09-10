@@ -2,6 +2,61 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
+/// A virtual recognition input backed by one saved source image. Rectangles
+/// use upright pixels with a top-left origin, independently of Vision quads.
+/// Version 1 performs an integer crop only: no resize, warp, or reorientation.
+nonisolated struct ScannerInputImageTransform: Codable, Equatable, Sendable {
+    let version: Int
+    let sourceImageFile: String
+    let coordinateSpace: String
+    let sourcePixelWidth: Int
+    let sourcePixelHeight: Int
+    let cropRectPixels: [Int]
+
+    init?(sourceImageFile: String, source: CGImage, input: CGImage, cropRect: CGRect) {
+        guard cropRect == cropRect.integral,
+              cropRect.minX >= 0, cropRect.minY >= 0,
+              cropRect.maxX <= CGFloat(source.width), cropRect.maxY <= CGFloat(source.height),
+              cropRect.width == CGFloat(input.width), cropRect.height == CGFloat(input.height)
+        else { return nil }
+        version = 1
+        self.sourceImageFile = sourceImageFile
+        coordinateSpace = "uprightPixelsTopLeft"
+        sourcePixelWidth = source.width
+        sourcePixelHeight = source.height
+        cropRectPixels = [Int(cropRect.minX), Int(cropRect.minY), input.width, input.height]
+    }
+
+    func apply(to source: CGImage) -> CGImage? {
+        guard version == 1, coordinateSpace == "uprightPixelsTopLeft",
+              source.width == sourcePixelWidth, source.height == sourcePixelHeight,
+              cropRectPixels.count == 4
+        else { return nil }
+        let values = cropRectPixels.map(CGFloat.init)
+        let rect = CGRect(x: values[0], y: values[1], width: values[2], height: values[3])
+        guard rect.minX >= 0, rect.minY >= 0, rect.width > 0, rect.height > 0,
+              rect.maxX <= CGFloat(source.width), rect.maxY <= CGFloat(source.height)
+        else { return nil }
+        return source.cropping(to: rect)
+    }
+}
+
+nonisolated enum ScannerRecordedImageLoader {
+    static func load(imageFile: String, transform: ScannerInputImageTransform?, directory: URL) -> CGImage? {
+        func read(_ file: String) -> CGImage? {
+            let url = directory.appendingPathComponent(file).standardizedFileURL
+            guard url.path.hasPrefix(directory.standardizedFileURL.path + "/"),
+                  FileManager.default.fileExists(atPath: url.path),
+                  let source = CGImageSourceCreateWithURL(url as CFURL, nil)
+            else { return nil }
+            return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        }
+        if let image = read(imageFile) { return image }
+        guard let transform, let source = read(transform.sourceImageFile) else { return nil }
+        return transform.apply(to: source)
+    }
+}
+
 nonisolated struct RecordedBinderDetection: Codable, Equatable {
     let pocketIndex: Int
     let status: String
@@ -41,6 +96,8 @@ nonisolated struct RecordedScanFrame: Codable {
     let expectedCardId: String?
     let expectedNoMatch: Bool?
     let imageFile: String
+    /// When the input JPEG is omitted, reconstruct it from this source recipe.
+    let inputImageTransform: ScannerInputImageTransform?
     /// Added after the original schema. Nil means a legacy single-card frame.
     let captureMode: String?
     /// Final per-pocket binder decisions. Older binder recordings keep their
@@ -69,7 +126,8 @@ nonisolated struct RecordedScanFrame: Codable {
         expectedNoMatch: Bool?,
         imageFile: String,
         captureMode: String? = nil,
-        binderDetections: [RecordedBinderDetection]? = nil
+        binderDetections: [RecordedBinderDetection]? = nil,
+        inputImageTransform: ScannerInputImageTransform? = nil
     ) {
         self.index = index
         self.timestampSeconds = timestampSeconds
@@ -91,6 +149,7 @@ nonisolated struct RecordedScanFrame: Codable {
         self.expectedCardId = expectedCardId
         self.expectedNoMatch = expectedNoMatch
         self.imageFile = imageFile
+        self.inputImageTransform = inputImageTransform
         self.captureMode = captureMode
         self.binderDetections = binderDetections
     }
@@ -335,10 +394,19 @@ enum ScannerReplayDocumentLoader {
             }
         }
 
-        guard images.count >= min(1, recording.frames.count) else {
+        for frame in recording.frames where images[frame.imageFile] == nil {
+            if let transform = frame.inputImageTransform,
+               let source = images[transform.sourceImageFile]
+                ?? images[URL(fileURLWithPath: transform.sourceImageFile).lastPathComponent],
+               let input = transform.apply(to: source) {
+                images[frame.imageFile] = input
+            }
+        }
+        let loadedFrames = recording.frames.filter { images[$0.imageFile] != nil }.count
+        guard loadedFrames == recording.frames.count else {
             throw ScannerReplayImportError.framesMissing(
                 expected: recording.frames.count,
-                loaded: images.count
+                loaded: loadedFrames
             )
         }
         return ScannerReplayImport(recording: recording, images: images)

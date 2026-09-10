@@ -5,7 +5,7 @@ The dev-mode recorder (`ScannerDevModeStore`) stops writing
 `frame-NNNN-attempt-K.jpg` files by default: every attempt's image is a pure
 function of the saved frame image plus the geometry already recorded in
 `evidence.json`. This script replays that function so labeling / debugging
-tools can still get the exact crops the pipeline evaluated.
+tools can reconstruct the crop geometry (pixels differ through JPEG and resampling).
 
 Implementation choice — Python (numpy + OpenCV/Pillow), not a Swift CLI:
 the recorder's warp is CoreImage's `CIPerspectiveCorrection` (quad -> upright
@@ -23,8 +23,9 @@ existing labeling venv without an Xcode toolchain.
 Source image and coordinate conventions (mirrors the Swift code):
   * Attempts crop from the PIPELINE INPUT image, `frame-NNNN.jpg` (the
     coordinator scans exactly the image the recorder saves as `imageFile`).
-    `frame-NNNN-original.jpg` is the pre-guide-crop sensor photo and is never
-    the crop source, so it is not used here.
+    Original-only recordings reconstruct that input using `inputImageTransform`
+    before deriving attempts. The source JPEG is never treated as the input
+    without applying its recorded crop.
   * All quads are normalized Vision coordinates: origin bottom-left, y up.
     Pixel conversion: px = x * W, py = (1 - y) * H.
   * `CardCropper.makeNormalizedCrop`: perspective-correct the quad, rotate
@@ -83,6 +84,9 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts"))
+from scanner_recording_images import load_input_image
 
 import numpy as np
 
@@ -261,6 +265,10 @@ def load_bgr(path):
     return image
 
 
+def load_input_bgr(session_dir, record):
+    return np.asarray(load_input_image(session_dir, record))[:, :, ::-1].copy()
+
+
 def mean_abs_diff(derived, recorded):
     """Mean absolute pixel difference (0-255) after resizing the derived crop
     to the recorded crop's size."""
@@ -288,7 +296,7 @@ def process_session(session_dir, out_dir, validate, try_both):
         if not attempts:
             continue
         try:
-            frame_image = load_bgr(session_dir / image_file)
+            frame_image = load_input_bgr(session_dir, record)
         except FileNotFoundError:
             result.skipped.append(f"{image_file}: frame image missing")
             continue

@@ -86,27 +86,49 @@ Some scanner diagnostic tests are intentionally opt-in and report `XCTSkip` unle
 
 ## App Store release automation
 
-Xcode Cloud remains responsible for signing, archiving, and uploading every relevant `main` build to internal TestFlight. Production submission is deliberately separate: pushing a release tag selects one exact, already-uploaded TestFlight build, submits it to App Review, and asks App Store Connect to release it automatically after approval.
+Both stages run in Xcode Cloud. The existing **Release** workflow signs, archives, and uploads relevant `main` builds to internal TestFlight. The **Submit Release** workflow promotes one exact, already-uploaded TestFlight build to App Review and requests automatic release after approval. GitHub Actions is not involved in submission.
 
-Before the first automated release, add these GitHub Actions repository secrets using an App Store Connect API key with App Manager access:
+Configure **Submit Release** in App Store Connect → TCGer → Xcode Cloud → Manage Workflows:
+
+- Name: exactly `Submit Release` (the scripts use this name as a guard).
+- Repository/project: the same as **Release**.
+- Start condition: **Tag Changes**, tags beginning with `ios-v`; no branch, pull-request, or schedule triggers. Leave auto-cancel off.
+- Action: exactly one **Build – iOS**, scheme `TCGer`, using a current iOS simulator. Do not add Archive, Test, or distribution post-actions.
+- Environment: latest stable Xcode/macOS. A clean build is optional.
+
+Xcode Cloud requires an action, so this workflow compiles the tagged source before its post-build script submits the previously uploaded build. It never archives or uploads a replacement binary. The build number in the tag refers to the earlier TestFlight upload, **not** the new Submit Release workflow run number. This also avoids waiting for an upload that cannot finish until the current workflow ends.
+
+Before the first submission, add these **workflow-specific secret environment variables** using an App Store Connect API key with App Manager access:
 
 - `APP_STORE_CONNECT_ISSUER_ID`
 - `APP_STORE_CONNECT_KEY_ID`
 - `APP_STORE_CONNECT_PRIVATE_KEY_BASE64` — the downloaded `.p8` file encoded as a single base64 string
+
+Keep the private key out of git and mark the values as Secret in Xcode Cloud. Put these credentials only on **Submit Release**, not the PR or routine TestFlight workflows. The submission hook installs Ruby 3.3 and the Fastlane dependencies pinned by `Gemfile.lock` in its own temporary environment.
 
 For each release:
 
 1. Set `MARKETING_VERSION` for both the app and widget targets to the next three-part version, such as `1.0.1`.
 2. Update `fastlane/metadata/en-US/release_notes.txt` with customer-facing release notes.
 3. Merge the changes to `main` and wait for the Xcode Cloud `Release` workflow to upload and finish processing the build in TestFlight.
-4. Push a tag containing both the version and the exact TestFlight build number:
+4. Test that build, then tag the exact source commit used for its Xcode Cloud archive. The tagged commit must already contain the submission hooks, lockfile, and final release notes. Push a tag containing both the version and the exact TestFlight build number (the values below are examples):
 
 ```bash
-git tag ios-v1.0.1-b208
-git push origin ios-v1.0.1-b208
+git tag ios-v1.0.1-b241 <tested-build-commit>
+git push origin ios-v1.0.1-b241
 ```
 
-The `iOS App Store release` GitHub Actions workflow rejects tags that do not match the checked-in marketing version, waits for that exact build to be valid, and then submits it. It never builds or signs an app itself, and it never substitutes a merely "latest" build for the build named in the tag.
+The pre-build hook validates the workflow, action, tag, app/widget marketing version, nonempty release notes, and presence of credentials before compiling. Only a successful Build action can run the submission hook. Fastlane waits for the named build to be valid and submits it with the checked-in release notes; it never substitutes a "latest" build. Existing screenshots and other unchanged product-page information are reused. The current release policy is immediate availability after approval, with phased release disabled.
+
+Monitor the **Submit Release** build log for submission errors, then App Store Connect's App Review page for Apple's decision. A successful workflow means submission completed; Apple approval is separate. If a run fails after contacting Apple, check the current submission state before retrying the same tag. Do not create a new tag just to retry a failed submission: release tags also set the version guard's floor.
+
+The `ci_scripts/app_store_release` symlinks make the Fastlane files, lockfile, release notes, and project version available to Xcode Cloud's later script phases, as described in Apple's [custom-script resource guidance](https://developer.apple.com/documentation/xcode/writing-custom-build-scripts). Keep these symlinks when reorganizing the iOS project.
+
+Validate the submission guards locally without contacting Apple:
+
+```bash
+python3 -m unittest discover -s mobile-apps/ios/scripts -p 'test_xcode_cloud_release.py'
+```
 
 Xcode Cloud also runs `TCGer/ci_scripts/ci_pre_xcodebuild.sh` before every archive action. The guard rejects inconsistent app/widget versions, a version that is not newer than `APP_STORE_LIVE_VERSION` or the highest `ios-v…-b…` release tag, and any commit that decreases the marketing version from its parent. This prevents an archive from being uploaded to a closed App Store version train without interfering with pull-request test actions. Keep `APP_STORE_LIVE_VERSION` as the bootstrap version already on the store; release tags become the authoritative floor after subsequent submissions.
 
@@ -115,6 +137,13 @@ Xcode Cloud also runs `TCGer/ci_scripts/ci_pre_xcodebuild.sh` before every archi
 Open the project in Xcode, select the `TCGer` app target, and choose a signing team under Signing & Capabilities. If the checked-in bundle identifier is not available to that team, use a unique app identifier and apply the same prefix change to the widget identifier and the shared App Group entitlement. Select the connected iOS 26 device and Run.
 
 Camera scanning and biometric-lock behavior should be verified on hardware. The simulator remains appropriate for unit tests, navigation, offline catalog, import/export, and most accessibility checks.
+
+In a binder, **Add Card to Binder** offers text search, **Scan card**, and
+**Choose photo**. Camera and photo matches use the existing scanner review and
+preselect that binder when saving, including in batch review. Choosing a photo
+does not start the camera or request camera access; **Use camera** switches to
+live capture. Scanning follows the selected supported game and its normal
+scanner-package installation flow.
 
 ## Universal links and App Shortcuts
 

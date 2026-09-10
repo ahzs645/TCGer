@@ -4,6 +4,10 @@ This directory contains the model-independent executable evidence for
 `docs/scanner-system/shared-card-geometry-plan-2026-09-02.md`: contract
 fixtures, corpus-release fixtures, and the preflight that gates training.
 
+## Studio backups
+
+The studios expose a configurable automatic backup destination and copy status. See [automatic backups](../../docs/scanner-system/STUDIO-BACKUPS.md) for the login service, covered state, native FiftyOne exports and verified recovery.
+
 ## Contract fixtures
 
 - `fixtures/validation-nms.v1.json` starts after a model-specific head has
@@ -239,8 +243,40 @@ the corner live, start the browser-side companion editor:
 ```
 
 Open `http://127.0.0.1:5152`. It loads the `geometry: binder first batch`
-saved view by default, writes to the same `manual_quad` field and append-only
-journal on every release, and updates `manual_instances_json` on **Save page**.
+saved view by default. Existing manual outlines autosave draft corner moves to
+`manual_quad` and the append-only journal; detector/model drafts wait for an
+explicit frame save. **Save all cards** or **Save & next** also updates the
+durable `manual_instances_json`, orientation, visibility and stacking.
+
+**Suggest card outlines** runs SAM 2.1 Hiera Large on the current photo locally.
+The optional runtime is pinned in `corner-editor-suggestions.requirements.txt`;
+install it in the labeling environment, separate from training dependencies.
+The first use downloads the public checkpoint to the Hugging Face cache;
+subsequent requests reuse the loaded model. Apple MPS, CUDA and CPU are selected
+in that order when available. This was exercised on macOS/MPS; CPU and CUDA
+execution have not been validated here.
+
+The button shows rectified proposals separately. Select a preview to highlight
+its outline; **Add draft** adds one or **Add all missing drafts** adds distinct
+proposals. Existing outlines and layer relations remain intact. Suggestions
+have unknown side/printed orientation until checked, and require an explicit
+frame save. The service only reads photos in the loaded view; it never writes
+labels or uploads photos. One inference runs at a time. Navigating away abandons
+that photo's preview, while its local inference may finish in the background.
+
+This is general segmentation followed by the existing conservative four-corner
+fit, not a trained card classifier. Tiny regions, irregular/occluded contours,
+duplicate quads and nested artwork regions are filtered. It can still miss
+cards or suggest other rectangular objects. Review proposals and draw missing
+or covered cards manually. SAM 3 remains a future option requiring approved
+checkpoint access; the current button uses SAM 2.1 Large.
+
+**Add card** takes the printed top-left first, then the other three corners in
+any order. The editor sorts the points around the perimeter without changing
+their positions or first corner. Degenerate/non-convex outlines remain blocked;
+stored labels retain TL/TR/BR/BL winding so their crops cannot be mirrored by
+reverse clicking. The cursor hides while the corner magnifier is visible and
+returns on release, cancellation, or focus loss.
 
 Only the active card displays draggable corner handles; other cards retain
 their outlines. Card tabs and the previous/next-card buttons switch the active

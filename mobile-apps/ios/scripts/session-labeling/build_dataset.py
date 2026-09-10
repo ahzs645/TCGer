@@ -34,6 +34,8 @@ IMAGE_REQUEST_HEADERS = {
 }
 REPO = SCRIPT_DIR.parents[2]
 PROJECT_ROOT = REPO.parent
+sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
+from scanner_recording_images import materialize_input
 DEFAULT_METADATA = (
     REPO / "ios/TCGer/TCGer/Resources/ScanIndex/CardsIndexMetadata.json"
 )
@@ -217,7 +219,7 @@ def attempt_crop_path(session_dir, record, attempt, derived_dir, name):
 
         attempts = record.get("attempts") or []
         flags = dc.orientation_flags(attempts)
-        bgr = dc.load_bgr(session_dir / record["imageFile"])
+        bgr = dc.load_input_bgr(session_dir, record)
         derived = dc.derive_attempt(bgr, attempt, flags[attempts.index(attempt)]) \
             if bgr is not None else None
         if derived is None:
@@ -416,10 +418,12 @@ def main():
         by_image = {r["imageFile"]: r for r in evidence if isinstance(r, dict)}
 
         for frame in bundle.get("frames", []):
-            frame_path = session_dir / frame["imageFile"]
-            if not frame_path.exists():
-                continue
             record = by_image.get(frame["imageFile"])
+            # Cache virtual inputs outside the immutable recording. Overlay
+            # and saved-label coordinates continue to use input dimensions.
+            frame_path = materialize_input(session_dir, {**(record or {}), **frame}, derived_dir / "inputs")
+            if not frame_path.is_file():
+                continue
             key = f"{session_dir.name}/{frame['imageFile']}"
             if key in existing_keys:
                 continue

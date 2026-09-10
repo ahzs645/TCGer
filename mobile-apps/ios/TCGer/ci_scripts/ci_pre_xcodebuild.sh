@@ -4,6 +4,10 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+if [[ "${CI_WORKFLOW:-}" == "Submit Release" ]]; then
+  exec "$script_dir/app_store_release/submit.sh" --validate-only
+fi
+
 if [[ -n "${CI_XCODEBUILD_ACTION:-}" && "$CI_XCODEBUILD_ACTION" != "archive" ]]; then
   echo "Skipping the App Store version guard for Xcode Cloud action: $CI_XCODEBUILD_ACTION"
   exit 0

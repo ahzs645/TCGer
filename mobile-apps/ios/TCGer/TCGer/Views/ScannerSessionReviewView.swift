@@ -26,6 +26,7 @@ struct ScannerSessionReviewView: View {
     let showsPrices: Bool
     let priceQuotes: [CardScanResult.ID: ScannerPriceQuote]
     let totalPriceText: String?
+    let onCardAdded: (String) async -> Void
     private let apiService = APIService()
 
     init(
@@ -33,13 +34,17 @@ struct ScannerSessionReviewView: View {
         color: Color,
         showsPrices: Bool,
         priceQuotes: [CardScanResult.ID: ScannerPriceQuote],
-        totalPriceText: String?
+        totalPriceText: String?,
+        initialBinderID: String? = nil,
+        onCardAdded: @escaping (String) async -> Void = { _ in }
     ) {
         self.viewModel = viewModel
         self.color = color
         self.showsPrices = showsPrices
         self.priceQuotes = priceQuotes
         self.totalPriceText = totalPriceText
+        self.onCardAdded = onCardAdded
+        _selectedBinderID = State(initialValue: initialBinderID)
         let resultIDs = Set(viewModel.sessionResults.map(\.id))
         _selectedResultIDs = State(
             initialValue: resultIDs.subtracting(viewModel.addedSessionResultIDs)
@@ -480,6 +485,7 @@ struct ScannerSessionReviewView: View {
                 viewModel.markSessionResultsAdded(addedIDs)
                 selectedResultIDs.subtract(addedIDs)
                 errorMessage = "Added \(addedIDs.count) of \(selectedResults.count) cards. \(error.localizedDescription)"
+                if !addedIDs.isEmpty { await onCardAdded(binderID) }
                 return
             }
         }
@@ -488,6 +494,7 @@ struct ScannerSessionReviewView: View {
         selectedResultIDs.subtract(addedIDs)
         if !addedIDs.isEmpty {
             HapticManager.notification(.success)
+            await onCardAdded(binderID)
         }
     }
 

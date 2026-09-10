@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.ahmadjalil.tcger.domain.*
 import com.ahmadjalil.tcger.ui.screens.BinderDetailScreen
+import com.ahmadjalil.tcger.ui.screens.AddCardDialog
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.assertEquals
@@ -15,6 +16,45 @@ class ProductWorkflowTest {
     @get:Rule val compose = createComposeRule()
     private val pikachu = OwnedCard("p", "b", CatalogCard("25", "Pikachu", "pokemon", collectorNumber = "25"), 1, "NM")
     private val bulbasaur = OwnedCard("q", "b", CatalogCard("1", "Bulbasaur", "pokemon", collectorNumber = "1"), 1, "LP")
+    @Test fun addingACardOffersTheOriginatingBinderAsThePrimaryDestination() {
+        var addedTo: String? = null
+        compose.setContent {
+            MaterialTheme {
+                AddCardDialog(
+                    card = pikachu.card,
+                    state = AppUiState(binders = listOf(Binder("other", "Other binder"), Binder("b", "Current binder"))),
+                    initialBinderId = "b",
+                    onDismiss = {},
+                    onBinder = { addedTo = it },
+                    onWishlist = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Add to Current binder").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("b", addedTo) }
+    }
+
+    @Test fun cancellingAnIdentifiedCardDoesNotAddIt() {
+        var additions = 0
+        var dismissed = false
+        compose.setContent {
+            MaterialTheme {
+                AddCardDialog(
+                    card = pikachu.card,
+                    state = AppUiState(binders = listOf(Binder("b", "Current binder"))),
+                    initialBinderId = "b",
+                    onDismiss = { dismissed = true },
+                    onBinder = { additions++ },
+                    onWishlist = { additions++ },
+                )
+            }
+        }
+        compose.onNodeWithText("Cancel").performClick()
+        compose.runOnIdle {
+            assertEquals(true, dismissed)
+            assertEquals(0, additions)
+        }
+    }
     private fun show(remove: (String, String) -> Unit = { _, _ -> }) {
         compose.setContent {
             val binder = Binder("b", "Test binder", cards = listOf(pikachu, bulbasaur))

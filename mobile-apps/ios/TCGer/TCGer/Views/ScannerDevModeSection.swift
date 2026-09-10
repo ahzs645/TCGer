@@ -14,6 +14,7 @@ struct ScannerDevModeSection: View {
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var devModeEnabled = false
     @AppStorage(ScannerDevModeStore.cropRescueEnabledDefaultsKey) private var cropRescueEnabled = false
     @AppStorage(ScannerDevModeStore.attemptImagesDefaultsKey) private var attemptImagesEnabled = false
+    @AppStorage(ScannerDevModeStore.inputImagesDefaultsKey) private var inputImagesEnabled = false
     @State private var sessions: [ScannerDevModeStore.SessionInfo] = []
     @State private var shareArchive: DevModeShareArchive?
     @State private var errorMessage: String?
@@ -44,6 +45,12 @@ struct ScannerDevModeSection: View {
 
             attemptImagesDescription
 
+            inputImagesToggle
+
+            Text("Also saves the cropped scanner input for debugging. Normally, camera captures save one original and the crop coordinates.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             if let errorMessage {
                 errorLabel(errorMessage)
             }
@@ -64,6 +71,8 @@ struct ScannerDevModeSection: View {
         cropRescueToggle
 
         attemptImagesToggle
+
+        inputImagesToggle
 
         if let errorMessage {
             errorLabel(errorMessage)
@@ -102,6 +111,12 @@ struct ScannerDevModeSection: View {
     private var attemptImagesToggle: some View {
         Toggle(isOn: $attemptImagesEnabled) {
             Label("Save Attempt Crop Images", systemImage: "photo.on.rectangle.angled")
+        }
+    }
+
+    private var inputImagesToggle: some View {
+        Toggle(isOn: $inputImagesEnabled) {
+            Label("Save Scanner Input Images", systemImage: "photo.on.rectangle")
         }
     }
 

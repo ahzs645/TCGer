@@ -32,7 +32,23 @@
     if (message) throw Error(message);
     return next;
   }
-  const api = { above, error, setRelation };
+  function moveRelativeTo(relations, key, others, direction, keys) {
+    if (!["above", "below"].includes(direction)) throw Error("Choose above or below.");
+    const targets = [...new Set(others)].filter(other => other !== key);
+    // Break conflicting paths at the selected card only. Relationships between
+    // the other cards stay intact, including their existing stacking order.
+    let next = relations.filter(r => direction === "above"
+      ? !(r.below === key && targets.some(t => t === r.above || above(relations, r.above).includes(t)))
+      : !(r.above === key && targets.some(t => t === r.below || above(relations, t).includes(r.below))));
+    for (const other of targets) {
+      const [upper, lower] = direction === "above" ? [key, other] : [other, key];
+      if (!above(next, lower).includes(upper)) next = setRelation(next, upper, lower, keys);
+    }
+    const message = error(next, keys);
+    if (message) throw Error(message);
+    return next;
+  }
+  const api = { above, error, setRelation, moveRelativeTo };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CardLabelLayers = api;
 })(typeof window !== "undefined" ? window : {});

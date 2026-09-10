@@ -239,9 +239,33 @@ function dirty() {
   status("Unsaved changes · Save frame when ready");
   persistDraft();
 }
-function persistDraft() {
-  localStorage.setItem(`archive-draft:${state.frame.recordId}`, JSON.stringify({ targets: state.targets, occlusionRelations: state.layers, revision: state.frame.label?.revision || 0, notes: $("#notes").value, direction: direction(), unsavedChanges: state.dirty }));
+const pendingDraftBackups = new Map();
+let draftBackupTimer, draftBackupInFlight = false;
+async function flushDraftBackups() {
+  if (draftBackupInFlight || !pendingDraftBackups.size) return;
+  const batch = new Map(pendingDraftBackups);
+  draftBackupInFlight = true;
+  try {
+    const response = await fetch('/api/draft-backup', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({drafts: Object.fromEntries(batch)}), keepalive: false});
+    if (!response.ok) throw Error('Draft backup failed');
+    for (const [key, value] of batch) if (pendingDraftBackups.get(key) === value) pendingDraftBackups.delete(key);
+    document.querySelector('[data-draft-backup-status]').textContent = 'Draft recovery saved';
+  } catch (_) {
+    document.querySelector('[data-draft-backup-status]').textContent = 'Draft backup pending — keep this tab open';
+  } finally {
+    draftBackupInFlight = false;
+    if (pendingDraftBackups.size) draftBackupTimer = setTimeout(flushDraftBackups, 5000);
+  }
 }
+function persistDraft() {
+  const value = JSON.stringify({ targets: state.targets, occlusionRelations: state.layers, revision: state.frame.label?.revision || 0, notes: $("#notes").value, direction: direction(), unsavedChanges: state.dirty });
+  localStorage.setItem(`archive-draft:${state.frame.recordId}`, value);
+  pendingDraftBackups.set(state.frame.recordId, value);
+  document.querySelector('[data-draft-backup-status]').textContent = 'Draft recovery pending';
+  clearTimeout(draftBackupTimer);
+  draftBackupTimer = setTimeout(flushDraftBackups, 1000);
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushDraftBackups(); });
 function layerKeys() { return state.keys.filter((k) => state.targets[k]?.corners && !state.targets[k].skip); }
 function cardName(key) { return `Card ${cardNumber(state.keys.indexOf(String(key)))}`; }
 function relativeLayer(key, other) {

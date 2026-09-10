@@ -15,6 +15,29 @@ SPEC.loader.exec_module(review)
 
 
 class ScannerReviewTests(unittest.TestCase):
+    def test_recorded_crop_metadata_remaps_without_pixel_registration(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            # Uniform images are ambiguous for registration; recorded offsets
+            # still identify the exact, deliberately off-centre crop.
+            source, input_path = root / "original.png", root / "input.png"
+            Image.new("RGB", (100, 80), "blue").save(source)
+            Image.new("RGB", (40, 30), "blue").save(input_path)
+            transform = {"version": 1, "coordinateSpace": "uprightPixelsTopLeft",
+                         "sourcePixelWidth": 100, "sourcePixelHeight": 80,
+                         "cropRectPixels": [11, 23, 40, 30]}
+            mapping = review.locate_scanner_crop(input_path, source, transform)
+            self.assertEqual(mapping["mode"], "recorded_input_crop")
+            self.assertEqual(mapping["rect"], (11, 23, 40, 30))
+            quad = [[0, 1], [1, 1], [1, 0], [0, 0]]
+            mapped = review.remap_quad_to_media(quad, (40, 30), (100, 80), mapping["rect"])
+            self.assertAlmostEqual(mapped[0][0], 0.11)
+            self.assertAlmostEqual(mapped[0][1], 1 - 23 / 80)
+            transform["sourcePixelWidth"] = 101
+            with self.assertRaises(ValueError):
+                review.locate_scanner_crop(input_path, source, transform)
+
     def test_quad_remap_uses_registered_guide_crop(self):
         quad = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
         remapped = review.remap_quad_to_media(

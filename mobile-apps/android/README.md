@@ -45,6 +45,13 @@ an emulator or physical device. The app supports Android 8.0 (API 26) and newer.
 The default launch mode is **On this device** and needs no account or backend.
 Use **Settings > Account & connection** to configure a TCGer server.
 
+Card search includes **Scan card** and **Choose photo** beside text search.
+Opening **Add card** from a binder retains that binder through search, scanning,
+and match confirmation. The current binder is the primary save destination;
+cards are added only after confirmation. Photo entry opens the image picker
+after any game/model prompt and does not request camera access unless the user
+chooses **Use camera**.
+
 The scanner works in both modes. A signed-in server session can use the shared
 pHash or embedding scanner and authenticated price endpoint. On-device mode
 uses an integrity-checked ArcFace ONNX model/index with ML Kit title OCR

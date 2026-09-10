@@ -16,6 +16,38 @@ test('partial order supports separated cards and transitive layers without renum
   assert.deepEqual(L.setRelation([{above:4,below:12}], 12, 4, keys), [{above:12,below:4}], 'an explicit pair can be reversed');
 });
 
+test('one move puts a card above all three targets and reflects on each target', () => {
+  const keys=[0,1,2,3,4,5];
+  const original=[{above:1,below:0},{above:2,below:1},{above:3,below:2},{above:4,below:5}];
+  const before=JSON.stringify(original);
+  const front=L.moveRelativeTo(original,0,[1,2,3],'above',keys);
+  for (const other of [1,2,3]) {
+    assert.ok(L.above(front,other).includes(0), `card ${other} must show card 0 above it`);
+    assert.ok(!L.above(front,0).includes(other));
+  }
+  assert.deepEqual(front.filter(r=>r.above!==0 && r.below!==0),original.filter(r=>r.above!==0 && r.below!==0));
+  assert.equal(L.above(front,4).includes(0),false,'unrelated card remains unordered relative to the selection');
+  assert.equal(L.error(front,keys),null);
+  assert.equal(JSON.stringify(original),before,'the input graph is unchanged');
+  const back=L.moveRelativeTo(front,0,[1,2,3],'below',keys);
+  for (const other of [1,2,3]) assert.ok(L.above(back,0).includes(other));
+  assert.equal(L.error(back,keys),null);
+});
+
+test('batch moves resolve indirect conflicts at the selected card without changing other cards', () => {
+  const original=[{above:1,below:2},{above:2,below:0},{above:3,below:0}];
+  const front=L.moveRelativeTo(original,0,[1],'above',[0,1,2,3]);
+  assert.ok(L.above(front,1).includes(0));
+  assert.ok(L.above(front,2).includes(1),'existing order between other cards stays intact');
+  assert.ok(L.above(front,0).includes(3),'compatible order to an unrelated card stays intact');
+  assert.ok(!front.some(r=>r.above===2 && r.below===0),'the conflicting path is detached only at the selection');
+  assert.equal(L.error(front,[0,1,2,3]),null);
+  const back=L.moveRelativeTo(front,0,[2],'below',[0,1,2,3]);
+  assert.ok(L.above(back,0).includes(2));
+  assert.ok(L.above(back,2).includes(1));
+  assert.equal(L.error(back,[0,1,2,3]),null);
+});
+
 test('covered pixels become transparent while full geometry and visible pixels are retained', () => {
   const source = {width:8, height:8, data:new Uint8ClampedArray(8*8*4).fill(190)};
   const card = [[0,0],[1,0],[1,1],[0,1]], cover = [[.6,0],[1,0],[1,1],[.6,1]];

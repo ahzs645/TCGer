@@ -9,12 +9,14 @@ final class ScannerDevModeStoreTests: XCTestCase {
         UserDefaults.standard.set(true, forKey: ScannerDevModeStore.enabledDefaultsKey)
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.attemptImagesDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.inputImagesDefaultsKey)
     }
 
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.enabledDefaultsKey)
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.cropRescueEnabledDefaultsKey)
         UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.attemptImagesDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: ScannerDevModeStore.inputImagesDefaultsKey)
         try? FileManager.default.removeItem(at: ScannerDevModeStore.rootDirectory())
         super.tearDown()
     }
@@ -113,6 +115,110 @@ final class ScannerDevModeStoreTests: XCTestCase {
             ),
             "attempt crop images are opt-in and must not be written by default"
         )
+    }
+
+    func testCameraRecordingReconstructsInputWithoutSecondJPEG() async throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 160, height: 200), format: {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return format
+        }())
+        let original = try XCTUnwrap(renderer.image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 160, height: 100))
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 0, y: 100, width: 160, height: 100))
+        }.cgImage)
+        let rect = CGRect(x: 31, y: 21, width: 90, height: 120)
+        let input = try XCTUnwrap(original.cropping(to: rect))
+        let saved = await ScannerDevModeStore.shared.record(
+            image: input, source: .photoCapture, mode: .pokemon,
+            elapsedMs: 1, result: .failure(.noMatch), diagnostics: nil,
+            originalImage: original, inputCropRect: rect
+        )
+        XCTAssertTrue(saved)
+        let session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        let evidence = try JSONDecoder().decode([ScanEvidenceRecord].self,
+            from: Data(contentsOf: session.url.appendingPathComponent("evidence.json")))
+        let record = try XCTUnwrap(evidence.last)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: session.url.appendingPathComponent(record.imageFile).path))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: session.url.path).filter { $0.hasSuffix(".jpg") }.count, 1)
+        XCTAssertEqual(record.inputImageTransform?.cropRectPixels, [31, 21, 90, 120])
+        let replay = try ScannerReplayDocumentLoader.load(urls: [session.url])
+        let frame = try XCTUnwrap(replay.recording.frames.last)
+        XCTAssertEqual(frame.inputImageTransform, record.inputImageTransform)
+        let restored = try XCTUnwrap(replay.images[record.imageFile])
+        XCTAssertEqual(restored.width, 90)
+        XCTAssertEqual(restored.height, 120)
+        let reference = try XCTUnwrap(ScannerReferenceLibrary.makeSet(at: session.url))
+        XCTAssertEqual(reference.items.count, 1)
+        XCTAssertEqual(reference.items.first?.loadImage()?.width, 90)
+        // Independent color probe catches a flipped Y axis or a silently
+        // replayed full source. The crop straddles the red/blue boundary.
+        let colors = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 2), format: {
+            let format = UIGraphicsImageRendererFormat(); format.scale = 1; return format
+        }()).image { _ in
+            UIImage(cgImage: restored).draw(in: CGRect(x: 0, y: 0, width: 1, height: 2))
+        }
+        let pixels = try XCTUnwrap(colors.cgImage?.dataProvider?.data) as Data
+        XCTAssertNotEqual(Array(pixels.prefix(4)), Array(pixels.suffix(4)))
+    }
+
+    func testInputImageEscapeHatchAndInvalidRecipePreserveInput() async throws {
+        let original = ScannerTestImage.solid(width: 120, height: 160)
+        let rect = CGRect(x: 10, y: 20, width: 90, height: 120)
+        let input = try XCTUnwrap(original.cropping(to: rect))
+        UserDefaults.standard.set(true, forKey: ScannerDevModeStore.inputImagesDefaultsKey)
+        await ScannerDevModeStore.shared.record(
+            image: input, source: .photoCapture, mode: .pokemon,
+            elapsedMs: 1, result: nil, diagnostics: nil,
+            originalImage: original, inputCropRect: rect
+        )
+        UserDefaults.standard.set(false, forKey: ScannerDevModeStore.inputImagesDefaultsKey)
+        await ScannerDevModeStore.shared.record(
+            image: input, source: .photoCapture, mode: .pokemon,
+            elapsedMs: 1, result: nil, diagnostics: nil,
+            originalImage: original, inputCropRect: CGRect(x: 50, y: 20, width: 90, height: 120)
+        )
+        let session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        let records = try JSONDecoder().decode([ScanEvidenceRecord].self,
+            from: Data(contentsOf: session.url.appendingPathComponent("evidence.json")))
+        XCTAssertNotNil(records[0].inputImageTransform)
+        XCTAssertNil(records[1].inputImageTransform)
+        for record in records {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: session.url.appendingPathComponent(record.imageFile).path))
+        }
+        XCTAssertEqual(try ScannerReplayDocumentLoader.load(urls: [session.url]).recording.frames.count, 2)
+    }
+
+    func testVirtualInputRejectsMissingSourceAndUnsupportedRecipe() async throws {
+        let original = ScannerTestImage.solid(width: 120, height: 160)
+        let rect = CGRect(x: 10, y: 20, width: 90, height: 120)
+        let input = try XCTUnwrap(original.cropping(to: rect))
+        await ScannerDevModeStore.shared.record(
+            image: input, source: .photoCapture, mode: .pokemon,
+            elapsedMs: 1, result: nil, diagnostics: nil,
+            originalImage: original, inputCropRect: rect
+        )
+        let session = try XCTUnwrap(ScannerDevModeStore.listSessions().first)
+        let replay = try ScannerReplayDocumentLoader.load(urls: [session.url])
+        let transform = try XCTUnwrap(replay.recording.frames.last?.inputImageTransform)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(transform)) as? [String: Any])
+        let changes: [[String: Any]] = [
+            ["version": 99], ["coordinateSpace": "vision"],
+            ["cropRectPixels": [-1, 0, 90, 120]], ["cropRectPixels": [1, 2]],
+            ["sourcePixelWidth": 121], ["cropRectPixels": [0, 0, 900, 120]],
+        ]
+        for change in changes {
+            json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(transform)) as? [String: Any])
+            json.merge(change) { _, new in new }
+            let bad = try JSONDecoder().decode(ScannerInputImageTransform.self, from: JSONSerialization.data(withJSONObject: json))
+            XCTAssertNil(bad.apply(to: original))
+        }
+        try FileManager.default.removeItem(at: session.url.appendingPathComponent(transform.sourceImageFile))
+        // An unrelated JPEG must not hide the missing frame.
+        try UIImage(cgImage: original).jpegData(compressionQuality: 0.85)?.write(to: session.url.appendingPathComponent("orphan.jpg"))
+        XCTAssertThrowsError(try ScannerReplayDocumentLoader.load(urls: [session.url]))
     }
 
     func testMixedGameSessionSummaryPreservesEveryModeAndCaptureMode() async throws {

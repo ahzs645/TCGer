@@ -8,8 +8,9 @@
   </head>
   <body>
     <header>
-      <div><h1>Card corner editor</h1><p>One card at a time · live corner zoom and perspective correction</p></div>
+      <div><h1>Card corner editor</h1><p>All card outlines · select a card to adjust · save the whole frame</p></div>
       <div class="sample-nav"><button id="previous">←</button><select id="sample"></select><button id="next">→</button></div>
+    <a data-backup-status href="http://127.0.0.1:8774/" target="_blank" rel="noopener">Backups</a>
     </header>
     <main>
       <section class="workspace">
@@ -18,20 +19,53 @@
             <button id="previous-card" aria-label="Previous card">← Card</button>
             <div id="cards" class="button-row" role="tablist" aria-label="Active card"></div>
             <button id="next-card" aria-label="Next card">Card →</button>
+            <button id="rotate-left" title="Rotate the rectified card counterclockwise; keep its outline">↶ Rotate (R)</button>
+            <button id="rotate-right" aria-label="Rotate card clockwise" title="Rotate the rectified card clockwise; keep its outline">↷</button>
             <button id="add-card-top" class="primary">+ Add card</button>
+            <button id="suggest-outlines" class="primary" title="Run SAM 2.1 Large locally on this photo; review proposals before adding them">Suggest card outlines</button>
+            <button id="cancel-drawing" hidden>Cancel drawing (Esc)</button>
           </div>
-          <canvas id="editor" tabindex="0" aria-label="Card editor. Tab next card, Shift Tab previous card, Escape exit editing, 1 to 4 select corner."></canvas>
-          <div id="drag-hint">Only active corners are editable · Tab / Shift+Tab switches cards · Esc exits</div>
+          <div class="photo-toolbar" aria-label="Photo view controls">
+            <label>Photo zoom <input id="photo-zoom" type="range" min="100" max="800" step="10" value="100" /></label>
+            <output id="photo-zoom-value" for="photo-zoom">100%</output>
+            <button id="zoom-out" aria-label="Zoom photo out">−</button>
+            <button id="zoom-in" aria-label="Zoom photo in">+</button>
+            <button id="fit-photo">Fit photo</button>
+            <button id="pan-photo" aria-pressed="false" title="Toggle panning, or temporarily hold Space while dragging the photo">Pan photo</button>
+            <span>Scroll to zoom · Hold Space + drag to pan · Middle-drag also pans</span>
+          </div>
+          <section id="suggestion-panel" hidden aria-label="Suggested card outlines">
+            <div class="suggestion-heading"><strong>SAM 2.1 Large · local</strong><button id="close-suggestions">Close suggestions</button></div>
+            <p id="suggestion-status" role="status"></p>
+            <p class="tip">Preview a suggestion, then add it as an editable draft. Check the printed top and rotate if needed. Covered cards can be missed; use Add card for those.</p>
+            <div id="suggestion-cards"></div>
+            <button id="add-suggestions" hidden>Add all missing drafts</button>
+          </section>
+          <canvas id="editor" tabindex="0" aria-label="Card editor. Click an outlined card to select. Add card: printed top-left first, then the other three corners in any order. Escape cancels drawing."></canvas>
+          <div id="floating-magnifier" hidden>
+            <div class="magnifier-title"><strong id="selection">Select a corner</strong><span id="coordinates"></span></div>
+            <canvas id="magnifier" width="360" height="360" aria-label="Magnified selected corner with crosshair"></canvas>
+          </div>
+          <div id="drag-hint">Click a card or thumbnail to select · Click overlapping cards again to cycle · Drag a selected corner to adjust</div>
+          <section class="thumbnail-panel" aria-label="Rectified card thumbnails">
+            <div class="thumbnail-heading"><strong id="thumbnail-count">Rectified cards</strong><span>Click a preview to select</span></div>
+            <div id="card-thumbnails" aria-label="All outlined cards"></div>
+          </section>
         </div>
         <aside class="inspection-panels">
           <section class="inspection">
-          <div class="magnifier-title"><strong id="selection">Select a corner</strong><span id="coordinates"></span></div>
-          <canvas id="magnifier" width="360" height="360"></canvas>
           <label class="zoom-control">Zoom window <input id="zoom" type="range" min="24" max="160" value="64" /></label>
-          <p class="tip">Press and hold a dot, then move your pointer. Release to save that corner.</p>
+          <p class="tip">Hold a corner to zoom directly over it. Drag to adjust; release to hide the zoom.</p>
           </section>
           <section class="inspection">
             <div class="magnifier-title"><strong>Rectified card</strong><span id="preview-card"></span></div>
+            <label class="profile-label">Overlap preview
+              <select id="preview-mode">
+                <option value="masked">Masked</option>
+                <option value="layers">Layer colors</option>
+                <option value="original">Original</option>
+              </select>
+            </label>
             <label class="profile-label">Preview proportions
               <select id="preview-profile">
                 <option value="standard">Standard · 63 × 88 mm</option>
@@ -41,13 +75,26 @@
             </label>
             <canvas id="rectified" width="252" height="352" aria-label="Live perspective-corrected active card preview"></canvas>
             <p id="preview-status" class="tip" aria-live="polite"></p>
-            <p class="tip">Checkerboard = outside the captured image. Proportions are a viewing aid, not a prediction of hidden corners. Preview only; saved quads are unchanged.</p>
+            <p id="card-angles" class="tip" title="Measured from the saved corners in source pixels. Rotation uses the printed top edge; skew is the largest corner-angle deviation from 90°. These are image-plane measurements, not calibrated 3D tilt."></p>
+            <p id="preview-legend" class="tip"></p>
+          </section>
+          <section class="inspection" id="layer-controls">
+            <strong>Card stacking</strong>
+            <p id="frame-overlaps" class="tip"></p>
+            <p class="tip">By default, move this card above or below every card it overlaps. All affected cards update together.</p>
+            <label class="profile-label">Relative to <select id="layer-other"></select></label>
+            <p id="layer-relationship" class="tip"></p>
+            <div class="button-row"><button id="layer-forward">Bring to front ↑</button><button id="layer-backward">Send to back ↓</button></div>
+            <div id="overlap-list" aria-label="All cards overlapping the selected card"></div>
+            <div id="layer-list" aria-label="Assigned card layers"></div>
+            <p class="tip">Save all cards in frame saves stacking and rotation.</p>
           </section>
         </aside>
       </section>
       <section class="controls">
+        <p class="tip">Corners already look right? Save all cards in frame to approve every outline. Only drag the corners that need correcting.</p>
         <div class="button-row">
-          <button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="no-card">No labelable card</button><button id="save" class="primary">Save frame</button>
+          <button id="add">+ Add card</button><button id="delete" class="danger">Delete active</button><button id="no-card">No labelable card</button><button id="save" class="primary">Save all cards in frame</button>
           <label class="scene-label">Evaluation slice
             <select id="scene-slice">
               <option value="single_handheld">Single handheld</option>
@@ -61,8 +108,13 @@
         <div id="metadata" class="metadata"></div>
       </section>
     </main>
-    <footer><span id="status">Loading…</span><span id="minimum-progress"></span><span id="page-count"></span></footer>
+    <footer>
+      <div class="footer-status"><span id="status" role="status">Loading…</span><div><span id="minimum-progress"></span> · <span id="page-count"></span></div></div>
+      <div class="save-actions"><button id="save-visible">Save all cards</button><button id="save-next" class="primary">Save &amp; next →</button></div>
+    </footer>
     <script src="/geometry.js"></script>
+    <script src="/layers.js"></script>
     <script src="/editor.js"></script>
+  <script src="/backup-status.js" defer></script>
   </body>
 </html>

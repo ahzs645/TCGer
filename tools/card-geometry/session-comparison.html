@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TCGer · completed session comparison</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#13171c;color:#edf2f7;font:15px system-ui}main{max-width:1500px;margin:auto;padding:20px}h1{font-size:24px;margin:0}p{line-height:1.5;color:#b8c4d0}button,select,a{font:inherit;color:inherit}button,select{background:#25303b;border:1px solid #647084;border-radius:7px;padding:8px}button{cursor:pointer}a{color:#97cdff}nav{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#13171cf5;padding:12px 0}#photo{max-width:min(700px,75vw)}table{border-collapse:collapse;margin:15px 0}th,td{padding:7px 20px 7px 0;text-align:left;border-bottom:1px solid #36414f;font-variant-numeric:tabular-nums}.panels{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{background:#1b222b;border:1px solid #36414f;border-radius:10px;padding:12px}.panel h2{font-size:18px;margin:0 0 8px}.overlay{width:100%;max-height:650px;object-fit:contain;background:#101317}.legend{font-size:13px}.gold{color:#ffce71}.green{color:#78ffae}.blue{color:#a8beff}#crops{display:flex;gap:20px;align-items:start;flex-wrap:wrap}.crop{width:150px}.crop canvas{width:140px;height:auto;background:repeating-conic-gradient(#39404c 0% 25%,#202631 0% 50%) 0/12px 12px}.crop p{font-size:12px;margin:5px 0}#card{min-width:110px}details{margin-top:15px}summary{cursor:pointer}#frame-detail{white-space:pre-wrap;font-size:13px}#warning{color:#ffce71}@media(max-width:800px){.panels{grid-template-columns:1fr}main{padding:12px}th,td{padding-right:10px;font-size:13px}}
+</style>
+<main>
+<h1>Your completed session · model comparison</h1>
+<p><a data-backup-status href="http://127.0.0.1:8774/" target="_blank" rel="noopener">Backups</a></p>
+<p>75 photos · 106 reviewed card outlines. This page only displays results; your saved labels are unchanged.</p>
+<p>Scores measure agreement with the saved outlines. Some unmatched predictions are partially visible background cards. The four reference spot checks are complete: the points are outside the captured photos, so the reviewed estimates are retained. Labels and scores remain unchanged.</p>
+<div id="summary"></div>
+<p class="legend"><span class="gold">Gold: your saved outline (C#)</span> · <span class="green">Green: baseline prediction (P#)</span> · <span class="blue">Blue: candidate prediction (P#)</span>. Gold dots mark your printed top-left.</p>
+<nav><button id="prev">← Previous</button><select id="photo" aria-label="Photo"></select><button id="next">Next →</button><select id="filter" aria-label="Filter"><option value="all">All photos</option><option value="miss">Missed cards</option><option value="gain">Candidate gains tight outlines</option><option value="loss">Candidate loses tight outlines</option><option value="multi">Multiple cards</option><option value="reference">Completed reference checks</option></select></nav>
+<p id="warning"></p>
+<p id="inspection-note"></p>
+<div class="panels"><section class="panel"><h2>Reviewed-data baseline</h2><div id="base-stats"></div><canvas id="base-overlay" class="overlay"></canvas></section><section class="panel"><h2 id="candidate-title">Candidate</h2><div id="candidate-stats"></div><canvas id="candidate-overlay" class="overlay"></canvas></section></div>
+<p><label>Rectified previews <select id="card"></select></label> · <a id="studio">Open saved corners in the studio</a></p>
+<div id="crops"></div>
+<p id="angle-readout"></p>
+<p>Raw model crops use the model’s own first corner. The aligned previews use your labels to choose the best rotation for diagnosis; that alignment is not available automatically during scanning.</p>
+<details><summary>Frame measurements</summary><div id="frame-detail"></div></details>
+<p>One capture session, with repeated views of some cards. Recognition identities have not been independently labeled, so these results measure detection and geometry, not recognition accuracy. Models and thresholds were fixed before this comparison.</p>
+</main>
+<script src="geometry.js"></script>
+<script src="backup-status.js" defer></script>
+<script>
+'use strict';
+const $=s=>document.querySelector(s),G=window.CardEditorGeometry;
+let data,frames=[],index=0,pixels=null,load=0,candidateLabel="Candidate";
+const quads=result=>result.map(p=>p.corners.map(c=>[c.point.x,c.point.y]));
+function counts(v){return `${v.counts.matched}/${v.counts.truth} found · ${v.matches.filter(m=>m.iou>=.9).length} tight outlines · ${v.counts.extras+v.counts.duplicates} unmatched predictions`;}
+function showSummary(){
+ const table=document.createElement('table');
+ const header=document.createElement('tr');for(const label of ['Metric','Baseline',candidateLabel]){const th=document.createElement('th');th.textContent=label;header.append(th);}table.append(header);
+ const a=data.metrics.baseline,b=data.metrics.candidate;
+ for(const [label,first,second] of [
+  ['Found cards (IoU ≥ .50)',a.detection.overall.matches,b.detection.overall.matches],
+  ['Tight outlines (IoU ≥ .90)',data.paired.baseline.tight,data.paired.candidate.tight],
+  ['Missed cards',a.detection.overall.miss,b.detection.overall.miss],
+  ['Extra + duplicate predictions',a.detection.overall.extra+a.detection.overall.duplicate,b.detection.overall.extra+b.detection.overall.duplicate],
+  ['Correct printed order on found cards',`${a.orientation.correctPairs}/${a.orientation.eligiblePairs}`,`${b.orientation.correctPairs}/${b.orientation.eligiblePairs}`]]){
+   const row=document.createElement('tr');for(const text of [label,first,second]){const td=document.createElement('td');td.textContent=text;row.append(td);}table.append(row);
+ }$('#summary').replaceChildren(table);
+}
+function subset(){
+ const previous=frames[index]?.id,filter=$('#filter').value;
+ frames=data.frames.filter(f=>filter==='all'||filter==='reference'&&f.inspection?.some(e=>['reference-check','reference-checked'].includes(e.kind))||filter==='multi'&&f.versions.baseline.counts.truth>1||filter==='miss'&&(f.versions.baseline.counts.misses||f.versions.candidate.counts.misses)||['gain','loss'].includes(filter)&&data.targets.some(t=>t.recordId===f.id&&(filter==='gain'?t.candidate?.iou>=.9&&!(t.baseline?.iou>=.9):t.baseline?.iou>=.9&&!(t.candidate?.iou>=.9))));
+ $('#photo').replaceChildren(...frames.map((f,i)=>new Option(`${f.reference} · ${f.key.split('/').at(-1)} · ${f.versions.baseline.counts.truth} cards`,i)));
+ index=Math.max(0,frames.findIndex(f=>f.id===previous));
+ $('#prev').disabled=$('#next').disabled=!frames.length;
+ if(frames.length)show();else $('#warning').textContent='No photos match this filter.';
+}
+function paint(canvas,image,truth,predicted,color){
+ const margin=.15,w=image.naturalWidth,h=image.naturalHeight;
+ canvas.width=900;canvas.height=Math.round(900*h/w);const ctx=canvas.getContext('2d');
+ const sx=canvas.width/(1+2*margin),sy=canvas.height/(1+2*margin),ox=sx*margin,oy=sy*margin;
+ ctx.fillStyle='#101317';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,ox,oy,sx,sy);
+ function polygon(q,c,label,dash){ctx.strokeStyle=c;ctx.lineWidth=2.5;ctx.setLineDash(dash);ctx.beginPath();q.forEach((p,i)=>{if(i)ctx.lineTo(ox+p[0]*sx,oy+p[1]*sy);else ctx.moveTo(ox+p[0]*sx,oy+p[1]*sy);});ctx.closePath();ctx.stroke();ctx.setLineDash([]);const x=ox+q[0][0]*sx,y=oy+q[0][1]*sy;ctx.fillStyle=c;ctx.font='bold 16px system-ui';ctx.fillText(label,x+5,y-7);if(c==='#ffce71'){ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();}}
+ predicted.forEach((q,i)=>polygon(q,color,`P${i+1}`,[]));truth.forEach((q,i)=>polygon(q,'#ffce71',`C${i+1}`,[6,4]));
+}
+async function show(){
+ const generation=++load,f=frames[index];pixels=null;$('#photo').value=index;
+ history.replaceState(null,'',`?photo=${f.reference}`);
+ $('#base-stats').textContent=counts(f.versions.baseline);$('#candidate-stats').textContent=counts(f.versions.candidate);
+ $('#warning').textContent=`${f.reference}: ${f.versions.baseline.reasons.length?'Baseline: '+f.versions.baseline.reasons.join('; ')+'. ':''}${f.versions.candidate.reasons.length?candidateLabel+': '+f.versions.candidate.reasons.join('; '):candidateLabel+' agrees closely with the saved outlines.'}`;
+ $('#inspection-note').textContent=(f.inspection||[]).map(e=>e.observation).join(' ');
+ $('#card').replaceChildren(...f.versions.baseline.referenceInstances.map((t,i)=>new Option(`Card ${i+1}`,i)));
+ $('#frame-detail').textContent=JSON.stringify({baseline:f.versions.baseline,candidate:f.versions.candidate},null,2);
+ const image=new Image();image.src=f.imageUrl;await image.decode();if(generation!==load)return;
+ const source=document.createElement('canvas');source.width=image.naturalWidth;source.height=image.naturalHeight;source.getContext('2d').drawImage(image,0,0);pixels=source.getContext('2d').getImageData(0,0,source.width,source.height);
+ const truth=f.versions.baseline.referenceInstances.map(t=>t.corners);
+ paint($('#base-overlay'),image,truth,quads(f.predictions.baseline),'#78ffae');paint($('#candidate-overlay'),image,truth,quads(f.predictions.candidate),'#a8beff');crops();
+}
+function crops(){
+ const f=frames[index],i=Number($('#card').value),truth=f.versions.baseline.referenceInstances[i];if(!pixels||!truth)return;
+ const target=data.targets.find(t=>t.recordId===f.id&&t.card===i+1);
+ const angles=G.measureQuad(truth.corners,f.source.width,f.source.height,target?.orientationKnown===true);
+ $('#angle-readout').textContent=`Saved corners: ${angles.printedRotationDegrees===null?'printed rotation unknown':`rotation ${angles.printedRotationDegrees.toFixed(1)}° (positive = clockwise)`} · perspective skew ${angles.skewDegrees.toFixed(1)}°. These measure the outline in the image; calibrated 3D tilt needs camera parameters.`;
+ $('#studio').href=`http://127.0.0.1:8772/?photo=${encodeURIComponent(f.key)}&card=C${i+1}`;
+ const entries=[['Your saved corners',truth.corners,'Printed orientation from your review']];
+ for(const [key,label] of [['baseline','Baseline'],['candidate',candidateLabel]]){
+  const match=f.versions[key].matches.find(m=>m.truthId===`T${i+1}`);
+  if(!match){entries.push([label,null,'No matching prediction']);continue;}
+  const q=quads(f.predictions[key])[Number(match.cardId.slice(1))-1],roll=match.bestCornerRoll;
+  entries.push([label+' · raw',q,`IoU ${match.iou.toFixed(3)} · model’s corner order`]);
+  if(roll)entries.push([label+' · aligned',q.slice(roll).concat(q.slice(0,roll)),`Uses your label to align ${roll} corner(s)`]);
+ }
+ $('#crops').replaceChildren(...entries.map(([title,q,note])=>{const div=document.createElement('div');div.className='crop';const strong=document.createElement('strong');strong.textContent=title;div.append(strong);if(q){const canvas=document.createElement('canvas');canvas.width=140;canvas.height=196;try{const p=G.rectify(pixels,q,140,196);canvas.getContext('2d').putImageData(new ImageData(p.data,p.width,p.height),0,0);}catch(e){note=e.message;}div.append(canvas);}const text=document.createElement('p');text.textContent=note;div.append(text);return div;}));
+}
+$('#prev').onclick=()=>{index=(index-1+frames.length)%frames.length;show();};$('#next').onclick=()=>{index=(index+1)%frames.length;show();};$('#photo').onchange=e=>{index=Number(e.target.value);show();};$('#filter').onchange=subset;$('#card').onchange=crops;
+fetch('data.json').then(r=>r.json()).then(payload=>{data=payload;candidateLabel=data.models.candidate.id==='cyclic-epoch50'?'Cyclic epoch 50':data.models.candidate.id==='orientation-validation-selected'?'Validation-selected YOLO11s':data.models.candidate.id;$('#candidate-title').textContent=candidateLabel;showSummary();const requested=new URL(location.href).searchParams.get('photo');frames=data.frames;index=Math.max(0,frames.findIndex(f=>f.reference===requested));subset();}).catch(e=>$('#warning').textContent=e.message);
+</script>

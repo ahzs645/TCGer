@@ -16,6 +16,29 @@
     return count ? ((index + direction) % count + count) % count : 0;
   }
 
+  // Image-plane measurements only: perspective tilt in 3D requires camera
+  // calibration. Always scale normalized coordinates to source pixels first.
+  function measureQuad(quad, width, height, orientationKnown = false) {
+    const error = labelQuadError(quad);
+    if (error) throw new Error(error);
+    if (!(Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0)) throw new Error("Source image dimensions are required");
+    const p = quad.map(([x,y]) => [x*width,y*height]);
+    const lengths=p.map((a,i)=>Math.hypot(p[(i+1)%4][0]-a[0],p[(i+1)%4][1]-a[1]));
+    const angles=p.map((a,i)=>{
+      const b=p[(i+3)%4], c=p[(i+1)%4];
+      const dot=(b[0]-a[0])*(c[0]-a[0])+(b[1]-a[1])*(c[1]-a[1]);
+      return Math.acos(Math.max(-1,Math.min(1,dot/(lengths[(i+3)%4]*lengths[i]))))*180/Math.PI;
+    });
+    const edgeAngle=Math.atan2(p[1][1]-p[0][1],p[1][0]-p[0][0])*180/Math.PI;
+    const rotation=orientationKnown ? edgeAngle : null;
+    const rotationBin=rotation===null ? "unknown" : Math.abs(rotation)<45 ? "upright" : Math.abs(rotation)>135 ? "upside-down" : rotation>=0 ? "sideways-clockwise" : "sideways-counterclockwise";
+    return {schema:"tcger-quad-angles/v1",printedRotationDegrees:rotation,firstEdgeDegrees:edgeAngle,rotationBin,
+      cornerAnglesDegrees:angles,skewDegrees:Math.max(...angles.map(a=>Math.abs(a-90))),
+      oppositeWidthRatio:Math.max(lengths[0],lengths[2])/Math.min(lengths[0],lengths[2]),
+      oppositeHeightRatio:Math.max(lengths[1],lengths[3])/Math.min(lengths[1],lengths[3]),
+      outsideCorners:quad.filter(([x,y])=>x<0||x>1||y<0||y>1).length};
+  }
+
   // The caller supplies screen-space coordinates. Hidden handles never hit.
   function nearestActiveHandle(quads, activeCard, point, radius) {
     let result = null;
@@ -58,6 +81,16 @@
     return null;
   }
 
+  // Click order is an input convenience; stored labels still have positive
+  // winding so rectification cannot mirror them. Keep the first printed TL.
+  function orderClickedCorners(points) {
+    if (!points || points.length!==4 || points.some(p=>!Array.isArray(p) || p.length!==2 || p.some(v=>!Number.isFinite(v)))) return points;
+    const center=points.reduce((c,p)=>[c[0]+p[0]/4,c[1]+p[1]/4],[0,0]);
+    const ordered=points.slice().sort((a,b)=>Math.atan2(a[1]-center[1],a[0]-center[0])-Math.atan2(b[1]-center[1],b[0]-center[0]));
+    const start=ordered.indexOf(points[0]);
+    return ordered.slice(start).concat(ordered.slice(0,start));
+  }
+
   // Map a rectified unit square back into the source quad: true projective
   // homography, not a bilinear deformation. Source coordinates are image-edge.
   function squareToQuad(quad) {
@@ -89,6 +122,29 @@
       if (cross < -1e-10) negative = true;
     }
     return !(positive && negative);
+  }
+
+  // Screen-space hit testing includes a small border tolerance. Repeated
+  // clicks in an overlap cycle through the outlined cards at that point.
+  function cardAtPoint(quads, point, activeCard, edgeRadius = 8) {
+    const distanceToEdge = (a, b) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const length2 = dx * dx + dy * dy;
+      const t = length2 ? Math.max(0, Math.min(1,
+        ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / length2)) : 0;
+      return Math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy);
+    };
+    const hits = [];
+    for (let index = quads.length - 1; index >= 0; index--) {
+      const quad = quads[index];
+      if (validQuad(quad)) continue;
+      if (pointInQuad(point, quad) || quad.some((a, i) => distanceToEdge(a, quad[(i + 1) % 4]) <= edgeRadius)) {
+        hits.push(index);
+      }
+    }
+    if (!hits.length) return null;
+    const current = hits.indexOf(activeCard);
+    return hits[(current + 1) % hits.length];
   }
 
   function rectify(source, quad, width, height, coveringQuads = []) {
@@ -166,7 +222,34 @@
     return result;
   }
 
-  const api = {PROFILES, defaultProfile, cycleCard, nearestActiveHandle, validQuad, labelQuadError, squareToQuad, project, pointInQuad, quadsOverlap, rectify, layerPreview};
+  function quadIoU(first, second) {
+    if (validQuad(first) || validQuad(second)) return 0;
+    const signedArea = points => points.reduce((sum,p,i) => {
+      const q=points[(i+1)%points.length]; return sum+p[0]*q[1]-q[0]*p[1];
+    },0)/2;
+    const direction = Math.sign(signedArea(second));
+    let clipped = first;
+    for (let i=0;i<4 && clipped.length;i++) {
+      const a=second[i], b=second[(i+1)%4];
+      const distance=p=>direction*((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]));
+      const input=clipped; clipped=[];
+      let previous=input.at(-1), dp=distance(previous);
+      for (const current of input) {
+        const dc=distance(current);
+        if ((dc>=0)!==(dp>=0)) {
+          const t=dp/(dp-dc);
+          clipped.push([previous[0]+t*(current[0]-previous[0]),previous[1]+t*(current[1]-previous[1])]);
+        }
+        if (dc>=0) clipped.push(current);
+        previous=current; dp=dc;
+      }
+    }
+    const intersection=Math.abs(signedArea(clipped));
+    const union=Math.abs(signedArea(first))+Math.abs(signedArea(second))-intersection;
+    return union>0 ? intersection/union : 0;
+  }
+
+  const api = {PROFILES, defaultProfile, cycleCard, measureQuad, nearestActiveHandle, cardAtPoint, validQuad, labelQuadError, orderClickedCorners, squareToQuad, project, pointInQuad, quadsOverlap, quadIoU, rectify, layerPreview};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CardEditorGeometry = api;
 })(typeof window !== "undefined" ? window : {});

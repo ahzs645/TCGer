@@ -33,6 +33,9 @@ SCENE_MINIMUMS = {
 import sys  # noqa: E402
 
 sys.path.insert(0, str(PLUGIN_DIR))
+sys.path.insert(0, str(STATIC_DIR.parent))
+from card_layer_order import ordered_indices, validate_relations  # noqa: E402
+from card_outline_suggestions import OutlineSuggestionJobs, SuggestionBusyError  # noqa: E402
 from geometry_editor import (  # noqa: E402
     default_geometry_metadata,
     geometry_record,
@@ -119,6 +122,27 @@ def durable_geometry(sample):
     except (TypeError, json.JSONDecodeError):
         return None
     return value if isinstance(value, dict) else None
+
+
+def load_editor_layers(sample, quads):
+    """Reuse explicit relations only while card indices still align."""
+    record = durable_geometry(sample) or {}
+    if len(record.get("instances") or []) != len(quads):
+        return []
+    return validate_relations(record.get("occlusionRelations", []), range(len(quads)))
+
+
+def detector_draft_quads(sample):
+    """Show distinct card proposals, not repeated recognition attempts."""
+    from reference_geometry import quad_iou
+    result = []
+    for quad in polyline_quads(sample, "detection_quads", preferred_label="decisive"):
+        if quad_validation_error(quad):
+            continue
+        if any(quad_iou(quad, previous) >= 0.85 for previous in result):
+            continue
+        result.append(quad)
+    return result
 
 
 def geometry_is_negative(sample):
@@ -270,9 +294,7 @@ class EditorStore:
             no_labelable_card = geometry_is_negative(sample)
             draft_source = None
             if not quads and not no_labelable_card:
-                quads = polyline_quads(
-                    sample, "detection_quads", preferred_label="decisive", limit=1
-                )
+                quads = detector_draft_quads(sample)
                 draft_source = "detector"
             result.append(
                 {
@@ -318,9 +340,7 @@ class EditorStore:
         no_labelable_card = geometry_is_negative(sample)
         draft_source = None
         if not quads and not no_labelable_card:
-            quads = polyline_quads(
-                sample, "detection_quads", preferred_label="decisive", limit=1
-            )
+            quads = detector_draft_quads(sample)
             draft_source = "detector"
         with Image.open(sample.filepath) as image:
             width, height = image.size
@@ -335,6 +355,7 @@ class EditorStore:
             "imageUrl": f"/api/image/{value}",
             "quads": quads,
             "metadata": load_editor_metadata(sample, quads),
+            "occlusionRelations": load_editor_layers(sample, quads),
             "finalized": geometry_is_finalized(sample, quads),
             "draftSource": draft_source,
             "noLabelableCard": no_labelable_card,
@@ -350,6 +371,10 @@ class EditorStore:
             raise KeyError(value)
         quads, metadata = validate_payload(payload)
         sample = self.dataset[value]
+        relations = validate_relations(
+            payload.get("occlusionRelations", load_editor_layers(sample, quads)),
+            range(len(quads)),
+        )
         sample["manual_quad"] = self.fo.Polylines(
             polylines=[
                 self.fo.Polyline(
@@ -362,10 +387,16 @@ class EditorStore:
             ]
         )
         if bool(payload.get("finalize")):
+            # The UI retains the explicit partial order; this compatible rank
+            # does not imply that the reviewer assigned every pair's order.
+            if relations:
+                for rank, index in enumerate(ordered_indices(range(len(quads)), relations)):
+                    metadata[index]["occlusionOrder"] = rank
             scene_slice = scene_slice_for(sample, payload.get("sceneSlice"))
             record = geometry_record(
                 sample_key(sample), field_value(sample, "game"), scene_slice, quads, metadata
             )
+            record["occlusionRelations"] = relations
             if payload.get("noLabelableCard") is True:
                 record["noLabelableCard"] = True
             if not self.dataset.has_sample_field("manual_instances_json"):
@@ -412,6 +443,8 @@ class EditorHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         path = unquote(urlparse(self.path).path)
         try:
+            if path.startswith("/api/outline-suggestions/jobs/"):
+                return self.send_json(self.server.suggestions.get(path.rsplit("/", 1)[-1]))
             if path == "/api/samples":
                 return self.send_json(
                     {
@@ -424,6 +457,10 @@ class EditorHandler(BaseHTTPRequestHandler):
                 return self.send_json(self.store.sample_payload(path.rsplit("/", 1)[-1]))
             if path.startswith("/api/image/"):
                 return self.send_file(self.store.image_path(path.rsplit("/", 1)[-1]))
+            if path == "/layers.js":
+                return self.send_file(STATIC_DIR.parent / "archive-labeler/layers.js", "text/javascript")
+            if path == "/backup-status.js":
+                return self.send_file(STATIC_DIR.parent / "backup-status.js", "text/javascript")
             relative = "index.html" if path in {"", "/"} else path.lstrip("/")
             target = (STATIC_DIR / relative).resolve()
             if STATIC_DIR.resolve() not in target.parents and target != STATIC_DIR.resolve():
@@ -435,6 +472,23 @@ class EditorHandler(BaseHTTPRequestHandler):
             self.send_json({"error": "file not found"}, HTTPStatus.NOT_FOUND)
         except Exception as error:  # pragma: no cover
             self.send_json({"error": str(error)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def do_POST(self):  # noqa: N802
+        path = unquote(urlparse(self.path).path)
+        if not path.startswith("/api/outline-suggestions/") or path.count("/") != 3:
+            return self.send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+        # A page on a different origin cannot launch expensive local inference.
+        origin = self.headers.get("Origin")
+        if origin and origin != f"http://{self.headers.get('Host')}":
+            return self.send_json({"error": "request must come from this studio"}, HTTPStatus.FORBIDDEN)
+        try:
+            sample_id = path.rsplit("/", 1)[-1]
+            image_path = self.store.image_path(sample_id)
+            return self.send_json(self.server.suggestions.start(sample_id, image_path), HTTPStatus.ACCEPTED)
+        except KeyError:
+            self.send_json({"error": "sample not found"}, HTTPStatus.NOT_FOUND)
+        except SuggestionBusyError as error:
+            self.send_json({"error": str(error)}, HTTPStatus.CONFLICT)
 
     def do_PUT(self):  # noqa: N802
         path = unquote(urlparse(self.path).path)
@@ -463,6 +517,7 @@ def main():
     store = EditorStore(args.dataset, args.view, args.scene_slice)
     server = ThreadingHTTPServer((args.host, args.port), EditorHandler)
     server.store = store
+    server.suggestions = OutlineSuggestionJobs()
     print(f"TCGer corner editor: http://{args.host}:{args.port} ({len(store.sample_ids)} samples from {args.view!r})")
     try:
         server.serve_forever()

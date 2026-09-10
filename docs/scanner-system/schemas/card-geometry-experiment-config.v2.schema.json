@@ -77,8 +77,8 @@
           "$ref": "#/$defs/sha256"
         },
         "policyId": {
-          "description": "Readiness policy the pinned corpus binds. v3 froze round two; v4 adds requireTargetSemantics and the archive layout slices for the successor corpus.",
-          "enum": ["training-minimums-v3", "training-minimums-v4"]
+          "description": "Readiness policy the pinned corpus binds. v3 froze round two; v4 adds target semantics and archive layouts; training-known-orientation-v1 reserves whole source groups for reviewed orientation validation.",
+          "enum": ["training-minimums-v3", "training-minimums-v4", "training-known-orientation-v1"]
         },
         "policySha256": {
           "$ref": "#/$defs/sha256"

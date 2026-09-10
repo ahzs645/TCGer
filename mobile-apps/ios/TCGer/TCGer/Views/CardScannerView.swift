@@ -22,6 +22,13 @@ private enum ScannerPhotoPickerMode {
     case bulk
 }
 
+enum CardScannerInput: String, Identifiable {
+    case camera
+    case photoLibrary
+
+    var id: String { rawValue }
+}
+
 private struct ScannerPhotoImportProgress {
     let captureMode: ScannerCaptureMode
     let current: Int
@@ -156,6 +163,9 @@ struct CardScannerView: View {
     @State private var bottomControlsHeight: CGFloat = 120
     @State private var showingSessionReview = false
     @State private var didApplyBinderStart = false
+    @State private var cameraEnabled: Bool
+    @State private var pendingInitialPhotoPicker: Bool
+    @State private var automaticallyShowBinderResults = true
     @State private var pendingCaptureMode: ScannerCaptureMode?
     @State private var sharedSessionSyncedIDs: Set<CardScanResult.ID> = []
     @State private var priceModeEnabled = false
@@ -170,23 +180,45 @@ struct CardScannerView: View {
     let scope: CardScanScope?
     let startingBinderID: String?
     let startingBinderPageNumber: Int?
+    let startingGame: TCGGame?
+    let onCardAdded: (String) async -> Void
 
     init(
         scope: CardScanScope? = nil,
         startingBinderID: String? = nil,
-        startingBinderPageNumber: Int? = nil
+        startingBinderPageNumber: Int? = nil,
+        startingGame: TCGGame? = nil,
+        initialInput: CardScannerInput = .camera,
+        onCardAdded: @escaping (String) async -> Void = { _ in }
     ) {
         self.scope = scope
         self.startingBinderID = startingBinderID
         self.startingBinderPageNumber = startingBinderPageNumber
+        self.startingGame = startingGame
+        self.onCardAdded = onCardAdded
+        _cameraEnabled = State(initialValue: initialInput == .camera)
+        _pendingInitialPhotoPicker = State(initialValue: initialInput == .photoLibrary)
     }
 
     var body: some View {
         ZStack {
-            CardScannerCameraPreview(controller: viewModel.cameraController)
-                .ignoresSafeArea()
+            if cameraEnabled {
+                CardScannerCameraPreview(controller: viewModel.cameraController)
+                    .ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+            }
 
-            framingOverlay
+            if cameraEnabled {
+                framingOverlay
+            } else {
+                ContentUnavailableView(
+                    "Add from Photo",
+                    systemImage: "photo",
+                    description: Text("Choose a clear photo of one card, then review the match before adding it.")
+                )
+                .foregroundStyle(.white)
+            }
         }
         .overlay(alignment: .top) {
             topStatusOverlay
@@ -205,13 +237,13 @@ struct CardScannerView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            viewModel.setAutomaticallyPresentsResults(automaticallyShowResults)
-            viewModel.updateEnvironment(environmentStore)
+            viewModel.setAutomaticallyPresentsResults(shouldPresentResults)
+            viewModel.updateEnvironment(environmentStore, prepareCamera: cameraEnabled)
             viewModel.updateScope(scope)
             if let scopedMode = scope?.scanMode {
                 selectScannerMode(scopedMode)
             } else {
-                resolveInitialScannerGame(requestedMode: consumePendingScanMode())
+                resolveInitialScannerGame(requestedMode: startingGame.map(ScanMode.game) ?? consumePendingScanMode())
             }
             applyBinderStartIfNeeded()
             Task { await loadYugiohDecks() }
@@ -222,11 +254,11 @@ struct CardScannerView: View {
             selectScannerMode(requestedMode)
         }
         .onChange(of: environmentStore.authToken, initial: false) { _, _ in
-            viewModel.updateEnvironment(environmentStore)
+            viewModel.updateEnvironment(environmentStore, prepareCamera: cameraEnabled)
             Task { await loadYugiohDecks() }
         }
-        .onChange(of: automaticallyShowResults, initial: false) { _, enabled in
-            viewModel.setAutomaticallyPresentsResults(enabled)
+        .onChange(of: shouldPresentResults, initial: false) { _, _ in
+            viewModel.setAutomaticallyPresentsResults(shouldPresentResults)
         }
         .onChange(of: environmentStore.enabledYugioh, initial: false) { _, _ in
             reconcileScannerGameSelection()
@@ -307,6 +339,7 @@ struct CardScannerView: View {
                 onDiscard: {
                     viewModel.removeSessionResult(id: result.id)
                 },
+                initialBinderID: startingBinderID,
                 onAddCard: { card, binderId, details in
                     try await APIService().addCardToBinder(
                         config: environmentStore.serverConfiguration,
@@ -315,6 +348,8 @@ struct CardScannerView: View {
                         card: card,
                         details: details
                     )
+                    viewModel.markSessionResultsAdded([result.id])
+                    await onCardAdded(binderId)
                 }
             )
             .presentationDetents([.medium, .large])
@@ -325,7 +360,9 @@ struct CardScannerView: View {
                 color: accentColor(for: viewModel.selectedMode),
                 showsPrices: priceModeEnabled,
                 priceQuotes: sessionPriceQuotes,
-                totalPriceText: sessionPriceTotalText
+                totalPriceText: sessionPriceTotalText,
+                initialBinderID: startingBinderID,
+                onCardAdded: onCardAdded
             )
             .environmentObject(environmentStore)
         }
@@ -385,12 +422,32 @@ struct CardScannerView: View {
 
     private func applyBinderStartIfNeeded() {
         guard !didApplyBinderStart,
-              let startingBinderID,
-              let startingBinderPageNumber else { return }
+              let startingBinderID else { return }
         didApplyBinderStart = true
-        viewModel.captureMode = .binder
         viewModel.selectedBinderID = startingBinderID
-        viewModel.setNextBinderPageNumber(startingBinderPageNumber)
+        if let startingBinderPageNumber {
+            viewModel.captureMode = .binder
+            viewModel.setNextBinderPageNumber(startingBinderPageNumber)
+        } else {
+            viewModel.captureMode = .card
+        }
+    }
+
+    private var shouldPresentResults: Bool {
+        startingBinderID != nil ? automaticallyShowBinderResults : automaticallyShowResults
+    }
+
+    private var automaticResultsSelection: Binding<Bool> {
+        Binding(
+            get: { shouldPresentResults },
+            set: { enabled in
+                if startingBinderID != nil {
+                    automaticallyShowBinderResults = enabled
+                } else {
+                    automaticallyShowResults = enabled
+                }
+            }
+        )
     }
 
     @MainActor
@@ -426,7 +483,7 @@ struct CardScannerView: View {
                 dismissIcon: scope == nil ? "chevron.left" : "xmark",
                 triggerMode: $viewModel.triggerMode,
                 selectedEngine: $viewModel.selectedEngine,
-                automaticallyShowResults: $automaticallyShowResults,
+                automaticallyShowResults: automaticResultsSelection,
                 priceModeEnabled: $priceModeEnabled,
                 savesBinderPageImages: $savesBinderPageImages,
                 replacesBinderPageImages: $replacesBinderPageImages,
@@ -802,7 +859,24 @@ struct CardScannerView: View {
 
     @ViewBuilder
     private var captureActionControl: some View {
-        if viewModel.captureMode == .binder || viewModel.triggerMode == .manual {
+        if !cameraEnabled {
+            VStack(spacing: 12) {
+                Button {
+                    presentPhotoPicker(.single)
+                } label: {
+                    Label("Choose photo", systemImage: "photo")
+                }
+                .buttonStyle(.borderedProminent)
+                Button {
+                    cameraEnabled = true
+                    viewModel.prepareCameraIfPossible()
+                } label: {
+                    Label("Use camera", systemImage: "camera")
+                }
+                .buttonStyle(.bordered)
+            }
+            .disabled(isProcessingPhoto)
+        } else if viewModel.captureMode == .binder || viewModel.triggerMode == .manual {
             Button {
                 guard ensureScannerPackageIsReady() else { return }
                 viewModel.capturePhoto()
@@ -1174,6 +1248,7 @@ struct CardScannerView: View {
 
     private func presentPhotoPicker(_ mode: ScannerPhotoPickerMode) {
         guard ensureScannerPackageIsReady() else { return }
+        pendingInitialPhotoPicker = false
         selectedPhotoItems = []
         photoPickerMode = mode
     }
@@ -1182,7 +1257,7 @@ struct CardScannerView: View {
         let captureMode = viewModel.captureMode
         let isBulkImport = items.count > 1
         let shouldDeferBinderReview = isBulkImport && captureMode == .binder
-        let shouldSuppressCardSheets = isBulkImport && captureMode == .card && automaticallyShowResults
+        let shouldSuppressCardSheets = isBulkImport && captureMode == .card && shouldPresentResults
         let binderPageCountBeforeImport = viewModel.binderPagesScanned
         var loadFailureCount = 0
 
@@ -1547,7 +1622,10 @@ private extension CardScannerView {
     }
 
     func completeScannerAssetPrompt() {
-        guard shouldChooseAnotherScannerAfterPrompt else { return }
+        guard shouldChooseAnotherScannerAfterPrompt else {
+            presentInitialPhotoPickerIfReady()
+            return
+        }
         shouldChooseAnotherScannerAfterPrompt = false
         presentScannerGameChoice()
     }
@@ -1596,11 +1674,23 @@ private extension CardScannerView {
         }
         guard let game = selectedScannerAssetGame else {
             scannerAssetPrompt = nil
+            presentInitialPhotoPickerIfReady()
             return
         }
         try? await scannerAssets.refreshManifest(for: game)
         guard !Task.isCancelled else { return }
         presentScannerAssetPrompt(force: false)
+        presentInitialPhotoPickerIfReady()
+    }
+
+    private func presentInitialPhotoPickerIfReady() {
+        guard pendingInitialPhotoPicker,
+              scannerGameSelectionResolved,
+              scannerGameChoicePrompt == nil,
+              scannerAssetPrompt == nil,
+              !scannerPackageRequired else { return }
+        pendingInitialPhotoPicker = false
+        presentPhotoPicker(.single)
     }
 
     func presentScannerAssetPrompt(force: Bool) {
@@ -1793,6 +1883,7 @@ private struct ScanResultSheet: View {
     let canAdjustCrop: Bool
     let onAdjustCrop: () -> Void
     let onDiscard: () -> Void
+    let initialBinderID: String?
     let onAddCard: (Card, String, BinderCardAddDetails) async throws -> Void
 
     init(
@@ -1802,6 +1893,7 @@ private struct ScanResultSheet: View {
         canAdjustCrop: Bool,
         onAdjustCrop: @escaping () -> Void,
         onDiscard: @escaping () -> Void,
+        initialBinderID: String? = nil,
         onAddCard: @escaping (Card, String, BinderCardAddDetails) async throws -> Void
     ) {
         self.result = result
@@ -1810,6 +1902,7 @@ private struct ScanResultSheet: View {
         self.canAdjustCrop = canAdjustCrop
         self.onAdjustCrop = onAdjustCrop
         self.onDiscard = onDiscard
+        self.initialBinderID = initialBinderID
         self.onAddCard = onAddCard
         _selectedCandidate = State(initialValue: result.primary)
         _debugCapture = State(initialValue: result.debugCapture)
@@ -1848,7 +1941,7 @@ private struct ScanResultSheet: View {
             }
         }
         .sheet(item: $cardToAdd) { card in
-            AddCardToBinderSheet(card: card) { selectedCard, binderId, details in
+            AddCardToBinderSheet(card: card, initialBinderId: initialBinderID) { selectedCard, binderId, details in
                 try await onAddCard(selectedCard, binderId, details)
             }
         }

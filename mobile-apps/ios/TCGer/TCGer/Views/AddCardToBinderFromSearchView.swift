@@ -10,6 +10,7 @@ struct AddCardToBinderFromSearchView: View {
     @State private var searchModel = CatalogCardSearchModel()
     @State private var selectedGame: TCGGame = .all
     @State private var addSheetCard: Card?
+    @State private var scannerInput: CardScannerInput?
 
     private let apiService = APIService()
 
@@ -39,8 +40,8 @@ struct AddCardToBinderFromSearchView: View {
                 } else if !searchModel.hasSearched {
                     SearchPlaceholderView(
                         icon: "magnifyingglass",
-                        title: "Search for Cards",
-                        message: "Search for cards to add to this binder."
+                        title: "Add a Card",
+                        message: "Search by name, scan a card, or choose a photo to add to this binder."
                     )
                 } else {
                     CardSearchResultsList(
@@ -63,11 +64,41 @@ struct AddCardToBinderFromSearchView: View {
                 prompt: "Search for cards..."
             )
             .safeAreaBar(edge: .top, spacing: 0) {
-                if environmentStore.shouldShowGamePicker {
-                    GamePickerPills(
-                        selection: $selectedGame,
-                        games: environmentStore.gamePickerGames
-                    )
+                VStack(spacing: 8) {
+                    HStack(spacing: 12) {
+                        Button {
+                            scannerInput = .camera
+                        } label: {
+                            Label("Scan card", systemImage: "camera.viewfinder")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .accessibilityIdentifier("addCard.scan")
+
+                        Button {
+                            scannerInput = .photoLibrary
+                        } label: {
+                            Label("Choose photo", systemImage: "photo")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .accessibilityIdentifier("addCard.photo")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!canScanSelectedGame)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                    if !canScanSelectedGame {
+                        Text("Scanning isn’t available for the selected game. You can still search by name.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
+                    }
+                    if environmentStore.shouldShowGamePicker {
+                        GamePickerPills(
+                            selection: $selectedGame,
+                            games: environmentStore.gamePickerGames
+                        )
+                    }
                 }
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
@@ -94,6 +125,17 @@ struct AddCardToBinderFromSearchView: View {
                     )
                     await onCardAdded(binderId)
                 }
+            }
+            .fullScreenCover(item: $scannerInput, onDismiss: {
+                Task { await onCardAdded(binderId) }
+            }) { input in
+                CardScannerView(
+                    startingBinderID: binderId,
+                    startingGame: selectedGame == .all ? nil : selectedGame,
+                    initialInput: input,
+                    onCardAdded: onCardAdded
+                )
+                .environmentObject(environmentStore)
             }
             .onChange(of: environmentStore.enabledYugioh) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledMagic) { validateSelectedGame() }
@@ -123,6 +165,12 @@ struct AddCardToBinderFromSearchView: View {
 
     private func validateSelectedGame() {
         selectedGame = environmentStore.resolvedGameSelection(selectedGame)
+    }
+
+    private var canScanSelectedGame: Bool {
+        ScannerAssetStore.downloadableGames.contains {
+            environmentStore.isGameEnabled($0) && (selectedGame == .all || selectedGame == $0)
+        }
     }
 
     @MainActor

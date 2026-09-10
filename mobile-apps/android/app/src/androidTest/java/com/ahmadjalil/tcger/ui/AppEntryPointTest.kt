@@ -13,6 +13,18 @@ import org.junit.Test
 class AppEntryPointTest {
     @get:Rule val compose = createEmptyComposeRule()
 
+    @Test fun searchOffersCameraAndOpensPhotoEntry() {
+        val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+            .setAction(Intent.ACTION_VIEW).setData(Uri.parse("tcger://search"))
+            .putExtra("tcgerParityTest", "true")
+        ActivityScenario.launch<MainActivity>(intent).use {
+            compose.waitUntil(15_000) { compose.onAllNodesWithTag("addCard.photo").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("addCard.scan").assertIsDisplayed().assertIsEnabled()
+            compose.onNodeWithTag("addCard.photo").assertIsDisplayed().assertIsEnabled().performClick()
+            compose.waitUntil(15_000) { compose.onAllNodesWithText("Add from photo").fetchSemanticsNodes().isNotEmpty() }
+        }
+    }
+
     @Test fun consumedSearchLinkDoesNotReplayAfterActivityRecreation() {
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
             .setAction(Intent.ACTION_VIEW).setData(Uri.parse("tcger://search?q=Pikachu"))

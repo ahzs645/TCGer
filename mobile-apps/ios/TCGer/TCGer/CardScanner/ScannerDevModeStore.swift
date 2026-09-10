@@ -29,8 +29,8 @@ nonisolated struct ScannerBinderDetectionExclusion: Sendable {
 
 /// Dev-mode scan recorder: when enabled, every scan that goes through the
 /// production coordinator — live frames, shutter captures, photo imports —
-/// is persisted with its raw input image, the geometry of every crop attempt,
-/// and the per-stage evidence collected by `ScanDiagnostics`. Attempt crop
+/// is persisted with its source image, the input crop recipe when available,
+/// every attempt's geometry, and evidence collected by `ScanDiagnostics`. Attempt crop
 /// JPEGs are re-derivable from that geometry and are only written when
 /// `isAttemptImageWritingEnabled` is on.
 ///
@@ -50,6 +50,20 @@ actor ScannerDevModeStore {
     static let enabledDefaultsKey = "scannerDevModeEnabled"
     static let cropRescueEnabledDefaultsKey = "scannerCropRescueEnabled"
     static let attemptImagesDefaultsKey = "scannerDevModeAttemptImages"
+    static let inputImagesDefaultsKey = "scannerDevModeInputImages"
+
+    /// Diagnostic escape hatch; normally the input is a virtual crop of the
+    /// original. Unknown/non-rectangular transforms always retain both images.
+    nonisolated static var isInputImageWritingEnabled: Bool {
+        if let raw = ProcessInfo.processInfo.environment["SCANNER_DEVMODE_INPUT_IMAGES"] {
+            switch raw.lowercased() {
+            case "1", "true", "yes": return true
+            case "0", "false", "no": return false
+            default: break
+            }
+        }
+        return UserDefaults.standard.bool(forKey: inputImagesDefaultsKey)
+    }
 
     /// Cheap main-thread check used by callers to avoid any recording work
     /// (including JPEG encoding) when dev mode is off.
@@ -137,6 +151,7 @@ actor ScannerDevModeStore {
         result: Result<CardScanResult, CardScannerError>?,
         diagnostics: ScanDiagnostics?,
         originalImage: CGImage? = nil,
+        inputCropRect: CGRect? = nil,
         outcomeLabel: String? = nil,
         expectedCardId: String? = nil,
         expectedNoMatch: Bool? = nil,
@@ -157,13 +172,26 @@ actor ScannerDevModeStore {
         let index = frameIndex
         frameIndex += 1
         let imageFile = String(format: "frame-%04d.jpg", index)
-        guard write(image: image, to: directory.appendingPathComponent(imageFile)) else { return false }
-
         var originalFile: String?
+        var inputTransform: ScannerInputImageTransform?
         if let originalImage {
             let name = String(format: "frame-%04d-original.jpg", index)
             if write(image: originalImage, to: directory.appendingPathComponent(name)) {
                 originalFile = name
+                if let inputCropRect {
+                    inputTransform = ScannerInputImageTransform(
+                        sourceImageFile: name, source: originalImage, input: image, cropRect: inputCropRect
+                    )
+                }
+            }
+        }
+
+        if inputTransform == nil || Self.isInputImageWritingEnabled {
+            guard write(image: image, to: directory.appendingPathComponent(imageFile)) else {
+                if let originalFile {
+                    try? FileManager.default.removeItem(at: directory.appendingPathComponent(originalFile))
+                }
+                return false
             }
         }
 
@@ -263,7 +291,8 @@ actor ScannerDevModeStore {
             expectedNoMatch: expectedNoMatch,
             imageFile: imageFile,
             captureMode: captureMode.rawValue,
-            binderDetections: binderDetections
+            binderDetections: binderDetections,
+            inputImageTransform: inputTransform
         ))
         evidence.append(ScanEvidenceRecord(
             imageFile: imageFile,
@@ -287,6 +316,7 @@ actor ScannerDevModeStore {
             },
             imageMetadata: Self.imageMetadata(for: image),
             originalImageMetadata: originalImage.map(Self.imageMetadata(for:)),
+            inputImageTransform: inputTransform,
             stageTimingsMs: diagnostics.flatMap { $0.stageTimings.isEmpty ? nil : $0.stageTimings }
         ))
 

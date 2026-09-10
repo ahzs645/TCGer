@@ -12,7 +12,7 @@
         <small id="studio-subtitle">TCGer · Training corner labels</small>
         <h1 id="studio-title">Label the four corners of each card</h1>
       </div>
-      <div id="progress"></div>
+      <div id="progress"></div><small data-draft-backup-status role="status"></small>
       <div class="header-actions">
         <button id="help" type="button" aria-expanded="false" title="How to label">? Help</button>
         <details class="compact-menu"><summary>More</summary><div class="menu-content header-menu">
@@ -48,6 +48,7 @@
           <a href="/draft-recovery.html" target="_blank">Back up browser drafts</a> before moving to another browser.
         </p>
       </div>
+    <a data-backup-status href="http://127.0.0.1:8774/" target="_blank" rel="noopener">Backups</a>
     </header>
     <nav>
       <button id="previous">← Previous</button>
@@ -173,5 +174,6 @@
     <script src="/geometry.js"></script>
     <script src="/layers.js"></script>
     <script src="/labeler.js"></script>
+  <script src="/backup-status.js" defer></script>
   </body>
 </html>

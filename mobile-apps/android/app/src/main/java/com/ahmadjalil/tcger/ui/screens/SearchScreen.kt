@@ -17,6 +17,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -51,7 +54,14 @@ import com.ahmadjalil.tcger.ui.AppUiState
 import com.ahmadjalil.tcger.ui.AppViewModel
 
 @Composable
-fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: AppViewModel) {
+fun SearchScreen(
+    state: AppUiState,
+    contentPadding: PaddingValues,
+    viewModel: AppViewModel,
+    onScanCard: (ScannerInput, String?) -> Unit,
+    initialBinderId: String? = null,
+    onBack: (() -> Unit)? = null,
+) {
     var selectedCard by remember { mutableStateOf<CatalogCard?>(null) }
     var appliedDefaultGame by rememberSaveable { mutableStateOf(false) }
     var showingFilters by rememberSaveable { mutableStateOf(false) }
@@ -63,6 +73,14 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
     }
     val games = (state.preferences.enabledGames.sorted() + packageDefinitions.map { "package:${it.id}" }).distinct()
     val filteredResults = state.searchResults.filter { filters.matches(it, state.searchGame) }
+    val targetBinder = state.binders.firstOrNull { it.id == initialBinderId }
+    val canScan = state.scannerSupportedGames.any {
+        it in state.preferences.enabledGames && (state.searchGame == null || state.searchGame == it)
+    }
+
+    LaunchedEffect(initialBinderId) {
+        if (initialBinderId != null) viewModel.setSearchCollectionOnly(false)
+    }
 
     LaunchedEffect(state.preferences.defaultGame, games) {
         val defaultGame = state.preferences.defaultGame
@@ -83,7 +101,17 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         item {
-        ScreenTitle("Card search", if (state.searchCollectionOnly) "Find cards in your binders" else "Search downloaded libraries and your connected catalog")
+        onBack?.let { back ->
+            TextButton(onClick = back) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                Text(" Back to binder")
+            }
+        }
+        ScreenTitle(
+            if (initialBinderId != null) "Add card to binder" else "Card search",
+            targetBinder?.let { "Search, scan, or choose a photo to add to ${it.name}" }
+                ?: if (state.searchCollectionOnly) "Find cards in your binders" else "Search downloaded libraries and your connected catalog",
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(!state.searchCollectionOnly, { viewModel.setSearchCollectionOnly(false) }, { Text("All cards") })
             FilterChip(state.searchCollectionOnly, { viewModel.setSearchCollectionOnly(true) }, { Text("My collection") })
@@ -96,6 +124,27 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
             label = { Text("Name or card number") },
             singleLine = true,
         )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { onScanCard(ScannerInput.CAMERA, state.searchGame) },
+                enabled = canScan,
+                modifier = Modifier.weight(1f).testTag("addCard.scan"),
+            ) {
+                Icon(Icons.Default.CameraAlt, null)
+                Text(" Scan card")
+            }
+            OutlinedButton(
+                onClick = { onScanCard(ScannerInput.PHOTO_LIBRARY, state.searchGame) },
+                enabled = canScan,
+                modifier = Modifier.weight(1f).testTag("addCard.photo"),
+            ) {
+                Icon(Icons.Default.PhotoLibrary, null)
+                Text(" Choose photo")
+            }
+        }
+        if (!canScan) {
+            Text("Scanning isn’t available for the selected game. You can still search by name.", style = MaterialTheme.typography.bodySmall)
+        }
         LazyRow(
             Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -144,6 +193,7 @@ fun SearchScreen(state: AppUiState, contentPadding: PaddingValues, viewModel: Ap
             onDismiss = { selectedCard = null },
             onBinder = { binderId -> viewModel.addCard(binderId, card); selectedCard = null },
             onWishlist = { wishlistId -> viewModel.addWishlistCard(wishlistId, card); selectedCard = null },
+            initialBinderId = initialBinderId,
         )
     }
     if (showingFilters) {
@@ -382,14 +432,17 @@ fun AddCardDialog(
     onDismiss: () -> Unit,
     onBinder: (String) -> Unit,
     onWishlist: (String) -> Unit,
+    initialBinderId: String? = null,
 ) {
+    val targetBinder = state.binders.firstOrNull { it.id == initialBinderId }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add ${card.name}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                targetBinder?.let { Text("Binder: ${it.name}", fontWeight = FontWeight.SemiBold) }
                 if (state.binders.isEmpty() && state.wishlists.isEmpty()) Text("Create a binder or wishlist first.")
-                state.binders.forEach { binder ->
+                state.binders.filterNot { it.id == targetBinder?.id }.forEach { binder ->
                     AssistChip(onClick = { onBinder(binder.id) }, label = { Text("Binder: ${binder.name}") })
                 }
                 state.wishlists.forEach { wishlist ->
@@ -397,6 +450,11 @@ fun AddCardDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = {
+            targetBinder?.let { binder ->
+                TextButton(onClick = { onBinder(binder.id) }) { Text("Add to ${binder.name}") }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

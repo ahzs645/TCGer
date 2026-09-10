@@ -78,8 +78,17 @@ nonisolated struct ScannerReferenceItem: Identifiable {
     let baselineConfidence: Double?
     /// Ground-truth card boxes in Vision's normalized, bottom-left origin space.
     let annotations: [CGRect]
+    var inputImageTransform: ScannerInputImageTransform? = nil
+    var recordingDirectory: URL? = nil
 
     func loadImage() -> CGImage? {
+        if let recordingDirectory {
+            return ScannerRecordedImageLoader.load(
+                imageFile: imageURL.lastPathComponent,
+                transform: inputImageTransform,
+                directory: recordingDirectory
+            )
+        }
         guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
@@ -208,7 +217,8 @@ nonisolated enum ScannerReferenceLibrary {
 
         let items = bundle.frames.compactMap { frame -> ScannerReferenceItem? in
             let imageURL = url.appendingPathComponent(frame.imageFile)
-            guard FileManager.default.fileExists(atPath: imageURL.path) else { return nil }
+            guard FileManager.default.fileExists(atPath: imageURL.path)
+                || frame.inputImageTransform != nil else { return nil }
             let key = imageURL.deletingPathExtension().lastPathComponent
             return ScannerReferenceItem(
                 id: frame.index,
@@ -219,7 +229,9 @@ nonisolated enum ScannerReferenceLibrary {
                 notes: labels[key]?.notes,
                 baselineCardID: frame.identified ? frame.bestMatchCardId : nil,
                 baselineConfidence: frame.confidence,
-                annotations: []
+                annotations: [],
+                inputImageTransform: frame.inputImageTransform,
+                recordingDirectory: frame.inputImageTransform == nil ? nil : url
             )
         }
         guard !items.isEmpty else { return nil }

@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TCGer · automatic backups</title>
+<style>body{font:16px system-ui;background:#151a20;color:#e8edf3;max-width:800px;margin:40px auto;padding:20px}h1{font-size:25px}p{line-height:1.6;color:#c4ced9}label{display:block;margin:25px 0 8px}input{box-sizing:border-box;width:100%;padding:12px;font:inherit;background:#202c38;border:1px solid #8291a3;border-radius:6px;color:inherit}button{margin:12px 8px 12px 0;padding:10px 16px;background:#346ac3;color:white;border:0;border-radius:6px;font:inherit;cursor:pointer}a{color:#a8cfff}#status{white-space:pre-wrap;border:1px solid #556170;border-radius:8px;padding:15px}#status.error{border-color:#ee856b}small{color:#aebdcc}</style>
+<h1>Automatic studio backups</h1>
+<p>Future archive journals, queues, saved drafts, review history and experiment reports are copied automatically. FiftyOne datasets are exported separately, including card outlines and saved views.</p>
+<label for="folder">Backup folder</label><input id="folder" placeholder="Paste an absolute folder path" autocomplete="off" spellcheck="false">
+<button id="configure">Save folder</button><button id="backup">Back up files now</button>
+<p id="status" role="status">Loading backup status…</p>
+<p>Changed files are checked every 10 seconds. FiftyOne exports run every 2 minutes. Completed copies are verified by checksum, and older versions are retained.</p>
+<p>If you choose a Google Drive folder, Drive handles the upload from that folder. “Copied” confirms the local synced-folder copy; it does not confirm that Drive has finished uploading.</p>
+<p>Source photos already in Reference stay there. Original photos uploaded through model review are included. Live databases, model weights and generated image caches stay local.</p>
+<p><a href="http://127.0.0.1:8772/">Corner editor</a> · <a href="http://127.0.0.1:8773/">Model comparison</a></p>
+<script>
+const $=s=>document.querySelector(s);let busy=false;
+function show(s){if(document.activeElement!==$('#folder'))$('#folder').value=s.folder||'';const failure=s.error||s.fiftyoneError;$('#status').className=failure?'error':'';$('#status').textContent=[failure?'Backup needs attention: '+failure:s.state==='saved'?'Copied and checksum verified':'Backup '+s.state,s.lastSuccess?'Last file check: '+new Date(s.lastSuccess).toLocaleString():'',s.files?`${s.files} files · ${(s.bytes/1024/1024).toFixed(1)} MB of current state`:'',s.fiftyoneExports?Object.entries(s.fiftyoneExports).map(([name,r])=>`${name}: ${r.state}${r.lastExport?' · last exported '+new Date(r.lastExport).toLocaleString():''}\n${Object.entries(r.datasets||{}).map(([n,c])=>`  ${n}: ${c} samples`).join('\n')}${r.error?'\n'+r.error:''}`).join('\n\n'):'FiftyOne exports pending'].filter(Boolean).join('\n');}
+async function request(url,body){const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});const s=await r.json();if(!r.ok)throw Error(s.error);show(s);}
+async function action(url,body){busy=true;$('#configure').disabled=$('#backup').disabled=true;try{await request(url,body);}catch(e){$('#status').className='error';$('#status').textContent=e.message;}finally{busy=false;$('#configure').disabled=$('#backup').disabled=false;}}
+$('#configure').onclick=()=>action('/api/config',{folder:$('#folder').value});$('#backup').onclick=()=>action('/api/snapshot',{});
+const refresh=()=>{if(!busy)request('/api/status').catch(e=>{$('#status').className='error';$('#status').textContent='Backup service unavailable: '+e.message})};refresh();setInterval(refresh,5000);
+</script>

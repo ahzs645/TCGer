@@ -72,6 +72,7 @@ final class BinderSessionReplayTests: XCTestCase {
 
     private struct EvidenceRecord: Decodable {
         let imageFile: String
+        let inputImageTransform: ScannerInputImageTransform?
         let outcome: String
         let mode: String?
         let attempts: [ScanDiagnostics.Attempt]
@@ -162,9 +163,9 @@ final class BinderSessionReplayTests: XCTestCase {
             let pocketLabels = BinderPocketLabelLoader.labelsByPage(in: session)
             for record in records where record.outcome.hasPrefix("binderPage")
                 && (frameFilter.isEmpty || frameFilter.contains(record.imageFile)) {
-                let imageURL = session.appendingPathComponent(record.imageFile)
-                guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-                      let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+                guard let image = ScannerRecordedImageLoader.load(
+                    imageFile: record.imageFile, transform: record.inputImageTransform, directory: session
+                )
                 else { continue }
                 pages += 1
                 let baselineCandidates = Set(record.attempts.compactMap { attempt in

@@ -9,7 +9,8 @@
   <header>
     <div><a class="eyebrow" href="/">TCGer / Labeler Studio</a><h1>Model comparison</h1><p id="model">Loading reviewed YOLO11s…</p></div>
     <div class="header-actions"><button id="upload-open">＋ Add photos</button><a class="button secondary" href="/api/model-review/export" download="reviewed-new-photo-candidates.json">Export reviewed new photos ↓</a></div>
-  </header>
+  <a data-backup-status href="http://127.0.0.1:8774/" target="_blank" rel="noopener">Backups</a>
+    </header>
   <section class="intro"><div><strong>Your saved borders are already compared.</strong><p id="comparison-intro">The examples show what the model still gets wrong. Existing reference labels are preserved; no repeat labeling is required.</p></div><span id="progress" class="pill"></span></section>
   <section id="upload-panel" hidden>
     <label>Collection session <input id="session" maxlength="120" placeholder="e.g. desk-evening-sep-08"></label>
@@ -50,5 +51,6 @@
     </aside>
   </main>
   <script src="/geometry.js"></script><script src="/model-review.js"></script>
-</body>
+<script src="/backup-status.js" defer></script>
+  </body>
 </html>

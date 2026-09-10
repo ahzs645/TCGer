@@ -1,0 +1,270 @@
+{
+  "counts": {
+    "cardInstances": 106,
+    "photos": 75
+  },
+  "decision": "Retain the existing reviewed-data baseline; no training, tuning or promotion.",
+  "detection": {
+    "baseline": {
+      "duplicate": 0,
+      "duplicatePerImage": 0.0,
+      "extra": 19,
+      "extraPerImage": 0.25333333333333335,
+      "matches": 96,
+      "meanMatchedIoU": 0.8592478985216933,
+      "miss": 10,
+      "missPerImage": 0.13333333333333333,
+      "predictions": 115,
+      "recall@0.5": 0.9056603773584906,
+      "recall@0.75": 0.8018867924528302,
+      "recall@0.9": 0.37735849056603776,
+      "records": 75,
+      "truthInstances": 106
+    },
+    "candidate": {
+      "duplicate": 0,
+      "duplicatePerImage": 0.0,
+      "extra": 37,
+      "extraPerImage": 0.49333333333333335,
+      "matches": 86,
+      "meanMatchedIoU": 0.8124531758909914,
+      "miss": 20,
+      "missPerImage": 0.26666666666666666,
+      "predictions": 123,
+      "recall@0.5": 0.8113207547169812,
+      "recall@0.75": 0.5660377358490566,
+      "recall@0.9": 0.24528301886792453,
+      "records": 75,
+      "truthInstances": 106
+    }
+  },
+  "limitations": [
+    "One session with repeated views; 106 instances are not 106 independent physical cards.",
+    "Labels are reviewer-approved starting outlines, not an independent blind second annotation.",
+    "No verified recognition identities; recognition accuracy cannot be scored.",
+    "Exact-hash exclusion does not prove physical-card or near-duplicate independence.",
+    "No production promotion or checkpoint selection from this session."
+  ],
+  "localOutputDirectory": ".artifacts/card-geometry/new-session-20260909-231206/model-comparison-20260910-v2",
+  "models": {
+    "baseline": {
+      "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/results/best.pt",
+      "checkpointSha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327",
+      "id": "previous"
+    },
+    "candidate": {
+      "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/cyclic-yolo11s-20260909/diagnosis/final-checkpoint/training/repeat-0/weights/best.pt",
+      "checkpointSha256": "54af5ba715e3620cfd74cbb6e85f85aa1ad7162db9dad3a120a56cf91ea711df",
+      "id": "cyclic-epoch50"
+    }
+  },
+  "orientation": {
+    "baseline": {
+      "accuracy": 0.9270833333333334,
+      "correctPairs": 89,
+      "eligiblePairs": 96,
+      "evaluatedPairs": 96,
+      "excludedUnknownOrientation": 0,
+      "insufficientKnownCorners": 0
+    },
+    "candidate": {
+      "accuracy": 0.6046511627906976,
+      "correctPairs": 52,
+      "eligiblePairs": 86,
+      "evaluatedPairs": 86,
+      "excludedUnknownOrientation": 0,
+      "insufficientKnownCorners": 0
+    }
+  },
+  "paired": {
+    "baseline": {
+      "commonHumanMedianCyclicError": 0.052271249888902416,
+      "commonHumanMedianFixedError": 0.05534970107947357,
+      "commonMedianIou": 0.9002605560273733,
+      "knownPhases": {
+        "0": 74,
+        "2": 6
+      },
+      "matched": 96,
+      "tight": 40
+    },
+    "candidate": {
+      "commonHumanMedianCyclicError": 0.08792775954586646,
+      "commonHumanMedianFixedError": 0.23845887048611622,
+      "commonMedianIou": 0.8570185279970305,
+      "knownPhases": {
+        "0": 48,
+        "1": 22,
+        "2": 4,
+        "3": 6
+      },
+      "matched": 86,
+      "tight": 26
+    },
+    "commonHumanQuads": 80,
+    "commonKnownOrientation": 80,
+    "commonMatched": 80,
+    "newMisses": 16,
+    "recoveredMisses": 6,
+    "targets": 106,
+    "tightGained": 1,
+    "tightLost": 15
+  },
+  "protocolSha256": "918725c141cfc2a93736a44776c73946c669befda937c097c841156ef79cba1c",
+  "referenceAdjudication": {
+    "disposition": "retain-outside-frame-estimates",
+    "independentHumanReview": false,
+    "labelsChanged": false,
+    "scoresChanged": false,
+    "status": "complete"
+  },
+  "referenceSpotChecks": [
+    "F11",
+    "F28",
+    "F60",
+    "F73"
+  ],
+  "schema": "tcger-reviewed-session-comparison/v1",
+  "slices": {
+    "hasNonvisibleCorner": {
+      "baseline": {
+        "commonHumanMedianCyclicError": 0.09578248863023492,
+        "commonHumanMedianFixedError": 0.09887475404266227,
+        "commonMedianIou": 0.8622312927623843,
+        "knownPhases": {
+          "0": 25,
+          "2": 3
+        },
+        "matched": 40,
+        "tight": 9
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": 0.12154300479655628,
+        "commonHumanMedianFixedError": 0.6585618695384449,
+        "commonMedianIou": 0.7799974513287491,
+        "knownPhases": {
+          "0": 13,
+          "1": 8,
+          "2": 4,
+          "3": 3
+        },
+        "matched": 30,
+        "tight": 3
+      },
+      "commonHumanQuads": 28,
+      "commonKnownOrientation": 28,
+      "commonMatched": 28,
+      "newMisses": 12,
+      "recoveredMisses": 2,
+      "targets": 44,
+      "tightGained": 0,
+      "tightLost": 6
+    },
+    "multiCard": {
+      "baseline": {
+        "commonHumanMedianCyclicError": 0.0383547083768626,
+        "commonHumanMedianFixedError": 0.0383547083768626,
+        "commonMedianIou": 0.9201064928041921,
+        "knownPhases": {
+          "0": 35,
+          "2": 1
+        },
+        "matched": 37,
+        "tight": 23
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": 0.04056385713618682,
+        "commonHumanMedianFixedError": 0.04056385713618682,
+        "commonMedianIou": 0.9125736236022592,
+        "knownPhases": {
+          "0": 35,
+          "3": 1
+        },
+        "matched": 40,
+        "tight": 19
+      },
+      "commonHumanQuads": 36,
+      "commonKnownOrientation": 36,
+      "commonMatched": 36,
+      "newMisses": 1,
+      "recoveredMisses": 4,
+      "targets": 43,
+      "tightGained": 0,
+      "tightLost": 4
+    },
+    "sideways": {
+      "baseline": {
+        "commonHumanMedianCyclicError": null,
+        "commonHumanMedianFixedError": null,
+        "commonMedianIou": null,
+        "knownPhases": {},
+        "matched": 0,
+        "tight": 0
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": null,
+        "commonHumanMedianFixedError": null,
+        "commonMedianIou": null,
+        "knownPhases": {},
+        "matched": 0,
+        "tight": 0
+      },
+      "commonHumanQuads": 0,
+      "commonKnownOrientation": 0,
+      "commonMatched": 0,
+      "newMisses": 0,
+      "recoveredMisses": 0,
+      "targets": 0,
+      "tightGained": 0,
+      "tightLost": 0
+    },
+    "upsideDown": {
+      "baseline": {
+        "commonHumanMedianCyclicError": 0.07061916236344883,
+        "commonHumanMedianFixedError": 1.4310123917952218,
+        "commonMedianIou": 0.8495129037638709,
+        "knownPhases": {
+          "0": 1,
+          "2": 6
+        },
+        "matched": 7,
+        "tight": 2
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": 0.06331158648416849,
+        "commonHumanMedianFixedError": 0.9983139506174276,
+        "commonMedianIou": 0.878475372682145,
+        "knownPhases": {
+          "0": 1,
+          "3": 6
+        },
+        "matched": 11,
+        "tight": 1
+      },
+      "commonHumanQuads": 7,
+      "commonKnownOrientation": 7,
+      "commonMatched": 7,
+      "newMisses": 0,
+      "recoveredMisses": 4,
+      "targets": 11,
+      "tightGained": 0,
+      "tightLost": 1
+    }
+  },
+  "verification": {
+    "inputsReverified": true,
+    "liveLabelsWritten": false,
+    "outputs": {
+      "baseline.metrics.json": "3f551db025825147b173a2e8cd25c502f4a4b5eac662e2e26711c9eb6fe85c53",
+      "baseline.predictions.jsonl": "fd38911b9ef3998ae367fed4f08f87f5a1063fa37a29ceb459632cddd97d404e",
+      "candidate.metrics.json": "3d6d7626bb3498548cd9dea84383e6ee16a7806b62ba479b06c2399122ee77ab",
+      "candidate.predictions.jsonl": "a0127eef6e02196e1f776c27cb57390bb0b4c2e6ff67a5ab13a6b07668a720f2",
+      "comparison.json": "7826d2eec4d9e6ef4fad1d4ae757cf422711611544b635d698a8a3eae948b07c",
+      "protocol.json": "918725c141cfc2a93736a44776c73946c669befda937c097c841156ef79cba1c",
+      "session-inputs.json": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618"
+    },
+    "passed": true,
+    "photosPerModel": 75,
+    "predictionRowsSchemaValidated": true
+  }
+}

@@ -1,12 +1,14 @@
 # Card geometry: current handoff and lessons
 
-Current through September 9, 2026. The implementation and detailed experiment reports were pushed to `main` in `405d157a`, including the preceding experiment history. This is the starting point for continuing the card work; older dated reports preserve what was known at the time.
+Updated locally through September 10, 2026. The September 9 implementation and detailed experiment reports were pushed to `main` in `405d157a`, including the preceding experiment history. The subsequent session/editor work and comparison are recorded below; this statement does not claim those later local changes have been pushed. Older dated reports preserve what was known at the time.
 
 ## Current decision
 
 Keep the **September 8 reviewed-data YOLO11s as the development baseline**. Retain the cyclic-loss run's epoch-50 checkpoint as the best border candidate, but do not replace the baseline: it misses more cards in real captures. “Baseline” here does not mean that this experimental detector has been deployed to the apps.
 
 The user's reference review is **finished: 502 photos / 561 cards**, including all 22 multi-card photos. There were no remaining drafts or skips at the verified completion snapshot. Model-comparison flags are model failures to investigate, not unfinished annotations. Do not ask the user to repeat this review.
+
+The separate September 9 phone session is also complete: **75 photos / 106 cards**, backed up and evaluated on September 10. With fixed settings, the baseline found 96 cards with 40 tight outlines; epoch 50 found 86 with 26 tight outlines. The four initial reference flags were subsequently checked at full resolution and retained as outside-frame estimates. Labels and scores are unchanged. Keep the baseline and preserve this session outside training/tuning. See the [session comparison and limitations](sessions/2026-09-09-231206-model-comparison.md); no full repeat review is needed.
 
 ## Work completed and what it established
 
@@ -24,7 +26,7 @@ The user's reference review is **finished: 502 photos / 561 cards**, including a
 | Saved checkpoint diagnosis | Framework `best.pt` selected epoch 20. Epoch 50 has better borders, yet worse real-capture recall and raw printed order. Neither internal fitness nor aggregate archive accuracy is a sufficient replacement rule. The job's final reporting error did not invalidate its saved training outputs; the report was recovered without retraining. | [Run and recovery](benchmarks/2026-09-09-corner-order-yolo11s/RUN.md), [diagnosis](benchmarks/2026-09-09-corner-order-yolo11s/DIAGNOSIS.md) |
 | Four-orientation recognition and guarded checkpoint selection | Rewarp sideways cards from source quads before portrait resizing. Require the winning identity family to beat rivals across all four orientations, using the existing margin. Evaluate scene-level detection and recognition regressions separately from border gains. | [Implementation, verification and limitations](benchmarks/2026-09-09-corner-order-yolo11s/SELECTION-ROTATION.md) |
 
-## Latest measured comparison
+## Earlier September 9 comparison
 
 These are different populations and must not be combined into one accuracy claim. Recognition counts below use only the **11 identity-labeled cases**, although all 57 replay frames were run for each model. The 600-photo real geometry benchmark contains 502 archive photos and 98 human-capture photos.
 
@@ -47,7 +49,7 @@ The final policy work passed 33 focused tests and replayed 171 frame/model combi
 ## What remains unfinished
 
 1. **Prepare suitable validation data before another run.** The current training release contains 1,279 real validation photos and zero with known printed-top orientation. The coverage audit and guarded selector are implemented; the replacement split is **not yet prepared**. Define it under an explicit versioned policy, respecting archive/fork aliases, sessions, source assets, physical cards and duplicate-image groups. If the existing whole-archive policy cannot supply the needed coverage, document the gap or a justified policy change rather than silently splitting an archive.
-2. **Collect a fresh independent check.** A useful starting batch is 20–30 new phone photos with upright/sideways/upside-down cards, multiple cards, varied angles and lighting, and known card identities where possible. This is an initial collection request, not a statistically sufficient release benchmark. Keep these new sessions out of training and selection. The repeatedly inspected 600-photo benchmark is development evidence, not a fresh holdout.
+2. **Fill the remaining evaluation gaps.** The completed 75-photo session supplies a new, frozen geometry check, with no exact-image overlap in the reviewed training or earlier evaluation releases. It has repeated physical cards, no targets in the defined sideways slice, and no independently verified recognition identities. Add those missing conditions in future sessions and keep them out of training and selection; exact-image exclusion alone does not establish physical-card independence. The repeatedly inspected 600-photo benchmark is development evidence, not a fresh holdout.
 3. **Measure remaining recognition failures and runtime cost.** Preserve the wrong-identification examples; do not tune a threshold merely to remove one known failure. More diverse labeled images can improve coverage, but more unverified duplicates do not establish better generalization.
 4. **Only then consider another declared training experiment and release decision.** No further job, production model replacement, production four-way policy rollout or export change was performed by the final selection/rotation work. Existing license and release gates remain applicable.
 
@@ -67,3 +69,9 @@ Local studio routes, while their servers are running:
 - `8771/policy/`: final rotation/selection comparison, a read-only report rather than another labeling queue.
 
 The documented findings are durable in Git. Reopening a studio on a different machine also requires its pinned local data and journal; the launch configuration alone does not contain those assets.
+
+## September 10 — automatic backups and next run
+
+Automatic, configurable studio backups now run at login on this Mac. Changed durable artifact files, archive/reference browser drafts, source code, reports and native FiftyOne exports are copied to `Reference/TCGer-Labeling/automatic`. Backups links are visible in the studios; settings are at `http://127.0.0.1:8774/`. Native export recovery matched 712 samples, 13 views and all manual fields. Both automatic version-retention cycles passed. The five older datasets retain their verified September 10 export while that database is offline. Copies are checksum verified locally; Google Drive upload completion is not measured. See [backup configuration and recovery](STUDIO-BACKUPS.md).
+
+The grouped orientation-validation follow-up is prepared and published, with one-shot continuation status at `http://127.0.0.1:8773/follow-up/`. See [experiment protocol](benchmarks/2026-09-10-orientation-validation-yolo11s/README.md). It uses one 50-epoch YOLO11s run and validation-only checkpoint ranking, followed by a separate diagnostic comparison on the already-inspected 75-photo session. The current baseline and reviewed labels remain unchanged. Job and completion state live in `.artifacts/card-geometry/orientation-validation-20260910/pipeline-status.json`; do not infer completion from this preparation note.

@@ -1,3 +1,5 @@
+import CoreGraphics
+import Foundation
 import XCTest
 @testable import TCGer
 
@@ -130,6 +132,75 @@ final class ScannerReplayRunnerTests: XCTestCase {
         XCTAssertEqual(report.missRegressions, 0)
         XCTAssertEqual(report.strategyChangedFrames, 0)
         XCTAssertGreaterThanOrEqual(report.meanLatencyMs, 0)
+    }
+
+    /// Optional integration test against an isolated original-only fixture.
+    /// Normal CI uses the small deterministic recorder tests above.
+    func testExternalOriginalOnlyRecordingImportsEveryFrame() throws {
+        guard let path = ProcessInfo.processInfo.environment["SCANNER_RECORDING_FIXTURE_DIR"] else {
+            throw XCTSkip("Set SCANNER_RECORDING_FIXTURE_DIR to an original-only recording fixture")
+        }
+        let directory = URL(fileURLWithPath: path)
+        let replay = try ScannerReplayDocumentLoader.load(urls: [directory])
+        XCTAssertFalse(replay.recording.frames.isEmpty)
+        for frame in replay.recording.frames {
+            let recipe = try XCTUnwrap(frame.inputImageTransform)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent(frame.imageFile).path))
+            let image = try XCTUnwrap(replay.images[frame.imageFile])
+            XCTAssertEqual(image.width, recipe.cropRectPixels[2])
+            XCTAssertEqual(image.height, recipe.cropRectPixels[3])
+        }
+        let reference = try XCTUnwrap(ScannerReferenceLibrary.makeSet(at: directory))
+        XCTAssertEqual(reference.items.count, replay.recording.frames.count)
+        for item in reference.items { XCTAssertNotNil(item.loadImage()) }
+        print("RECORDINGIMPORT verified \(replay.recording.frames.count) original-only frames in replay and reference browser")
+    }
+
+    /// Report JPEG reconstruction drift and the effect of a wider input using
+    /// one fixed bundled recognition runtime. Recorded identities are baseline
+    /// observations, not independently verified ground truth.
+    func testExternalRecordingRecognitionComparison() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let originalPath = environment["SCANNER_RECORDING_ORIGINAL_DIR"],
+              let fixturePath = environment["SCANNER_RECORDING_FIXTURE_DIR"] else {
+            throw XCTSkip("Set both recording directories to run the recognition comparison")
+        }
+        let directory = URL(fileURLWithPath: originalPath)
+        let fixture = URL(fileURLWithPath: fixturePath)
+        let bundle = try JSONDecoder().decode(RecordedScanBundle.self,
+            from: Data(contentsOf: fixture.appendingPathComponent("results.json")))
+        let coordinator = CardScannerCoordinator(strategies: [
+            BoardCardEmbeddingScannerStrategy(variant: .arcface)
+        ], apiService: APIService())
+        var rows: [[String: String]] = []
+        for frame in bundle.frames where frame.captureMode != "binder" {
+            let recipe = try XCTUnwrap(frame.inputImageTransform)
+            let archived = try XCTUnwrap(ScannerRecordedImageLoader.load(
+                imageFile: frame.imageFile, transform: nil, directory: directory))
+            let derived = try XCTUnwrap(ScannerRecordedImageLoader.load(
+                imageFile: frame.imageFile, transform: recipe, directory: fixture))
+            let full = try XCTUnwrap(ScannerRecordedImageLoader.load(
+                imageFile: recipe.sourceImageFile, transform: nil, directory: fixture))
+            var row = ["imageFile": frame.imageFile, "recorded": frame.bestMatchCardId ?? "noMatch"]
+            for (name, image) in [("archived", archived), ("derived", derived), ("full", full)] {
+                let result = await coordinator.scan(image: image, context: .test(engine: .localOnly), source: .photoCapture)
+                switch result {
+                case .success(let match): row[name] = match.primary.details.identity.id
+                case .failure(let error):
+                    row[name] = "noMatch"
+                    row[name + "Error"] = String(describing: error)
+                }
+            }
+            rows.append(row)
+            print("RECORDINGCOMPARE \(row)")
+        }
+        XCTAssertFalse(rows.isEmpty)
+        XCTAssertTrue(rows.contains { $0["archived"] != "noMatch" }, "Comparison must exercise a working recognition runtime")
+        if let report = environment["SCANNER_RECORDING_COMPARISON_REPORT"] {
+            try JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys])
+                .write(to: URL(fileURLWithPath: report), options: .atomic)
+        }
+        print("RECORDINGCOMPARE frames=\(rows.count) reconstructionDrift=\(rows.filter { $0["archived"] != $0["derived"] }.count) fullFrameChanges=\(rows.filter { $0["archived"] != $0["full"] }.count)")
     }
 
     private func frame(index: Int, baseline: String?, image: String) -> RecordedScanFrame {

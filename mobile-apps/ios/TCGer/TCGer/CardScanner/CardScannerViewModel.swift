@@ -359,14 +359,16 @@ final class CardScannerViewModel: ObservableObject {
         isPhotoImportActive = active
     }
 
-    func updateEnvironment(_ environment: EnvironmentStore) {
+    func updateEnvironment(_ environment: EnvironmentStore, prepareCamera: Bool = true) {
         environmentStore = environment
         // Recognition routing is an implementation detail for regular scans:
         // stay fully on-device in phone-only mode, otherwise use the local-first
         // automatic chain. Developer tools can still override this afterward.
         selectedEngine = environment.serverConfiguration.isOnDevice ? .localOnly : .automatic
         rebuildContext()
-        prepareCameraIfPossible()
+        if prepareCamera {
+            prepareCameraIfPossible()
+        }
     }
 
     func updateScope(_ scope: CardScanScope?) {
@@ -459,6 +461,7 @@ final class CardScannerViewModel: ObservableObject {
         image: CGImage,
         source: ScanInvocationKind = .importedPhoto,
         originalImage: CGImage? = nil,
+        inputCropRect: CGRect? = nil,
         cameraIntrinsics: ScannerCameraIntrinsics? = nil,
         allowsCropRescue: Bool = true,
         manualCropQuad: ScannerCropQuad? = nil
@@ -542,6 +545,7 @@ final class CardScannerViewModel: ObservableObject {
                     result: result,
                     diagnostics: diagnostics,
                     originalImage: originalImage,
+                    inputCropRect: inputCropRect,
                     captureQuality: captureQuality
                 )
             }
@@ -586,6 +590,7 @@ final class CardScannerViewModel: ObservableObject {
         presentsReview: Bool = true,
         source: ScanInvocationKind = .importedPhoto,
         originalImage: CGImage? = nil,
+        inputCropRect: CGRect? = nil,
         protectedRect: CGRect? = nil,
         cameraIntrinsics: ScannerCameraIntrinsics? = nil
     ) async {
@@ -620,6 +625,7 @@ final class CardScannerViewModel: ObservableObject {
             recordBinderPageForDevMode(
                 page: image,
                 original: originalImage,
+                inputCropRect: inputCropRect,
                 result: result,
                 error: nil,
                 source: source,
@@ -656,6 +662,7 @@ final class CardScannerViewModel: ObservableObject {
             recordBinderPageForDevMode(
                 page: image,
                 original: originalImage,
+                inputCropRect: inputCropRect,
                 result: nil,
                 error: error,
                 source: source,
@@ -675,6 +682,7 @@ final class CardScannerViewModel: ObservableObject {
     private func recordBinderPageForDevMode(
         page: CGImage,
         original: CGImage?,
+        inputCropRect: CGRect?,
         result: BinderPageScanResult?,
         error: Error?,
         source: ScanInvocationKind,
@@ -723,6 +731,7 @@ final class CardScannerViewModel: ObservableObject {
                 result: nil,
                 diagnostics: diagnostics,
                 originalImage: original,
+                inputCropRect: inputCropRect,
                 outcomeLabel: label,
                 captureQuality: captureQuality,
                 captureMode: .binder,
@@ -958,6 +967,7 @@ final class CardScannerViewModel: ObservableObject {
                 image: cropped.image,
                 source: .photoCapture,
                 originalImage: cgImage,
+                inputCropRect: cropped.cropRect,
                 protectedRect: guideRectInViewportNormalized,
                 cameraIntrinsics: cropped.intrinsics
             )
@@ -971,6 +981,7 @@ final class CardScannerViewModel: ObservableObject {
                 image: cropped.image,
                 source: .photoCapture,
                 originalImage: cgImage,
+                inputCropRect: cropped.cropRect,
                 cameraIntrinsics: cropped.intrinsics
             )
         }
@@ -1300,14 +1311,14 @@ final class CardScannerViewModel: ObservableObject {
         from image: CGImage,
         geometry: ScannerGuideGeometry?,
         intrinsics: ScannerCameraIntrinsics?
-    ) -> (image: CGImage, intrinsics: ScannerCameraIntrinsics?) {
+    ) -> (image: CGImage, intrinsics: ScannerCameraIntrinsics?, cropRect: CGRect) {
         guard let geometry,
               let rect = ScannerGuideCropper().imageCropRect(
                 imageSize: CGSize(width: image.width, height: image.height),
                 geometry: geometry
               ),
               let cropped = image.cropping(to: rect)
-        else { return (image, intrinsics) }
+        else { return (image, intrinsics, CGRect(x: 0, y: 0, width: image.width, height: image.height)) }
         let adjusted = intrinsics.map {
             ScannerCameraIntrinsics(
                 fx: $0.fx,
@@ -1316,7 +1327,7 @@ final class CardScannerViewModel: ObservableObject {
                 cy: $0.cy - rect.minY
             )
         }
-        return (cropped, adjusted)
+        return (cropped, adjusted, rect)
     }
 
     /// Crops the sensor image to the full visible preview instead of the

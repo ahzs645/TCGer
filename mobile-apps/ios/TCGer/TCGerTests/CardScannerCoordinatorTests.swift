@@ -96,6 +96,31 @@ final class CardScannerCoordinatorTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedEngine, .automatic)
     }
 
+    func testPhotoImportCanRecognizeWithoutPreparingTheCamera() async {
+        let coordinator = CardScannerCoordinator(
+            strategies: [StubScanStrategy(
+                kind: .artworkFingerprint,
+                behavior: .match(cardID: "photo-card"),
+                recorder: ScanInvocationRecorder()
+            )],
+            apiService: APIService()
+        )
+        let viewModel = CardScannerViewModel(coordinator: coordinator, restoresStagedSession: false)
+        let environment = EnvironmentStore()
+        environment.serverConfiguration = .onDevice
+        viewModel.updateEnvironment(environment, prepareCamera: false)
+        viewModel.setAutomaticallyPresentsResults(true)
+
+        guard case .idle = viewModel.state else {
+            return XCTFail("Photo entry must not initialize the camera or require camera access")
+        }
+        await viewModel.scan(image: ScannerTestImage.solid())
+
+        XCTAssertEqual(viewModel.latestResult?.primary.details.identity.id, "photo-card")
+        XCTAssertEqual(viewModel.sessionResults.count, 1)
+        XCTAssertFalse(viewModel.cameraController.isPhotoCaptureReady)
+    }
+
     func testSuccessfulManualScanStaysInSessionByDefault() async {
         let recorder = ScanInvocationRecorder()
         let coordinator = CardScannerCoordinator(

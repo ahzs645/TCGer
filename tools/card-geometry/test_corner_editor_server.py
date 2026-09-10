@@ -1,6 +1,9 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import json
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +27,60 @@ class _Sample(dict):
 
 
 class CornerEditorServerTest(unittest.TestCase):
+    def test_layers_round_trip_with_rotation_and_reject_cycles_before_saving(self):
+        quads = [
+            [[.1,.1],[.6,.1],[.6,.7],[.1,.7]],
+            [[.3,.2],[.8,.2],[.8,.8],[.3,.8]],
+            [[.4,.3],[.9,.3],[.9,.9],[.4,.9]],
+        ]
+        quads[0] = quads[0][1:] + quads[0][:1]
+        sample = _Sample(key="frame-1", game="pokemon", frame_type="single")
+        sample.save = lambda: None
+
+        class Dataset(dict):
+            def has_sample_field(self, name):
+                return True
+
+        store = object.__new__(SERVER.EditorStore)
+        store.sample_ids = [sample.id]
+        store.dataset = Dataset({sample.id: sample})
+        store.fo = SimpleNamespace(Polylines=lambda **kw: SimpleNamespace(**kw),
+                                   Polyline=lambda **kw: SimpleNamespace(**kw))
+        relations = [{"above": 0, "below": 1}, {"above": 1, "below": 2}]
+        metadata = SERVER.default_geometry_metadata("frame-1", quads)
+        metadata[0]["cornerVisibility"] = ["occluded", "visible", "visible", "visible"]
+        payload = {"quads": quads, "metadata": metadata, "finalize": True,
+                   "sceneSlice": "single_handheld", "occlusionRelations": relations}
+        with patch.object(SERVER, "append_journal") as journal:
+            self.assertTrue(store.save(sample.id, payload)["finalized"])
+            journal.assert_called_once_with(sample)
+            self.assertEqual(SERVER.load_editor_layers(sample, quads), relations)
+            saved = SERVER.durable_geometry(sample)
+            self.assertEqual(saved["instances"][0]["corners"], quads[0])
+            self.assertEqual(SERVER.load_editor_metadata(sample, quads)[0]["cornerVisibility"], metadata[0]["cornerVisibility"])
+            self.assertEqual([item["occlusionOrder"] for item in saved["instances"]], [2, 1, 0])
+            before = dict(sample)
+            with self.assertRaisesRegex(ValueError, "cycle"):
+                store.save(sample.id, {**payload, "occlusionRelations": relations + [{"above": 2, "below": 0}]})
+            self.assertEqual(dict(sample), before)
+            self.assertEqual(journal.call_count, 1)
+        self.assertEqual(SERVER.load_editor_layers(sample, quads[:2]), [])
+
+    def test_legacy_card_numbers_do_not_invent_layer_relations(self):
+        sample = _Sample(manual_instances_json=json.dumps({"instances": [{"occlusionOrder": 0}, {"occlusionOrder": 1}]}))
+        self.assertEqual(SERVER.load_editor_layers(sample, [[], []]), [])
+
+    def test_drafts_include_distinct_cards_without_duplicate_attempts(self):
+        from types import SimpleNamespace
+        import sys
+        sys.path.insert(0, str(SERVER_PATH.parent))
+        a = [[.1,.1],[.4,.1],[.4,.8],[.1,.8]]
+        b = [[.6,.1],[.9,.1],[.9,.8],[.6,.8]]
+        lines = [SimpleNamespace(label=label, points=[quad]) for label,quad in
+                 [("decisive",a),("attempt",a[2:]+a[:2]),("attempt",b)]]
+        sample = _Sample(detection_quads=SimpleNamespace(polylines=lines))
+        self.assertEqual(SERVER.detector_draft_quads(sample), [a,b])
+
     def test_missing_optional_metadata_field_uses_defaults(self):
         quad = [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]
         metadata = SERVER.load_editor_metadata(_Sample(key="frame-1"), [quad])

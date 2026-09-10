@@ -375,6 +375,7 @@ def handler(store, review=None):
                                      mimetypes.guess_type(f["imageFile"])[0] or "application/octet-stream")
                 return self.send({k: v for k, v in f.items() if k != "imageFile"} | {"label": store.saved.get(key)})
             files = {"/": STATIC / "index.html", "/labeler.js": STATIC / "labeler.js",
+                     "/backup-status.js": STATIC.parent / "backup-status.js",
                      "/model-review.html": STATIC / "model-review.html",
                      "/model-review.js": STATIC / "model-review.js",
                      "/model-review.css": STATIC / "model-review.css",

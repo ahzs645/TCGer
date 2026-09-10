@@ -42,6 +42,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from scanner_recording_images import default_input_cache, materialize_input
+
 import cv2
 import numpy as np
 from PIL import Image
@@ -362,7 +365,7 @@ def load_device_session_frames(sessions_root: Path):
             image_file = frame.get("imageFile")
             if not quad or not image_file:
                 continue
-            image_path = session / image_file
+            image_path = materialize_input(session, frame, default_input_cache())
             if not image_path.is_file():
                 continue
             key = f"{session.name}/{image_file}"

@@ -18,6 +18,8 @@ import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
+from scanner_recording_images import load_input_image
+
 
 LABEL_CONFIG = """<View>
   <Header value="Card geometry"/>
@@ -199,11 +201,12 @@ def export_bundle(recording_root: Path, output: Path, local_files_root: Path) ->
 
     for frame in frames:
         source_image = recording_root / frame["imageFile"]
-        if not source_image.is_file():
-            raise FileNotFoundError(source_image)
         image_name = Path(frame["imageFile"]).name
         destination_image = images_output / image_name
-        shutil.copy2(source_image, destination_image)
+        if source_image.is_file():
+            shutil.copy2(source_image, destination_image)
+        else:
+            load_input_image(recording_root, frame).save(destination_image, format="JPEG", quality=95)
         width, height = jpeg_dimensions(destination_image)
         local_path = output_relative / "images" / image_name
         image_url = f"/data/local-files/?d={quote(local_path.as_posix(), safe='/')}"

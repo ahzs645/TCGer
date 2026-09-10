@@ -1,5 +1,7 @@
 package com.ahmadjalil.tcger.ui
 
+import android.net.Uri
+import com.ahmadjalil.tcger.ui.screens.ScannerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.lazy.items
@@ -122,6 +124,10 @@ private const val MORE_ROUTE = "bottom-navigation-more"
 private const val CUSTOMIZE_NAVIGATION_ROUTE = "bottom-navigation-customize"
 private const val GAME_STORE_ROUTE = "settings-game-store"
 private const val INSTALL_GAME_URL_ROUTE = "settings-install-game-url"
+private const val CARD_CAPTURE_ROUTE = "card-capture?binderId={binderId}&game={game}&input={input}"
+
+private fun cardCaptureRoute(binderId: String? = null, game: String? = null, input: ScannerInput = ScannerInput.CAMERA): String =
+    "card-capture?binderId=${Uri.encode(binderId.orEmpty())}&game=${Uri.encode(game.orEmpty())}&input=${input.name}"
 private val PARITY_BOTTOM_NAVIGATION_ITEMS = listOf(
     BottomNavigationItem.HOME,
     BottomNavigationItem.COLLECTIONS,
@@ -435,7 +441,9 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
                     )
                 }
                 composable(BottomNavigationItem.SEARCH.route) {
-                    SearchScreen(state, padding, viewModel)
+                    SearchScreen(state, padding, viewModel, onScanCard = { input, game ->
+                        navController.navigate(cardCaptureRoute(game = game, input = input))
+                    })
                 }
                 composable(BottomNavigationItem.WISHLISTS.route) {
                     WishlistsScreen(
@@ -483,6 +491,31 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
                         },
                         bulkScannerRequestHandler = viewModel::scanCards,
                         onBulkAddToBinder = viewModel::addCardsToBinder,
+                    )
+                }
+                composable(
+                    CARD_CAPTURE_ROUTE,
+                    arguments = listOf(
+                        navArgument("binderId") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("game") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("input") { type = NavType.StringType; defaultValue = ScannerInput.CAMERA.name },
+                    ),
+                ) { entry ->
+                    ScannerScreen(
+                        state = state,
+                        contentPadding = padding,
+                        viewModel = viewModel,
+                        onBack = navController::popBackStack,
+                        scannerRequestHandler = AndroidScannerRequestHandler { viewModel.scanCard(it) },
+                        guidedScannerRequestHandler = AndroidScannerResultRequestHandler { request, completion ->
+                            viewModel.scanCardForGuidedCapture(request, completion)
+                        },
+                        bulkScannerRequestHandler = viewModel::scanCards,
+                        onBulkAddToBinder = viewModel::addCardsToBinder,
+                        initialBinderId = entry.arguments?.getString("binderId")?.takeIf(String::isNotBlank),
+                        initialGame = entry.arguments?.getString("game")?.takeIf(String::isNotBlank),
+                        initialInput = ScannerInput.entries.firstOrNull { it.name == entry.arguments?.getString("input") } ?: ScannerInput.CAMERA,
+                        startsWithSingleCard = true,
                     )
                 }
                 composable(BottomNavigationItem.SEALED.route) {
@@ -662,6 +695,17 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
                         onBack = navController::popBackStack,
                     )
                 }
+                composable("binder/{binderId}/add-card", arguments = listOf(navArgument("binderId") { type = NavType.StringType })) { entry ->
+                    val binderId = entry.arguments?.getString("binderId")
+                    SearchScreen(
+                        state, padding, viewModel,
+                        initialBinderId = binderId,
+                        onBack = navController::popBackStack,
+                        onScanCard = { input, game ->
+                            navController.navigate(cardCaptureRoute(binderId, game, input))
+                        },
+                    )
+                }
                 composable("binder/{binderId}", arguments = listOf(navArgument("binderId") { type = NavType.StringType })) { entry ->
                     BinderDetailScreen(
                         binder = state.binders.firstOrNull { it.id == entry.arguments?.getString("binderId") },
@@ -673,8 +717,8 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
                         onBack = navController::popBackStack,
                         binders = state.binders,
                         local = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE,
-                        onAddCard = { navController.navigate(BottomNavigationItem.SEARCH.route) },
-                        onScan = { navController.navigate(BottomNavigationItem.SCAN.route) },
+                        onAddCard = { navController.navigate("binder/${Uri.encode(entry.arguments?.getString("binderId"))}/add-card") },
+                        onScan = { navController.navigate(cardCaptureRoute(binderId = entry.arguments?.getString("binderId"))) },
                         canEdit = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE || state.preferences.isSignedIn,
                         onSaveCopy = viewModel::saveCopy,
                         onBulk = viewModel::bulkEdit,

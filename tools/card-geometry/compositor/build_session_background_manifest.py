@@ -8,6 +8,9 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
+from scanner_recording_images import default_input_cache, materialize_input
 from typing import Any
 
 from PIL import Image
@@ -157,8 +160,10 @@ def build_manifest(
                 continue
             name = frame.get("imageFile")
             metadata = frame.get("imageMetadata", {})
-            source = session / str(name)
-            if not name or not source.is_file():
+            if not name:
+                continue
+            source = materialize_input(session, frame, default_input_cache())
+            if not source.is_file():
                 continue
             try:
                 width = int(metadata["pixelWidth"])

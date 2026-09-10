@@ -1,0 +1,10 @@
+# Optional local SAM 2.1 Large runtime for the corner editor; not training jobs.
+# Validated on macOS arm64 / Python 3.13 with MPS. Install in a dedicated
+# labeling environment, separate from the pinned geometry training runtime.
+torch==2.13.0
+torchvision==0.28.0
+transformers==5.16.1
+Pillow==12.3.0
+numpy==2.5.2
+opencv-python==5.0.0.93
+huggingface_hub==1.28.0

@@ -396,9 +396,9 @@ final class DevModeSessionReplayTests: XCTestCase {
                 // Binder pages have their own replay harness. Treating a full
                 // 3x3 page as one card creates meaningless single-card hits.
                 guard !binderImages.contains(frame.imageFile) else { continue }
-                let imageURL = session.appendingPathComponent(frame.imageFile)
-                guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-                      let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+                guard let image = ScannerRecordedImageLoader.load(
+                    imageFile: frame.imageFile, transform: frame.inputImageTransform, directory: session
+                )
                 else { continue }
 
                 let key = "\(session.lastPathComponent)/\(frame.imageFile)"

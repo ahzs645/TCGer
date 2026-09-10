@@ -160,6 +160,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
+enum class ScannerInput { CAMERA, PHOTO_LIBRARY }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScannerScreen(
@@ -173,11 +175,19 @@ fun ScannerScreen(
     bulkScannerRequestHandler: ((List<AndroidScannerRequest>) -> Unit)? = null,
     onReplayRequested: ((ScannerRecordingBundle) -> Unit)? = null,
     onBulkAddToBinder: ((String, List<CatalogCard>) -> Unit)? = null,
+    initialBinderId: String? = null,
+    initialGame: String? = null,
+    initialInput: ScannerInput = ScannerInput.CAMERA,
+    startsWithSingleCard: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val result = state.scanResult
     val supportedGames = state.scannerSupportedGames.filter { it in state.preferences.enabledGames }
+    val targetBinder = state.binders.firstOrNull { it.id == initialBinderId }
+    val destinationBinders = state.binders.sortedBy { if (it.id == initialBinderId) 0 else 1 }
+    var cameraEnabled by rememberSaveable { mutableStateOf(initialInput == ScannerInput.CAMERA) }
+    var pendingInitialPhotoPicker by rememberSaveable { mutableStateOf(initialInput == ScannerInput.PHOTO_LIBRARY) }
     if (supportedGames.isEmpty()) {
         Column(Modifier.fillMaxSize()) {
             TopAppBar(
@@ -206,16 +216,18 @@ fun ScannerScreen(
     }
     val initialGameResolution = remember(
         supportedGames,
+        initialGame,
         lastSelectedScannerGame,
         state.preferences.defaultGame,
     ) {
         resolveScannerGameChoice(
             supportedGames,
-            lastSelectedScannerGame ?: state.preferences.defaultGame,
+            initialGame?.takeIf(supportedGames::contains) ?: lastSelectedScannerGame ?: state.preferences.defaultGame,
         )
     }
     var selectedGame by rememberSaveable(
         supportedGames,
+        initialGame,
         lastSelectedScannerGame,
         state.preferences.defaultGame,
     ) {
@@ -223,6 +235,7 @@ fun ScannerScreen(
     }
     var scannerGameSelectionResolved by rememberSaveable(
         supportedGames,
+        initialGame,
         lastSelectedScannerGame,
         state.preferences.defaultGame,
     ) {
@@ -230,6 +243,7 @@ fun ScannerScreen(
     }
     var showingScannerGameChoice by rememberSaveable(
         supportedGames,
+        initialGame,
         lastSelectedScannerGame,
         state.preferences.defaultGame,
     ) {
@@ -242,7 +256,9 @@ fun ScannerScreen(
     val binderPagePhotoStore = remember(context) { BinderPagePhotoStore(context) }
     val scannerPriceClient = remember { ScannerPriceClient() }
     val sharedSessionClient = remember { ScannerSharedSessionClient() }
-    var options by remember { mutableStateOf(optionStore.load()) }
+    var options by remember {
+        mutableStateOf(optionStore.load().let { if (startsWithSingleCard) it.copy(captureMode = ScannerCaptureMode.CARD) else it })
+    }
     var sessionEntries by remember { mutableStateOf(sessionStore.load()) }
     var developerUnlocked by remember { mutableStateOf(developerStore.isUnlocked()) }
     val developerUnlockCounter = remember { DeveloperUnlockCounter() }
@@ -762,8 +778,13 @@ fun ScannerScreen(
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }
-            if (bytes != null) acceptCapturedImage(bytes, "photo-library")
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: error("The selected photo could not be opened.")
+                }
+            }.onSuccess { bytes -> acceptCapturedImage(bytes, "photo-library") }
+                .onFailure { ioMessage = "Unable to load this photo. ${it.message.orEmpty()}" }
         }
     }
     val bulkImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -1009,6 +1030,7 @@ fun ScannerScreen(
         scannerGameSelectionResolved,
         scannerAssetStatus,
         remoteScannerManifest?.version,
+        suppressedScannerPromptKey,
     ) {
         if (!scannerGameSelectionResolved) {
             scannerAssetPromptGame = null
@@ -1030,6 +1052,10 @@ fun ScannerScreen(
             localArcFaceAvailable && !scannerUpdateAvailable -> {
                 scannerAssetPromptGame = null
             }
+        }
+        if (pendingInitialPhotoPicker && scannerAssetPromptGame == null && scannerAssetStatus !is ScannerAssetInstallStatus.Installing) {
+            pendingInitialPhotoPicker = false
+            imagePicker.launch("image/*")
         }
     }
 
@@ -1054,7 +1080,7 @@ fun ScannerScreen(
             .testTag(ParityFeatureIDs.screen(ParityFeatureIDs.SCANNER_IDENTIFY)),
     ) {
         TopAppBar(
-            title = { Text(if (showingResult && result != null) "Scan result" else "Scan a card") },
+            title = { Text(if (showingResult && result != null) "Scan result" else if (!cameraEnabled) "Add from photo" else "Scan a card") },
             navigationIcon = {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
             },
@@ -1075,6 +1101,9 @@ fun ScannerScreen(
                 }
             },
         )
+        targetBinder?.let {
+            Text("Adding to ${it.name}", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.bodyMedium)
+        }
         if (result == null || !showingResult) {
             ScannerCapturePane(
                 state = state,
@@ -1094,6 +1123,8 @@ fun ScannerScreen(
                 },
                 fastCapture = options.performance[ScannerPerformanceOption.FAST_CAPTURE] ?: true,
                 selectedCameraId = selectedCameraId,
+                cameraEnabled = cameraEnabled,
+                onEnableCamera = { cameraEnabled = true },
                 automaticCapture = scannerGameSelectionResolved &&
                     options.captureMode == ScannerCaptureMode.CARD &&
                     options.triggerMode == ScannerTriggerMode.AUTOMATIC,
@@ -1108,7 +1139,10 @@ fun ScannerScreen(
                 onPickPhoto = {
                     when {
                         !scannerGameSelectionResolved -> showingScannerGameChoice = true
-                        else -> imagePicker.launch("image/*")
+                        else -> {
+                            pendingInitialPhotoPicker = false
+                            imagePicker.launch("image/*")
+                        }
                     }
                 },
                 canAdjustCrop = options.captureMode == ScannerCaptureMode.CARD && lastSourceBitmap != null,
@@ -1378,27 +1412,13 @@ fun ScannerScreen(
     }
 
     pendingCard?.let { card ->
-        AlertDialog(
-            onDismissRequest = { pendingCard = null },
-            title = { Text("Add ${card.name}") },
-            text = {
-                if (state.binders.isEmpty()) {
-                    Text("Create a binder first, then return here to add this card.")
-                } else {
-                    LazyColumn(Modifier.heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(state.binders, key = { it.id }) { binder ->
-                            TextButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                onClick = {
-                                    viewModel.addCard(binder.id, card)
-                                    pendingCard = null
-                                },
-                            ) { Text(binder.name, modifier = Modifier.fillMaxWidth()) }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { pendingCard = null }) { Text("Close") } },
+        AddCardDialog(
+            card = card,
+            state = state,
+            initialBinderId = initialBinderId,
+            onDismiss = { pendingCard = null },
+            onBinder = { binderId -> viewModel.addCard(binderId, card); pendingCard = null },
+            onWishlist = { wishlistId -> viewModel.addWishlistCard(wishlistId, card); pendingCard = null },
         )
     }
 
@@ -1584,7 +1604,7 @@ fun ScannerScreen(
                     Text("Create a binder first, then return to the scan session.")
                 } else {
                     LazyColumn(Modifier.heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(state.binders, key = { it.id }) { binder ->
+                        items(destinationBinders, key = { it.id }) { binder ->
                             TextButton(
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = {
@@ -1612,7 +1632,7 @@ fun ScannerScreen(
                                     pendingBinderPageJpeg = null
                                     pendingSessionBinder = false
                                 },
-                            ) { Text(binder.name, modifier = Modifier.fillMaxWidth()) }
+                            ) { Text(if (binder.id == initialBinderId) "Add to ${binder.name} (current binder)" else binder.name, modifier = Modifier.fillMaxWidth()) }
                         }
                     }
                 }
@@ -1896,6 +1916,8 @@ private fun ScannerCapturePane(
     onCaptured: (ByteArray, Boolean) -> Unit,
     fastCapture: Boolean,
     selectedCameraId: String?,
+    cameraEnabled: Boolean,
+    onEnableCamera: () -> Unit,
     automaticCapture: Boolean,
     automaticIntervalMillis: Long,
     onPickPhoto: () -> Unit,
@@ -1924,8 +1946,8 @@ private fun ScannerCapturePane(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         hasCameraPermission = it
     }
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission && !ParityTestMode.isEnabled) permissionLauncher.launch(Manifest.permission.CAMERA)
+    LaunchedEffect(cameraEnabled) {
+        if (cameraEnabled && !hasCameraPermission && !ParityTestMode.isEnabled) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
     LazyColumn(
@@ -1997,6 +2019,12 @@ private fun ScannerCapturePane(
                 contentAlignment = Alignment.Center,
             ) {
                 when {
+                    !cameraEnabled -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Choose a photo of your card to identify it.", color = Color.White)
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = onPickPhoto, enabled = !state.isScanning) { Text("Choose photo") }
+                        TextButton(onClick = onEnableCamera, enabled = !state.isScanning) { Text("Use camera") }
+                    }
                     ParityTestMode.isEnabled -> Text("Camera preview", color = Color.White)
                     hasCameraPermission -> CameraPreview(
                         onCaptured = onCaptured,
@@ -2012,7 +2040,7 @@ private fun ScannerCapturePane(
                         Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) { Text("Allow camera") }
                     }
                 }
-                Box(
+                if (cameraEnabled) Box(
                     Modifier
                         .fillMaxWidth(0.68f)
                         .aspectRatio(0.714f)

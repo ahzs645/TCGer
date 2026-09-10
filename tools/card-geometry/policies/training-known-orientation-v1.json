@@ -1,0 +1,96 @@
+{
+  "allowedSourceTiers": [
+    "shippable"
+  ],
+  "description": "Controlled follow-up retaining original labels and all whole-source leakage gates. Reserve connected pk-detect and pokefolio archive groups for validation, providing existing reviewed printed orientation and multi-card geometry. Lower only the three affected training scene floors (single-card 4000 to 3800; grid 700 to 500; scatter 1000 to 950) to reflect reserving those entire groups instead of leaking their variants across splits. Other corpus and metric minimums are unchanged. This is an archive validation experiment, not a claim of independent phone validation; the September 9 phone session and existing frozen evaluations remain excluded. Start from the pinned generic COCO pose checkpoint because earlier card checkpoints trained on the newly reserved archives.",
+  "metricEligibleCornerSources": [
+    "human",
+    "synthetic"
+  ],
+  "minimumInstancesPerSplit": {
+    "train": 20000,
+    "validation": 3000
+  },
+  "minimumMetricEligibleInstances": {
+    "train": 10000,
+    "validation": 1000
+  },
+  "minimumRealEvaluationSessions": 0,
+  "minimumRecordsPerSplit": {
+    "train": 12000,
+    "validation": 2000
+  },
+  "policyId": "training-known-orientation-v1",
+  "realOnlySplits": [],
+  "requireTargetSemantics": true,
+  "requiredLeakageKeys": {
+    "real": [
+      "sourceAssetIds"
+    ],
+    "synthetic": [
+      "physicalCardIds",
+      "sourceAssetIds"
+    ]
+  },
+  "requiredSceneSlices": [
+    {
+      "minimumInstances": 3800,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "single_card_archive",
+      "split": "train"
+    },
+    {
+      "minimumInstances": 500,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "multi_card_grid_archive",
+      "split": "train"
+    },
+    {
+      "minimumInstances": 950,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "multi_card_scatter_archive",
+      "split": "train"
+    },
+    {
+      "minimumInstances": 1000,
+      "minimumMetricEligibleInstances": 0,
+      "sceneSlice": "single_card_archive",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 150,
+      "minimumMetricEligibleInstances": 150,
+      "sceneSlice": "single_handheld",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 75,
+      "minimumMetricEligibleInstances": 75,
+      "sceneSlice": "single_handheld_distractor_free",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 150,
+      "minimumMetricEligibleInstances": 150,
+      "sceneSlice": "steep_playmat",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 900,
+      "minimumMetricEligibleInstances": 900,
+      "sceneSlice": "duel_field",
+      "split": "validation"
+    },
+    {
+      "minimumInstances": 1000,
+      "minimumMetricEligibleInstances": 1000,
+      "sceneSlice": "binder_page",
+      "split": "validation"
+    }
+  ],
+  "requiredSplits": [
+    "train",
+    "validation"
+  ],
+  "schema": "https://tcger.app/schemas/card-geometry-readiness-policy/v1"
+}

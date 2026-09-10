@@ -323,10 +323,9 @@ nonisolated final class ScanDiagnostics: @unchecked Sendable {
 /// replay/browser tools already read, without touching that schema.
 nonisolated struct ScanEvidenceRecord: Codable {
     let imageFile: String
-    /// The unprocessed sensor photo for camera captures, saved alongside the
-    /// guide-cropped pipeline input so the guide-cropping stage itself stays
-    /// inspectable. Nil for imports/live frames, where `imageFile` already is
-    /// the original.
+    /// The upright decoded camera photo, before the guide/viewport crop.
+    /// With inputImageTransform the input JPEG can be omitted. Nil for
+    /// imports/live frames where imageFile already is the source.
     let originalImageFile: String?
     let source: String
     let mode: String
@@ -346,6 +345,7 @@ nonisolated struct ScanEvidenceRecord: Codable {
     /// Optional for backward compatibility with older exports.
     let imageMetadata: ScanImageMetadata?
     let originalImageMetadata: ScanImageMetadata?
+    var inputImageTransform: ScannerInputImageTransform? = nil
     /// Frame-level stage totals in milliseconds (e.g. "detect"). Attempts
     /// carry their own per-stage fields; this holds the once-per-frame work.
     /// Optional so pre-instrumentation recordings decode unchanged.

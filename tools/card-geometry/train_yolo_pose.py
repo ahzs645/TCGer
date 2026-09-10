@@ -204,6 +204,12 @@ SUPPORTED_CANDIDATES = {"yolo11n-pose", "yolo11s-pose"}
 
 def train(args: argparse.Namespace) -> dict[str, Any]:
     release = Path(os.environ["TCGER_GEOMETRY_RELEASE_ROOT"])
+    if getattr(args, "select_on_validation", False):
+        from select_geometry_checkpoint import validation_coverage
+        if not validation_coverage(release)["orientationSelectionReady"]:
+            raise ValueError("Known printed orientation and sideways real validation are required before training")
+        if int(os.environ["TCGER_GEOMETRY_BUDGET_VALUE"]) != 50:
+            raise ValueError("The declared validation shortlist requires exactly 50 epochs")
     output = Path(os.environ["TCGER_GEOMETRY_OUTPUT_DIR"])
     output.mkdir(parents=True, exist_ok=True)
     budget_kind = os.environ["TCGER_GEOMETRY_BUDGET_KIND"]
@@ -305,6 +311,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "status": selection["status"], "policy": selection["policy"],
             "validationCoverage": selection["validationCoverage"],
         },
+        "validationSelectionRequested": getattr(args, "select_on_validation", False),
     }
     (output / "trainer-summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -322,6 +329,7 @@ def main() -> int:
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--corner-order-policy", choices=("fixed-v1", "cyclic-unknown-v1"), default="fixed-v1")
+    parser.add_argument("--select-on-validation", action="store_true", help="Choose the declared saved shortlist using validation geometry before any frozen evaluation")
     parser.add_argument("--materialize-only", action="store_true")
     parser.add_argument("--release-root", type=Path)
     parser.add_argument("--output", type=Path)
