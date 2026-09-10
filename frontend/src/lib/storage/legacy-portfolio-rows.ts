@@ -230,6 +230,7 @@ export function toWishlistRows(
       name: wishlist.name,
       description: wishlist.description || undefined,
       colorHex: stripHash(wishlist.color),
+      ...(wishlist.excludedCardKeys?.length ? { excludedCardKeys: wishlist.excludedCardKeys } : {}),
       createdAt: created,
       updatedAt: created,
     });
@@ -319,6 +320,7 @@ export function toDemoWishlists(rows: WishlistSnapshot): DemoWishlist[] {
       };
       // A wishlist that never had rules keeps no `rules` key at all — the
       // shipped shape leaves it absent and the readers distinguish the two.
+      if (wishlist.excludedCardKeys?.length) nested.excludedCardKeys = wishlist.excludedCardKeys;
       if (rules?.length) nested.rules = rules;
       return nested;
     });

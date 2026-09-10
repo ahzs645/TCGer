@@ -185,6 +185,7 @@ export interface DemoWishlistRule {
 }
 
 export interface DemoWishlist {
+  excludedCardKeys?: string[];
   id: string;
   name: string;
   description: string;
@@ -2166,6 +2167,9 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
 
     const now = Date.now();
     const externalId = cardData?.externalId ?? card.id;
+    await localDb.patch("wishlists", wishlistId, {
+      excludedCardKeys: (wishlist.excludedCardKeys ?? []).filter(key => key !== `${card.tcg}:${externalId}`),
+    });
     await localDb.insert("wishlistCards", {
       wishlistId,
       externalId,
@@ -2214,6 +2218,11 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   removeCardFromWishlist: async (wishlistId, cardInstanceId) => {
     const row = await localDb.get("wishlistCards", cardInstanceId);
     if (!row || row.wishlistId !== wishlistId) return;
+    const wishlist = await localDb.get("wishlists", wishlistId);
+    if (!wishlist) return;
+    await localDb.patch("wishlists", wishlistId, {
+      excludedCardKeys: [...new Set([...(wishlist.excludedCardKeys ?? []), `${row.tcg}:${row.externalId}`])],
+    });
     await localDb.delete("wishlistCards", cardInstanceId);
     publishWishlists();
   },

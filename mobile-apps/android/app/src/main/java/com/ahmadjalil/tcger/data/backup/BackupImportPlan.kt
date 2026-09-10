@@ -21,7 +21,7 @@ fun PortableCollectionBackup.importPlan(products: List<SealedProductEntity>): Lo
     }
     val wishlistGroups = wishlists.mapIndexed { index, wishlist ->
         val id = wishlist.id ?: stable("wishlist:$index")
-        WishlistWithCards(WishlistEntity(id, wishlist.name, wishlist.description, wishlist.colorHex, wishlist.matchAnyPrinting, 0, 0, Json.encodeToString(wishlist.rules)),
+        WishlistWithCards(WishlistEntity(id, wishlist.name, wishlist.description, wishlist.colorHex, wishlist.matchAnyPrinting, 0, 0, Json.encodeToString(wishlist.rules), Json.encodeToString(wishlist.excludedCardKeys)),
             wishlist.cards.mapIndexed { cardIndex, wanted ->
                 val card = wanted.card
                 WishlistCardEntity(wanted.id ?: stable("wanted:$index:$cardIndex"), id, card.id, card.name, card.tcg, card.setCode,

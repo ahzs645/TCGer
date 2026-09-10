@@ -75,6 +75,7 @@ data class WishlistEntity(
     val createdAt: Long,
     val updatedAt: Long,
     @androidx.room.ColumnInfo(defaultValue = "'[]'") val rulesJson: String = "[]",
+    @androidx.room.ColumnInfo(defaultValue = "'[]'") val excludedCardKeysJson: String = "[]",
 )
 
 @Entity(

@@ -121,7 +121,7 @@ struct WishlistSyncService {
         )
 
         let matches = try await expand(rule: rule)
-        let existing = Set(wishlist.cards.map { "\($0.tcg):\($0.externalId)" })
+        let existing = Set(wishlist.cards.map { "\($0.tcg):\($0.externalId)" } + (wishlist.excludedCardKeys ?? []))
         let fresh = matches.filter { !existing.contains("\($0.tcg):\($0.id)") }
 
         if !fresh.isEmpty {
@@ -152,7 +152,7 @@ struct WishlistSyncService {
         onProgress: (@MainActor (String) -> Void)? = nil
     ) async -> SyncResult {
         var result = SyncResult()
-        var known = Set(wishlist.cards.map { "\($0.tcg):\($0.externalId)" })
+        var known = Set(wishlist.cards.map { "\($0.tcg):\($0.externalId)" } + (wishlist.excludedCardKeys ?? []))
 
         for rule in wishlist.expansionRules {
             do {

@@ -384,6 +384,7 @@ model Wishlist {
   name             String
   description      String?
   colorHex         String?
+  excludedCardKeys String[] @default([])
   matchAnyPrinting Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

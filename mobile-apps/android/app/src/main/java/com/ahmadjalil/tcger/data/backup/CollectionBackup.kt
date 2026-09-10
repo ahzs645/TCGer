@@ -81,6 +81,7 @@ data class PortableWishlist(
     val cards: List<PortableWishlistCard>,
     val rules: List<com.ahmadjalil.tcger.domain.WishlistRule> = emptyList(),
     val id: String? = null,
+    val excludedCardKeys: List<String> = emptyList(),
 ) {
     fun input() = WishlistInput(name, description, colorHex, matchAnyPrinting)
 }
@@ -126,7 +127,7 @@ object CollectionBackupJson {
                 wishlist.colorHex,
                 wishlist.matchAnyPrinting,
                 wishlist.cards.map { PortableWishlistCard(it.card.portable(), it.desiredQuantity, it.notes, it.id) },
-                wishlist.rules, wishlist.id,
+                wishlist.rules, wishlist.id, wishlist.excludedCardKeys,
             )
         },
         sealedInventory = sealedInventory.map {

@@ -1049,6 +1049,8 @@ struct Wishlist: Identifiable, Codable, Hashable, Sendable {
     /// stores and servers still decode.
     var matchAnyPrinting: Bool? = nil
 
+    var excludedCardKeys: [String]? = nil
+
     var expansionRules: [WishlistRule] { rules ?? [] }
     var matchesAnyPrinting: Bool { matchAnyPrinting ?? false }
 }

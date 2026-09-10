@@ -256,6 +256,8 @@ export interface WishlistCardResponse {
 }
 
 export interface WishlistResponse {
+  /** Exact tcg:externalId identities omitted from future rule syncs. */
+  excludedCardKeys?: string[];
   id: string;
   name: string;
   description?: string;

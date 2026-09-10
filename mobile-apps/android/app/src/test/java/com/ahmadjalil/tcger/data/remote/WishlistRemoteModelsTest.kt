@@ -10,6 +10,13 @@ import org.junit.Test
 
 class WishlistRemoteModelsTest {
     @Test
+    fun `legacy responses default to no exclusions and new responses preserve them`() {
+        assertEquals(emptyList<String>(), Json.decodeFromString<WishlistDto>("""{"id":"w","name":"Darkrai"}""").excludedCardKeys)
+        val decoded = Json.decodeFromString<WishlistDto>("""{"id":"w","name":"Darkrai","excludedCardKeys":["pokemon:base5-83"]}""")
+        assertEquals(listOf("pokemon:base5-83"), decoded.excludedCardKeys)
+    }
+
+    @Test
     fun `request carries all wishlist editor fields`() {
         val request = WishlistRequest(
             name = "Master set",

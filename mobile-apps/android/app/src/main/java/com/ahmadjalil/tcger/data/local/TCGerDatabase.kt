@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SealedInventoryEntity::class,
         SealedOpeningEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class TCGerDatabase : RoomDatabase() {
@@ -78,10 +78,16 @@ abstract class TCGerDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE wishlists ADD COLUMN excludedCardKeysJson TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
         fun create(context: Context): TCGerDatabase = Room.databaseBuilder(
             context,
             TCGerDatabase::class.java,
             "tcger.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
     }
 }

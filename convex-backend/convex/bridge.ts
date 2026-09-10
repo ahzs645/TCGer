@@ -463,6 +463,7 @@ async function hydrateWishlist(
     name: wishlist.name,
     description: wishlist.description,
     colorHex: wishlist.colorHex,
+    excludedCardKeys: wishlist.excludedCardKeys ?? [],
     matchAnyPrinting: wishlist.matchAnyPrinting ?? false,
     cards: hydratedCards,
     rules: rules
@@ -2314,6 +2315,9 @@ export const addWishlistCard = internalMutation({
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const wishlist = await requireWishlistForUser(ctx, args.wishlistId, viewer._id);
+    await ctx.db.patch(wishlist._id, {
+      excludedCardKeys: (wishlist.excludedCardKeys ?? []).filter(key => key !== `${args.card.tcg}:${args.card.externalId}`)
+    });
     const desiredQuantity = validateDesiredQuantity(args.card.desiredQuantity);
     const existing = await ctx.db
       .query("wishlistCards")
@@ -2416,6 +2420,7 @@ export const addWishlistCards = internalMutation({
     const timestamp = now();
 
     for (const card of args.cards) {
+      if ((wishlist.excludedCardKeys ?? []).includes(`${card.tcg}:${card.externalId}`)) continue;
       const desiredQuantity = validateDesiredQuantity(card.desiredQuantity);
       const existing = await ctx.db
         .query("wishlistCards")
@@ -2549,7 +2554,10 @@ export const removeWishlistCard = internalMutation({
     }
 
     await ctx.db.delete(card._id);
-    await ctx.db.patch(wishlist._id, { updatedAt: now() });
+    await ctx.db.patch(wishlist._id, {
+      excludedCardKeys: [...new Set([...(wishlist.excludedCardKeys ?? []), `${card.tcg}:${card.externalId}`])],
+      updatedAt: now()
+    });
     return null;
   }
 });

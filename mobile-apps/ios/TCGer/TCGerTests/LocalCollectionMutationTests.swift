@@ -16,6 +16,22 @@ final class LocalCollectionMutationTests: XCTestCase {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
     }
 
+    func testWishlistExclusionsPersistAndManualAddRestoresCard() throws {
+        let list = store.createWishlist(name: "Darkrai", description: nil, colorHex: nil)
+        let removed = try store.addCardToWishlist(wishlistId: list.id, card: card())
+        store.removeCardFromWishlist(wishlistId: list.id, cardId: removed.id)
+        let reloaded = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root))
+        for _ in 0..<2 {
+            let synced = try reloaded.addCardsToWishlist(wishlistId: list.id, cards: [card()])
+            XCTAssertTrue(synced.cards.isEmpty)
+            XCTAssertEqual(synced.excludedCardKeys, ["pokemon:001"])
+        }
+        _ = try reloaded.addCardToWishlist(wishlistId: list.id, card: card())
+        let restored = try reloaded.addCardsToWishlist(wishlistId: list.id, cards: [card()])
+        XCTAssertEqual(restored.cards.count, 1)
+        XCTAssertEqual(restored.excludedCardKeys, [])
+    }
+
     private func card(_ game: String = "pokemon", id: String = "001") -> Card {
         Card(id: id, name: "Card \(game)", tcg: game, setCode: "set", setName: "Set", rarity: "Rare",
              artist: "Artist", imageUrl: "https://example.test/card.png", imageUrlSmall: nil, price: 10,

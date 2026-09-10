@@ -10,6 +10,18 @@ ROOT = Path(__file__).resolve().parents[2]
 ANDROID = ROOT / "mobile-apps/android/app"
 
 class PhysicalCopyMigrationTest(unittest.TestCase):
+    def test_wishlist_exclusions_default_empty_on_upgrade(self):
+        schema = json.loads((ANDROID / "schemas/com.ahmadjalil.tcger.data.local.TCGerDatabase/4.json").read_text())["database"]
+        db = sqlite3.connect(":memory:")
+        entity = next(e for e in schema["entities"] if e["tableName"] == "wishlists")
+        db.execute(entity["createSql"].replace("${TABLE_NAME}", "wishlists"))
+        db.execute("INSERT INTO wishlists (id, name, colorHex, matchAnyPrinting, createdAt, updatedAt) VALUES ('w', 'Darkrai', 'ffffff', 0, 0, 0)")
+        source = (ANDROID / "src/main/java/com/ahmadjalil/tcger/data/local/TCGerDatabase.kt").read_text().split("val MIGRATION_4_5", 1)[1].split("fun create", 1)[0]
+        for statement in re.findall(r'db.execSQL\("([^"]+)"', source):
+            db.execute(statement)
+        self.assertEqual(db.execute("SELECT excludedCardKeysJson FROM wishlists").fetchone()[0], "[]")
+        db.close()
+
     def test_stack_split_and_game_scoped_wishlist_index(self):
         schema = json.loads((ANDROID / "schemas/com.ahmadjalil.tcger.data.local.TCGerDatabase/3.json").read_text())["database"]
         db = sqlite3.connect(":memory:")
@@ -20,7 +32,7 @@ class PhysicalCopyMigrationTest(unittest.TestCase):
         columns = [row[1] for row in db.execute("PRAGMA table_info(owned_cards)")]
         values = {"id": "original", "binderId": "binder", "externalId": "001", "name": "Pikachu", "tcg": "pokemon", "quantity": 3, "condition": "LP", "price": 10.5, "createdAt": 0}
         db.execute(f"INSERT INTO owned_cards ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})", [values.get(column) for column in columns])
-        source = (ANDROID / "src/main/java/com/ahmadjalil/tcger/data/local/TCGerDatabase.kt").read_text().split("val MIGRATION_3_4", 1)[1].split("fun create", 1)[0]
+        source = (ANDROID / "src/main/java/com/ahmadjalil/tcger/data/local/TCGerDatabase.kt").read_text().split("val MIGRATION_3_4", 1)[1].split("val MIGRATION_4_5", 1)[0]
         statements = re.findall(r'db.execSQL\("([^"]+)"', source)
         for statement in statements:
             if statement.startswith(("ALTER", "DROP", "CREATE")):

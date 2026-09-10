@@ -526,3 +526,34 @@ test("local card PATCH clears tags, preserves omitted tags and metadata, and mov
   assert.equal(moved.cards.length, 2);
   assert.equal(moved.cards.find((c) => c.tcg === "pokemon")?.cardData?.baseExternalId, "review-base");
 });
+
+
+test("wishlist removals survive repeated sync batches and explicit adds restore them", async () => {
+  useDemoStore.getState().init();
+  const request = async (method: string, path: string, body?: unknown) => {
+    const response = await handleDemoRequest(method, path, body);
+    assert.ok(response.status < 300);
+    return response.status === 204 ? null : response.json();
+  };
+  const list = await request("POST", "/wishlists", {
+    name: "Exclusion regression",
+  });
+  const card = {
+    tcg: "pokemon",
+    externalId: "exclusion-raichu",
+    name: "Dark Raichu",
+  };
+  const added = await request("POST", `/wishlists/${list.id}/cards`, card);
+  await request("DELETE", `/wishlists/${list.id}/cards/${added.id}`);
+  for (let i = 0; i < 2; i++) {
+    const synced = await request("POST", `/wishlists/${list.id}/cards/batch`, {
+      cards: [card],
+    });
+    assert.equal(synced.cards.length, 0);
+    assert.deepEqual(synced.excludedCardKeys, ["pokemon:exclusion-raichu"]);
+  }
+  await request("POST", `/wishlists/${list.id}/cards`, card);
+  const restored = await request("GET", `/wishlists/${list.id}`);
+  assert.equal(restored.cards.length, 1);
+  assert.deepEqual(restored.excludedCardKeys, []);
+});

@@ -197,6 +197,7 @@ data class Wishlist(
     val matchAnyPrinting: Boolean = false,
     val cards: List<WishlistCard> = emptyList(),
     val rules: List<WishlistRule> = emptyList(),
+    val excludedCardKeys: List<String> = emptyList(),
 ) {
     val ownedCards: Int get() = cards.count { it.ownedQuantity > 0 }
     val completionPercent: Int

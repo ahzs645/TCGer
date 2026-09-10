@@ -815,6 +815,9 @@ class DefaultTCGerRepository(
         notes: String?,
     ) = withSource(
         local = {
+            val wishlist = requireNotNull(dao.getWishlist(wishlistId)) { "Wishlist not found" }
+            val excluded = Json.decodeFromString<List<String>>(wishlist.excludedCardKeysJson)
+            dao.updateWishlist(wishlist.copy(excludedCardKeysJson = Json.encodeToString(excluded.filterNot { it == "${card.tcg}:${card.id}" })))
             dao.insertWishlistCard(
                 WishlistCardEntity(
                     id = UUID.randomUUID().toString(),
@@ -855,7 +858,15 @@ class DefaultTCGerRepository(
     )
 
     override suspend fun removeWishlistCard(wishlistId: String, wishlistCardId: String) = withSource(
-        local = { dao.deleteWishlistCard(wishlistId, wishlistCardId) },
+        local = {
+            val list = requireNotNull(dao.getWishlists().firstOrNull { it.wishlist.id == wishlistId }) { "Wishlist not found" }
+            val card = list.cards.firstOrNull { it.id == wishlistCardId }
+            if (card != null) {
+                val excluded = Json.decodeFromString<List<String>>(list.wishlist.excludedCardKeysJson)
+                dao.updateWishlist(list.wishlist.copy(excludedCardKeysJson = Json.encodeToString((excluded + "${card.tcg}:${card.externalId}").distinct())))
+                dao.deleteWishlistCard(wishlistId, wishlistCardId)
+            }
+        },
         remote = { api, auth -> api.removeWishlistCard(auth, wishlistId, wishlistCardId) },
     )
 
@@ -1092,6 +1103,7 @@ private suspend fun WishlistWithCards.toDomain(dao: TCGerDao) = Wishlist(
     description = wishlist.description,
     colorHex = wishlist.colorHex,
     matchAnyPrinting = wishlist.matchAnyPrinting,
+    excludedCardKeys = Json.decodeFromString(wishlist.excludedCardKeysJson),
     rules = Json.decodeFromString(wishlist.rulesJson),
     cards = cards.map { entity ->
         WishlistCard(
@@ -1276,6 +1288,7 @@ private fun BinderShareLinkDto.toDomain() = BinderShareLink(
 )
 
 private fun WishlistDto.toDomain() = Wishlist(
+    excludedCardKeys = excludedCardKeys,
     id = id,
     name = name,
     description = description,

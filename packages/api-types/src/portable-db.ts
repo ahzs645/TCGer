@@ -123,6 +123,7 @@ export interface WishlistRow extends PortableRow {
   colorHex?: string;
   /** A card counts as owned if *any* printing of it is, not just this one. */
   matchAnyPrinting?: boolean;
+  excludedCardKeys?: string[];
   createdAt: number;
   updatedAt: number;
 }

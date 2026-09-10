@@ -640,7 +640,7 @@ export const importData = internalMutation({
     for (const list of backup.wishlists) {
       const wishlistId = await save("wishlists", list.id!, {
         userId: user._id,
-        ...pick(list, ["name", "description", "colorHex", "matchAnyPrinting"]),
+        ...pick(list, ["name", "description", "colorHex", "matchAnyPrinting", "excludedCardKeys"]),
         createdAt: now,
         updatedAt: now,
       });

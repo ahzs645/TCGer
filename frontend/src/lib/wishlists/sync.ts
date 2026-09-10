@@ -139,7 +139,11 @@ export interface WishlistSyncResult {
  */
 export async function syncWishlistRules(
   token: string,
-  wishlist: { id: string; cards: Array<{ externalId: string; tcg: string }> },
+  wishlist: {
+    id: string;
+    excludedCardKeys?: string[];
+    cards: Array<{ externalId: string; tcg: string }>;
+  },
   rules: WishlistRuleResponse[],
   options?: {
     /** Skip rules with autoSync off (the "Sync all" button). */
@@ -150,9 +154,10 @@ export async function syncWishlistRules(
   const applicable = options?.autoOnly
     ? rules.filter((rule) => rule.autoSync)
     : rules;
-  const existing = new Set(
-    wishlist.cards.map((card) => `${card.tcg}:${card.externalId}`),
-  );
+  const existing = new Set([
+    ...wishlist.cards.map((card) => `${card.tcg}:${card.externalId}`),
+    ...(wishlist.excludedCardKeys ?? []),
+  ]);
 
   const results: RuleSyncResult[] = [];
   const errors: string[] = [];

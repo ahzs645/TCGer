@@ -389,6 +389,7 @@ data class WishlistDto(
     val matchAnyPrinting: Boolean = false,
     val cards: List<WishlistCardDto> = emptyList(),
     val rules: List<com.ahmadjalil.tcger.domain.WishlistRule> = emptyList(),
+    val excludedCardKeys: List<String> = emptyList(),
 )
 
 @Serializable

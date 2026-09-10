@@ -1041,6 +1041,7 @@ function toWishlist(w: DemoWishlist) {
     description: w.description,
     colorHex: stripHash(w.color),
     cards,
+    excludedCardKeys: w.excludedCardKeys ?? [],
     rules: w.rules ?? [],
     totalCards,
     ownedCards,
@@ -2457,6 +2458,8 @@ async function handleWishlists(
   ) {
     const data = body as { cards: AddWishlistCardInput[] };
     for (const card of data.cards ?? []) {
+      const wishlist = store().wishlists.find((wl: DemoWishlist) => wl.id === wishlistId);
+      if (wishlist?.excludedCardKeys?.includes(`${card.tcg}:${card.externalId}`)) continue;
       const demoCard: DemoOwnedCard = DEMO_CARDS.find(
         (c) => c.id === card.externalId,
       ) || {

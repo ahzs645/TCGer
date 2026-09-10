@@ -100,6 +100,7 @@ export const portableBackupSchema = z
                 notes: optionalText,
               }),
             ),
+            excludedCardKeys: z.array(z.string()).optional(),
             rules: z.array(z.record(z.unknown())).default([]),
           })
           .passthrough(),

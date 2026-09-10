@@ -2,20 +2,26 @@ jest.mock('../../lib/prisma', () => ({
   prisma: {
     wishlist: {
       findFirst: jest.fn(),
-      findMany: jest.fn()
+      findMany: jest.fn(),
+      update: jest.fn()
     },
+    $transaction: jest.fn(),
     wishlistCard: {
+      delete: jest.fn(),
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn()
     },
     collection: {
+      aggregate: jest.fn(),
       findMany: jest.fn()
     }
   }
 }));
 
 import { prisma } from '../../lib/prisma';
-import { getUserWishlist, updateWishlistCard } from './wishlists.service';
+import { getUserWishlist, updateWishlistCard, removeCardFromWishlist, addCardsToWishlist, addCardToWishlist } from './wishlists.service';
 
 const createdAt = new Date('2026-08-13T12:00:00.000Z');
 const updatedAt = new Date('2026-08-13T13:00:00.000Z');
@@ -188,5 +194,53 @@ describe('legacy wishlist quantity semantics', () => {
       where: { id: 'wanted-pikachu' },
       data: { desiredQuantity: 3, notes: undefined }
     });
+  });
+});
+
+
+describe('wishlist sync exclusions', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('records the exact removed identity and deletes the row in one transaction', async () => {
+    jest.mocked(prisma.wishlist.findFirst).mockResolvedValue({ id: 'wishlist-1', userId: 'user-1' } as never);
+    jest.mocked(prisma.wishlistCard.findFirst).mockResolvedValue({ id: 'wanted', tcg: 'pokemon', externalId: 'base5-83' } as never);
+    await removeCardFromWishlist('user-1', 'wishlist-1', 'wanted');
+    expect(prisma.wishlist.update).toHaveBeenCalledWith({
+      where: { id: 'wishlist-1' }, data: { excludedCardKeys: { push: 'pokemon:base5-83' } }
+    });
+    expect(prisma.wishlistCard.delete).toHaveBeenCalledWith({ where: { id: 'wanted' } });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('manual restoration clears only that card exclusion', async () => {
+    const list = { id: 'wishlist-1', excludedCardKeys: ['pokemon:base5-83', 'pokemon:other'] };
+    const card = wishlistCard({ id: 'wanted', externalId: 'base5-83', desiredQuantity: 1 });
+    jest.mocked(prisma.wishlist.findFirst).mockResolvedValue(list as never);
+    jest.mocked(prisma.wishlist.update).mockResolvedValue(list as never);
+    jest.mocked(prisma.wishlistCard.findUnique).mockResolvedValue(null);
+    jest.mocked(prisma.wishlistCard.upsert).mockResolvedValue(card as never);
+    jest.mocked(prisma.collection.aggregate).mockResolvedValue({ _sum: { quantity: 0 } } as never);
+    jest.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(prisma));
+    await addCardToWishlist('user-1', 'wishlist-1', { tcg: 'pokemon', externalId: 'base5-83', name: 'Dark Raichu' });
+    expect(prisma.wishlist.update).toHaveBeenLastCalledWith({
+      where: { id: 'wishlist-1' }, data: { excludedCardKeys: ['pokemon:other'] }
+    });
+    expect(prisma.wishlistCard.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips excluded identities during subsequent batches', async () => {
+    jest.mocked(prisma.wishlist.findFirst).mockResolvedValue({
+      id: 'wishlist-1', userId: 'user-1', name: 'Darkrai', cards: [], rules: [],
+      excludedCardKeys: ['pokemon:base5-83'], createdAt, updatedAt
+    } as never);
+    jest.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    jest.mocked(prisma.wishlist.update).mockResolvedValue({ excludedCardKeys: ['pokemon:base5-83'] } as never);
+    jest.mocked(prisma.$transaction).mockImplementation(async (callback: any) => callback(prisma));
+    const result = await addCardsToWishlist('user-1', 'wishlist-1', {
+      cards: [{ tcg: 'pokemon', externalId: 'base5-83', name: 'Dark Raichu' }]
+    });
+    expect(prisma.wishlistCard.upsert).not.toHaveBeenCalled();
+    expect(result.cards).toEqual([]);
+    expect(result.excludedCardKeys).toEqual(['pokemon:base5-83']);
   });
 });

@@ -218,6 +218,7 @@ export async function getUserWishlists(userId: string): Promise<WishlistResponse
       name: wishlist.name,
       description: wishlist.description ?? undefined,
       colorHex: wishlist.colorHex ?? undefined,
+      excludedCardKeys: wishlist.excludedCardKeys ?? [],
       matchAnyPrinting: wishlist.matchAnyPrinting,
       cards,
       rules: wishlist.rules.map(mapWishlistRule),
@@ -266,6 +267,7 @@ export async function getUserWishlist(userId: string, wishlistId: string): Promi
     name: wishlist.name,
     description: wishlist.description ?? undefined,
     colorHex: wishlist.colorHex ?? undefined,
+    excludedCardKeys: wishlist.excludedCardKeys ?? [],
     matchAnyPrinting: wishlist.matchAnyPrinting,
     cards,
     rules: wishlist.rules.map(mapWishlistRule),
@@ -300,6 +302,7 @@ export async function createWishlist(
     name: wishlist.name,
     description: wishlist.description ?? undefined,
     colorHex: wishlist.colorHex ?? undefined,
+    excludedCardKeys: wishlist.excludedCardKeys ?? [],
     matchAnyPrinting: wishlist.matchAnyPrinting,
     cards: [],
     rules: [],
@@ -365,55 +368,71 @@ export async function addCardToWishlist(
     throw new Error('Wishlist not found');
   }
 
-  const existing = await prisma.wishlistCard.findUnique({
-    where: {
-      wishlistId_externalId_tcg: {
+  const card = await prisma.$transaction(async (tx) => {
+    // Lock this wishlist so a concurrent removal cannot lose its exclusion.
+    const current = await tx.wishlist.update({
+      where: { id: wishlistId },
+      data: { updatedAt: new Date() }
+    });
+    const existing = await tx.wishlistCard.findUnique({
+      where: {
+        wishlistId_externalId_tcg: {
+          wishlistId,
+          externalId: input.externalId,
+          tcg: input.tcg
+        }
+      },
+      select: { tcgSpecific: true, desiredQuantity: true }
+    });
+    const card = await tx.wishlistCard.upsert({
+      where: {
+        wishlistId_externalId_tcg: {
+          wishlistId,
+          externalId: input.externalId,
+          tcg: input.tcg
+        }
+      },
+      update: {
+        name: input.name,
+        setCode: input.setCode,
+        setName: input.setName,
+        rarity: input.rarity,
+        imageUrl: input.imageUrl,
+        imageUrlSmall: input.imageUrlSmall,
+        setSymbolUrl: input.setSymbolUrl,
+        setLogoUrl: input.setLogoUrl,
+        collectorNumber: input.collectorNumber,
+        desiredQuantity: input.desiredQuantity ?? existing?.desiredQuantity ?? 1,
+        tcgSpecific: mergeWishlistCardSpecificSnapshot(existing?.tcgSpecific, input),
+        notes: input.notes
+      },
+      create: {
         wishlistId,
         externalId: input.externalId,
-        tcg: input.tcg
+        tcg: input.tcg,
+        name: input.name,
+        setCode: input.setCode,
+        setName: input.setName,
+        rarity: input.rarity,
+        imageUrl: input.imageUrl,
+        imageUrlSmall: input.imageUrlSmall,
+        setSymbolUrl: input.setSymbolUrl,
+        setLogoUrl: input.setLogoUrl,
+        collectorNumber: input.collectorNumber,
+        desiredQuantity: input.desiredQuantity ?? 1,
+        tcgSpecific: buildWishlistCardSpecificSnapshot(input),
+        notes: input.notes
       }
-    },
-    select: { tcgSpecific: true, desiredQuantity: true }
-  });
-  const card = await prisma.wishlistCard.upsert({
-    where: {
-      wishlistId_externalId_tcg: {
-        wishlistId,
-        externalId: input.externalId,
-        tcg: input.tcg
+    });
+    await tx.wishlist.update({
+      where: { id: wishlistId },
+      data: {
+        excludedCardKeys: (current.excludedCardKeys ?? []).filter(
+          key => key !== `${input.tcg}:${input.externalId}`
+        )
       }
-    },
-    update: {
-      name: input.name,
-      setCode: input.setCode,
-      setName: input.setName,
-      rarity: input.rarity,
-      imageUrl: input.imageUrl,
-      imageUrlSmall: input.imageUrlSmall,
-      setSymbolUrl: input.setSymbolUrl,
-      setLogoUrl: input.setLogoUrl,
-      collectorNumber: input.collectorNumber,
-      desiredQuantity: input.desiredQuantity ?? existing?.desiredQuantity ?? 1,
-      tcgSpecific: mergeWishlistCardSpecificSnapshot(existing?.tcgSpecific, input),
-      notes: input.notes
-    },
-    create: {
-      wishlistId,
-      externalId: input.externalId,
-      tcg: input.tcg,
-      name: input.name,
-      setCode: input.setCode,
-      setName: input.setName,
-      rarity: input.rarity,
-      imageUrl: input.imageUrl,
-      imageUrlSmall: input.imageUrlSmall,
-      setSymbolUrl: input.setSymbolUrl,
-      setLogoUrl: input.setLogoUrl,
-      collectorNumber: input.collectorNumber,
-      desiredQuantity: input.desiredQuantity ?? 1,
-      tcgSpecific: buildWishlistCardSpecificSnapshot(input),
-      notes: input.notes
-    }
+    });
+    return card;
   });
 
   // Check ownership. Each physical copy is its own collection row, so the
@@ -464,7 +483,13 @@ export async function removeCardFromWishlist(
     throw new Error('Wishlist card not found');
   }
 
-  await prisma.wishlistCard.delete({ where: { id: cardId } });
+  await prisma.$transaction([
+    prisma.wishlist.update({
+      where: { id: wishlistId },
+      data: { excludedCardKeys: { push: `${card.tcg}:${card.externalId}` } }
+    }),
+    prisma.wishlistCard.delete({ where: { id: cardId } })
+  ]);
 }
 
 export async function updateWishlistCard(
@@ -513,7 +538,14 @@ export async function addCardsToWishlist(
   // Preserve rich fields that are omitted when a later import only refreshes
   // the card's basic display snapshot.
   await prisma.$transaction(async (tx) => {
+    // Serialize additions and removals for this list, then read current exclusions.
+    const current = await tx.wishlist.update({
+      where: { id: wishlistId },
+      data: { updatedAt: new Date() }
+    });
+    const excluded = new Set(current.excludedCardKeys ?? []);
     for (const card of input.cards) {
+      if (excluded.has(`${card.tcg}:${card.externalId}`)) continue;
       const key = {
         wishlistId,
         externalId: card.externalId,

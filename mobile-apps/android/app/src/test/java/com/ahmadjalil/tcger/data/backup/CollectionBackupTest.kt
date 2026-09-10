@@ -20,6 +20,7 @@ class CollectionBackupTest {
             "Master set",
             description = "All printings",
             matchAnyPrinting = true,
+            excludedCardKeys = listOf("pokemon:base5-83"),
             cards = listOf(WishlistCard("wanted", card, desiredQuantity = 2, notes = "Reverse holo")),
         )
 
@@ -29,6 +30,7 @@ class CollectionBackupTest {
 
         assertEquals(3, decoded.binders.single().cards.single().quantity)
         assertTrue(decoded.wishlists.single().matchAnyPrinting)
+        assertEquals(listOf("pokemon:base5-83"), decoded.wishlists.single().excludedCardKeys)
         assertEquals(2, decoded.wishlists.single().cards.single().desiredQuantity)
     }
 

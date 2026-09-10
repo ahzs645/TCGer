@@ -418,6 +418,7 @@ export default defineSchema({
     .index("by_user_label", ["userId", "label"]),
 
   wishlists: defineTable({
+    excludedCardKeys: v.optional(v.array(v.string())),
     userId: v.id("users"),
     name: v.string(),
     description: v.optional(v.string()),

@@ -1,0 +1,1 @@
+ALTER TABLE "Wishlist" ADD COLUMN "excludedCardKeys" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

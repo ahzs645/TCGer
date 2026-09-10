@@ -85,3 +85,12 @@ test("web deck and trade rows validate before import and retain their IDs", asyn
     ),
   );
 });
+
+test("portable backups preserve wishlist sync exclusions", () => {
+  const input = structuredClone(fixture);
+  input.wishlists[0].excludedCardKeys = ["pokemon:base5-83"];
+  assert.deepEqual(
+    normalizePortableBackup(input).wishlists[0]!.excludedCardKeys,
+    ["pokemon:base5-83"],
+  );
+});

@@ -2248,7 +2248,8 @@ final class LocalStore {
                 createdAt: wishlist.createdAt,
                 updatedAt: LocalStore.isoFormatter.string(from: Date()),
                 rules: wishlist.rules,
-                matchAnyPrinting: wishlist.matchAnyPrinting
+                matchAnyPrinting: wishlist.matchAnyPrinting,
+                excludedCardKeys: wishlist.excludedCardKeys
             )
         }
 
@@ -3098,7 +3099,8 @@ final class LocalStore {
             createdAt: wishlist.createdAt,
             updatedAt: wishlist.updatedAt,
             rules: wishlist.rules,
-            matchAnyPrinting: wishlist.matchAnyPrinting
+            matchAnyPrinting: wishlist.matchAnyPrinting,
+            excludedCardKeys: wishlist.excludedCardKeys
         )
     }
 
@@ -3139,7 +3141,8 @@ final class LocalStore {
             createdAt: wl.createdAt,
             updatedAt: LocalStore.isoFormatter.string(from: Date()),
             rules: wl.rules,
-            matchAnyPrinting: matchAnyPrinting ?? wl.matchAnyPrinting
+            matchAnyPrinting: matchAnyPrinting ?? wl.matchAnyPrinting,
+            excludedCardKeys: wl.excludedCardKeys
         )
         wishlists[idx] = updated
         try persistOrThrow()
@@ -3156,7 +3159,8 @@ final class LocalStore {
             throw APIService.APIError.serverError(status: 404, message: "Wishlist not found")
         }
         let now = LocalStore.isoFormatter.string(from: Date())
-        let wl = wishlists[idx]
+        var wl = wishlists[idx]
+        wl.excludedCardKeys = (wl.excludedCardKeys ?? []).filter { $0 != "\(card.tcg):\(card.id)" }
         let maps = ownershipMaps()
 
         if var existing = wl.cards.first(where: { $0.externalId == card.id && $0.tcg == card.tcg }) {
@@ -3186,7 +3190,7 @@ final class LocalStore {
         let now = LocalStore.isoFormatter.string(from: Date())
         let wl = wishlists[idx]
         var cards = wl.cards
-        var seen = Set(cards.map { "\($0.tcg):\($0.externalId)" })
+        var seen = Set(cards.map { "\($0.tcg):\($0.externalId)" } + (wl.excludedCardKeys ?? []))
 
         for card in newCards {
             let key = "\(card.tcg):\(card.id)"
@@ -3203,7 +3207,9 @@ final class LocalStore {
 
     func removeCardFromWishlist(wishlistId: String, cardId: String) {
         guard let idx = wishlists.firstIndex(where: { $0.id == wishlistId }) else { return }
-        let wl = wishlists[idx]
+        var wl = wishlists[idx]
+        guard let removed = wl.cards.first(where: { $0.id == cardId }) else { return }
+        wl.excludedCardKeys = Array(Set((wl.excludedCardKeys ?? []) + ["\(removed.tcg):\(removed.externalId)"]))
         let cards = wl.cards.filter { $0.id != cardId }
         let now = LocalStore.isoFormatter.string(from: Date())
         wishlists[idx] = LocalStore.rebuildWishlist(wl, cards: cards, rules: wl.rules, updatedAt: now)
@@ -3351,7 +3357,8 @@ final class LocalStore {
             createdAt: wishlist.createdAt,
             updatedAt: updatedAt,
             rules: rules,
-            matchAnyPrinting: wishlist.matchAnyPrinting
+            matchAnyPrinting: wishlist.matchAnyPrinting,
+            excludedCardKeys: wishlist.excludedCardKeys
         )
     }
 

@@ -156,6 +156,7 @@ export async function importLocalBackup(input: unknown): Promise<void> {
     description: list.description ?? "",
     color: `#${list.colorHex}`,
     createdAt: now,
+    excludedCardKeys: list.excludedCardKeys,
     rules: list.rules.map((rule, i) => ({
       ...rule,
       id: rule.id ?? `${list.id}:rule:${i}`,

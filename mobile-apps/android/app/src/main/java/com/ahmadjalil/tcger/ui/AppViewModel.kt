@@ -245,7 +245,8 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             val matches = (repository.resolveWishlistRule(rule) + packageCards).distinctBy { it.identity() }.let {
                 if (rule.includeAllPrintings) it else it.distinctBy { card -> "${card.tcg}:${card.name.lowercase()}" }
             }
-            val owned = repository.getWishlists().first { it.id == wishlistId }.cards.map { it.card.identity() }.toSet()
+            val wishlist = repository.getWishlists().first { it.id == wishlistId }
+            val owned = (wishlist.cards.map { it.card.identity() } + wishlist.excludedCardKeys).toSet()
             matches.filterNot { it.identity() in owned }.forEach { repository.addWishlistCard(wishlistId, it) }
             repository.saveWishlistRule(wishlistId, rule.copy(lastSyncedAt = java.time.Instant.now().toString(), lastMatchCount = matches.size))
         } finally { refresh() }

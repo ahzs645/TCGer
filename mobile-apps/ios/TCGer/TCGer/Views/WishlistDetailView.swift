@@ -20,6 +20,7 @@ struct WishlistDetailView: View {
     @State private var searchText = ""
     @State private var filterOwned: OwnershipFilter = .all
     @State private var rules: [WishlistRule]
+    @State private var excludedCardKeys: [String]
     @State private var showingBulkAdd = false
     @State private var showingAddSets = false
     @State private var isSyncing = false
@@ -45,6 +46,7 @@ struct WishlistDetailView: View {
         _isEditing = State(initialValue: startsInEditMode)
         _cards = State(initialValue: wishlist.cards)
         _rules = State(initialValue: wishlist.expansionRules)
+        _excludedCardKeys = State(initialValue: wishlist.excludedCardKeys ?? [])
         _editedName = State(initialValue: wishlist.name)
         _editedDescription = State(initialValue: wishlist.description ?? "")
         _selectedColor = State(initialValue: Color.fromHex(wishlist.colorHex))
@@ -94,7 +96,8 @@ struct WishlistDetailView: View {
             createdAt: wishlist.createdAt,
             updatedAt: wishlist.updatedAt,
             rules: rules,
-            matchAnyPrinting: wishlist.matchAnyPrinting
+            matchAnyPrinting: wishlist.matchAnyPrinting,
+            excludedCardKeys: excludedCardKeys
         )
     }
 
@@ -345,6 +348,7 @@ struct WishlistDetailView: View {
             )
             cards = updated.cards
             rules = updated.expansionRules
+            excludedCardKeys = updated.excludedCardKeys ?? []
         } catch {
             // Keep existing cards if refresh fails
         }
@@ -362,19 +366,7 @@ struct WishlistDetailView: View {
             token: token,
             enabledGames: environmentStore.enabledGames
         )
-        let snapshot = Wishlist(
-            id: wishlist.id,
-            name: wishlist.name,
-            description: wishlist.description,
-            colorHex: wishlist.colorHex,
-            cards: cards,
-            totalCards: cards.count,
-            ownedCards: ownedCount,
-            completionPercent: completionPercent,
-            createdAt: wishlist.createdAt,
-            updatedAt: wishlist.updatedAt,
-            rules: rules
-        )
+        let snapshot = currentWishlist
 
         let result = await service.sync(wishlist: snapshot) { message in
             syncStatus = message
@@ -424,6 +416,7 @@ struct WishlistDetailView: View {
                 cardId: card.id
             )
             cards.removeAll { $0.id == card.id }
+            excludedCardKeys = Array(Set(excludedCardKeys + ["\(card.tcg):\(card.externalId)"]))
             onUpdate?()
         } catch {
             errorMessage = error.localizedDescription
