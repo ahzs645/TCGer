@@ -1,5 +1,9 @@
 # Card geometry — AI agent handoff, 2026-09-06
 
+**Historical handoff:** for current decisions and work through September 9,
+read [the latest card-geometry handoff and lessons](card-geometry-handoff-2026-09-09.md).
+The experiment details below remain historical evidence.
+
 ## Start here
 
 This handoff covers the recent card-outline training, corpus/tooling repairs, benchmarks and failure analysis. It is current through **`b3134c60`** on branch **`claude/tcg-card-recognition-review-fkwkvl`**. It does not replace the [scanner architecture index](README.md) for the broader app, catalog and per-game recognition system.

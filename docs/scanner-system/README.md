@@ -1,6 +1,6 @@
 # TCGer scanner and offline-game system
 
-**Status date:** 2026-08-29, with card-geometry results updated 2026-09-04
+**Status date:** broader system record 2026-08-29; card-geometry handoff updated 2026-09-09
 
 **Purpose:** canonical index for the scanner, catalog, offline-pack, training,
 and distribution work completed during the universal-scanner project.
@@ -13,6 +13,15 @@ R2 publication, app integration, durable image-library work, and the Pokémon
 TCG Pocket audit.
 
 ## Read this first
+
+For the latest card-outline, labeling and model work, start with the
+[September 9 card-geometry handoff and lessons](card-geometry-handoff-2026-09-09.md).
+The 502-photo reference review is complete. Keep the reviewed-data YOLO11s as
+the development baseline; the final cyclic checkpoint has better borders but
+worse real-capture detection. The handoff links all experiments, records the
+rotation/selection improvements, and distinguishes completed work from the
+validation split that still needs preparation. The production table and
+broader-system priorities below retain their historical August status.
 
 The project now has a working end-to-end recognition and distribution path for
 Pokémon, Magic: The Gathering, and Yu-Gi-Oh!:
