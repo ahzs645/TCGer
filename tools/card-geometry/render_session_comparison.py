@@ -63,7 +63,7 @@ def render(root):
             draw.text((left+10,top+8), frame["reference"]+"  "+frame["key"].split("/")[-1], fill="white", font=font)
             for n,(name,color) in enumerate((("baseline", "#78ffae"),("candidate", "#a8beff"))):
                 v=frame["versions"][name]
-                text=f"{'B' if n==0 else 'E50'} {v['counts']['matched']}/{v['counts']['truth']} found; {sum(m['iou']>=.9 for m in v['matches'])} tight; {v['counts']['extras']+v['counts']['duplicates']} extra"
+                text=f"{'B' if n==0 else 'C'} {v['counts']['matched']}/{v['counts']['truth']} found; {sum(m['iou']>=.9 for m in v['matches'])} tight; {v['counts']['extras']+v['counts']['duplicates']} extra"
                 draw.text((left+10,top+30+n*19), text, fill=color, font=font)
             with Image.open(frame["source"]["path"]) as opened:
                 image=opened.convert("RGB")
@@ -78,7 +78,7 @@ def render(root):
                     outline([[c['point']['x'],c['point']['y']] for c in result['corners']],color,2)
             for truth in frame["versions"]["baseline"]["referenceInstances"]:
                 outline(truth['corners'],'#ffce71',1)
-            draw.text((left+10,top+475),'Gold truth / Green B / Blue E50',fill='#aabac9',font=font)
+            draw.text((left+10,top+475),'Gold truth / Green baseline / Blue candidate',fill='#aabac9',font=font)
         sheet.save(sheets/f"sheet-{start//12+1:02d}.jpg",quality=94)
     write_json(output / "gallery-verification.json", {"comparisonSha256":sha256_file(source),
         "readOnly":True,"frames":len(gallery['frames']),"images":len(list(images.glob('*.jpg'))),

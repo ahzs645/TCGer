@@ -1,0 +1,377 @@
+{
+  "schema": "tcger-orientation-validation-results/v1",
+  "completedDate": "2026-09-11",
+  "trainingJobId": "6aa2e5e85527934177ec1db1",
+  "epochs": 50,
+  "additionalTrainingRuns": 0,
+  "selected": {
+    "checkpoint": "training/repeat-0/weights/epoch49.pt",
+    "checkpointSha256": "13c2eb19b41a03ef1a68a6d2dacb4f480f57c9d25ffdf54046f24f3b6f62c7de",
+    "id": "epoch49",
+    "metricsSha256": "b36a911205b31fbed25f63a26992bbb86ba49ef263ebd043a6138939bf422692",
+    "predictionsSha256": "3683e0f4bde20fe5a673092e1361f3f1c7f649ec848d4d3806013b991f362700",
+    "score": 0.8054582100642643,
+    "shortlistIndex": 4
+  },
+  "validationCandidates": [
+    {
+      "checkpoint": "training/repeat-0/weights/epoch9.pt",
+      "checkpointSha256": "e812df634ed0a8e2c2512e0963e1c7bab3e8ff4f6e45bceb02a278e58202b08c",
+      "id": "epoch9",
+      "metricsSha256": "1a8780af18bbe78c3635c430c191e985e528483e670bdf6b3eaa1ef57af6c35d",
+      "predictionsSha256": "cd772eb67bab90e5d97ba411d2c866af75a8123c078fcd351c05b9b56559de03",
+      "score": 0.5555558158302631,
+      "shortlistIndex": 0
+    },
+    {
+      "checkpoint": "training/repeat-0/weights/epoch19.pt",
+      "checkpointSha256": "72c93792d8364e49e97a818f510ddb7074cc54ac8278bd012cff991a94e26358",
+      "id": "epoch19",
+      "metricsSha256": "0c9d88a985bf14174401f36caa4fd515cb65d632a88280ec6ff6559acd8e5040",
+      "predictionsSha256": "c39657864f48e722d835893b63d12021dc5f9c42b26eaaa64a506fd4e776393b",
+      "score": 0.7231608440490702,
+      "shortlistIndex": 1
+    },
+    {
+      "checkpoint": "training/repeat-0/weights/epoch29.pt",
+      "checkpointSha256": "d93ff77ca9a8767251a1b3aa17a3e30000a2a0f5787d554362170ddff00aa96f",
+      "id": "epoch29",
+      "metricsSha256": "e9cefc84704fd6073c1631a9beee7c07c8b3a180d0753afe885ccff9be0865f2",
+      "predictionsSha256": "6744f90dc6b23b4ddd419d06c39f424d5cf8295485c7a08b8daa1964ddf224f6",
+      "score": 0.7962819844024669,
+      "shortlistIndex": 2
+    },
+    {
+      "checkpoint": "training/repeat-0/weights/epoch39.pt",
+      "checkpointSha256": "409d697a7cfa070fc28879a2b28aaac3b3ace911a1f6bed0e2715e2466e5e0f4",
+      "id": "epoch39",
+      "metricsSha256": "9f69b991f14c313b8fe11bd50b9e60dd7531bf5f7bf495e14fb204f12b3ff9b9",
+      "predictionsSha256": "a44aabd8c4519097b8b41063ec0f3ac1b4dc9b712e0f514e00f1271b47900cb0",
+      "score": 0.7936663311419722,
+      "shortlistIndex": 3
+    },
+    {
+      "checkpoint": "training/repeat-0/weights/epoch49.pt",
+      "checkpointSha256": "13c2eb19b41a03ef1a68a6d2dacb4f480f57c9d25ffdf54046f24f3b6f62c7de",
+      "id": "epoch49",
+      "metricsSha256": "b36a911205b31fbed25f63a26992bbb86ba49ef263ebd043a6138939bf422692",
+      "predictionsSha256": "3683e0f4bde20fe5a673092e1361f3f1c7f649ec848d4d3806013b991f362700",
+      "score": 0.8054582100642643,
+      "shortlistIndex": 4
+    },
+    {
+      "checkpoint": "training/repeat-0/weights/best.pt",
+      "checkpointSha256": "f610f4089624a5fcebaaba6a2e8b77345f492fe647736e5ffa0ffd2118df6d4d",
+      "id": "best",
+      "metricsSha256": "ee85bf8d69c6eb655512e57f341590a1882cc0e8ca8cb8cb20c81d5e9b62cd70",
+      "predictionsSha256": "96aa8e7a893642771445ee7b3787bc5398766dbe930a9c00348cf220d1e5bd03",
+      "score": 0.7231608440490702,
+      "shortlistIndex": 5
+    },
+    {
+      "checkpoint": "training/repeat-0/weights/last.pt",
+      "checkpointSha256": "a1702fcce28b1a0af9faefa2b9a13a1f78dd707a773138b2ca4254307ce03886",
+      "id": "last",
+      "metricsSha256": "55e4430505076621916270107b0a095d99ecf80a3d3664dcf52c8e51fbda354c",
+      "predictionsSha256": "0be0c9670b3c0a11dacb8b39f103ab699fc88edf1683de0889a6b2e1456de480",
+      "score": 0.8054582100642643,
+      "shortlistIndex": 6
+    }
+  ],
+  "validationFrames": 1844,
+  "selectionProtocolSha256": "dd9777a169d03b5276382ed908c813973d1c8988ec19f1ef8962f6fd9c8187e9",
+  "comparisonSha256": "fc93a730c876d2961f9ef1c1468cb251f5d7fe0525f9a88444e1da754e75f039",
+  "verificationSha256": "69c391cd081ee3f4aa2064dde00a3e3c2b4a4a08d93d03e800205ac972d8a352",
+  "counts": {
+    "cardInstances": 106,
+    "photos": 75
+  },
+  "detection": {
+    "baseline": {
+      "duplicate": 0,
+      "duplicatePerImage": 0.0,
+      "extra": 19,
+      "extraPerImage": 0.25333333333333335,
+      "matches": 96,
+      "meanMatchedIoU": 0.8592478985216933,
+      "miss": 10,
+      "missPerImage": 0.13333333333333333,
+      "predictions": 115,
+      "recall@0.5": 0.9056603773584906,
+      "recall@0.75": 0.8018867924528302,
+      "recall@0.9": 0.37735849056603776,
+      "records": 75,
+      "truthInstances": 106
+    },
+    "candidate": {
+      "duplicate": 0,
+      "duplicatePerImage": 0.0,
+      "extra": 21,
+      "extraPerImage": 0.28,
+      "matches": 86,
+      "meanMatchedIoU": 0.83687319195555,
+      "miss": 20,
+      "missPerImage": 0.26666666666666666,
+      "predictions": 107,
+      "recall@0.5": 0.8113207547169812,
+      "recall@0.75": 0.6698113207547169,
+      "recall@0.9": 0.3113207547169811,
+      "records": 75,
+      "truthInstances": 106
+    }
+  },
+  "orientation": {
+    "baseline": {
+      "accuracy": 0.9270833333333334,
+      "correctPairs": 89,
+      "eligiblePairs": 96,
+      "evaluatedPairs": 96,
+      "excludedUnknownOrientation": 0,
+      "insufficientKnownCorners": 0
+    },
+    "candidate": {
+      "accuracy": 0.9418604651162791,
+      "correctPairs": 81,
+      "eligiblePairs": 86,
+      "evaluatedPairs": 86,
+      "excludedUnknownOrientation": 0,
+      "insufficientKnownCorners": 0
+    }
+  },
+  "paired": {
+    "baseline": {
+      "commonHumanMedianCyclicError": 0.05995365274151767,
+      "commonHumanMedianFixedError": 0.06335018796189054,
+      "commonMedianIou": 0.8898766050876946,
+      "knownPhases": {
+        "0": 79,
+        "1": 1,
+        "2": 5
+      },
+      "matched": 96,
+      "tight": 40
+    },
+    "candidate": {
+      "commonHumanMedianCyclicError": 0.0705823821997887,
+      "commonHumanMedianFixedError": 0.07104372490571169,
+      "commonMedianIou": 0.8557592505152641,
+      "knownPhases": {
+        "0": 80,
+        "2": 5
+      },
+      "matched": 86,
+      "tight": 33
+    },
+    "commonHumanQuads": 85,
+    "commonKnownOrientation": 85,
+    "commonMatched": 85,
+    "newMisses": 11,
+    "recoveredMisses": 1,
+    "targets": 106,
+    "tightGained": 4,
+    "tightLost": 11
+  },
+  "slices": {
+    "hasNonvisibleCorner": {
+      "baseline": {
+        "commonHumanMedianCyclicError": 0.10108485675333524,
+        "commonHumanMedianFixedError": 0.10280090152441422,
+        "commonMedianIou": 0.8298531910589547,
+        "knownPhases": {
+          "0": 33,
+          "1": 1,
+          "2": 3
+        },
+        "matched": 40,
+        "tight": 9
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": 0.09144304275571194,
+        "commonHumanMedianFixedError": 0.12315638285326547,
+        "commonMedianIou": 0.7994927591160566,
+        "knownPhases": {
+          "0": 34,
+          "2": 3
+        },
+        "matched": 38,
+        "tight": 6
+      },
+      "commonHumanQuads": 37,
+      "commonKnownOrientation": 37,
+      "commonMatched": 37,
+      "newMisses": 3,
+      "recoveredMisses": 1,
+      "targets": 44,
+      "tightGained": 1,
+      "tightLost": 4
+    },
+    "multiCard": {
+      "baseline": {
+        "commonHumanMedianCyclicError": 0.036310485444853144,
+        "commonHumanMedianFixedError": 0.036310485444853144,
+        "commonMedianIou": 0.9273641909709387,
+        "knownPhases": {
+          "0": 29,
+          "2": 1
+        },
+        "matched": 37,
+        "tight": 23
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": 0.036482607521944564,
+        "commonHumanMedianFixedError": 0.036482607521944564,
+        "commonMedianIou": 0.9238490181572743,
+        "knownPhases": {
+          "0": 29,
+          "2": 1
+        },
+        "matched": 31,
+        "tight": 20
+      },
+      "commonHumanQuads": 30,
+      "commonKnownOrientation": 30,
+      "commonMatched": 30,
+      "newMisses": 7,
+      "recoveredMisses": 1,
+      "targets": 43,
+      "tightGained": 1,
+      "tightLost": 4
+    },
+    "sideways": {
+      "baseline": {
+        "commonHumanMedianCyclicError": null,
+        "commonHumanMedianFixedError": null,
+        "commonMedianIou": null,
+        "knownPhases": {},
+        "matched": 0,
+        "tight": 0
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": null,
+        "commonHumanMedianFixedError": null,
+        "commonMedianIou": null,
+        "knownPhases": {},
+        "matched": 0,
+        "tight": 0
+      },
+      "commonHumanQuads": 0,
+      "commonKnownOrientation": 0,
+      "commonMatched": 0,
+      "newMisses": 0,
+      "recoveredMisses": 0,
+      "targets": 0,
+      "tightGained": 0,
+      "tightLost": 0
+    },
+    "upsideDown": {
+      "baseline": {
+        "commonHumanMedianCyclicError": 0.0953494384387949,
+        "commonHumanMedianFixedError": 1.4757042683999193,
+        "commonMedianIou": 0.8121366757655968,
+        "knownPhases": {
+          "2": 5
+        },
+        "matched": 7,
+        "tight": 2
+      },
+      "candidate": {
+        "commonHumanMedianCyclicError": 0.08452700242816022,
+        "commonHumanMedianFixedError": 1.470001129351079,
+        "commonMedianIou": 0.8242329420897128,
+        "knownPhases": {
+          "2": 5
+        },
+        "matched": 5,
+        "tight": 1
+      },
+      "commonHumanQuads": 5,
+      "commonKnownOrientation": 5,
+      "commonMatched": 5,
+      "newMisses": 2,
+      "recoveredMisses": 0,
+      "targets": 11,
+      "tightGained": 0,
+      "tightLost": 1
+    }
+  },
+  "newMisses": [
+    {
+      "photo": "F6",
+      "card": 2,
+      "multiCard": true,
+      "hasNonvisibleCorner": false
+    },
+    {
+      "photo": "F7",
+      "card": 1,
+      "multiCard": true,
+      "hasNonvisibleCorner": false
+    },
+    {
+      "photo": "F7",
+      "card": 2,
+      "multiCard": true,
+      "hasNonvisibleCorner": true
+    },
+    {
+      "photo": "F7",
+      "card": 3,
+      "multiCard": true,
+      "hasNonvisibleCorner": false
+    },
+    {
+      "photo": "F20",
+      "card": 1,
+      "multiCard": true,
+      "hasNonvisibleCorner": false
+    },
+    {
+      "photo": "F20",
+      "card": 2,
+      "multiCard": true,
+      "hasNonvisibleCorner": false
+    },
+    {
+      "photo": "F20",
+      "card": 3,
+      "multiCard": true,
+      "hasNonvisibleCorner": true
+    },
+    {
+      "photo": "F21",
+      "card": 1,
+      "multiCard": false,
+      "hasNonvisibleCorner": false
+    },
+    {
+      "photo": "F25",
+      "card": 1,
+      "multiCard": false,
+      "hasNonvisibleCorner": true
+    },
+    {
+      "photo": "F42",
+      "card": 1,
+      "multiCard": false,
+      "hasNonvisibleCorner": false
+    },
+    {
+      "photo": "F71",
+      "card": 1,
+      "multiCard": false,
+      "hasNonvisibleCorner": false
+    }
+  ],
+  "decision": "retain-reviewed-data-baseline",
+  "productionModelChanged": false,
+  "labelsChanged": false,
+  "broaderFrozenEvaluationComplete": false,
+  "limitations": [
+    "One session with repeated views; 106 instances are not 106 independent physical cards.",
+    "This session has already been inspected during development; repeat results are diagnostic, not a fresh blind test.",
+    "Labels are reviewer-approved starting outlines, not an independent blind second annotation.",
+    "No verified recognition identities; recognition accuracy cannot be scored.",
+    "Exact-hash exclusion does not prove physical-card or near-duplicate independence.",
+    "No production promotion or checkpoint selection from this session."
+  ]
+}

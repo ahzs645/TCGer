@@ -1,0 +1,595 @@
+{
+  "schema": "tcger-sam31-pilot-summary/v1",
+  "job": {
+    "id": "6aa43a4421047bf1b03778cc",
+    "url": "https://huggingface.co/jobs/ahzs645/6aa43a4421047bf1b03778cc",
+    "inputRevision": "4a2586b037e16c868725652ea8d17bf61d6e73d2",
+    "path": "geometry/sam31-pilots/8a826e7fdc543bb151b024154de73d476eb1c3773de9bcd3cd330faf27af9c79",
+    "outputPath": "geometry/sam31-pilots/8a826e7fdc543bb151b024154de73d476eb1c3773de9bcd3cd330faf27af9c79/outputs/a933e6be1436729880960715e4ab0621fd40d78b4e149c82d8f890f874330416",
+    "codeRevision": "1381333aca404e7edf6b23294db041d644fd4749",
+    "scriptSha256": "a933e6be1436729880960715e4ab0621fd40d78b4e149c82d8f890f874330416",
+    "commandSha256": "05b3e907a67ba2ad240ce3c43173feb458dca8e84a7e998e6cd946c74e3d7c4b",
+    "timeoutSeconds": 1500,
+    "status": "COMPLETED",
+    "priorFailures": [
+      "6aa4376221047bf1b0377781",
+      "6aa4384221047bf1b03777d5",
+      "6aa4395c5527934177ec86bf"
+    ],
+    "resultsVerified": true
+  },
+  "verification": {
+    "passed": true,
+    "repoRevision": "5b961e8e569178fe9675bd3ae0f7ba1c3800c9cb",
+    "jobId": "6aa43a4421047bf1b03778cc",
+    "verifiedFiles": 121,
+    "resultsSha256": "3dec054ae124eab9bd9a78a3d8e8f11161a5b7f7e6fc4f679f78c3fab3b3e0ad",
+    "inputManifestMatches": true,
+    "scriptMatches": true,
+    "complete": true
+  },
+  "referenceCards": 51,
+  "tradingCardMatches": 42,
+  "playingCardMatches": 11,
+  "pooledMatches": 47,
+  "pooledMasks": 96,
+  "pooledUnmatchedOrDuplicateMasks": 49,
+  "promotionEligible": false,
+  "peakGpuAllocatedBytes": 5643970560,
+  "rows": [
+    {
+      "photoId": "P01",
+      "reference": "F6",
+      "recordId": "scan-session-20260909-231206/frame-0005.jpg",
+      "purpose": "recent-regression",
+      "cards": 4,
+      "tradingCard": {
+        "cards": 4,
+        "masks": 5,
+        "matchedAt50": 4,
+        "unmatchedCards": 0,
+        "extraMasks": 1,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 3,
+            "fullOutlineIoU": 0.9443415586365684
+          },
+          {
+            "card": 2,
+            "mask": 5,
+            "fullOutlineIoU": 0.9689637661678168
+          },
+          {
+            "card": 3,
+            "mask": 2,
+            "fullOutlineIoU": 0.9782494199370827
+          },
+          {
+            "card": 4,
+            "mask": 1,
+            "fullOutlineIoU": 0.9699063701327799
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 4,
+        "masks": 4,
+        "matchedAt50": 4,
+        "unmatchedCards": 0,
+        "extraMasks": 0,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 3,
+            "fullOutlineIoU": 0.94458488724251
+          },
+          {
+            "card": 2,
+            "mask": 4,
+            "fullOutlineIoU": 0.9670093234520679
+          },
+          {
+            "card": 3,
+            "mask": 2,
+            "fullOutlineIoU": 0.9784134759145082
+          },
+          {
+            "card": 4,
+            "mask": 1,
+            "fullOutlineIoU": 0.9696494475822142
+          }
+        ]
+      }
+    },
+    {
+      "photoId": "P02",
+      "reference": "F7",
+      "recordId": "scan-session-20260909-231206/frame-0006.jpg",
+      "purpose": "recent-regression",
+      "cards": 5,
+      "tradingCard": {
+        "cards": 5,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 5,
+        "extraMasks": 0,
+        "assignments": []
+      },
+      "playingCard": {
+        "cards": 5,
+        "masks": 5,
+        "matchedAt50": 5,
+        "unmatchedCards": 0,
+        "extraMasks": 0,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 2,
+            "fullOutlineIoU": 0.9884427730860875
+          },
+          {
+            "card": 2,
+            "mask": 5,
+            "fullOutlineIoU": 0.9767721636128077
+          },
+          {
+            "card": 3,
+            "mask": 4,
+            "fullOutlineIoU": 0.9250541125541125
+          },
+          {
+            "card": 4,
+            "mask": 3,
+            "fullOutlineIoU": 0.9708970897089709
+          },
+          {
+            "card": 5,
+            "mask": 1,
+            "fullOutlineIoU": 0.9681811516789208
+          }
+        ]
+      }
+    },
+    {
+      "photoId": "P03",
+      "reference": "F20",
+      "recordId": "scan-session-20260909-231206/frame-0019.jpg",
+      "purpose": "recent-regression",
+      "cards": 3,
+      "tradingCard": {
+        "cards": 3,
+        "masks": 5,
+        "matchedAt50": 3,
+        "unmatchedCards": 0,
+        "extraMasks": 2,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 5,
+            "fullOutlineIoU": 0.9743802242553635
+          },
+          {
+            "card": 2,
+            "mask": 4,
+            "fullOutlineIoU": 0.9700157195892839
+          },
+          {
+            "card": 3,
+            "mask": 3,
+            "fullOutlineIoU": 0.9259692219001714
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 3,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 3,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P04",
+      "reference": "F21",
+      "recordId": "scan-session-20260909-231206/frame-0020.jpg",
+      "purpose": "recent-regression",
+      "cards": 1,
+      "tradingCard": {
+        "cards": 1,
+        "masks": 3,
+        "matchedAt50": 1,
+        "unmatchedCards": 0,
+        "extraMasks": 2,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 2,
+            "fullOutlineIoU": 0.9805876317629606
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 1,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 1,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P05",
+      "reference": "F25",
+      "recordId": "scan-session-20260909-231206/frame-0024.jpg",
+      "purpose": "recent-regression",
+      "cards": 1,
+      "tradingCard": {
+        "cards": 1,
+        "masks": 1,
+        "matchedAt50": 1,
+        "unmatchedCards": 0,
+        "extraMasks": 0,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 1,
+            "fullOutlineIoU": 0.9825648168511595
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 1,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 1,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P06",
+      "reference": "F42",
+      "recordId": "scan-session-20260909-231206/frame-0041.jpg",
+      "purpose": "recent-regression",
+      "cards": 1,
+      "tradingCard": {
+        "cards": 1,
+        "masks": 12,
+        "matchedAt50": 1,
+        "unmatchedCards": 0,
+        "extraMasks": 11,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 7,
+            "fullOutlineIoU": 0.9844806057920812
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 1,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 1,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P07",
+      "reference": "F71",
+      "recordId": "scan-session-20260909-231206/frame-0070.jpg",
+      "purpose": "recent-regression",
+      "cards": 1,
+      "tradingCard": {
+        "cards": 1,
+        "masks": 20,
+        "matchedAt50": 1,
+        "unmatchedCards": 0,
+        "extraMasks": 19,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 18,
+            "fullOutlineIoU": 0.9789347915372578
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 1,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 1,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P08",
+      "reference": "F4",
+      "recordId": "coco-05fb17c99cb9b2a926d4f0d2a1d3494e8b2a75331bd8ead98b5740c478ed0d8a",
+      "purpose": "sideways",
+      "cards": 4,
+      "tradingCard": {
+        "cards": 4,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 4,
+        "extraMasks": 0,
+        "assignments": []
+      },
+      "playingCard": {
+        "cards": 4,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 4,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P09",
+      "reference": "F19",
+      "recordId": "scan-session-20260909-231206/frame-0018.jpg",
+      "purpose": "upside-down",
+      "cards": 2,
+      "tradingCard": {
+        "cards": 2,
+        "masks": 6,
+        "matchedAt50": 2,
+        "unmatchedCards": 0,
+        "extraMasks": 4,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 5,
+            "fullOutlineIoU": 0.9773756425683174
+          },
+          {
+            "card": 2,
+            "mask": 6,
+            "fullOutlineIoU": 0.9273109605381277
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 2,
+        "masks": 5,
+        "matchedAt50": 2,
+        "unmatchedCards": 0,
+        "extraMasks": 3,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 4,
+            "fullOutlineIoU": 0.9779295736907248
+          },
+          {
+            "card": 2,
+            "mask": 5,
+            "fullOutlineIoU": 0.9289153214386859
+          }
+        ]
+      }
+    },
+    {
+      "photoId": "P10",
+      "reference": "F33",
+      "recordId": "scan-session-20260903-110212/frame-0032.jpg",
+      "purpose": "skew",
+      "cards": 1,
+      "tradingCard": {
+        "cards": 1,
+        "masks": 2,
+        "matchedAt50": 1,
+        "unmatchedCards": 0,
+        "extraMasks": 1,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 2,
+            "fullOutlineIoU": 0.9508455218467206
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 1,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 1,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P11",
+      "reference": "F101",
+      "recordId": "coco-12f3cd899e46f847fb5cbe79415f0402f8f972864e30ddd0e7432636be487b1a",
+      "purpose": "overlap",
+      "cards": 13,
+      "tradingCard": {
+        "cards": 13,
+        "masks": 13,
+        "matchedAt50": 13,
+        "unmatchedCards": 0,
+        "extraMasks": 0,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 4,
+            "fullOutlineIoU": 0.8888888888888888
+          },
+          {
+            "card": 2,
+            "mask": 12,
+            "fullOutlineIoU": 0.9304868913857678
+          },
+          {
+            "card": 3,
+            "mask": 1,
+            "fullOutlineIoU": 0.8863602110022607
+          },
+          {
+            "card": 4,
+            "mask": 5,
+            "fullOutlineIoU": 0.8188417486691402
+          },
+          {
+            "card": 5,
+            "mask": 13,
+            "fullOutlineIoU": 0.9499275478988891
+          },
+          {
+            "card": 6,
+            "mask": 10,
+            "fullOutlineIoU": 0.7989966555183946
+          },
+          {
+            "card": 7,
+            "mask": 2,
+            "fullOutlineIoU": 0.9408330703692016
+          },
+          {
+            "card": 8,
+            "mask": 6,
+            "fullOutlineIoU": 0.9710436667698978
+          },
+          {
+            "card": 9,
+            "mask": 3,
+            "fullOutlineIoU": 0.9477447744774478
+          },
+          {
+            "card": 10,
+            "mask": 9,
+            "fullOutlineIoU": 0.957563563197366
+          },
+          {
+            "card": 11,
+            "mask": 11,
+            "fullOutlineIoU": 0.8748495788206979
+          },
+          {
+            "card": 12,
+            "mask": 8,
+            "fullOutlineIoU": 0.9561679304605142
+          },
+          {
+            "card": 13,
+            "mask": 7,
+            "fullOutlineIoU": 0.9114114114114115
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 13,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 13,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    },
+    {
+      "photoId": "P12",
+      "reference": "F8",
+      "recordId": "coco-070ae8ca5c3cfcd6712b1c9fb4a5ab1ae12be4d5529ce1e53c6c9b1f00daf9f5",
+      "purpose": "edge",
+      "cards": 15,
+      "tradingCard": {
+        "cards": 15,
+        "masks": 15,
+        "matchedAt50": 15,
+        "unmatchedCards": 0,
+        "extraMasks": 0,
+        "assignments": [
+          {
+            "card": 1,
+            "mask": 5,
+            "fullOutlineIoU": 0.9222966014418126
+          },
+          {
+            "card": 2,
+            "mask": 9,
+            "fullOutlineIoU": 0.9603623221980262
+          },
+          {
+            "card": 3,
+            "mask": 7,
+            "fullOutlineIoU": 0.9299337700408961
+          },
+          {
+            "card": 4,
+            "mask": 4,
+            "fullOutlineIoU": 0.8760711271333133
+          },
+          {
+            "card": 5,
+            "mask": 3,
+            "fullOutlineIoU": 0.8579896669434449
+          },
+          {
+            "card": 6,
+            "mask": 6,
+            "fullOutlineIoU": 0.9269682254425878
+          },
+          {
+            "card": 7,
+            "mask": 13,
+            "fullOutlineIoU": 0.9771991805955527
+          },
+          {
+            "card": 8,
+            "mask": 12,
+            "fullOutlineIoU": 0.8881380445353215
+          },
+          {
+            "card": 9,
+            "mask": 14,
+            "fullOutlineIoU": 0.925175612217177
+          },
+          {
+            "card": 10,
+            "mask": 1,
+            "fullOutlineIoU": 0.9387697630446152
+          },
+          {
+            "card": 11,
+            "mask": 15,
+            "fullOutlineIoU": 0.8834438382306168
+          },
+          {
+            "card": 12,
+            "mask": 11,
+            "fullOutlineIoU": 0.9503603603603603
+          },
+          {
+            "card": 13,
+            "mask": 10,
+            "fullOutlineIoU": 0.9054760281754147
+          },
+          {
+            "card": 14,
+            "mask": 8,
+            "fullOutlineIoU": 0.9052512259431754
+          },
+          {
+            "card": 15,
+            "mask": 2,
+            "fullOutlineIoU": 0.9595559202886208
+          }
+        ]
+      },
+      "playingCard": {
+        "cards": 15,
+        "masks": 0,
+        "matchedAt50": 0,
+        "unmatchedCards": 15,
+        "extraMasks": 0,
+        "assignments": []
+      }
+    }
+  ]
+}

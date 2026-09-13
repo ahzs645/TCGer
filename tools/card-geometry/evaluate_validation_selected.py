@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from corpus_release import load_json,sha256_file
 from evaluate_geometry_candidate import evaluate
-from recognition_orientation import FOUR_WAY_POLICY
+from recognition_orientation import POLICY as FOUR_WAY_POLICY
 from select_training_validation import select
 
 def run():

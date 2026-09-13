@@ -7,14 +7,16 @@
 </style>
 <main>
 <h1>Your completed session · model comparison</h1>
-<p><a data-backup-status href="http://127.0.0.1:8774/" target="_blank" rel="noopener">Backups</a></p>
+<p><a data-backup-status href="http://127.0.0.1:8774/" target="_blank" rel="noopener">Backups</a> · <a href="http://127.0.0.1:8775/">Angle and position library</a></p>
 <p>75 photos · 106 reviewed card outlines. This page only displays results; your saved labels are unchanged.</p>
 <p>Scores measure agreement with the saved outlines. Some unmatched predictions are partially visible background cards. The four reference spot checks are complete: the points are outside the captured photos, so the reviewed estimates are retained. Labels and scores remain unchanged.</p>
 <div id="summary"></div>
 <p class="legend"><span class="gold">Gold: your saved outline (C#)</span> · <span class="green">Green: baseline prediction (P#)</span> · <span class="blue">Blue: candidate prediction (P#)</span>. Gold dots mark your printed top-left.</p>
-<nav><button id="prev">← Previous</button><select id="photo" aria-label="Photo"></select><button id="next">Next →</button><select id="filter" aria-label="Filter"><option value="all">All photos</option><option value="miss">Missed cards</option><option value="gain">Candidate gains tight outlines</option><option value="loss">Candidate loses tight outlines</option><option value="multi">Multiple cards</option><option value="reference">Completed reference checks</option></select></nav>
+<nav><button id="prev">← Previous</button><select id="photo" aria-label="Photo"></select><button id="next">Next →</button><select id="filter" aria-label="Filter"><option value="all">All photos</option><option value="miss">Missed cards</option><option value="newmiss">Cards missed only by the new model</option><option value="gain">Candidate gains tight outlines</option><option value="loss">Candidate loses tight outlines</option><option value="multi">Multiple cards</option><option value="reference">Completed reference checks</option></select></nav>
 <p id="warning"></p>
 <p id="inspection-note"></p>
+<p id="review-guide" hidden>Review these seven photos using Next / Previous. Compare missing cards and the outer borders against gold; C# identifies your saved card, P# a model prediction. Send observations in chat as “F7 / C2: …”. This page displays results and does not save review decisions.</p>
+<p id="sam-link-row" hidden><a id="sam-link" target="_blank" rel="noopener">Compare both SAM prompts on this photo →</a></p>
 <div class="panels"><section class="panel"><h2>Reviewed-data baseline</h2><div id="base-stats"></div><canvas id="base-overlay" class="overlay"></canvas></section><section class="panel"><h2 id="candidate-title">Candidate</h2><div id="candidate-stats"></div><canvas id="candidate-overlay" class="overlay"></canvas></section></div>
 <p><label>Rectified previews <select id="card"></select></label> · <a id="studio">Open saved corners in the studio</a></p>
 <div id="crops"></div>
@@ -46,7 +48,7 @@ function showSummary(){
 }
 function subset(){
  const previous=frames[index]?.id,filter=$('#filter').value;
- frames=data.frames.filter(f=>filter==='all'||filter==='reference'&&f.inspection?.some(e=>['reference-check','reference-checked'].includes(e.kind))||filter==='multi'&&f.versions.baseline.counts.truth>1||filter==='miss'&&(f.versions.baseline.counts.misses||f.versions.candidate.counts.misses)||['gain','loss'].includes(filter)&&data.targets.some(t=>t.recordId===f.id&&(filter==='gain'?t.candidate?.iou>=.9&&!(t.baseline?.iou>=.9):t.baseline?.iou>=.9&&!(t.candidate?.iou>=.9))));
+ frames=data.frames.filter(f=>filter==='all'||filter==='reference'&&f.inspection?.some(e=>['reference-check','reference-checked'].includes(e.kind))||filter==='newmiss'&&data.targets.some(t=>t.recordId===f.id&&t.baseline&&!t.candidate)||filter==='multi'&&f.versions.baseline.counts.truth>1||filter==='miss'&&(f.versions.baseline.counts.misses||f.versions.candidate.counts.misses)||['gain','loss'].includes(filter)&&data.targets.some(t=>t.recordId===f.id&&(filter==='gain'?t.candidate?.iou>=.9&&!(t.baseline?.iou>=.9):t.baseline?.iou>=.9&&!(t.candidate?.iou>=.9))));
  $('#photo').replaceChildren(...frames.map((f,i)=>new Option(`${f.reference} · ${f.key.split('/').at(-1)} · ${f.versions.baseline.counts.truth} cards`,i)));
  index=Math.max(0,frames.findIndex(f=>f.id===previous));
  $('#prev').disabled=$('#next').disabled=!frames.length;
@@ -62,10 +64,14 @@ function paint(canvas,image,truth,predicted,color){
 }
 async function show(){
  const generation=++load,f=frames[index];pixels=null;$('#photo').value=index;
- history.replaceState(null,'',`?photo=${f.reference}`);
+ const query=new URLSearchParams({photo:f.reference});if($('#filter').value!=='all')query.set('filter',$('#filter').value);history.replaceState(null,'','?'+query);
  $('#base-stats').textContent=counts(f.versions.baseline);$('#candidate-stats').textContent=counts(f.versions.candidate);
  $('#warning').textContent=`${f.reference}: ${f.versions.baseline.reasons.length?'Baseline: '+f.versions.baseline.reasons.join('; ')+'. ':''}${f.versions.candidate.reasons.length?candidateLabel+': '+f.versions.candidate.reasons.join('; '):candidateLabel+' agrees closely with the saved outlines.'}`;
  $('#inspection-note').textContent=(f.inspection||[]).map(e=>e.observation).join(' ');
+ $('#review-guide').hidden=$('#filter').value!=='newmiss';
+ const samPhoto=(f.inspection||[]).find(e=>/^P\d{2}$/.test(e.samPhotoId||''))?.samPhotoId;
+ $('#sam-link-row').hidden=!samPhoto;
+ if(samPhoto)$('#sam-link').href=`../../sam31-pilot/?photo=${encodeURIComponent(samPhoto)}`;
  $('#card').replaceChildren(...f.versions.baseline.referenceInstances.map((t,i)=>new Option(`Card ${i+1}`,i)));
  $('#frame-detail').textContent=JSON.stringify({baseline:f.versions.baseline,candidate:f.versions.candidate},null,2);
  const image=new Image();image.src=f.imageUrl;await image.decode();if(generation!==load)return;
@@ -90,5 +96,5 @@ function crops(){
  $('#crops').replaceChildren(...entries.map(([title,q,note])=>{const div=document.createElement('div');div.className='crop';const strong=document.createElement('strong');strong.textContent=title;div.append(strong);if(q){const canvas=document.createElement('canvas');canvas.width=140;canvas.height=196;try{const p=G.rectify(pixels,q,140,196);canvas.getContext('2d').putImageData(new ImageData(p.data,p.width,p.height),0,0);}catch(e){note=e.message;}div.append(canvas);}const text=document.createElement('p');text.textContent=note;div.append(text);return div;}));
 }
 $('#prev').onclick=()=>{index=(index-1+frames.length)%frames.length;show();};$('#next').onclick=()=>{index=(index+1)%frames.length;show();};$('#photo').onchange=e=>{index=Number(e.target.value);show();};$('#filter').onchange=subset;$('#card').onchange=crops;
-fetch('data.json').then(r=>r.json()).then(payload=>{data=payload;candidateLabel=data.models.candidate.id==='cyclic-epoch50'?'Cyclic epoch 50':data.models.candidate.id==='orientation-validation-selected'?'Validation-selected YOLO11s':data.models.candidate.id;$('#candidate-title').textContent=candidateLabel;showSummary();const requested=new URL(location.href).searchParams.get('photo');frames=data.frames;index=Math.max(0,frames.findIndex(f=>f.reference===requested));subset();}).catch(e=>$('#warning').textContent=e.message);
+fetch('data.json', {cache:'no-store'}).then(r=>r.json()).then(payload=>{data=payload;candidateLabel=data.models.candidate.id==='cyclic-epoch50'?'Cyclic epoch 50':data.models.candidate.id==='orientation-validation-selected'?'Validation-selected YOLO11s':data.models.candidate.id;$('#candidate-title').textContent=candidateLabel;showSummary();const params=new URL(location.href).searchParams,requested=params.get('photo'),filter=params.get('filter');if([...$('#filter').options].some(o=>o.value===filter))$('#filter').value=filter;frames=data.frames;index=Math.max(0,frames.findIndex(f=>f.reference===requested));subset();}).catch(e=>$('#warning').textContent=e.message);
 </script>

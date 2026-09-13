@@ -1,6 +1,10 @@
 # Card geometry: current handoff and lessons
 
-Updated locally through September 10, 2026. The September 9 implementation and detailed experiment reports were pushed to `main` in `405d157a`, including the preceding experiment history. The subsequent session/editor work and comparison are recorded below; this statement does not claim those later local changes have been pushed. Older dated reports preserve what was known at the time.
+**September 11 library and SAM update:** the [angle/position library](CARD-COVERAGE-LIBRARY.md) inventories current releases and saved reviews, including 1,316 human-reviewed real outlines. Border-axis angles are measurable without a printed-top flag; 610 reviewed outlines still have unknown printed orientation. A completed [SAM 3.1 inference pilot](benchmarks/2026-09-11-sam31-pilot/README.md) pooled two fixed prompts and matched 47/51 saved outlines on 12 selected photos. It is a labeling-assistance trial, not a production replacement or directly comparable YOLO benchmark. No additional supervised model was trained for this pilot.
+
+**September 11 update:** the one-model orientation-validation follow-up is complete through checkpoint selection and the frozen 75-photo comparison. Epoch 50 was selected on validation, but the baseline still wins: 96/106 found and 40 tight outlines versus 86 found and 33 tight. Keep the baseline. The seven photos with newly missed cards are prepared in the comparison gallery. See the [completed results and recovery](benchmarks/2026-09-10-orientation-validation-yolo11s/README.md). Earlier prerequisite and next-run paragraphs below describe prior stages; no additional training job is currently pending.
+
+Updated locally through September 11, 2026. The September 9 implementation and detailed experiment reports were pushed to `main` in `405d157a`, including the preceding experiment history. The subsequent session/editor work and comparison are recorded below; this statement does not claim those later local changes have been pushed. Older dated reports preserve what was known at the time.
 
 ## Current decision
 

@@ -1,0 +1,291 @@
+{
+  "schema": "tcger-regression-visual-review/v1",
+  "date": "2026-09-13",
+  "comparisonSha256": "fc93a730c876d2961f9ef1c1468cb251f5d7fe0525f9a88444e1da754e75f039",
+  "samResultsSha256": "3dec054ae124eab9bd9a78a3d8e8f11161a5b7f7e6fc4f679f78c3fab3b3e0ad",
+  "scope": "Assistant observations and saved-output diagnostics; human review pending. No labels, metrics, thresholds or predictions changed.",
+  "entries": [
+    {
+      "reference": "F6",
+      "kind": "qualitative-review",
+      "author": "assistant",
+      "humanReviewStatus": "pending",
+      "samPhotoId": "P01",
+      "observation": "Angled cards on the desk. Check C2 (top-left Bombirdier): a candidate outline exists, but it is displaced/shrunken and its IoU is 0.482, just below the 0.50 matching cutoff. Baseline finds 4/4; candidate 3/4. This is a border-placement failure, not a complete absence of a prediction. The partially visible green card at the right is outside the four saved targets.",
+      "candidateBestOverlap": [
+        {
+          "card": "C1",
+          "bestCandidate": {
+            "prediction": "P3",
+            "iou": 0.7674759488892435,
+            "confidence": 0.676594614982605
+          }
+        },
+        {
+          "card": "C2",
+          "bestCandidate": {
+            "prediction": "P4",
+            "iou": 0.48213336662756573,
+            "confidence": 0.22021827101707458
+          }
+        },
+        {
+          "card": "C3",
+          "bestCandidate": {
+            "prediction": "P2",
+            "iou": 0.7877753417864506,
+            "confidence": 0.8706514835357666
+          }
+        },
+        {
+          "card": "C4",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.8434238547908557,
+            "confidence": 0.9627861976623535
+          }
+        }
+      ],
+      "samPrompts": {
+        "trading card": {
+          "matched": 4,
+          "targets": 4,
+          "masks": 5
+        },
+        "playing card": {
+          "matched": 4,
+          "targets": 4,
+          "masks": 4
+        }
+      }
+    },
+    {
+      "reference": "F7",
+      "kind": "qualitative-review",
+      "author": "assistant",
+      "humanReviewStatus": "pending",
+      "samPhotoId": "P02",
+      "observation": "Five separated desk cards at a steeper view. Baseline finds 4/5; candidate keeps only one prediction (C5, lower-right Trainer), with 0.077 confidence. SAM: \u201ctrading card\u201d returns zero masks; \u201cplaying card\u201d returns all five. Check the three cards only the baseline finds (C1, C2, C3), plus C4 missed by both YOLO models. This demonstrates SAM prompt sensitivity; the cause of the YOLO regression remains unproven.",
+      "candidateBestOverlap": [
+        {
+          "card": "C1",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.0,
+            "confidence": 0.07749349623918533
+          }
+        },
+        {
+          "card": "C2",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.0,
+            "confidence": 0.07749349623918533
+          }
+        },
+        {
+          "card": "C3",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.0,
+            "confidence": 0.07749349623918533
+          }
+        },
+        {
+          "card": "C4",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.0,
+            "confidence": 0.07749349623918533
+          }
+        },
+        {
+          "card": "C5",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.7357049762590827,
+            "confidence": 0.07749349623918533
+          }
+        }
+      ],
+      "samPrompts": {
+        "trading card": {
+          "matched": 0,
+          "targets": 5,
+          "masks": 0
+        },
+        "playing card": {
+          "matched": 5,
+          "targets": 5,
+          "masks": 5
+        }
+      }
+    },
+    {
+      "reference": "F20",
+      "kind": "qualitative-review",
+      "author": "assistant",
+      "humanReviewStatus": "pending",
+      "samPhotoId": "P03",
+      "observation": "Upside-down Slowpoke over another card, with two saved background targets. Baseline finds 3/3; candidate has five predictions clustered inside the foreground card, all above 0.91 confidence, but none matches a full saved outline. Best foreground IoU is 0.429. Check whether the blue corners follow internal artwork/text instead of the outside border; distinguish background cards from the partially covered card beneath Slowpoke.",
+      "candidateBestOverlap": [
+        {
+          "card": "C1",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.4286394328795799,
+            "confidence": 0.9602351188659668
+          }
+        },
+        {
+          "card": "C2",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.0,
+            "confidence": 0.9602351188659668
+          }
+        },
+        {
+          "card": "C3",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.0,
+            "confidence": 0.9602351188659668
+          }
+        }
+      ],
+      "samPrompts": {
+        "trading card": {
+          "matched": 3,
+          "targets": 3,
+          "masks": 5
+        },
+        "playing card": {
+          "matched": 0,
+          "targets": 3,
+          "masks": 0
+        }
+      }
+    },
+    {
+      "reference": "F21",
+      "kind": "qualitative-review",
+      "author": "assistant",
+      "humanReviewStatus": "pending",
+      "samPhotoId": "P04",
+      "observation": "Large upside-down Bombirdier. Baseline finds the full card, although its printed-corner order differs. Candidate makes two confident inner-card outlines (0.984 and 0.958 confidence); best IoU is only 0.169. Check outer border placement separately from the direction of the rectified crop.",
+      "candidateBestOverlap": [
+        {
+          "card": "C1",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.1686136612365355,
+            "confidence": 0.9844369888305664
+          }
+        }
+      ],
+      "samPrompts": {
+        "trading card": {
+          "matched": 1,
+          "targets": 1,
+          "masks": 3
+        },
+        "playing card": {
+          "matched": 0,
+          "targets": 1,
+          "masks": 0
+        }
+      }
+    },
+    {
+      "reference": "F25",
+      "kind": "qualitative-review",
+      "author": "assistant",
+      "humanReviewStatus": "pending",
+      "samPhotoId": "P05",
+      "observation": "Nickit at a shallow view, with strong foreshortening and some blur. The candidate outline extends upward into the desk background: IoU 0.482, confidence 0.929. Baseline finds the card but also has a substantial border difference. Check the top edge and perspective shape; this is a localization failure near the matching cutoff.",
+      "candidateBestOverlap": [
+        {
+          "card": "C1",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.48232242303643225,
+            "confidence": 0.9292687773704529
+          }
+        }
+      ],
+      "samPrompts": {
+        "trading card": {
+          "matched": 1,
+          "targets": 1,
+          "masks": 1
+        },
+        "playing card": {
+          "matched": 0,
+          "targets": 1,
+          "masks": 0
+        }
+      }
+    },
+    {
+      "reference": "F42",
+      "kind": "qualitative-review",
+      "author": "assistant",
+      "humanReviewStatus": "pending",
+      "samPhotoId": "P06",
+      "observation": "Trainer card on a stack. Baseline finds the full foreground card; candidate predicts nested inner outlines, best IoU 0.390 at 0.964 confidence. Check the outer silver border and separate it from cards underneath. SAM follows the main card but produces 12 masks including background cards/fragments; those masks are not all false detections.",
+      "candidateBestOverlap": [
+        {
+          "card": "C1",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.3902795629120188,
+            "confidence": 0.9640017151832581
+          }
+        }
+      ],
+      "samPrompts": {
+        "trading card": {
+          "matched": 1,
+          "targets": 1,
+          "masks": 12
+        },
+        "playing card": {
+          "matched": 0,
+          "targets": 1,
+          "masks": 0
+        }
+      }
+    },
+    {
+      "reference": "F71",
+      "kind": "qualitative-review",
+      "author": "assistant",
+      "humanReviewStatus": "pending",
+      "samPhotoId": "P07",
+      "observation": "Blue German-language card above overlapping cards. Baseline follows the full card; candidate predicts a narrower inner outline, IoU 0.498 at 0.979 confidence, just below the matching cutoff. Check left/right borders and the bottom edge. SAM finds the main target but also segments many background cards/fragments; language is an observation, not an established cause.",
+      "candidateBestOverlap": [
+        {
+          "card": "C1",
+          "bestCandidate": {
+            "prediction": "P1",
+            "iou": 0.4982101513324398,
+            "confidence": 0.9793922305107117
+          }
+        }
+      ],
+      "samPrompts": {
+        "trading card": {
+          "matched": 1,
+          "targets": 1,
+          "masks": 20
+        },
+        "playing card": {
+          "matched": 0,
+          "targets": 1,
+          "masks": 0
+        }
+      }
+    }
+  ]
+}

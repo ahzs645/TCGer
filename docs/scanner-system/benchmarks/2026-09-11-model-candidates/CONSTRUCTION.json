@@ -1,0 +1,39 @@
+{
+  "ultralyticsVersion": "8.4.138",
+  "method": "Constructed random-initialized one-class, four-keypoint models from installed official configurations on CPU. No pretrained weights downloaded, no training, no performance measurement.",
+  "models": [
+    {
+      "model": "yolo11s-pose",
+      "parameters": 9715447,
+      "keypointShape": [
+        4,
+        3
+      ],
+      "headType": "Pose",
+      "end2end": false,
+      "sourceConfigSha256": "756393f55051c43f21fa39900b4a9610ebc5bf2c750946b4b5e92dd6439dbe69"
+    },
+    {
+      "model": "yolo11m-pose",
+      "parameters": 20904759,
+      "keypointShape": [
+        4,
+        3
+      ],
+      "headType": "Pose",
+      "end2end": false,
+      "sourceConfigSha256": "756393f55051c43f21fa39900b4a9610ebc5bf2c750946b4b5e92dd6439dbe69"
+    },
+    {
+      "model": "yolo26s-pose",
+      "parameters": 10578542,
+      "keypointShape": [
+        4,
+        3
+      ],
+      "headType": "Pose26",
+      "end2end": true,
+      "sourceConfigSha256": "07ba82d9637023f261e526c38fa9aeb8ab05d911766ffd8cf4f48cd33f27188d"
+    }
+  ]
+}
