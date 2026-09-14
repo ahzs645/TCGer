@@ -1,0 +1,29 @@
+{
+  "runs": [
+    {
+      "run": "rotation-seed-20260905",
+      "epochs": 50,
+      "selectedEpoch": 50,
+      "realFound": 664,
+      "realTight": 544,
+      "verified": true
+    },
+    {
+      "run": "control-seed-20260906",
+      "epochs": 50,
+      "selectedEpoch": 40,
+      "realFound": 679,
+      "realTight": 524,
+      "verified": true
+    },
+    {
+      "run": "rotation-seed-20260906",
+      "epochs": 50,
+      "selectedEpoch": 50,
+      "realFound": 669,
+      "realTight": 556,
+      "verified": true
+    }
+  ],
+  "finalCommonComparisonComplete": false
+}

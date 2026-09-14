@@ -71,7 +71,7 @@ def prepare_cpu(api,models):
  write(ROOT/'paired-cpu-config.json',config)
  commit=api.create_commit(repo_id=HUB,operations=[CommitOperationAdd(path_in_repo=toolpath,path_or_fileobj=str(archive)),CommitOperationAdd(path_in_repo=prefix+'/config.json',path_or_fileobj=str(ROOT/'paired-cpu-config.json')),CommitOperationAdd(path_in_repo=prefix+'/protocol.json',path_or_fileobj=str(ROOT/'analysis-protocol.json'))],commit_message='Freeze common CPU evaluation of the four selected paired checkpoints')
  pre=cfg['corpus']['preflightReport'];cmd=bootstrap_command(candidate='yolo11s-pose',checkpoint_repo=HUB,hub_revision=commit.oid,tooling_path=toolpath,tooling_sha=sha(archive),config_path=prefix+'/config.json',config_sha=sha(ROOT/'paired-cpu-config.json'),pipeline_smoke=False,preflight_path=pre['path'],preflight_sha=pre['sha256'])
- cmd[-1]=cmd[-1].rsplit('\n',1)[0]+'\nexport OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1\npython tools/card-geometry/run_paired_geometry_audit_hf.py --config /work/experiment.json --output /work/paired-audit\n'
+ cmd[-1]=cmd[-1].rsplit('\n',1)[0]+'\npython -m pip install --no-cache-dir scipy==1.15.3\npython -c "import scipy.optimize"\nexport OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1\npython tools/card-geometry/run_paired_geometry_audit_hf.py --config /work/experiment.json --output /work/paired-audit\n'
  spec=dict(image=PYTORCH_26_IMAGE,command=cmd,flavor='cpu-upgrade',timeout='2h',name='tcger-paired-rotation-cpu-audit',labels={'tcger-batch':'rotation-augmentation-20260913','tcger-phase':'paired-cpu-audit'})
  write(file,spec);write(ROOT/'paired-cpu-publication.json',dict(revision=commit.oid,configSha256=sha(ROOT/'paired-cpu-config.json'),specSha256=sha(file),outputPrefix=config['outputPrefix']))
  return spec

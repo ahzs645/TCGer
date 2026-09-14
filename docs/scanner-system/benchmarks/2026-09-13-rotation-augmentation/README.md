@@ -1,5 +1,7 @@
 # Two-seed rotation experiment and checkpoint-selection backtest
 
+**September 14 recovery update:** All three Hugging Face training jobs completed all 50 epochs, checkpoint selection, individual real/synthetic evaluation and historical recognition replay. Local checkpoint/report/prediction hashes were rechecked. Selection chose epoch 40 for the extra control and epoch 50 for both rotation seeds. The common CPU audit job `6aa7a0125527934177edc727` failed before inference because its environment lacked SciPy. The launch command now explicitly installs and imports SciPy. No training was repeated and no replacement cloud job was submitted. The same four selected checkpoints are now being evaluated through the frozen common CPU code locally under `.artifacts/card-geometry/augmentation-20260913/paired-local`; status and final output are mirrored to Reference. Do not interpret individual GPU metrics as the completed common-CPU endpoint. The local recovery script and pinned protocol are retained with the experiment artifacts. Earlier launch status below is historical.
+
 September 13, 9:39 p.m. PDT: the checkpoint backtest is complete and all three L4 jobs are submitted. The control is running; both rotation seeds are waiting for hardware at this check. This is a declared experiment, not a model promotion. The already completed September 10 split / fixed-order / seed 20260905 run supplies the first control.
 
 ## Frozen choices before new inference
