@@ -1,0 +1,197 @@
+{
+  "passed": true,
+  "checkedAt": "2026-09-14T03:24:45.505239+00:00",
+  "verifiedOutputFiles": 56,
+  "resultsSha256": "06dcba900adbd17d2a5711994f33854599728cb18f7b52fd24dbe30ad2ad4a99",
+  "receipts": {
+    "newFixedFinal": {
+      "passed": true,
+      "protocolSha256": "d5a45ddc7768f7cc8349c6fb5cf6c279c5b88c35e25b6eb12256c9fad11478d1",
+      "checkpointSha256": "f20b7e3da3557948e61dc429d5235c8c45a7467d94d2d83c4282205ef89111ad",
+      "completedAt": "2026-09-14T02:14:35.137947+00:00",
+      "elapsedSeconds": 4170.407582792002,
+      "files": {
+        "real.predictions.jsonl": "8371f185647551a801a07e9f605c8c9fec86cb8d6735a6cef1b54612a673082a",
+        "synthetic.overlap.json": "9a3bacc66dfd6e22f576d08a7d3e1867b460319cad68d7b413dbd9b28c805f0f",
+        "synthetic.predictions.jsonl": "ea165a37528063ab926a9be1f936aedac328ca95ad61bdc9613cf182b8a1acd9",
+        "real.benchmark.json": "8310ef627fd155f4a4af4dc7da8b9b6b144a834c97eb77cdaca196bfe883f8b1",
+        "recognition-replay.json": "317799c29b1a95dbf3386a78dd6d8a8a1afcb76fd9c20c9c286455bad1b4c4cb",
+        "synthetic.benchmark.json": "c367b63844996a91c3f5ef595c0eaf92d7824b46869767805445bb65bc17729f",
+        "protocol.json": "151d24c9f5f3d59b1bd23f81925852251b3d109d0480f137a812af2a60b43672",
+        "real.overlap.json": "cef8cf392f9ea9bf4e8c67a170b4f65fce7514b5c28809dbdd7affca08490413"
+      },
+      "recognition": {
+        "frames": 57,
+        "correct": 4,
+        "wrong": 1,
+        "abstain": 7,
+        "correctReject": 0,
+        "unknown": 45
+      },
+      "sourceLabelChanges": false,
+      "productionPromotion": false
+    },
+    "newSeedFinal": {
+      "passed": true,
+      "protocolSha256": "d5a45ddc7768f7cc8349c6fb5cf6c279c5b88c35e25b6eb12256c9fad11478d1",
+      "checkpointSha256": "dff4e1fa87fb6bc69e15e4e5eb2ba1b301f86742a9cfbd7759a95bbb412056dc",
+      "completedAt": "2026-09-14T02:14:45.656603+00:00",
+      "elapsedSeconds": 4180.998812459002,
+      "files": {
+        "real.predictions.jsonl": "f667c1c1bec029f09c2ac510bdd50b6a3fba2d7c898d8d80549d12f8c472fbd7",
+        "synthetic.overlap.json": "105281e6864f0067a96c1cf0a19523dc0d4cd0cc3dc5e5671f74b9a893b29f42",
+        "synthetic.predictions.jsonl": "72702fff6004b240b15aaa198bed2e210a20d3d12de30cdc3a5779f12fea3626",
+        "real.benchmark.json": "d986072d21f8ad88435b6dfbe22339fa9d8b750158b24d9d18bcd4f3534cc58d",
+        "recognition-replay.json": "eefc8392577e6d1c815c421c7178b9aa1de4f7fc009ee919f6a1dd1c9d7fbf4b",
+        "synthetic.benchmark.json": "35a97c38199ddd8eb7e117e50f7e85d30fb5f0a71d4fe6c0af3ba87f9cd1a387",
+        "protocol.json": "3ef14e71a788f58d73ec929a890ebbbeaf804804f7012be5cd56a7b12b4f3763",
+        "real.overlap.json": "fe989d166addea6405382bdb8c3ace4738636a8072c7cf0fb4646f4d00bc0a4f"
+      },
+      "recognition": {
+        "frames": 57,
+        "correct": 4,
+        "wrong": 1,
+        "abstain": 7,
+        "correctReject": 0,
+        "unknown": 45
+      },
+      "sourceLabelChanges": false,
+      "productionPromotion": false
+    },
+    "oldFixedFinal": {
+      "passed": true,
+      "protocolSha256": "d5a45ddc7768f7cc8349c6fb5cf6c279c5b88c35e25b6eb12256c9fad11478d1",
+      "checkpointSha256": "a814b2a20d8ae1679a2ba14a4f7c2c3341cf006687a8afeeb4fbe0d8b74f6056",
+      "completedAt": "2026-09-14T02:22:46.651498+00:00",
+      "elapsedSeconds": 487.4693570840027,
+      "files": {
+        "real.predictions.jsonl": "af866c925af9f2bca3cd550a8bc500a017e7384432f680da55c20ef2eca61859",
+        "synthetic.overlap.json": "97674ece0b0c76bc6989a144448606a92b5f51e6671cccf4a5f60eb9bc9443e4",
+        "synthetic.predictions.jsonl": "2cc8f32858cc3ee8a66b08e88a8bbcd4348d2658f0cff272f3c8cddf5ee0459e",
+        "real.benchmark.json": "826454639bab4c6b0bc7ec11c7b39626a1a96ae3e6ebab4374cceb14ceb7bf6a",
+        "recognition-replay.json": "51998f5ffb9297adcdaf2efc3c6f69ba090a1760c23b989e577ebd1f1873745b",
+        "synthetic.benchmark.json": "255eb7ca19d0d56a1c34571cf32110fb1797a160ca49a3847af4d76949b96a11",
+        "protocol.json": "bd5dbcf5e5d4bcfc73bfd1ead96979b87d541f7b3d3e2f064f5a21fa69de08d8",
+        "real.overlap.json": "abee7a880d6c31c5c753f118ed3208aa7f5d568b17f31bff94c47d424608c3bb"
+      },
+      "recognition": {
+        "frames": 57,
+        "correct": 4,
+        "wrong": 1,
+        "abstain": 7,
+        "correctReject": 0,
+        "unknown": 45
+      },
+      "sourceLabelChanges": false,
+      "productionPromotion": false
+    },
+    "newSeedBest": {
+      "passed": true,
+      "protocolSha256": "d5a45ddc7768f7cc8349c6fb5cf6c279c5b88c35e25b6eb12256c9fad11478d1",
+      "checkpointSha256": "1a62ae263c35211307ce5f7e72b136d8e36340d974a84746aeda89f9c339f2fc",
+      "completedAt": "2026-09-14T02:22:57.016712+00:00",
+      "elapsedSeconds": 488.6305945839995,
+      "files": {
+        "real.predictions.jsonl": "7ce16900bba34b84e75248e06948ca0545dc3906d3ad222fcaad17b518f47a7c",
+        "synthetic.overlap.json": "b3a15701f677654b7855ff197cb213ea0f26bf9ab1ed653b9aa03f5cd6ee6abe",
+        "synthetic.predictions.jsonl": "e1686af09b6b5e9be1f89d16d56291dce4cc7302e14c77ee691c4ce806137b21",
+        "real.benchmark.json": "6b226ecb3ca2d7993c7291e17841820cfe3fb0a594fed172f688667f4477039b",
+        "recognition-replay.json": "747c50f9798c28d72da9b45426a2b8d968d2d86f17b57d6e28ac092f4c34a3bf",
+        "synthetic.benchmark.json": "e02441ad104726c43efbfa9cba67ea5e93b28a656bb9448633551a30f711b555",
+        "protocol.json": "c65335acdf077e29191a03de63e4d45ed03df5cb86f56390a7c3ad3c02a3a627",
+        "real.overlap.json": "dbe60e1083bf41ac7f31abef88875a4ccd92b7fd53cf60ce78fc030e8947f2fa"
+      },
+      "recognition": {
+        "frames": 57,
+        "correct": 4,
+        "wrong": 1,
+        "abstain": 7,
+        "correctReject": 0,
+        "unknown": 45
+      },
+      "sourceLabelChanges": false,
+      "productionPromotion": false
+    },
+    "oldCyclicFinal": {
+      "passed": true,
+      "protocolSha256": "d5a45ddc7768f7cc8349c6fb5cf6c279c5b88c35e25b6eb12256c9fad11478d1",
+      "checkpointSha256": "54af5ba715e3620cfd74cbb6e85f85aa1ad7162db9dad3a120a56cf91ea711df",
+      "completedAt": "2026-09-14T02:27:28.486269+00:00",
+      "elapsedSeconds": 274.9187869999878,
+      "files": {
+        "real.predictions.jsonl": "3c6cab754c95ef28389b972fe6d00457bb64838d4a8fb7a0445cab2e3d415af4",
+        "synthetic.overlap.json": "68fdbe8591ec411046838c00329bbfdc50da1ebc507355d086babd997bb12550",
+        "synthetic.predictions.jsonl": "610ab464646f43a6856de8b2e0eb3add5bd8d8fe80c3feb7341bb2672b1aca62",
+        "real.benchmark.json": "f6fb135c4748f75a6f016afb6765d0be8a61eb267590d0bb41b6821d3a7e48a1",
+        "recognition-replay.json": "36bf0b3b4aef7feabbf7058901438a13e1c31f1ccf7dee1ad324183408a4012c",
+        "synthetic.benchmark.json": "593a72f768eef353703429487f912b64f9d18879f26d89b8836e3944eea2c60d",
+        "protocol.json": "f67d403c3515e6cb91eb08300356e3687e83f605e8db8b936d4fec3713952bfd",
+        "real.overlap.json": "9e206f46c6e0b724c7a3135820897fbea8e557f80923163cc4f898f7c8c76940"
+      },
+      "recognition": {
+        "frames": 57,
+        "correct": 4,
+        "wrong": 1,
+        "abstain": 8,
+        "correctReject": 0,
+        "unknown": 44
+      },
+      "sourceLabelChanges": false,
+      "productionPromotion": false
+    },
+    "newCyclicFinal": {
+      "passed": true,
+      "protocolSha256": "d5a45ddc7768f7cc8349c6fb5cf6c279c5b88c35e25b6eb12256c9fad11478d1",
+      "checkpointSha256": "13c2eb19b41a03ef1a68a6d2dacb4f480f57c9d25ffdf54046f24f3b6f62c7de",
+      "completedAt": "2026-09-14T02:27:29.065231+00:00",
+      "elapsedSeconds": 268.4457162500039,
+      "files": {
+        "real.predictions.jsonl": "f27e40d315cf91bb5e7df0ecf57dff09e0b00d8e9f52dae88ba1ce5d875a340d",
+        "synthetic.overlap.json": "fb1d32b878e245c5d6ae48589e7e569b84b49a06634a775c5f3e8079c1ca4fbf",
+        "synthetic.predictions.jsonl": "f60329fde2dbfaf57ac23707336825a7688244fb16287e8b9b7a8d61548046f6",
+        "real.benchmark.json": "3acf97e322603ab9c69ba896a356e45f80300eb3350b1ba94100115f100b08ad",
+        "recognition-replay.json": "cabc20795e3b52f83f6ede1c049ffb6d44fbf5d3e2bb34d804227b61e85c8718",
+        "synthetic.benchmark.json": "9edcb8c8446d8c1548222e071f2c65399dbf6401cc1d7814872052277424c926",
+        "protocol.json": "633de94b64466d241b8f2d98f5d79042ce0b77c13fe38a786e7c275b9729c5c8",
+        "real.overlap.json": "478ea49b44348c0db5f686a288663995ba5c6e2b9e90ab3d48e7fe2dee7825e4"
+      },
+      "recognition": {
+        "frames": 57,
+        "correct": 4,
+        "wrong": 1,
+        "abstain": 7,
+        "correctReject": 0,
+        "unknown": 45
+      },
+      "sourceLabelChanges": false,
+      "productionPromotion": false
+    },
+    "oldFixedBest": {
+      "passed": true,
+      "protocolSha256": "d5a45ddc7768f7cc8349c6fb5cf6c279c5b88c35e25b6eb12256c9fad11478d1",
+      "checkpointSha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327",
+      "completedAt": "2026-09-14T02:30:33.728676+00:00",
+      "elapsedSeconds": 183.12981224998657,
+      "files": {
+        "real.predictions.jsonl": "2cae742549a87b0b5b42475d6c15ef684810c2c2098c406758e01cd75169f1aa",
+        "synthetic.overlap.json": "fc0d13010591550699885ec6c21ef4d2ba141a45dd4432afe447ce74493ee3cf",
+        "synthetic.predictions.jsonl": "2ba030e3fb5e61998a7feef42ef9433cb862d83e89e27c7bd1296db57dd6d2b7",
+        "real.benchmark.json": "42224d40123b62b74f65ca7f7f739b43c2a621efddbf08562bbb40500b2f4e10",
+        "recognition-replay.json": "4c577150f75924d4555ce68f07bc9aac28959cde462033c789e4a152bdda5090",
+        "synthetic.benchmark.json": "a5e16a0cda8acb6eeb6c81c7399f862bda93ff5d0805f4da414b07b2cab89dcf",
+        "protocol.json": "495bfe13bb077f8d4f5350b4f1e49b7be247ce76d512ab259c0b697c8a597f49",
+        "real.overlap.json": "c92eae8ad54acf095d38efffa9914b0f351fb59395f58636fdd227b576f5fd65"
+      },
+      "recognition": {
+        "frames": 57,
+        "correct": 4,
+        "wrong": 1,
+        "abstain": 7,
+        "correctReject": 0,
+        "unknown": 45
+      },
+      "sourceLabelChanges": false,
+      "productionPromotion": false
+    }
+  }
+}
