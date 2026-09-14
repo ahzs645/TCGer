@@ -1,0 +1,11 @@
+.build/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+node_modules/
+prototype/output/
+prototype/tcgcsv-output/
+prototype/tcgcsv-cache/
+__pycache__/
+
+prototype/mobile-output/

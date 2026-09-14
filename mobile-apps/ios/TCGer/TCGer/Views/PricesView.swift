@@ -489,7 +489,8 @@ struct PricesView: View {
 
     @MainActor
     private func refreshTrackedPrices(force: Bool) async {
-        guard !isRefreshingPrices, let token = environmentStore.authToken else { return }
+        guard !isRefreshingPrices, environmentStore.serverConfiguration.isOnDevice || environmentStore.authToken != nil else { return }
+        let token = environmentStore.authToken ?? ""
         let items = collections.flatMap(\.cards).flatMap { card in
             collectionPricingLots(for: card).map { lot in
                 APIService.TrackedPriceItem(
@@ -518,6 +519,9 @@ struct PricesView: View {
         isRefreshingPrices = true
         defer { isRefreshingPrices = false }
         do {
+            if environmentStore.serverConfiguration.isOnDevice {
+                for result in await apiService.getCachedPokemonPrices(items: items) { livePrices[result.lookupKey] = result }
+            }
             let response = try await apiService.getTrackedPrices(
                 config: environmentStore.serverConfiguration,
                 token: token,

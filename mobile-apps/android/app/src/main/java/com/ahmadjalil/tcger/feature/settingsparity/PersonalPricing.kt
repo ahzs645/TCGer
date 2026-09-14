@@ -54,7 +54,11 @@ fun selectPersonalQuote(payload: JsonObject, owned: OwnedCard, condition: String
         }.singleOrNull()?.get("price")?.jsonPrimitive?.doubleOrNull?.takeIf { it.isFinite() && it > 0 }
 }
 
-class PersonalPricingClient(private val store: PersonalPricingStore, private val source: (String) -> String) {
+class PersonalPricingClient(
+    private val store: PersonalPricingStore,
+    private val direct: com.ahmadjalil.tcger.data.pricing.TcgCsvPriceClient? = null,
+    private val source: (String) -> String,
+) {
     private val client = OkHttpClient.Builder().callTimeout(java.time.Duration.ofSeconds(20)).build()
     suspend fun test(): Long = withContext(Dispatchers.IO) {
         val start = System.nanoTime()
@@ -67,7 +71,9 @@ class PersonalPricingClient(private val store: PersonalPricingStore, private val
         check(it.isSuccessful) { "Pricing provider returned ${it.code}. Check your configuration and try again." }
         Json.parseToJsonElement(requireNotNull(it.body).string()).jsonObject
     }
-    suspend fun refresh(binders: List<Binder>, portfolio: PricePortfolio): PricePortfolio = withContext(Dispatchers.IO) {
+    suspend fun cached(binders: List<Binder>, portfolio: PricePortfolio): PricePortfolio = load(binders, portfolio, force = false, cacheOnly = true)
+    suspend fun refresh(binders: List<Binder>, portfolio: PricePortfolio, force: Boolean = false): PricePortfolio = load(binders, portfolio, force, cacheOnly = false)
+    private suspend fun load(binders: List<Binder>, portfolio: PricePortfolio, force: Boolean, cacheOnly: Boolean): PricePortfolio = withContext(Dispatchers.IO) {
         val copies = binders.flatMap { it.cards }
         val key = store.key()
         val quoteCache = mutableMapOf<String, JsonObject?>()
@@ -77,6 +83,13 @@ class PersonalPricingClient(private val store: PersonalPricingStore, private val
             val requested = source(tracked.tcg)
             val quotes = matching.map { owned ->
                 runCatching {
+                    if (owned.card.tcg == "pokemon" && requested == "automatic" && direct != null) {
+                        val finish = owned.details.finishCode ?: if (owned.details.isFoil) "holofoil" else null
+                        val market = if (cacheOnly) direct.cached(owned.card, finish, owned.details.language)
+                            else direct.quote(owned.card, finish, owned.details.language)
+                        return@runCatching market?.let { it.price to it.sourceLabel }
+                    }
+                    if (cacheOnly || !force) return@runCatching null
                     val useJust = key != null && requested in setOf("automatic", "justtcg")
                     var quote: Pair<Double, String>? = null
                     if (useJust) {
@@ -103,6 +116,6 @@ class PersonalPricingClient(private val store: PersonalPricingStore, private val
             if (quotes.isEmpty() || quotes.any { it == null }) { missed++; tracked }
             else tracked.copy(unitPrice = matching.indices.sumOf { quotes[it]!!.first * matching[it].quantity } / tracked.quantity, currency = "USD", source = quotes.map { it!!.second }.distinct().joinToString(" / "))
         }
-        portfolio.copy(cards = priced, refreshedAt = Instant.now().toString(), warning = if (missed > 0) "$missed printings could not be priced exactly. Their saved values are shown." else null)
+        portfolio.copy(cards = priced, refreshedAt = if (cacheOnly) portfolio.refreshedAt else Instant.now().toString(), warning = if (missed > 0) "$missed printings could not be priced exactly. Their saved values are shown." else null)
     }
 }

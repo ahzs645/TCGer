@@ -755,6 +755,7 @@ internal fun ScannerSessionReviewPanel(
                     Checkbox(checked = entry.selected, onCheckedChange = { onToggle(entry.id) })
                     Column(Modifier.weight(1f)) {
                         Text(entry.name, fontWeight = FontWeight.Medium)
+                        entry.priceSource?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Text(
                             listOfNotNull(entry.setName, entry.collectorNumber).joinToString(" · ").ifBlank { entry.game },
                             style = MaterialTheme.typography.bodySmall,

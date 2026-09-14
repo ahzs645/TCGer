@@ -1,5 +1,9 @@
 # Cloudflare R2 asset delivery
 
+The separate [hosted pricing Worker](pricing/README.md) contains the initial
+authenticated D1 price API and abuse controls. It is disabled until provisioned;
+it does not change the public catalog asset delivery described below.
+
 TCGer publishes generated catalog packs to an R2 Standard bucket. The
 production URL layout is:
 

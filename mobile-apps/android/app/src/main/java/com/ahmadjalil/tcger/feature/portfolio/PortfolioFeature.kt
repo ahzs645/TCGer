@@ -163,6 +163,7 @@ enum class AnalyticsPeriod(val apiValue: String, val days: Int, val title: Strin
 data class PortfolioConnection(val serverUrl: String = "", val authToken: String? = null)
 
 interface PortfolioRepository {
+    suspend fun cachedPrices(binders: List<Binder>): PricePortfolio = buildLocalPricePortfolio(binders)
     suspend fun prices(binders: List<Binder>, force: Boolean = false): PricePortfolio
     suspend fun comparePrices(card: TrackedCard): List<MarketPriceQuote>
     suspend fun analytics(binders: List<Binder>, period: AnalyticsPeriod): AnalyticsSnapshot
@@ -172,14 +173,20 @@ class DefaultPortfolioRepository(
     private val connection: PortfolioConnection,
     private val client: OkHttpClient = OkHttpClient(),
     private val priceSourceResolver: (String) -> String = { "automatic" },
-    private val localPricing: (suspend (List<Binder>, PricePortfolio) -> PricePortfolio)? = null,
+    private val localPricing: (suspend (List<Binder>, PricePortfolio, Boolean) -> PricePortfolio)? = null,
+    private val localCachedPricing: (suspend (List<Binder>, PricePortfolio) -> PricePortfolio)? = null,
 ) : PortfolioRepository {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
+
+    override suspend fun cachedPrices(binders: List<Binder>): PricePortfolio {
+        val local = buildLocalPricePortfolio(binders)
+        return if (connection.serverUrl.isBlank() || connection.authToken.isNullOrBlank()) localCachedPricing?.invoke(binders, local) ?: local else local
+    }
 
     override suspend fun prices(binders: List<Binder>, force: Boolean): PricePortfolio {
         val local = buildLocalPricePortfolio(binders)
         if (local.cards.isEmpty()) return local
-        if (connection.serverUrl.isBlank() || connection.authToken.isNullOrBlank()) return if (force && localPricing != null) localPricing.invoke(binders, local) else local
+        if (connection.serverUrl.isBlank() || connection.authToken.isNullOrBlank()) return localPricing?.invoke(binders, local, force) ?: local
         return runCatching {
             val items = local.cards.map { TrackedPriceItem(it.tcg, it.externalId) }.distinct()
             val responses = items.groupBy { priceSourceResolver(it.tcg) }.map { (source, sourceItems) ->

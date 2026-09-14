@@ -50,7 +50,7 @@ final class ScannerPriceModeTests: XCTestCase {
         )
     }
 
-    func testOnDeviceAutomaticFallsBackToScryfallOnlyForMagic() {
+    func testOnDeviceAutomaticSupportsFreeMagicAndPokemon() {
         XCTAssertTrue(
             ScannerPriceModeSupport.hasOnDeviceProvider(
                 for: .magic,
@@ -60,7 +60,7 @@ final class ScannerPriceModeTests: XCTestCase {
                 collectrGames: []
             )
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
             ScannerPriceModeSupport.hasOnDeviceProvider(
                 for: .pokemon,
                 selectedSource: .automatic,

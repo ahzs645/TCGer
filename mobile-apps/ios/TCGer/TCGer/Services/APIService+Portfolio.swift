@@ -160,6 +160,16 @@ extension APIService {
         let source: String
     }
 
+    func getCachedPokemonPrices(items: [TrackedPriceItem]) async -> [TrackedPriceResult] {
+        var results: [TrackedPriceResult] = []
+        for item in items where item.tcg.lowercased() == "pokemon" && PricingSource.selected(for: item.tcg) == .automatic {
+            if let quote = await TCGCSVPriceClient.shared.cached(item.tcgcsvLookup) {
+                results.append(item.tcgcsvResult(quote))
+            }
+        }
+        return results
+    }
+
     func getTrackedPrices(
         config: ServerConfiguration,
         token: String,
@@ -231,6 +241,11 @@ extension APIService {
             let source = selectedSource.isAvailableOnDevice || selectedSource == .collectrPrivateTest
                 ? selectedSource
                 : .automatic
+            if item.tcg.lowercased() == "pokemon", source == .automatic {
+                let quote = await TCGCSVPriceClient.shared.quote(item.tcgcsvLookup)
+                results.append(item.tcgcsvResult(quote))
+                continue
+            }
             let cacheKey = "\(source.rawValue):\(item.key)"
             if let cached = await OnDeviceTrackedPriceCache.shared.result(for: cacheKey, force: force) {
                 results.append(cached.withCached(true))
@@ -1033,5 +1048,20 @@ private enum LocalSampleAnalytics {
                 )
             ]
         )
+    }
+}
+
+extension APIService.TrackedPriceItem {
+    var tcgcsvLookup: TCGCSVLookup {
+        TCGCSVLookup(name: lookupHint?.name ?? "", setName: lookupHint?.setName,
+                     setCode: lookupHint?.setCode, number: lookupHint?.collectorNumber,
+                     productID: identifiers?.tcgplayerId.flatMap(Int.init), finish: finishCode, language: language)
+    }
+    func tcgcsvResult(_ quote: TCGCSVQuote?) -> APIService.TrackedPriceResult {
+        APIService.TrackedPriceResult(key: key, tcg: tcg, externalId: externalId, finishCode: finishCode,
+            condition: condition, language: language, identifiers: identifiers, lookupHint: lookupHint,
+            price: quote?.price, currency: quote == nil ? nil : "USD", source: quote?.sourceLabel,
+            updatedAt: quote?.sourceAsOf, cached: quote?.cached ?? false,
+            error: quote == nil ? "No exact English market reference is available" : nil)
     }
 }

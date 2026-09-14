@@ -79,7 +79,11 @@ fun PricesScreen(
             loading = false
         }
     }
-    LaunchedEffect(repository, binders) { refresh(false) }
+    LaunchedEffect(repository, binders) {
+        portfolio = runCatching { repository.cachedPrices(binders) }.getOrElse { buildLocalPricePortfolio(binders) }
+        loading = false
+        refresh(false)
+    }
 
     if (!showPricing) {
         FeatureEmptyPane("Pricing is hidden", "Enable pricing in Settings to use the price tracker.", contentPadding)

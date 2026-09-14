@@ -736,6 +736,9 @@ private struct ScannerSessionCard: View {
                         }
                     }
                     .font(.caption2)
+                    if showsPrice, let source = priceQuote?.source {
+                        Text(source).font(.system(size: 8)).foregroundStyle(.secondary).lineLimit(3)
+                    }
                 }
                 .frame(width: 94, alignment: .leading)
             }

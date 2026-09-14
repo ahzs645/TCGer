@@ -1,0 +1,44 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "tcger-pricing",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "alias": { "cbor": "./src/attestation-cbor.mjs" },
+  "workers_dev": false,
+  "preview_urls": false,
+  "limits": { "cpu_ms": 50 },
+  "observability": { "enabled": false },
+  "vars": {
+    "PRICING_ENABLED": "false",
+    "GUEST_ENABLED": "false",
+    "ACCOUNT_ACCESS_ENABLED": "false",
+    "APPLE_TEAM_ID": "",
+    "APPLE_BUNDLE_ID": "firstform.TCGer",
+    "ANDROID_PACKAGE_NAME": "com.ahmadjalil.tcger",
+    "ANDROID_CERTIFICATE_DIGESTS": "",
+    "GUEST_DAILY_EXCHANGES": "2000",
+    "AUTH_ISSUER": "",
+    "AUTH_AUDIENCE": "convex",
+    "AUTH_JWKS": "{\"keys\":[]}",
+    "ALLOWED_ORIGINS": "",
+    "USER_DAILY_CARDS": "2000",
+    "GLOBAL_DAILY_CARDS": "100000",
+    "GLOBAL_DAILY_REQUESTS": "10000"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "tcger-pricing",
+    "database_id": "00000000-0000-0000-0000-000000000000",
+    "migrations_dir": "migrations"
+  }],
+  "ratelimits": [
+    { "name": "IP_RATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } },
+    { "name": "USER_RATE_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }
+  ],
+  "durable_objects": { "bindings": [
+    { "name": "QUOTAS", "class_name": "PricingQuota" },
+    { "name": "DEVICES", "class_name": "GuestDevice" }
+  ] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PricingQuota", "GuestDevice"] }]
+}

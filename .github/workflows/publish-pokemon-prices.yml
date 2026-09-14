@@ -1,0 +1,78 @@
+name: Publish Pokémon raw prices (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-pokemon-prices
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Publishing is manual only; no automatic R2 updates.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.PRICING_CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Check publishing configuration
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo '::error::Configure CLOUDFLARE_ACCOUNT_ID and bucket-scoped PRICING_CLOUDFLARE_API_TOKEN secrets.'
+            exit 1
+          fi
+      - run: npm ci --ignore-scripts
+      - uses: actions/cache/restore@v6.1.0
+        with:
+          path: cloudflare/pricing/prototype/tcgcsv-cache
+          key: tcgcsv-pokemon-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: tcgcsv-pokemon-v1-
+      - name: Read last published source stamp
+        run: >-
+          ./node_modules/.bin/wrangler r2 object get
+          tcger-pricing-prototype/manifest.json
+          --file previous-pricing-manifest.json --remote
+      - name: Build only when the source changes
+        id: sync
+        run: |
+          python3 cloudflare/pricing/prototype/sync_tcgcsv.py \
+            --out cloudflare/pricing/prototype/tcgcsv-output \
+            --cache cloudflare/pricing/prototype/tcgcsv-cache \
+            --previous previous-pricing-manifest.json --result pricing-result.json
+          python3 - <<'PY'
+          import json, os
+          result = json.load(open('pricing-result.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('changed=' + str(result['changed']).lower() + '\n')
+          PY
+      - uses: actions/cache/save@v6.1.0
+        if: always()
+        with:
+          path: cloudflare/pricing/prototype/tcgcsv-cache
+          key: tcgcsv-pokemon-v1-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Publish per-set mobile fallback
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          python3 cloudflare/pricing/prototype/build_mobile_backup.py \
+            --sqlite cloudflare/pricing/prototype/tcgcsv-output/catalog.sqlite \
+            --out cloudflare/pricing/prototype/mobile-output
+          node cloudflare/pricing/prototype/publish_mobile_backup.mjs \
+            cloudflare/pricing/prototype/mobile-output --publish
+      - name: Verify and publish snapshot
+        if: steps.sync.outputs.changed == 'true'
+        run: >-
+          node cloudflare/pricing/prototype/publish.mjs
+          cloudflare/pricing/prototype/tcgcsv-output tcger-pricing-prototype --publish

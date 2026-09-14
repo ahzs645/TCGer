@@ -1448,6 +1448,13 @@ private extension CardScannerView {
         let config = environmentStore.serverConfiguration
         guard config.isOnDevice || environmentStore.authToken != nil else { return }
         do {
+            if config.isOnDevice {
+                for result in await APIService().getCachedPokemonPrices(items: pendingItems) {
+                    if let price = result.price, let currency = result.currency {
+                        priceQuotesByLookupKey[result.lookupKey] = ScannerPriceQuote(price: price, currency: currency, source: result.source)
+                    }
+                }
+            }
             let response = try await APIService().getTrackedPrices(
                 config: config,
                 token: environmentStore.authToken ?? "",
@@ -1460,7 +1467,8 @@ private extension CardScannerView {
                       price.isFinite else { continue }
                 priceQuotesByLookupKey[result.lookupKey] = ScannerPriceQuote(
                     price: price,
-                    currency: result.currency ?? "USD"
+                    currency: result.currency ?? "USD",
+                    source: result.source
                 )
             }
             attemptedPriceLookupKeys.formUnion(pendingItems.map(\.lookupKey))

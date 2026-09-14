@@ -31,8 +31,17 @@ object ScannerPriceJson {
         .firstOrNull()
 }
 
-class ScannerPriceClient(private val client: OkHttpClient = OkHttpClient()) {
+class ScannerPriceClient(
+    private val client: OkHttpClient = OkHttpClient(),
+    private val direct: com.ahmadjalil.tcger.data.pricing.TcgCsvPriceClient? = null,
+) {
+    suspend fun cached(card: CatalogCard): ScannerPriceQuote? = if (card.tcg == "pokemon") direct?.cached(card)?.let {
+        ScannerPriceQuote(it.sourceLabel, it.price, "USD", it.sourceAsOf, it.backup)
+    } else null
     suspend fun fetch(serverUrl: String, authToken: String, card: CatalogCard): ScannerPriceQuote? = withContext(Dispatchers.IO) {
+        if (card.tcg == "pokemon" && direct != null) {
+            return@withContext direct.quote(card)?.let { ScannerPriceQuote(it.sourceLabel, it.price, "USD", it.sourceAsOf, it.backup) }
+        }
         require(serverUrl.isNotBlank() && authToken.isNotBlank()) { "A signed-in scanner server is required for pricing" }
         val url = serverUrl.trim().trimEnd('/').toHttpUrl().newBuilder()
             .addPathSegment("prices")

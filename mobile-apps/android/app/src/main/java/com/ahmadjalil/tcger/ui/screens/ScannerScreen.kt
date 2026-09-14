@@ -254,7 +254,7 @@ fun ScannerScreen(
     val recordingSessionStore = remember(context) { ScannerRecordingSessionStore(context) }
     val attemptImageStore = remember(context) { ScannerAttemptImageStore(context) }
     val binderPagePhotoStore = remember(context) { BinderPagePhotoStore(context) }
-    val scannerPriceClient = remember { ScannerPriceClient() }
+    val scannerPriceClient = remember(context) { ScannerPriceClient(direct = com.ahmadjalil.tcger.data.pricing.TcgCsvPriceClient.shared(java.io.File(context.filesDir, "TCGCSVPrices"))) }
     val sharedSessionClient = remember { ScannerSharedSessionClient() }
     var options by remember {
         mutableStateOf(optionStore.load().let { if (startsWithSingleCard) it.copy(captureMode = ScannerCaptureMode.CARD) else it })
@@ -287,7 +287,7 @@ fun ScannerScreen(
         remoteScannerManifest.version != installedScannerManifest.version
     val capabilities = scannerCapabilities ?: AndroidScannerCapabilities(
         serverConfigured = state.preferences.isSignedIn && state.preferences.serverUrl.isNotBlank(),
-        priceLookupAvailable = state.preferences.isSignedIn && state.preferences.serverUrl.isNotBlank(),
+        priceLookupAvailable = normalizedScannerGame == "pokemon" || (state.preferences.isSignedIn && state.preferences.serverUrl.isNotBlank()),
         arcFaceRuntimeAvailable = localArcFaceAvailable,
         binderPageDetectorAvailable = true,
         dinoV2RuntimeAvailable = localDinoV2Available,
@@ -374,15 +374,21 @@ fun ScannerScreen(
 
     fun fetchSessionPrices(entries: List<ScannerSessionEntry>) {
         if (options.priceMode != ScannerPriceMode.SESSION_MARKET || !capabilities.priceLookupAvailable) return
-        val token = state.preferences.authToken ?: return
+        val token = state.preferences.authToken.orEmpty()
         scope.launch {
+            fun applyQuote(entry: ScannerSessionEntry, quote: com.ahmadjalil.tcger.data.scanner.ScannerPriceQuote) {
+                updateSession(sessionEntries.map {
+                    if (it.id == entry.id) it.copy(price = quote.price, currency = quote.currency, priceSource = quote.source, priceUpdatedAt = quote.updatedAt) else it
+                })
+            }
+            for (entry in entries) scannerPriceClient.cached(entry.toCatalogCard())?.let { applyQuote(entry, it) }
             entries.forEach { entry ->
                 val quote = runCatching {
                     scannerPriceClient.fetch(state.preferences.serverUrl, token, entry.toCatalogCard())
                 }.getOrNull() ?: return@forEach
                 updateSession(
                     sessionEntries.map {
-                        if (it.id == entry.id) it.copy(price = quote.price, currency = quote.currency, priceSource = quote.source) else it
+                        if (it.id == entry.id) it.copy(price = quote.price, currency = quote.currency, priceSource = quote.source, priceUpdatedAt = quote.updatedAt) else it
                     },
                 )
             }

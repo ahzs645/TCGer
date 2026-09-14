@@ -265,11 +265,19 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
         }
         val pricingSourceRepository = remember(settingsConnection) { PricingSourceRepository(settingsConnection) }
         val pricingSourceStore = remember(context) { PricingSourcePreferenceStore(context) }
+        val personalPricingClient = remember(context, pricingSourceStore) {
+            com.ahmadjalil.tcger.feature.settingsparity.PersonalPricingClient(
+                com.ahmadjalil.tcger.feature.settingsparity.PersonalPricingStore(context),
+                com.ahmadjalil.tcger.data.pricing.TcgCsvPriceClient.shared(java.io.File(context.filesDir, "TCGCSVPrices")),
+                pricingSourceStore::resolvedSource,
+            )
+        }
         val portfolioRepository = remember(connectedServerUrl, state.preferences.authToken, pricingSourceStore) {
             DefaultPortfolioRepository(
                 PortfolioConnection(connectedServerUrl, state.preferences.authToken),
                 priceSourceResolver = pricingSourceStore::resolvedSource,
-                localPricing = com.ahmadjalil.tcger.feature.settingsparity.PersonalPricingClient(com.ahmadjalil.tcger.feature.settingsparity.PersonalPricingStore(context), pricingSourceStore::resolvedSource)::refresh,
+                localPricing = personalPricingClient::refresh,
+                localCachedPricing = personalPricingClient::cached,
             )
         }
         val financeRepository = remember(context, settingsConnection) {

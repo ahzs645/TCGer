@@ -1,0 +1,30 @@
+name: Hosted pricing checks
+
+on:
+  pull_request:
+    paths:
+      - 'cloudflare/pricing/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/hosted-pricing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # The tests build and execute Wrangler's deployment bundle locally.
+      - run: npm run test --workspace @tcg/hosted-pricing
+      - run: python3 -m unittest discover -s cloudflare/pricing/prototype -p 'test_*.py'

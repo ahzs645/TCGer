@@ -3,8 +3,10 @@ import Foundation
 nonisolated struct ScannerPriceQuote: Equatable, Sendable {
     let price: Double
     let currency: String
+    let source: String?
 
-    init(price: Double, currency: String) {
+    init(price: Double, currency: String, source: String? = nil) {
+        self.source = source
         self.price = price
         self.currency = currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
@@ -52,7 +54,7 @@ enum ScannerPriceModeSupport {
 
         switch effectiveSource {
         case .automatic:
-            return hasJustTCGKey || game == .magic
+            return hasJustTCGKey || game == .magic || game == .pokemon
         case .justTCG:
             return hasJustTCGKey
         case .scryfall:

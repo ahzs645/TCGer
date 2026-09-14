@@ -98,6 +98,7 @@ data class ScannerSessionEntry(
     val price: Double? = null,
     val currency: String? = null,
     val priceSource: String? = null,
+    val priceUpdatedAt: String? = null,
 ) {
     fun toCatalogCard() = CatalogCard(
         id = cardId,
