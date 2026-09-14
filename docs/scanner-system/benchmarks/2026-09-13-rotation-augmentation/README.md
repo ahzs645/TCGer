@@ -1,6 +1,6 @@
 # Two-seed rotation experiment and checkpoint-selection backtest
 
-Started September 13, 2026. [The CPU backtest completed on Hugging Face](https://huggingface.co/jobs/ahzs645/6aa7754a5527934177edbfc9); training configurations are prepared and published, and the backtest review permits the three-run pilot. This is a declared experiment, not a model promotion. The user authorized three Hugging Face jobs: one additional fixed-order control seed and two augmented seeds. The already completed September 10 split / fixed-order / seed 20260905 run supplies the first control.
+September 13, 9:39 p.m. PDT: the checkpoint backtest is complete and all three L4 jobs are submitted. The control is running; both rotation seeds are waiting for hardware at this check. This is a declared experiment, not a model promotion. The already completed September 10 split / fixed-order / seed 20260905 run supplies the first control.
 
 ## Frozen choices before new inference
 
@@ -39,3 +39,17 @@ The existing replay has 57 frames, **11 verified identities**, four forbidden ac
 The [per-card identity review](http://127.0.0.1:8776/) is ready for the 106 saved phone-session outlines, with source and corner hashes, catalog identity checks and durable append-only decisions. There are 23 optional unverified phone-recognition suggestions, associated only where a device outline unambiguously overlaps the reviewed outline; catalog images are shown for checking. No new identities have been claimed as verified. The queue and decisions save directly into the Reference folder under `TCGer-Labeling/recognition-reviews/phone-20260909-identity-v1`. Previous, Undo and refresh position are supported. The companion `replay_instance_identities.py` assigns detections across the whole photo before selecting verified identities and reports model-crop versus human-border-crop recognition separately. Model suggestions are not verified labels. Recognition truth remains a separate versioned release; the frozen geometry benchmark and training labels stay unchanged. This is a targeted identity review, not another border review.
 
 Local work: `.artifacts/card-geometry/augmentation-20260913/`. Training progress and submitted job receipts will be recorded here and copied to the configured Drive folder. [Hugging Face Jobs](https://huggingface.co/docs/hub/jobs-overview) supplies the remote compute.
+
+## Submitted jobs and continuation
+
+| Run | Hugging Face job | Maximum GPU runtime |
+|---|---|---|
+| Control seed 20260906 | [6aa779b421047bf1b0386339](https://huggingface.co/jobs/ahzs645/6aa779b421047bf1b0386339) | 4 hours |
+| Quarter turns seed 20260905 | [6aa779b421047bf1b038633b](https://huggingface.co/jobs/ahzs645/6aa779b421047bf1b038633b) | 4 hours |
+| Quarter turns seed 20260906 | [6aa779b521047bf1b038633d](https://huggingface.co/jobs/ahzs645/6aa779b521047bf1b038633d) | 4 hours |
+
+Training code is pinned at `56df86f9`, common CPU analysis code at `c93bb21e`. The [training publication](training-input-publication.json) binds all three configs and job specs. The separate [analysis protocol](analysis-protocol.json) allows one final two-hour CPU audit, with total compute capped at $9.72 including the completed backtest. Reported ceilings exclude any unrelated jobs or storage.
+
+`tools/card-geometry/continue_rotation_experiment.py --workdir .artifacts/card-geometry/augmentation-20260913 --mirror-dir <Reference>/TCGer-Labeling/reports/2026-09-13-rotation-augmentation` is the finite local batch coordinator. It reuses job receipts, verifies the backtest gate and input hashes, collects completed training, submits one common CPU audit, then downloads verified results. It never automatically retries a failed training job or promotes a model. The coordinator needs this Mac awake for collection and the CPU handoff; already submitted training runs independently on Hugging Face. Restarting the coordinator reuses those jobs. It mirrors status and readable evidence into the Drive folder. Google Drive's remote synchronization status is not independently verified.
+
+[Live local status](http://127.0.0.1:8773/rotation/) · [Identity review](http://127.0.0.1:8776/)

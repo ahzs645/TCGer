@@ -1,0 +1,59 @@
+{
+  "repo": "ahzs645/tcger-universal-arcface",
+  "revision": "0fd02800b57786e0f77d0dd05570f714913f5e8d",
+  "protocolSha256": "2339509836fe2d491c4aea8820a5cf30f054368bde87cf15ccc86b2ebed7ddd4",
+  "toolingRevision": "56df86f9297468b1c921db70e615f329ec28872a",
+  "jobs": {
+    "control-seed-20260906": {
+      "specSha256": "0446f9bc821793d7e6a7b3983c7fd34c01a66a30939cd70decccc34d8607b158",
+      "experiment": {
+        "bakeoffId": "card-geometry-quarter-turn-control-seed-20260906-v1",
+        "candidate": "yolo11s-pose",
+        "checkpointPrefix": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/802395826d27c7223a8a170b465662e0e8eebd59befee1c1c0e2d1b039b7b905",
+        "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+        "experimentHash": "802395826d27c7223a8a170b465662e0e8eebd59befee1c1c0e2d1b039b7b905",
+        "fairnessHash": "211d6c8f72f75f79bdee29b18071f0f1e1c3817638a1192dbd82c5a5a592c698",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-known-orientation-v1",
+        "policySha256": "91078d80e3fcc057fded524de747adfb835bbb896110863f9a0b84c37eca7201",
+        "resolvedConfigSha256": "802395826d27c7223a8a170b465662e0e8eebd59befee1c1c0e2d1b039b7b905",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      }
+    },
+    "rotation-seed-20260905": {
+      "specSha256": "5d59a0c2aa33a1ba66375b424d042b01df9a8af3a14e2e680b16536e74713275",
+      "experiment": {
+        "bakeoffId": "card-geometry-quarter-turn-rotation-seed-20260905-v1",
+        "candidate": "yolo11s-pose",
+        "checkpointPrefix": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/62da83b79ee9dbdd82626f1d5c44e2c5847930401e8d79bf2eeb1cf33509ce79",
+        "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+        "experimentHash": "62da83b79ee9dbdd82626f1d5c44e2c5847930401e8d79bf2eeb1cf33509ce79",
+        "fairnessHash": "c46da7925f951becb441765e6f13a6b3152daac98e8da773e84db9da439c3bc9",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-known-orientation-v1",
+        "policySha256": "91078d80e3fcc057fded524de747adfb835bbb896110863f9a0b84c37eca7201",
+        "resolvedConfigSha256": "62da83b79ee9dbdd82626f1d5c44e2c5847930401e8d79bf2eeb1cf33509ce79",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      }
+    },
+    "rotation-seed-20260906": {
+      "specSha256": "b35aec07359cba69ee2975d84d5ff74aca254d36f9881b2762ec8e513c29890e",
+      "experiment": {
+        "bakeoffId": "card-geometry-quarter-turn-rotation-seed-20260906-v1",
+        "candidate": "yolo11s-pose",
+        "checkpointPrefix": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/24e9f83023afd7228825939c41266c4186c99e16b67fd059b257c8f4cebfb8d3",
+        "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+        "experimentHash": "24e9f83023afd7228825939c41266c4186c99e16b67fd059b257c8f4cebfb8d3",
+        "fairnessHash": "9a56db8bc20cf456c3262eee6f3f155a3d0257b3f780b45185d30fe3d738fc69",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-known-orientation-v1",
+        "policySha256": "91078d80e3fcc057fded524de747adfb835bbb896110863f9a0b84c37eca7201",
+        "resolvedConfigSha256": "24e9f83023afd7228825939c41266c4186c99e16b67fd059b257c8f4cebfb8d3",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      }
+    }
+  }
+}

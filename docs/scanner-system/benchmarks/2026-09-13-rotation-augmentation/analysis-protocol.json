@@ -1,0 +1,13 @@
+{
+  "schema": "tcger-paired-common-cpu/v1",
+  "maximumAdditionalCpuJobs": 1,
+  "toolingRevision": "c93bb21e1c4acda175f138ebe0a5297e95e2360e",
+  "parentTrainingProtocolSha256": "2339509836fe2d491c4aea8820a5cf30f054368bde87cf15ccc86b2ebed7ddd4",
+  "flavor": "cpu-upgrade",
+  "timeoutSeconds": 7200,
+  "maxAdditionalComputeCostUsd": 0.06,
+  "maxTotalBatchComputeCostUsd": 9.72,
+  "purpose": "Evaluate all four validation-selected checkpoints with one common CPU pipeline on the frozen real and synthetic sets and historical recognition replay.",
+  "productionPromotion": false,
+  "automaticRetryTraining": false
+}
