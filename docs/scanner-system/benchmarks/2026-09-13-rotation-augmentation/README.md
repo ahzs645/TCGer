@@ -1,6 +1,6 @@
 # Two-seed rotation experiment and checkpoint-selection backtest
 
-Preparation started September 13, 2026. This is a declared experiment, not a model promotion. The user authorized three Hugging Face jobs: one additional fixed-order control seed and two augmented seeds. The already completed September 10 split / fixed-order / seed 20260905 run supplies the first control.
+Started September 13, 2026. [The CPU backtest completed on Hugging Face](https://huggingface.co/jobs/ahzs645/6aa7754a5527934177edbfc9); training configurations are prepared and published, and the backtest review permits the three-run pilot. This is a declared experiment, not a model promotion. The user authorized three Hugging Face jobs: one additional fixed-order control seed and two augmented seeds. The already completed September 10 split / fixed-order / seed 20260905 run supplies the first control.
 
 ## Frozen choices before new inference
 
@@ -18,16 +18,24 @@ Before ranking, exclude checkpoints with real validation extras plus duplicates 
 
 Backtest the declared rule on the complete saved September 10 cyclic and September 13 fixed-order shortlists. Hash-check original validation metrics and weights. Write the validation choice before evaluating every shortlisted epoch on the 700-card benchmark. Report transfer, including failures to pick the best benchmark result; do not tune the rule to force agreement with that already inspected benchmark.
 
+## Backtest outcome
+
+The declared selector chose epoch 50 in both shortlists. It chose the highest real tight count in the cyclic run (550/700), but missed the fixed run's tight winner: epoch 30 had 559 tight / 675 found / 16 extras, versus epoch 50 with 544 / 676 / 26. Both fixed checkpoints had one duplicate. The later checkpoint finds one more card and loses 15 tight borders. The rule therefore remains a provisional experiment policy, not a proven promotion rule. Keep it unchanged for the pilot rather than tune it to this benchmark after inspection. [Pinned results](backtest-results/RESULTS.json) and [technical review](backtest-review.json).
+
+The HF runtime smoke check trained a one-epoch fixture, confirmed the stock fixed-order loss and absence of implicit Albumentations, and reloaded a four-corner checkpoint successfully. Fixture training is separate from the three full training jobs.
+
 ## Experiment endpoints and limits
 
 Average the selected-checkpoint endpoints across the two seeds per arm. Primary: real tight rate on the 700-card benchmark. Pilot success threshold: at least +3 percentage points, with no reduction in mean real found rate and no increase exceeding 0.02 extras-plus-duplicates per real photo. Report both seeds individually. These are practical pilot thresholds, not a statistical confidence bound inferred from one previous seed pair. Human-corner results on 139 cards, synthetic results, and the 74 checked-orientation validation photos remain separate secondary diagnostics. Validation diagnostics are reused for selection and are not independent evaluation. The frozen phone session stays qualitative.
 
 The large audit did not establish a causal explanation for the phone regression. Near ties for one seed do not close the objective question. Fixed order is used here to keep this rotation experiment bounded; cyclic objectives can also support augmentation with an appropriate adapter. Two seeds remain a small experiment, and geometry benefit alone does not promote a production model.
 
+The final four selected checkpoints will also receive a common CPU evaluation on Hugging Face. This avoids mixing historical Mac CPU scores with new GPU scores in the primary comparison. The two CPU evaluation jobs have separate two-hour caps at $0.03/hour each, adding at most $0.12 to the three GPU jobs' $9.60 compute ceiling. No model is promoted automatically.
+
 ## Recognition work
 
 The existing replay has 57 frames, **11 verified identities**, four forbidden accepts and 42 unknown identities. It evaluates one highest-confidence detection per frame. Unchanged aggregate counts are not evidence of unchanged per-card recognition across a full scene. Earlier human-label crop replay already produced four correct, six abstentions and one wrong result on the 11 verified identities; improving geometry alone did not fix those cases. Encoder, index, identity truth and acceptance behavior require their own diagnostics.
 
-Prepare an independent per-card identity review set from the 106 saved phone-session outlines, with source and corner hashes, catalog identity checks and durable append-only decisions. Model suggestions are not verified labels. Recognition truth remains a separate versioned release; the frozen geometry benchmark and training labels stay unchanged. This is a targeted identity review, not another border review.
+The [per-card identity review](http://127.0.0.1:8776/) is ready for the 106 saved phone-session outlines, with source and corner hashes, catalog identity checks and durable append-only decisions. There are 23 optional unverified phone-recognition suggestions, associated only where a device outline unambiguously overlaps the reviewed outline; catalog images are shown for checking. No new identities have been claimed as verified. The queue and decisions save directly into the Reference folder under `TCGer-Labeling/recognition-reviews/phone-20260909-identity-v1`. Previous, Undo and refresh position are supported. The companion `replay_instance_identities.py` assigns detections across the whole photo before selecting verified identities and reports model-crop versus human-border-crop recognition separately. Model suggestions are not verified labels. Recognition truth remains a separate versioned release; the frozen geometry benchmark and training labels stay unchanged. This is a targeted identity review, not another border review.
 
 Local work: `.artifacts/card-geometry/augmentation-20260913/`. Training progress and submitted job receipts will be recorded here and copied to the configured Drive folder. [Hugging Face Jobs](https://huggingface.co/docs/hub/jobs-overview) supplies the remote compute.

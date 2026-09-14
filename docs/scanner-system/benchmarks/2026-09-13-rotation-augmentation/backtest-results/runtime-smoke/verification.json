@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "epochs": 1,
+  "fixtureOnly": true,
+  "ultralytics": "8.4.138",
+  "device": "cpu",
+  "stockFixedOrderLoss": true,
+  "savedCheckpointReloaded": true,
+  "implicitAlbumentations": false
+}

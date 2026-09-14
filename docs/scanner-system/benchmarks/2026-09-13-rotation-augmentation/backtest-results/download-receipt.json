@@ -1,0 +1,12 @@
+{
+  "revision": "3353b06aac42aa463b1dbc0e3dcf0c29a6144988",
+  "outputPrefix": "geometry/rotation-augmentation-20260913/backtest-results/56df86f9297468b1c921db70e615f329ec28872a",
+  "files": {
+    "RESULTS.json": "296f5094a07a3479148eff3176875fd3c6d6ef6fe2927abf7bd31ad3fcb765ff",
+    "cyclic/declaration.json": "bdc007c91f97d0caef8acd8802d0cd1f958751daba9ad3079deaa66f235a8d2b",
+    "cyclic/RESULTS.json": "cf66f262ebfa9e6d973a242fa421774a66ef7d3ffd81703f8a737c5abb646f89",
+    "fixed/declaration.json": "ca954fefdeb633a0d15e34c4f8801c100d507059e320b83c0b65b09c444f98ba",
+    "fixed/RESULTS.json": "67ac4004ea65aa2e2fe505d368d34555ad5338a63467a70bb79af0dbf14adb4f",
+    "runtime-smoke/verification.json": "eb1c20c770037f7acf9d333df3fb80e8b57ed05c1e4e7590a34b6b6998cce09d"
+  }
+}

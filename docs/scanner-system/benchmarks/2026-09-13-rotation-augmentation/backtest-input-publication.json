@@ -1,0 +1,7 @@
+{
+  "revision": "a64a2d345965db836e97f3d71aea74a6ae0d47a0",
+  "toolingRevision": "56df86f9297468b1c921db70e615f329ec28872a",
+  "configSha256": "2dc0b88146ad72697141d3c4f0a62acab3586df75e9241cb96c011e8f1f78fe8",
+  "specSha256": "221fa58941b6f1dbb979dcb4479cc379f907ab5b4d1bac4e5550f637f98b02b5",
+  "outputPrefix": "geometry/rotation-augmentation-20260913/backtest-results/56df86f9297468b1c921db70e615f329ec28872a"
+}

@@ -1,0 +1,101 @@
+{
+  "automaticRetryTraining": false,
+  "batch": 16,
+  "candidate": "yolo11s-pose",
+  "causalLimits": "Two seeds are a pilot, not a variance estimate. Previous one-seed loss comparisons do not close the objective question.",
+  "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+  "cpuBacktestTimeoutSeconds": 7200,
+  "epochs": 50,
+  "evaluationJobs": 1,
+  "gpuFlavor": "l4x1",
+  "gpuTimeoutSeconds": 14400,
+  "labelChanges": false,
+  "maxCpuBacktestComputeCostUsd": 0.06,
+  "maxGpuComputeCostUsd": 9.6,
+  "maximumExtraDuplicateIncreasePerPhoto": 0.02,
+  "minimumFoundImprovement": 0.0,
+  "minimumTightImprovement": 0.03,
+  "phoneRole": "qualitative only",
+  "primaryEndpoint": "Mean real IoU>=.90 tight rate at each validation-selected checkpoint across two seeds per arm",
+  "productionPromotion": false,
+  "recognitionRole": "Separate per-card verified identity release; no promotion without recognition evidence",
+  "resolution": 640,
+  "reusedControl": {
+    "configSha256": "2afadc940f8753a947cfc4256969a1eea43916dae09068bee4049a5fa40a5cc0",
+    "jobId": "6aa704e121047bf1b03859c4",
+    "seed": 20260905,
+    "selection": "Reapply the same v2 rule to its saved validation shortlist"
+  },
+  "runs": {
+    "control-seed-20260906": {
+      "augmentation": "none",
+      "configSha256": "23a6657f66abab03f4911bf3c31eab9e7bcd1c3d0c60b9f04c6c80c87d46f7c1",
+      "experiment": {
+        "bakeoffId": "card-geometry-quarter-turn-control-seed-20260906-v1",
+        "candidate": "yolo11s-pose",
+        "checkpointPrefix": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/802395826d27c7223a8a170b465662e0e8eebd59befee1c1c0e2d1b039b7b905",
+        "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+        "experimentHash": "802395826d27c7223a8a170b465662e0e8eebd59befee1c1c0e2d1b039b7b905",
+        "fairnessHash": "211d6c8f72f75f79bdee29b18071f0f1e1c3817638a1192dbd82c5a5a592c698",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-known-orientation-v1",
+        "policySha256": "91078d80e3fcc057fded524de747adfb835bbb896110863f9a0b84c37eca7201",
+        "resolvedConfigSha256": "802395826d27c7223a8a170b465662e0e8eebd59befee1c1c0e2d1b039b7b905",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      },
+      "seed": 20260906
+    },
+    "rotation-seed-20260905": {
+      "augmentation": "quarter-turn-v1",
+      "configSha256": "f5b658209a73186c3614d9c9d17fc00c809e514977cc20232fb4ada1986982b1",
+      "experiment": {
+        "bakeoffId": "card-geometry-quarter-turn-rotation-seed-20260905-v1",
+        "candidate": "yolo11s-pose",
+        "checkpointPrefix": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/62da83b79ee9dbdd82626f1d5c44e2c5847930401e8d79bf2eeb1cf33509ce79",
+        "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+        "experimentHash": "62da83b79ee9dbdd82626f1d5c44e2c5847930401e8d79bf2eeb1cf33509ce79",
+        "fairnessHash": "c46da7925f951becb441765e6f13a6b3152daac98e8da773e84db9da439c3bc9",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-known-orientation-v1",
+        "policySha256": "91078d80e3fcc057fded524de747adfb835bbb896110863f9a0b84c37eca7201",
+        "resolvedConfigSha256": "62da83b79ee9dbdd82626f1d5c44e2c5847930401e8d79bf2eeb1cf33509ce79",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      },
+      "seed": 20260905
+    },
+    "rotation-seed-20260906": {
+      "augmentation": "quarter-turn-v1",
+      "configSha256": "3683a2fe71817dc43773dd949e6a3e2d9343782339c2ce9845545ca416c008c5",
+      "experiment": {
+        "bakeoffId": "card-geometry-quarter-turn-rotation-seed-20260906-v1",
+        "candidate": "yolo11s-pose",
+        "checkpointPrefix": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/24e9f83023afd7228825939c41266c4186c99e16b67fd059b257c8f4cebfb8d3",
+        "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+        "experimentHash": "24e9f83023afd7228825939c41266c4186c99e16b67fd059b257c8f4cebfb8d3",
+        "fairnessHash": "9a56db8bc20cf456c3262eee6f3f155a3d0257b3f780b45185d30fe3d738fc69",
+        "framework": "ultralytics",
+        "licenseRoute": "evaluation-only",
+        "policyId": "training-known-orientation-v1",
+        "policySha256": "91078d80e3fcc057fded524de747adfb835bbb896110863f9a0b84c37eca7201",
+        "resolvedConfigSha256": "24e9f83023afd7228825939c41266c4186c99e16b67fd059b257c8f4cebfb8d3",
+        "schema": "https://tcger.app/reports/card-geometry-candidate-run/v1"
+      },
+      "seed": 20260906
+    }
+  },
+  "schema": "tcger-two-seed-quarter-turn/v1",
+  "secondaryEndpoints": [
+    "139 human-corner cards reported separately",
+    "synthetic benchmark separately",
+    "74 checked-orientation validation photos; reused validation, not independent"
+  ],
+  "seeds": [
+    20260905,
+    20260906
+  ],
+  "selectionPolicy": "validation-real-weighted-guarded-v2",
+  "toolingRevision": "56df86f9297468b1c921db70e615f329ec28872a",
+  "trainingJobs": 3
+}

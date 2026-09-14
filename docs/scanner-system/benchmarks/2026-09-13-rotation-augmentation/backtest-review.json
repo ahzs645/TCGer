@@ -1,0 +1,8 @@
+{
+  "allowThreeTrainingJobs": true,
+  "backtestResultsSha256": "296f5094a07a3479148eff3176875fd3c6d6ef6fe2927abf7bd31ad3fcb765ff",
+  "selectionPolicy": "validation-real-weighted-guarded-v2",
+  "selectionPolicyChangedAfterBacktest": false,
+  "interpretation": "Both validation selections are epoch 50. Cyclic selection has the highest real tight count (550). Fixed selection has 544 tight versus epoch 30 with 559 (one fewer found, 10 fewer extras). The selector does not universally pick the real benchmark winner. Keep the predeclared rule provisionally for the two-seed rotation pilot without test-based retuning; no production promotion.",
+  "runtimeSmokePassed": true
+}

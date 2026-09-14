@@ -1,0 +1,256 @@
+{
+  "complete": true,
+  "configSha256": "2dc0b88146ad72697141d3c4f0a62acab3586df75e9241cb96c011e8f1f78fe8",
+  "productionPromotion": false,
+  "runs": {
+    "cyclic": {
+      "candidates": [
+        {
+          "checkpointSha256": "e812df634ed0a8e2c2512e0963e1c7bab3e8ff4f6e45bceb02a278e58202b08c",
+          "id": "epoch9",
+          "predictionsSha256": "1eae3365984af892860f59ca6152ae14077dce6bd65671b6687738e1f6a8dc8a",
+          "real": {
+            "duplicate": 4,
+            "duplicatePerImage": 0.006666666667,
+            "extra": 126,
+            "extraPerImage": 0.21,
+            "matches": 670,
+            "meanMatchedIoU": 0.896182286059,
+            "miss": 30,
+            "missPerImage": 0.05,
+            "predictions": 800,
+            "recall@0.5": 0.957142857143,
+            "recall@0.75": 0.872857142857,
+            "recall@0.9": 0.665714285714,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.5318818663519895
+        },
+        {
+          "checkpointSha256": "72c93792d8364e49e97a818f510ddb7074cc54ac8278bd012cff991a94e26358",
+          "id": "epoch19",
+          "predictionsSha256": "d6ab6f2761a254e098657c8c278dd60c33a494ba83e521e0357409611ae9bd53",
+          "real": {
+            "duplicate": 5,
+            "duplicatePerImage": 0.008333333333,
+            "extra": 71,
+            "extraPerImage": 0.118333333333,
+            "matches": 674,
+            "meanMatchedIoU": 0.910891498012,
+            "miss": 26,
+            "missPerImage": 0.043333333333,
+            "predictions": 750,
+            "recall@0.5": 0.962857142857,
+            "recall@0.75": 0.89,
+            "recall@0.9": 0.748571428571,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.6886762253763036
+        },
+        {
+          "checkpointSha256": "d93ff77ca9a8767251a1b3aa17a3e30000a2a0f5787d554362170ddff00aa96f",
+          "id": "epoch29",
+          "predictionsSha256": "38a68c290cebdcf423eeec926bf2cef6aed0d61f6e828faee0fedeebbbac40de",
+          "real": {
+            "duplicate": 8,
+            "duplicatePerImage": 0.013333333333,
+            "extra": 30,
+            "extraPerImage": 0.05,
+            "matches": 679,
+            "meanMatchedIoU": 0.919880464108,
+            "miss": 21,
+            "missPerImage": 0.035,
+            "predictions": 717,
+            "recall@0.5": 0.97,
+            "recall@0.75": 0.895714285714,
+            "recall@0.9": 0.775714285714,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.7690502500942751
+        },
+        {
+          "checkpointSha256": "409d697a7cfa070fc28879a2b28aaac3b3ace911a1f6bed0e2715e2466e5e0f4",
+          "id": "epoch39",
+          "predictionsSha256": "fddfdda075c99e17d769a78d394216a7c11dc70ac9e990ca5fc8c60315e82f6d",
+          "real": {
+            "duplicate": 3,
+            "duplicatePerImage": 0.005,
+            "extra": 34,
+            "extraPerImage": 0.056666666667,
+            "matches": 675,
+            "meanMatchedIoU": 0.922831151119,
+            "miss": 25,
+            "missPerImage": 0.041666666667,
+            "predictions": 712,
+            "recall@0.5": 0.964285714286,
+            "recall@0.75": 0.905714285714,
+            "recall@0.9": 0.781428571429,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.7645668702112948
+        },
+        {
+          "checkpointSha256": "13c2eb19b41a03ef1a68a6d2dacb4f480f57c9d25ffdf54046f24f3b6f62c7de",
+          "id": "epoch49",
+          "predictionsSha256": "f9ad845907a5abaa644ad043b83750cb2ccdd731a5fb1ff57f0af9afc901df08",
+          "real": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.001666666667,
+            "extra": 36,
+            "extraPerImage": 0.06,
+            "matches": 677,
+            "meanMatchedIoU": 0.924600209539,
+            "miss": 23,
+            "missPerImage": 0.038333333333,
+            "predictions": 714,
+            "recall@0.5": 0.967142857143,
+            "recall@0.75": 0.902857142857,
+            "recall@0.9": 0.785714285714,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.7805654530912567
+        }
+      ],
+      "complete": true,
+      "declarationSha256": "bdc007c91f97d0caef8acd8802d0cd1f958751daba9ad3079deaa66f235a8d2b",
+      "productionPromotion": false,
+      "testMetricsUsedToTuneRule": false,
+      "validationSelected": "epoch49"
+    },
+    "fixed": {
+      "candidates": [
+        {
+          "checkpointSha256": "0c796ee7f98dc3a7919d02e524b7126e0deee5be85e281f08c08acb310ce640c",
+          "id": "epoch9",
+          "predictionsSha256": "2bf1a9b98877e85931a1f73a0fe94e020832b78ef2efbede4f20de35b7306f6d",
+          "real": {
+            "duplicate": 11,
+            "duplicatePerImage": 0.018333333333,
+            "extra": 101,
+            "extraPerImage": 0.168333333333,
+            "matches": 671,
+            "meanMatchedIoU": 0.888875572891,
+            "miss": 29,
+            "missPerImage": 0.048333333333,
+            "predictions": 783,
+            "recall@0.5": 0.958571428571,
+            "recall@0.75": 0.878571428571,
+            "recall@0.9": 0.622857142857,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.48755990433176705
+        },
+        {
+          "checkpointSha256": "0f5de4d1f3962dcb999bf600770f7991352258eb3e055de43d680acfb3ebbbdc",
+          "id": "epoch19",
+          "predictionsSha256": "0d4e9895d15c76e7ebf78a38d51c8ffbbda8c12e963d5675b720e34431238da6",
+          "real": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.001666666667,
+            "extra": 16,
+            "extraPerImage": 0.026666666667,
+            "matches": 675,
+            "meanMatchedIoU": 0.907811066992,
+            "miss": 25,
+            "missPerImage": 0.041666666667,
+            "predictions": 692,
+            "recall@0.5": 0.964285714286,
+            "recall@0.75": 0.898571428571,
+            "recall@0.9": 0.704285714286,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.7051552627311306
+        },
+        {
+          "checkpointSha256": "89a7183b2c86860974e2936336de271a54fd499a1a07207f71b16047695869e1",
+          "id": "epoch29",
+          "predictionsSha256": "76cfd87d0d0cbf7450aacff1a1f95c2b9b482b521450b80da511deea493f2435",
+          "real": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.001666666667,
+            "extra": 16,
+            "extraPerImage": 0.026666666667,
+            "matches": 675,
+            "meanMatchedIoU": 0.925946174253,
+            "miss": 25,
+            "missPerImage": 0.041666666667,
+            "predictions": 692,
+            "recall@0.5": 0.964285714286,
+            "recall@0.75": 0.922857142857,
+            "recall@0.9": 0.798571428571,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.7549471042246164
+        },
+        {
+          "checkpointSha256": "43e9ffe7a2aebaa6038d75b456570bdb424bbf42a746ed3e0825d1a49f45621a",
+          "id": "epoch39",
+          "predictionsSha256": "0ceb299b0e900d872d34ebb0815be6b77a0415cf07f3f32b8b767ef25416f902",
+          "real": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.001666666667,
+            "extra": 23,
+            "extraPerImage": 0.038333333333,
+            "matches": 677,
+            "meanMatchedIoU": 0.924098046015,
+            "miss": 23,
+            "missPerImage": 0.038333333333,
+            "predictions": 701,
+            "recall@0.5": 0.967142857143,
+            "recall@0.75": 0.912857142857,
+            "recall@0.9": 0.772857142857,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.7565184404450068
+        },
+        {
+          "checkpointSha256": "f20b7e3da3557948e61dc429d5235c8c45a7467d94d2d83c4282205ef89111ad",
+          "id": "epoch49",
+          "predictionsSha256": "02f0880345ff7be9f59eeb02c422acfb71c7ea7dea9f14effac7ae7ec86a1ee8",
+          "real": {
+            "duplicate": 1,
+            "duplicatePerImage": 0.001666666667,
+            "extra": 26,
+            "extraPerImage": 0.043333333333,
+            "matches": 676,
+            "meanMatchedIoU": 0.925349830802,
+            "miss": 24,
+            "missPerImage": 0.04,
+            "predictions": 703,
+            "recall@0.5": 0.965714285714,
+            "recall@0.75": 0.912857142857,
+            "recall@0.9": 0.777142857143,
+            "records": 600,
+            "truthInstances": 700
+          },
+          "validationScore": 0.7737105821648308
+        }
+      ],
+      "complete": true,
+      "declarationSha256": "ca954fefdeb633a0d15e34c4f8801c100d507059e320b83c0b65b09c444f98ba",
+      "productionPromotion": false,
+      "testMetricsUsedToTuneRule": false,
+      "validationSelected": "epoch49"
+    }
+  },
+  "runtimeSmoke": {
+    "device": "cpu",
+    "epochs": 1,
+    "fixtureOnly": true,
+    "implicitAlbumentations": false,
+    "passed": true,
+    "savedCheckpointReloaded": true,
+    "stockFixedOrderLoss": true,
+    "ultralytics": "8.4.138"
+  },
+  "testMetricsUsedToTuneRule": false
+}
