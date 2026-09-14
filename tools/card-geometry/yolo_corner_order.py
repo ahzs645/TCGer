@@ -96,11 +96,13 @@ class CornerOrderPoseLoss(v8PoseLoss):
 
 
 class CornerOrderDataset(YOLODataset):
+    policy = POLICY
+
     def get_labels(self):
         require_runtime()
         labels = super().get_labels()
         metadata = json.loads((Path(self.data["path"]) / self.data["corner_order_metadata"]).read_text())
-        if metadata["policy"] != POLICY or self.data["corner_order_policy"] != POLICY:
+        if metadata["policy"] != self.policy or self.data["corner_order_policy"] != self.policy:
             raise ValueError("corner-order dataset policy mismatch")
         root = Path(self.data["path"]).resolve()
         for label in labels:
@@ -122,6 +124,8 @@ class CornerOrderDataset(YOLODataset):
             count = len(label["cls"])
             rows = np.concatenate((label["cls"], label["bboxes"], label["keypoints"].reshape(count, 12)), axis=1)
             label["orientation_lookup"] = np.asarray([lookup[row.tobytes()] for row in rows], dtype=bool)
+            if "rotationEligible" in binding:
+                label["rotation_eligible"] = binding["rotationEligible"]
         return labels
 
     def build_transforms(self, hyp=None):

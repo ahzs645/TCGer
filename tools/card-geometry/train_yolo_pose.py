@@ -99,12 +99,17 @@ def yolo_line(
 def materialize_yolo(
     release: Path, destination: Path, real_context_policy: dict[str, Any] | None = None,
     corner_order_policy: str = "fixed-v1",
+    runtime_augmentation: str = "none",
 ) -> dict[str, Any]:
     if corner_order_policy not in {"fixed-v1", "cyclic-unknown-v1"}:
         raise ValueError("unsupported corner-order policy")
+    if runtime_augmentation not in {"none", "quarter-turn-v1"} or (runtime_augmentation != "none" and corner_order_policy != "fixed-v1"):
+        raise ValueError("quarter-turn augmentation requires fixed-order supervision")
+    bind_orientation = corner_order_policy == "cyclic-unknown-v1" or runtime_augmentation != "none"
+    metadata_policy = "fixed-quarter-turn-v1" if runtime_augmentation != "none" else corner_order_policy
     manifest = load_json(release / "manifest.json")
     counts: Counter[str] = Counter()
-    orientation_metadata = {"policy": corner_order_policy, "corpusHash": manifest["corpusHash"], "images": {}}
+    orientation_metadata = {"policy": metadata_policy, "corpusHash": manifest["corpusHash"], "images": {}}
     destination.mkdir(parents=True, exist_ok=False)
     for split in ("train", "validation"):
         (destination / "images" / split).mkdir(parents=True)
@@ -139,25 +144,35 @@ def materialize_yolo(
         padded.save(image_target, format="JPEG", quality=95, optimize=False, progressive=False)
         lines = []
         orientation_targets = []
+        rotation_eligible = True
         for instance in record["instances"]:
             line = yolo_line(instance, width, height, margins)
             if line is not None:
                 lines.append(line)
                 counts[f"instances:{split}"] += 1
-                if corner_order_policy == "cyclic-unknown-v1":
+                if bind_orientation:
                     orientation = instance.get("orientationKnown")
                     if type(orientation) is not bool:
                         raise ValueError("orientation-aware materialization requires explicit orientationKnown")
                     orientation_targets.append({"instanceId": instance["instanceId"],
                         "orientationKnown": orientation, "yolo": list(map(float, line.split()))})
                     counts[f"orientation{'Known' if orientation else 'Unknown'}:{split}"] += 1
+                    if not orientation and has_corner_supervision(instance):
+                        points = [c['point'] for c in instance['corners']]
+                        start = min(range(4), key=lambda i: points[i]['x']*width + points[i]['y']*height)
+                        # Preserve exceptional unknown phases instead of silently
+                        # changing their supervision or inventing printed top.
+                        rotation_eligible = rotation_eligible and start == 0
         label_path = destination / "labels" / split / f"{entry['recordId']}.txt"
         label_path.write_text(
             "\n".join(lines) + "\n", encoding="utf-8"
         )
-        if corner_order_policy == "cyclic-unknown-v1":
+        if bind_orientation:
             orientation_metadata["images"][image_target.relative_to(destination).as_posix()] = {
-                "labelSha256": sha256_file(label_path), "targets": orientation_targets}
+                "labelSha256": sha256_file(label_path), "targets": orientation_targets,
+                **({"rotationEligible": rotation_eligible} if runtime_augmentation != "none" else {})}
+            if runtime_augmentation != "none":
+                counts[f"rotation{'Eligible' if rotation_eligible else 'ExcludedUnknownPhase'}:{split}"] += 1
         counts[f"records:{split}"] += 1
     yaml = (
         f"path: {destination.resolve()}\n"
@@ -167,10 +182,10 @@ def materialize_yolo(
         "kpt_shape: [4, 3]\n"
         "flip_idx: [1, 0, 3, 2]\n"
     )
-    if corner_order_policy == "cyclic-unknown-v1":
+    if bind_orientation:
         metadata_path = destination / "corner-order.json"
         metadata_path.write_text(json.dumps(orientation_metadata, sort_keys=True) + "\n", encoding="utf-8")
-        yaml += "corner_order_policy: cyclic-unknown-v1\ncorner_order_metadata: corner-order.json\n"
+        yaml += f"corner_order_policy: {metadata_policy}\ncorner_order_metadata: corner-order.json\n"
     (destination / "dataset.yaml").write_text(yaml, encoding="utf-8")
     if not counts["records:train"] or not counts["records:validation"]:
         raise ValueError(f"materialized dataset is incomplete: {dict(counts)}")
@@ -178,7 +193,7 @@ def materialize_yolo(
         "corpusHash": manifest["corpusHash"],
         "cornerOrderPolicy": corner_order_policy,
         "cornerOrderMetadataSha256": sha256_file(destination / "corner-order.json")
-            if corner_order_policy == "cyclic-unknown-v1" else None,
+            if bind_orientation else None,
         "realContextMarginPolicy": real_context_policy,
         "counts": dict(sorted(counts.items())),
         "contextPadding": {
@@ -223,7 +238,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("one Job invocation trains exactly one resolved repeat")
 
     dataset = output / "yolo-dataset"
-    materialization = materialize_yolo(release, dataset, context_policy_from_environment(), args.corner_order_policy)
+    augmentation = getattr(args, "runtime_augmentation", "none")
+    materialization = materialize_yolo(release, dataset, context_policy_from_environment(), args.corner_order_policy, augmentation)
     base = output / f"base-{args.candidate}.pt"
     download_verified(args.base_url, args.base_sha256, base)
 
@@ -235,6 +251,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     if args.corner_order_policy == "cyclic-unknown-v1":
         from yolo_corner_order import CornerOrderPoseTrainer
         trainer_options["trainer"] = CornerOrderPoseTrainer
+    elif augmentation == "quarter-turn-v1":
+        from yolo_card_rotation import FixedRotationPoseTrainer
+        trainer_options["trainer"] = FixedRotationPoseTrainer
     model.train(
         **trainer_options,
         data=str(dataset / "dataset.yaml"),
@@ -299,7 +318,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "batch": args.batch,
             "seed": seed,
             "augmentationProfile": os.environ["TCGER_GEOMETRY_AUGMENTATION_PROFILE"],
-            "runtimeAugmentation": "disabled; variation is baked into the canonical corpus",
+            "runtimeAugmentation": "disabled; variation is baked into the canonical corpus" if augmentation == "none" else "quarter-turn-v1: whole-photo 0/90/180/270 degrees, uniform; no flips or clipping; known printed indices retained; canonical unknown phases recomputed; exceptional unknown-phase frames unchanged",
             "cornerOrderPolicy": args.corner_order_policy,
             "materialization": "black context pad, JPEG quality 95, then 114 letterbox",
             "ultralyticsVersion": ultralytics_version,
@@ -330,6 +349,7 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--corner-order-policy", choices=("fixed-v1", "cyclic-unknown-v1"), default="fixed-v1")
     parser.add_argument("--select-on-validation", action="store_true", help="Choose the declared saved shortlist using validation geometry before any frozen evaluation")
+    parser.add_argument("--runtime-augmentation", choices=("none", "quarter-turn-v1"), default="none")
     parser.add_argument("--materialize-only", action="store_true")
     parser.add_argument("--release-root", type=Path)
     parser.add_argument("--output", type=Path)
@@ -340,7 +360,7 @@ def main() -> int:
             parser.error("--materialize-only requires --release-root and --output")
         print(json.dumps(materialize_yolo(args.release_root, args.output,
             load_json(args.real_context_policy) if args.real_context_policy else context_policy_from_environment(),
-            args.corner_order_policy), sort_keys=True))
+            args.corner_order_policy, args.runtime_augmentation), sort_keys=True))
         return 0
     print(json.dumps(train(args), indent=2, sort_keys=True))
     return 0
