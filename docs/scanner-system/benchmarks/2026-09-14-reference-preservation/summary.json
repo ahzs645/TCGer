@@ -1,0 +1,26 @@
+{
+  "completedAt": "2026-09-14T14:29:51.034128+00:00",
+  "destination": "/Users/ahmadjalil/Library/CloudStorage/GoogleDrive-ahzs645@gmail.com/My Drive/Projects/TCG/Reference/TCGer-Geometry-Archive/2026-09-14",
+  "archiveBytes": 7908290422,
+  "archiveSha256": "417bd34853daaeb0d6fc0647b6335ffa97b47a2ca9d9af2c51c54ccd5107ab2f",
+  "manifestSha256": "2affce6fc9c87d002a91e8a74360e49abc98965d3b1b1e784b0c37f45e6abeb1",
+  "archivedFilePaths": 395732,
+  "uniqueObjects": 91526,
+  "releaseVersions": 32,
+  "directHuggingFaceManifestMatches": 14,
+  "otherManifestsAbsentAtCheckedDirectPaths": 18,
+  "currentSelectedCheckpointsIncluded": 4,
+  "restoreTest": {
+    "restoredFiles": 1206,
+    "independentCopies": true,
+    "prefix": ".artifacts/card-geometry/releases/real-geometry-evaluation-v6-full-aliases-v2/",
+    "verifiedRestoredFiles": 1206,
+    "photos": 600,
+    "truthInstances": 700,
+    "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+    "completedAt": "2026-09-14T14:28:15.704120+00:00",
+    "temporaryRestoreRemoved": true
+  },
+  "sourceFilesMovedOrDeleted": false,
+  "remoteGoogleDriveSyncVerified": false
+}

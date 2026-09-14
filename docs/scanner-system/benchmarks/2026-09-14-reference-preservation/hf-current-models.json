@@ -1,0 +1,33 @@
+{
+  "repo": "ahzs645/tcger-universal-arcface",
+  "models": [
+    {
+      "name": "control-20260906",
+      "path": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/802395826d27c7223a8a170b465662e0e8eebd59befee1c1c0e2d1b039b7b905/training-output/training/repeat-0/weights/epoch39.pt",
+      "sha256": "3cff0d4883b5bc5e40297cd50a2d38eb92187d7c9d8d359af0f75c8d3c9f8512",
+      "revision": "bc3e65b955c66e650af2ed4a1a93368541fc297f",
+      "remoteLfsSha256Matches": true
+    },
+    {
+      "name": "rotation-20260905",
+      "path": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/62da83b79ee9dbdd82626f1d5c44e2c5847930401e8d79bf2eeb1cf33509ce79/training-output/training/repeat-0/weights/epoch49.pt",
+      "sha256": "e2e6f960d8c115206ec82dc9749cc7cdf473cca4e75dbe7a67209bc533787e28",
+      "revision": "bc3e65b955c66e650af2ed4a1a93368541fc297f",
+      "remoteLfsSha256Matches": true
+    },
+    {
+      "name": "rotation-20260906",
+      "path": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/24e9f83023afd7228825939c41266c4186c99e16b67fd059b257c8f4cebfb8d3/training-output/training/repeat-0/weights/epoch49.pt",
+      "sha256": "b926584cb4a45181559d52813612c597ec3e2adc0c8bfa3b7d00d21800cffbe8",
+      "revision": "bc3e65b955c66e650af2ed4a1a93368541fc297f",
+      "remoteLfsSha256Matches": true
+    },
+    {
+      "name": "control-20260905",
+      "path": "geometry/yolo11s-pose/aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162/e6bd0d00300626e25352a271a917d91d44e69b3527816dd5a9a8f7a08bd7a056/training-output/training/repeat-0/weights/epoch49.pt",
+      "revision": "bc3e65b955c66e650af2ed4a1a93368541fc297f",
+      "sha256": "f20b7e3da3557948e61dc429d5235c8c45a7467d94d2d83c4282205ef89111ad",
+      "remoteLfsSha256Matches": true
+    }
+  ]
+}

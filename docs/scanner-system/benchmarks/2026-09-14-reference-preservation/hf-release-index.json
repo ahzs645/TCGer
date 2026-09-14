@@ -1,0 +1,263 @@
+{
+  "repository": "ahzs645/tcger-scanner-images",
+  "revision": "f73c4103e4a8c81a45ecf0b188fcbdeed003ce78",
+  "check": "Direct manifest comparison only; not an exhaustive historical archive or image audit.",
+  "releases": [
+    {
+      "release": "real-geometry-round-two-candidate-v1",
+      "corpusHash": "fba31d0c62d4844219faa15ff3f29a515933a44bbd9f93898d8e047b1b7c1981",
+      "localManifestSha256": "6122d82dd9453073d962109097a0a92550b8013b15faf73560ccd0e77b8e6647",
+      "path": "geometry/releases/real-geometry-round-two-candidate-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "synthetic-geometry-multigame-production-v1",
+      "corpusHash": "68e35a210d0c2947c4d9d2e4fe9c9b90a7a9f6c912bf03c2c28e2efef29067b7",
+      "localManifestSha256": "db01d05b2ab7fec289a3b276beb954dfbf4384c43a954892bcdc72c2f4314c9a",
+      "path": "geometry/releases/synthetic-geometry-multigame-production-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-evaluation-v6-full-aliases-v2",
+      "corpusHash": "631cc7f9ac24b19d5e7587f5c5aefa401f911cfcf4ed52ab6858ea29d3740dd7",
+      "localManifestSha256": "c7418b1331c5b16630f302cd62a64a847459a87ba1804b3123f1b2e7518ad879",
+      "path": "geometry/releases/real-geometry-evaluation-v6-full-aliases-v2/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "card-geometry-training-reviewed-corners-v1",
+      "corpusHash": "41c110e13eef6c898d31ed9ba7e56bdc449f3651ffb6ad7f103655eac60495cf",
+      "localManifestSha256": "583e256b01de55e06260107b53c3bdc5f6511771491a59251e2f9f845cafa764",
+      "path": "geometry/releases/card-geometry-training-reviewed-corners-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "real-geometry-binder-smoke-v4",
+      "corpusHash": "764491d11ea134686687c462fa7bef19cf70ca817ab1d124d3f27b5c6d400a0d",
+      "localManifestSha256": "86bf2e9200278365c7e48d2c5be6a011fa1105fa085ffb0cf591d79bd595d86f",
+      "path": "geometry/releases/real-geometry-binder-smoke-v4/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "combined-shippable-training-production-v1",
+      "corpusHash": "a8d9d7b77506883316d4660bd2d85449befe9d26a7ac84198a6475e16ac250cc",
+      "localManifestSha256": "c26d439392c30ae6fe8069b5c999fc2fd62f93239994ec12044a8ceb4b7b4851",
+      "path": "geometry/releases/combined-shippable-training-production-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "real-geometry-reviewed-corners-clean-v1",
+      "corpusHash": "971359677eebde0dd14220ac994a9309bf9150a87a2dfbdc0d5eadb2e2aba1b1",
+      "localManifestSha256": "f5f2cdc135f4b7f9465f5a5161e101e321e628e4f5c9c31007022e4945826174",
+      "path": "geometry/releases/real-geometry-reviewed-corners-clean-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-devmode-orientation-smoke-v3",
+      "corpusHash": "97780e7e96cbd98da91173a00b37e6304514f758a9046f5bd98adf30c418820e",
+      "localManifestSha256": "e164767baefa325a708c8651c8110df93355ce6be69454eeda52f5b429a68a48",
+      "path": "geometry/releases/real-geometry-devmode-orientation-smoke-v3/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "real-geometry-steep-duel-smoke-v6",
+      "corpusHash": "b9622edbe8033f7e739c8ef5fb1c1cd604e3d9ca194aa2164899ac0f6a6c112e",
+      "localManifestSha256": "e96abf5aadb95bc4959e74b643d0cb64805841e67477caac471eecfaee71aa1c",
+      "path": "geometry/releases/real-geometry-steep-duel-smoke-v6/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "synthetic-geometry-smoke-v1",
+      "corpusHash": "544ec80646b61e8b3c5343b93ce9580061d164ad03cd1e25ed28c08d2eec9393",
+      "localManifestSha256": "57c8b73fbd622d2ed1bd16ccf662d3089aa6f19757f51bf3493a2d9b733c12f2",
+      "path": "geometry/releases/synthetic-geometry-smoke-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "card-geometry-orientation-validation-v1",
+      "corpusHash": "5a11e124874fbfc57610c82e2402cccafe2dc0f1f2bcbb579d8ed2879d86cea2",
+      "localManifestSha256": "aec3b599069cc0f2a356e6dee8996d82ec4d22832f0d4463b89d15421e510bdc",
+      "path": "geometry/releases/card-geometry-orientation-validation-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-successor-candidate-v1",
+      "corpusHash": "8c709255183d446e6e5740bc4754767b80e01281e810904e1e8578ede667a855",
+      "localManifestSha256": "91a40cf6592073da243ef7d0aef7dbb571599ccdbf8039c2bdd1b2196f0752b4",
+      "path": "geometry/releases/real-geometry-successor-candidate-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "synthetic-geometry-multigame-bakeoff-eval-v1",
+      "corpusHash": "bda45771be01d50bde130b6a68afe91ad509154df9aa26050f9cfdf30aad809a",
+      "localManifestSha256": "89c1b467fc77f7f5d6e5de1ed8d139a297a513fd68dadfc2f51676b57c6aa7c1",
+      "path": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "real-geometry-round-two-candidate-v2",
+      "corpusHash": "7d4b031ee5e98f6f70cf04c7868c9717c76ff105c9f8213f7c8783bf09a7ba60",
+      "localManifestSha256": "b9c05629aa273e8e1388020898472a2dd993f72caef717286de1da0213e9052a",
+      "path": "geometry/releases/real-geometry-round-two-candidate-v2/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-round-two-candidate-v3",
+      "corpusHash": "d41b0881a30f03be56e9ec734ff3f8bb40ee90525a46cfde442b9188c57cabee",
+      "localManifestSha256": "05b86a79d9ef4bfa32d65636a774c63b08827141a43ac3a566ad9861968a2916",
+      "path": "geometry/releases/real-geometry-round-two-candidate-v3/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-steep-smoke-v5",
+      "corpusHash": "52105a038761d544ff5c2d96fadcc1522103978951b6dd9886c0012655d4e38e",
+      "localManifestSha256": "211bcd201c11039fc9174e6625e46ef06194e94134193d06f0975d95bae7c151",
+      "path": "geometry/releases/real-geometry-steep-smoke-v5/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-reviewed-corners-unrepaired-v1",
+      "corpusHash": "a12c9df7fe8cc7e20ec4d09bdc20b5b8a1d09d479ef2798b38bea483c479c8bb",
+      "localManifestSha256": "88253558f65f9444a44c8e83aa75bf533c10375db15576c0b0a9a06f74058e36",
+      "path": "geometry/releases/real-geometry-reviewed-corners-unrepaired-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "synthetic-geometry-round-two-v1",
+      "corpusHash": "7dc313a7a322f7907555a99fd2271a101f7eca99af620287e97f288b38373d7f",
+      "localManifestSha256": "77b7d90165cae57966530c2091268137c35643bf7666c702cfb20c074f47c813",
+      "path": "geometry/releases/synthetic-geometry-round-two-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-category-repair-candidate-v1",
+      "corpusHash": "1dd3a9d86552c5c2d47fd54c0b37376bc3f89a2e45e9d9510f64375e841a5d7c",
+      "localManifestSha256": "1711a729fcc1a582c1198443ec745b56c98a8154dae9c088c3ac0de92b602a8c",
+      "path": "geometry/releases/real-geometry-category-repair-candidate-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "combined-shippable-training-v1",
+      "corpusHash": "0fead0a36f9065963e8373632c10adef5840dbf99dc732d9e1f872690c841aac",
+      "localManifestSha256": "87d52dba506ea70d7ef533eb10d1de888f6a39ec874936601f188298f3935f02",
+      "path": "geometry/releases/combined-shippable-training-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "card-geometry-training-round-two-v1",
+      "corpusHash": "286d1196e9f0c85a37779ec52c6e9ba2f1533224a62c066dc93269c26720dbc4",
+      "localManifestSha256": "bd159433b5028e1f8c078503235f68a61868c715671c44a094ef616ae556aedf",
+      "path": "geometry/releases/card-geometry-training-round-two-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "real-geometry-reviewed-corners-v1",
+      "corpusHash": "edcc7a8a2d2d7314b61d35d2387af18df940aafee1cc6455bb5b62bc382d8d68",
+      "localManifestSha256": "251237c47d74c2b689223decd5c5d1393e4dcd866249b4e3db7fdb581fd4494d",
+      "path": "geometry/releases/real-geometry-reviewed-corners-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-devmode-smoke-v2",
+      "corpusHash": "d14c97a428e7295e10e75644189528dce297d5990d9c76435eeb9e1cf64dc242",
+      "localManifestSha256": "0b8c9644456e68c288c95eac6b46aa2c58c849284812928c83be66fd8412ff19",
+      "path": "geometry/releases/real-geometry-devmode-smoke-v2/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "real-geometry-successor-padding-fixed-v1",
+      "corpusHash": "d3e761313361542990c402a7706490cebcdeec9578bc0471635b8a80d416a20c",
+      "localManifestSha256": "0109ffb588d4a4adc3a44e4da81af22f036d675d80a46ab03d16150f3f8dfeca",
+      "path": "geometry/releases/real-geometry-successor-padding-fixed-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-reviewed-corners-derived-v1",
+      "corpusHash": "8709098dfbeaf60cbecfb76a30e9a07e40b985fe3777784f306e8dce9b0af9c1",
+      "localManifestSha256": "7c110b4029591a66e5f9c60b1c4749e44130c544b87775d43877a8c817c90f7e",
+      "path": "geometry/releases/real-geometry-reviewed-corners-derived-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "synthetic-geometry-smoke-v2",
+      "corpusHash": "eb3a6b2232b14377dd00cdbcbc92d62b3ca81bec2586e464523e1421fbaa7ebe",
+      "localManifestSha256": "bf659dd5be25cf2812b6db4fb1016b7deb013eaf1c8d95431ccd8ca92928ec3c",
+      "path": "geometry/releases/synthetic-geometry-smoke-v2/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "card-geometry-orientation-validation-v2",
+      "corpusHash": "aceff85cccac00fc9420831df4a1c88c2360847a47c5f1a3f917462b20630162",
+      "localManifestSha256": "171e36e45ceb13d582bb13da48567fafe2e5b002e4eaebafbcccae42538f70bf",
+      "path": "geometry/releases/card-geometry-orientation-validation-v2/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2",
+      "corpusHash": "fb3eca1aa55d99cbff03c1f0eb58600884be879af2d75b8b4becc3d94932ba05",
+      "localManifestSha256": "bcda571129b3d4d8b993ff4f0e9f60bc2eab8b1794ce714347be7aedcb4c723f",
+      "path": "geometry/releases/synthetic-geometry-multigame-bakeoff-eval-v1-aliases-v2/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "synthetic-geometry-multigame-production-train-v1",
+      "corpusHash": "efceb3b2d9d0a62081ea4cb6de0d20ab025d884142094578f5d62826116f359b",
+      "localManifestSha256": "1703e53769e6a6961f928d05ce0919415750dbd0b6cfdfd675cda155b64ce93f",
+      "path": "geometry/releases/synthetic-geometry-multigame-production-train-v1/manifest.json",
+      "remoteManifestPresent": false,
+      "remoteManifestMatches": false
+    },
+    {
+      "release": "real-geometry-evaluation-v6-full",
+      "corpusHash": "7a75cc5ba2f0ac429136fa67f75b473e09c05f6edaee112bf0f5b1ba701a188a",
+      "localManifestSha256": "dc7f2b7deec6d7ddd1c269745e938542dbab39948df5c4cd57912c68d98c9285",
+      "path": "geometry/releases/real-geometry-evaluation-v6-full/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "real-ingestion-smoke-v1",
+      "corpusHash": "ca5ba6b366047c94d689ebe368eaa11e40be4c8fc976bbea99fd31d26229a9bd",
+      "localManifestSha256": "5ffa913d1b3a8b94b1d7974606240eae8f51802c9e6ee064b4a86532519f47c2",
+      "path": "geometry/releases/real-ingestion-smoke-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    },
+    {
+      "release": "card-geometry-training-successor-candidate-v1",
+      "corpusHash": "74f33bc2643a70b6f9137a23a7169af1f42fb44f495c9c64011a1bb27edf4adf",
+      "localManifestSha256": "eec70ef5f041b243be6951857d37efa3a53f0581a0c5e1782b149d1a09c6370c",
+      "path": "geometry/releases/card-geometry-training-successor-candidate-v1/manifest.json",
+      "remoteManifestPresent": true,
+      "remoteManifestMatches": true
+    }
+  ]
+}

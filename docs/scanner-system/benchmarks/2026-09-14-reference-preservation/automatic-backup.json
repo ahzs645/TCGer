@@ -1,0 +1,37 @@
+{
+  "bytes": 369194947,
+  "error": null,
+  "fiftyoneError": null,
+  "fiftyoneExports": {
+    "scanner-review": {
+      "datasets": {
+        "tcger-scanner-ios-replay": 2336,
+        "tcger-scanner-real-sessions": 1726,
+        "tcger-scanner-real-sessions-quality-v2": 1726,
+        "tcger-scanner-rectification-previews": 96,
+        "tcger-scanner-shutter-benchmark": 299
+      },
+      "error": null,
+      "lastExport": "2026-09-10T16:18:17+00:00",
+      "source": "Verified September 10 preservation snapshot; database currently stopped",
+      "state": "offline"
+    },
+    "sessions": {
+      "datasets": {
+        "tcger-sessions": 712
+      },
+      "error": null,
+      "lastExport": "2026-09-10T20:22:03.074432+00:00",
+      "state": "offline"
+    }
+  },
+  "fiftyoneIntervalSeconds": 120,
+  "fileIntervalSeconds": 10,
+  "files": 2681,
+  "folder": "/Users/ahmadjalil/Library/CloudStorage/GoogleDrive-ahzs645@gmail.com/My Drive/Projects/TCG/Reference/TCGer-Labeling/automatic",
+  "lastCheck": "2026-09-14T14:20:52.162622+00:00",
+  "lastSuccess": "2026-09-14T14:20:52.163482+00:00",
+  "manifestSha256": "cc8e7540b9a9d766653dc48b53c122e6ea648100c445a3c1a98857017b259d94",
+  "providerSync": "not measured",
+  "state": "saved"
+}
