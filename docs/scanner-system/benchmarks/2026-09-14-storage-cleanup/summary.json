@@ -1,0 +1,40 @@
+{
+  "completedAt": "2026-09-14T14:00:57.773069+00:00",
+  "projectAllocatedKiBBefore": 38740312,
+  "artifactAllocatedKiBBefore": 27724372,
+  "removedAllocatedBytes": 9530494976,
+  "protectedFilesVerified": 2677,
+  "diskBefore": {
+    "total": 494384795648,
+    "used": 474961182720,
+    "free": 19423612928
+  },
+  "diskAfter": {
+    "total": 494384795648,
+    "used": 465482899456,
+    "free": 28901896192
+  },
+  "currentTrainingPreserved": true,
+  "sourceAndLabelChanges": false,
+  "retained": [
+    "All card-geometry releases and source photos",
+    "All saved studio labels and journals",
+    "Latest trained checkpoints and unfinished final CPU comparison evidence",
+    "Active ML and FiftyOne environments",
+    "Root and frontend node_modules",
+    "Original crop parity cases, source images, archives, reports and canonical reference variant"
+  ],
+  "removedCategoryGiB": {
+    "generated_builds": 3.0912017822265625,
+    "unused_environments": 2.3007736206054688,
+    "crop_test_variants_and_duplicate_bundles": 2.473072052001953,
+    "clean_git_worktrees": 0.6697807312011719,
+    "old_upload_caches": 0.3411369323730469
+  },
+  "projectAllocatedKiBAfter": 29432628,
+  "artifactAllocatedKiBAfter": 23233148,
+  "projectGBBefore": 39.670079488,
+  "projectGBAfter": 30.139011072,
+  "artifactsGBBefore": 28.389756928,
+  "artifactsGBAfter": 23.790743552
+}

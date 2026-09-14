@@ -1,0 +1,44 @@
+[
+  {
+    "path": ".artifacts/card-geometry/cyclic-yolo11s-20260909/tooling-worktree",
+    "revision": "73ae5e61d7f667fb7cdc8e28fc0a30cf24208425",
+    "allocatedBytes": 324030464,
+    "restoreCommand": [
+      "git",
+      "worktree",
+      "add",
+      "--detach",
+      ".artifacts/card-geometry/cyclic-yolo11s-20260909/tooling-worktree",
+      "73ae5e61d7f667fb7cdc8e28fc0a30cf24208425"
+    ],
+    "removedAt": "2026-09-14T13:58:30.415059+00:00"
+  },
+  {
+    "path": ".artifacts/card-geometry/reviewed-yolo11s-20260908/tooling-worktree",
+    "revision": "9a96e11fb09aa82693eff9b0301e24b1dda9a734",
+    "allocatedBytes": 323796992,
+    "restoreCommand": [
+      "git",
+      "worktree",
+      "add",
+      "--detach",
+      ".artifacts/card-geometry/reviewed-yolo11s-20260908/tooling-worktree",
+      "9a96e11fb09aa82693eff9b0301e24b1dda9a734"
+    ],
+    "removedAt": "2026-09-14T13:58:30.741973+00:00"
+  },
+  {
+    "path": ".artifacts/card-geometry/orientation-validation-20260910/tooling-worktree",
+    "revision": "633b348d332c51bf7718b33c2bb107a765c7f02f",
+    "allocatedBytes": 71344128,
+    "restoreCommand": [
+      "git",
+      "worktree",
+      "add",
+      "--detach",
+      ".artifacts/card-geometry/orientation-validation-20260910/tooling-worktree",
+      "633b348d332c51bf7718b33c2bb107a765c7f02f"
+    ],
+    "removedAt": "2026-09-14T13:58:30.883897+00:00"
+  }
+]
