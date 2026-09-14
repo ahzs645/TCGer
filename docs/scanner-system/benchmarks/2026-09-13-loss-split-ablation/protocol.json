@@ -1,0 +1,29 @@
+{
+  "authorizedTrainingRuns": 2,
+  "baseSeed": 20260905,
+  "candidate": "yolo11s-pose",
+  "date": "2026-09-13",
+  "epochs": 50,
+  "flavor": "l4x1",
+  "interpretation": [
+    "Loss effect is a conditional single-seed contrast; recovery near 96 is evidence, not sole-cause proof.",
+    "The historical 96/86 figures use different checkpoint selection. The final-epoch two-by-two is reported separately.",
+    "One additional seed gives one observed replicate difference, not a precise seed-variance estimate."
+  ],
+  "primaryCheckpoint": "epoch49.pt (50th epoch), fixed before evaluation for all four loss/split cells",
+  "prohibitedChanges": [
+    "No frozen label edits",
+    "No orientation proposals in these training inputs",
+    "No training from phone session",
+    "No YOLO11m submission",
+    "No automatic replacement training after failure"
+  ],
+  "repeatSeed": 20260906,
+  "schema": "tcger-loss-split-ablation/v1",
+  "secondaryComparisons": [
+    "Framework best for the September 8 recipe seed repeat, matching the historical baseline selection rule.",
+    "September 10 balanced validation selector for fixed versus cyclic on the new split; no test-based selection."
+  ],
+  "session": "Frozen September 9 75-photo / 106-card snapshot. Already inspected; diagnostic, not a new blind test.",
+  "timeoutPerRun": "4h"
+}

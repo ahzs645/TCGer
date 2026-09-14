@@ -1,0 +1,25 @@
+{
+  "effects": {
+    "seedChangeFinal": {
+      "found": 9,
+      "tight": -3,
+      "meanIoU": 0.02775519031145035
+    },
+    "fixedMinusCyclicOld": {
+      "found": 3,
+      "tight": 7,
+      "meanIoU": 0.0414728956942545
+    },
+    "fixedMinusCyclicNew": {
+      "found": 5,
+      "tight": -2,
+      "meanIoU": 0.028397403096844243
+    },
+    "selectedMinusFinalOriginal": {
+      "found": 7,
+      "tight": 7,
+      "meanIoU": 0.042543820322912484
+    }
+  },
+  "scope": "Point differences on the inspected 106-card phone session. One seed pair is not a sampling distribution."
+}

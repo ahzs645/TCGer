@@ -1,0 +1,2236 @@
+{
+  "schema": "tcger-session-iou-distribution/v1",
+  "diagnosticOnly": true,
+  "assignment": "Maximum-total-IoU one-to-one pairing without an IoU cutoff. Unassigned/zero-overlap references get zero. This differs from the frozen threshold-specific benchmark matcher.",
+  "unchanged": "Predictions, confidence thresholds, reference labels, checkpoint choices and original benchmark scores.",
+  "models": {
+    "baseline": {
+      "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/reviewed-yolo11s-20260908/results/best.pt",
+      "checkpointSha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327",
+      "id": "previous"
+    },
+    "candidate": {
+      "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/orientation-validation-20260910/results/selected.pt",
+      "checkpointSha256": "13c2eb19b41a03ef1a68a6d2dacb4f480f57c9d25ffdf54046f24f3b6f62c7de",
+      "id": "orientation-validation-selected"
+    }
+  },
+  "summaries": {
+    "baseline": {
+      "count": 106,
+      "mean": 0.7966689905523348,
+      "zeroOverlap": 4,
+      "quantiles": {
+        "0": 0.0,
+        "10": 0.6551432242692352,
+        "25": 0.7855117585285142,
+        "50": 0.8622312927623843,
+        "75": 0.9230704436456216,
+        "90": 0.9411510847616791,
+        "100": 0.9710426529240285
+      },
+      "histogram": {
+        "edges": [
+          0.0,
+          0.05,
+          0.1,
+          0.15000000000000002,
+          0.2,
+          0.25,
+          0.30000000000000004,
+          0.35000000000000003,
+          0.4,
+          0.45,
+          0.5,
+          0.55,
+          0.6000000000000001,
+          0.65,
+          0.7000000000000001,
+          0.75,
+          0.8,
+          0.8500000000000001,
+          0.9,
+          0.9500000000000001,
+          1.0
+        ],
+        "counts": [
+          4,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          2,
+          0,
+          0,
+          1,
+          4,
+          6,
+          8,
+          20,
+          17,
+          32,
+          8
+        ]
+      },
+      "survival": [
+        {
+          "iou": 0.05,
+          "count": 102
+        },
+        {
+          "iou": 0.1,
+          "count": 101
+        },
+        {
+          "iou": 0.15,
+          "count": 100
+        },
+        {
+          "iou": 0.2,
+          "count": 100
+        },
+        {
+          "iou": 0.25,
+          "count": 100
+        },
+        {
+          "iou": 0.3,
+          "count": 100
+        },
+        {
+          "iou": 0.35,
+          "count": 100
+        },
+        {
+          "iou": 0.39999999999999997,
+          "count": 99
+        },
+        {
+          "iou": 0.44999999999999996,
+          "count": 98
+        },
+        {
+          "iou": 0.49999999999999994,
+          "count": 96
+        },
+        {
+          "iou": 0.5499999999999999,
+          "count": 96
+        },
+        {
+          "iou": 0.6,
+          "count": 96
+        },
+        {
+          "iou": 0.65,
+          "count": 95
+        },
+        {
+          "iou": 0.7,
+          "count": 91
+        },
+        {
+          "iou": 0.75,
+          "count": 85
+        },
+        {
+          "iou": 0.7999999999999999,
+          "count": 77
+        },
+        {
+          "iou": 0.85,
+          "count": 57
+        },
+        {
+          "iou": 0.9,
+          "count": 40
+        },
+        {
+          "iou": 0.95,
+          "count": 8
+        },
+        {
+          "iou": 1.0,
+          "count": 0
+        }
+      ]
+    },
+    "candidate": {
+      "count": 106,
+      "mean": 0.7127491931167425,
+      "zeroOverlap": 9,
+      "quantiles": {
+        "0": 0.0,
+        "10": 0.1342810833521206,
+        "25": 0.6345851544003538,
+        "50": 0.8326759679794475,
+        "75": 0.9064989852183434,
+        "90": 0.9449977603043014,
+        "100": 0.9711771703560357
+      },
+      "histogram": {
+        "edges": [
+          0.0,
+          0.05,
+          0.1,
+          0.15000000000000002,
+          0.2,
+          0.25,
+          0.30000000000000004,
+          0.35000000000000003,
+          0.4,
+          0.45,
+          0.5,
+          0.55,
+          0.6000000000000001,
+          0.65,
+          0.7000000000000001,
+          0.75,
+          0.8,
+          0.8500000000000001,
+          0.9,
+          0.9500000000000001,
+          1.0
+        ],
+        "counts": [
+          9,
+          1,
+          2,
+          1,
+          0,
+          0,
+          0,
+          2,
+          2,
+          3,
+          2,
+          2,
+          5,
+          1,
+          5,
+          11,
+          14,
+          13,
+          24,
+          9
+        ]
+      },
+      "survival": [
+        {
+          "iou": 0.05,
+          "count": 97
+        },
+        {
+          "iou": 0.1,
+          "count": 96
+        },
+        {
+          "iou": 0.15,
+          "count": 94
+        },
+        {
+          "iou": 0.2,
+          "count": 93
+        },
+        {
+          "iou": 0.25,
+          "count": 93
+        },
+        {
+          "iou": 0.3,
+          "count": 93
+        },
+        {
+          "iou": 0.35,
+          "count": 93
+        },
+        {
+          "iou": 0.39999999999999997,
+          "count": 91
+        },
+        {
+          "iou": 0.44999999999999996,
+          "count": 89
+        },
+        {
+          "iou": 0.49999999999999994,
+          "count": 86
+        },
+        {
+          "iou": 0.5499999999999999,
+          "count": 84
+        },
+        {
+          "iou": 0.6,
+          "count": 82
+        },
+        {
+          "iou": 0.65,
+          "count": 77
+        },
+        {
+          "iou": 0.7,
+          "count": 76
+        },
+        {
+          "iou": 0.75,
+          "count": 71
+        },
+        {
+          "iou": 0.7999999999999999,
+          "count": 60
+        },
+        {
+          "iou": 0.85,
+          "count": 46
+        },
+        {
+          "iou": 0.9,
+          "count": 33
+        },
+        {
+          "iou": 0.95,
+          "count": 9
+        },
+        {
+          "iou": 1.0,
+          "count": 0
+        }
+      ]
+    }
+  },
+  "photoBalancedMean": {
+    "baseline": 0.7968248827342359,
+    "candidate": 0.7207094712339479
+  },
+  "originalBenchmark": {
+    "baseline": {
+      "found": 96,
+      "tight": 40
+    },
+    "candidate": {
+      "found": 86,
+      "tight": 33
+    }
+  },
+  "paired": {
+    "improved": 30,
+    "worse": 73,
+    "unchanged": 3
+  },
+  "rows": [
+    {
+      "reference": "F1",
+      "recordId": "scan-session-20260909-231206:frame-0000.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9069431942307454,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9069431942307454
+      },
+      "candidate": {
+        "iou": 0.9284247933061395,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9284247933061395
+      },
+      "delta": 0.021481599075394042
+    },
+    {
+      "reference": "F1",
+      "recordId": "scan-session-20260909-231206:frame-0000.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9390216886320414,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9390216886320414
+      },
+      "candidate": {
+        "iou": 0.9711771703560357,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9711771703560357
+      },
+      "delta": 0.032155481723994295
+    },
+    {
+      "reference": "F1",
+      "recordId": "scan-session-20260909-231206:frame-0000.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9305365716780032,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9305365716780032
+      },
+      "candidate": {
+        "iou": 0.8905004143304015,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.8905004143304015
+      },
+      "delta": -0.040036157347601686
+    },
+    {
+      "reference": "F1",
+      "recordId": "scan-session-20260909-231206:frame-0000.jpg",
+      "card": 4,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9325645335940279,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9325645335940279
+      },
+      "candidate": {
+        "iou": 0.9635247040189512,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9635247040189512
+      },
+      "delta": 0.030960170424923272
+    },
+    {
+      "reference": "F2",
+      "recordId": "scan-session-20260909-231206:frame-0001.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9232202359381368,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9232202359381368
+      },
+      "candidate": {
+        "iou": 0.9216583867427769,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9216583867427769
+      },
+      "delta": -0.0015618491953599545
+    },
+    {
+      "reference": "F2",
+      "recordId": "scan-session-20260909-231206:frame-0001.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9441821859413343,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9441821859413343
+      },
+      "candidate": {
+        "iou": 0.9442884120104287,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9442884120104287
+      },
+      "delta": 0.00010622606909438392
+    },
+    {
+      "reference": "F2",
+      "recordId": "scan-session-20260909-231206:frame-0001.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9113941315842476,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9113941315842476
+      },
+      "candidate": {
+        "iou": 0.9112696973711488,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9112696973711488
+      },
+      "delta": -0.00012443421309882297
+    },
+    {
+      "reference": "F2",
+      "recordId": "scan-session-20260909-231206:frame-0001.jpg",
+      "card": 4,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9503966516271012,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9503966516271012
+      },
+      "candidate": {
+        "iou": 0.9457071085981741,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9457071085981741
+      },
+      "delta": -0.004689543028927101
+    },
+    {
+      "reference": "F3",
+      "recordId": "scan-session-20260909-231206:frame-0002.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9275639001320956,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9275639001320956
+      },
+      "candidate": {
+        "iou": 0.9530335623015959,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9530335623015959
+      },
+      "delta": 0.025469662169500307
+    },
+    {
+      "reference": "F3",
+      "recordId": "scan-session-20260909-231206:frame-0002.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.3090501382934833
+      },
+      "candidate": {
+        "iou": 0.9064470525241914,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9064470525241914
+      },
+      "delta": 0.9064470525241914
+    },
+    {
+      "reference": "F3",
+      "recordId": "scan-session-20260909-231206:frame-0002.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9510632267097607,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9510632267097607
+      },
+      "candidate": {
+        "iou": 0.9665597924020287,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9665597924020287
+      },
+      "delta": 0.015496565692267983
+    },
+    {
+      "reference": "F3",
+      "recordId": "scan-session-20260909-231206:frame-0002.jpg",
+      "card": 4,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9121799796633753,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9121799796633753
+      },
+      "candidate": {
+        "iou": 0.8910983924058659,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.8910983924058659
+      },
+      "delta": -0.021081587257509415
+    },
+    {
+      "reference": "F3",
+      "recordId": "scan-session-20260909-231206:frame-0002.jpg",
+      "card": 5,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9299031983467294,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9299031983467294
+      },
+      "candidate": {
+        "iou": 0.9384336880989779,
+        "prediction": 5,
+        "bestUnrestrictedIoU": 0.9384336880989779
+      },
+      "delta": 0.00853048975224846
+    },
+    {
+      "reference": "F4",
+      "recordId": "scan-session-20260909-231206:frame-0003.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9298778234421015,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9298778234421015
+      },
+      "candidate": {
+        "iou": 0.9079816532130689,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9079816532130689
+      },
+      "delta": -0.021896170229032563
+    },
+    {
+      "reference": "F4",
+      "recordId": "scan-session-20260909-231206:frame-0003.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9226210667680758,
+        "prediction": 5,
+        "bestUnrestrictedIoU": 0.9226210667680758
+      },
+      "candidate": {
+        "iou": 0.8328076266784887,
+        "prediction": 5,
+        "bestUnrestrictedIoU": 0.8328076266784887
+      },
+      "delta": -0.08981344008958703
+    },
+    {
+      "reference": "F4",
+      "recordId": "scan-session-20260909-231206:frame-0003.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9610231335193579,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9610231335193579
+      },
+      "candidate": {
+        "iou": 0.9595526400630356,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9595526400630356
+      },
+      "delta": -0.0014704934563222194
+    },
+    {
+      "reference": "F4",
+      "recordId": "scan-session-20260909-231206:frame-0003.jpg",
+      "card": 4,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9633869187992313,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9633869187992313
+      },
+      "candidate": {
+        "iou": 0.9327502363647286,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9327502363647286
+      },
+      "delta": -0.030636682434502682
+    },
+    {
+      "reference": "F4",
+      "recordId": "scan-session-20260909-231206:frame-0003.jpg",
+      "card": 5,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9392004919066458,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9392004919066458
+      },
+      "candidate": {
+        "iou": 0.9484374921299009,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9484374921299009
+      },
+      "delta": 0.009237000223255132
+    },
+    {
+      "reference": "F5",
+      "recordId": "scan-session-20260909-231206:frame-0004.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9271644818097818,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9271644818097818
+      },
+      "candidate": {
+        "iou": 0.922844524984948,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.922844524984948
+      },
+      "delta": -0.0043199568248338815
+    },
+    {
+      "reference": "F5",
+      "recordId": "scan-session-20260909-231206:frame-0004.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9597933076421136,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9597933076421136
+      },
+      "candidate": {
+        "iou": 0.9543599126454638,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9543599126454638
+      },
+      "delta": -0.005433394996649743
+    },
+    {
+      "reference": "F5",
+      "recordId": "scan-session-20260909-231206:frame-0004.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9158070898437881,
+        "prediction": 5,
+        "bestUnrestrictedIoU": 0.9158070898437881
+      },
+      "candidate": {
+        "iou": 0.9702797707187267,
+        "prediction": 5,
+        "bestUnrestrictedIoU": 0.9702797707187267
+      },
+      "delta": 0.05447268087493862
+    },
+    {
+      "reference": "F5",
+      "recordId": "scan-session-20260909-231206:frame-0004.jpg",
+      "card": 4,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9568824000254963,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.9568824000254963
+      },
+      "candidate": {
+        "iou": 0.9248535113296005,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9248535113296005
+      },
+      "delta": -0.03202888869589582
+    },
+    {
+      "reference": "F5",
+      "recordId": "scan-session-20260909-231206:frame-0004.jpg",
+      "card": 5,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.9326411301741273,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.9326411301741273
+      },
+      "candidate": {
+        "iou": 0.9314990841338959,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.9314990841338959
+      },
+      "delta": -0.0011420460402313815
+    },
+    {
+      "reference": "F6",
+      "recordId": "scan-session-20260909-231206:frame-0005.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.8011440124654925,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.8011440124654925
+      },
+      "candidate": {
+        "iou": 0.7674759488892435,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.7674759488892435
+      },
+      "delta": -0.03366806357624896
+    },
+    {
+      "reference": "F6",
+      "recordId": "scan-session-20260909-231206:frame-0005.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.8234373643722159,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.8234373643722159
+      },
+      "candidate": {
+        "iou": 0.48213336662756573,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.48213336662756573
+      },
+      "delta": -0.3413039977446502
+    },
+    {
+      "reference": "F6",
+      "recordId": "scan-session-20260909-231206:frame-0005.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.8639714894762616,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.8639714894762616
+      },
+      "candidate": {
+        "iou": 0.7877753417864506,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.7877753417864506
+      },
+      "delta": -0.07619614768981098
+    },
+    {
+      "reference": "F6",
+      "recordId": "scan-session-20260909-231206:frame-0005.jpg",
+      "card": 4,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.874162974780956,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.874162974780956
+      },
+      "candidate": {
+        "iou": 0.8434238547908557,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8434238547908557
+      },
+      "delta": -0.03073911999010026
+    },
+    {
+      "reference": "F7",
+      "recordId": "scan-session-20260909-231206:frame-0006.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.8602669582704966,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.8602669582704966
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": -0.8602669582704966
+    },
+    {
+      "reference": "F7",
+      "recordId": "scan-session-20260909-231206:frame-0006.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.7170905297977869,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.7170905297977869
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": -0.7170905297977869
+    },
+    {
+      "reference": "F7",
+      "recordId": "scan-session-20260909-231206:frame-0006.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.7174179186904786,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.7174179186904786
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": -0.7174179186904786
+    },
+    {
+      "reference": "F7",
+      "recordId": "scan-session-20260909-231206:frame-0006.jpg",
+      "card": 4,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": 0.0
+    },
+    {
+      "reference": "F7",
+      "recordId": "scan-session-20260909-231206:frame-0006.jpg",
+      "card": 5,
+      "multiCard": true,
+      "scene": "binder_page",
+      "baseline": {
+        "iou": 0.7428169417157128,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7428169417157128
+      },
+      "candidate": {
+        "iou": 0.7357049762590827,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7357049762590827
+      },
+      "delta": -0.007111965456630065
+    },
+    {
+      "reference": "F8",
+      "recordId": "scan-session-20260909-231206:frame-0007.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9175919188403084,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9175919188403084
+      },
+      "candidate": {
+        "iou": 0.8958325462938829,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8958325462938829
+      },
+      "delta": -0.02175937254642557
+    },
+    {
+      "reference": "F8",
+      "recordId": "scan-session-20260909-231206:frame-0007.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8780310370875447,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.8780310370875447
+      },
+      "candidate": {
+        "iou": 0.8857299518671762,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.8857299518671762
+      },
+      "delta": 0.007698914779631472
+    },
+    {
+      "reference": "F9",
+      "recordId": "scan-session-20260909-231206:frame-0008.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8908157841238824,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8908157841238824
+      },
+      "candidate": {
+        "iou": 0.9212440889637836,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9212440889637836
+      },
+      "delta": 0.03042830483990122
+    },
+    {
+      "reference": "F10",
+      "recordId": "scan-session-20260909-231206:frame-0009.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8898814821327987,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8898814821327987
+      },
+      "candidate": {
+        "iou": 0.8708566647400461,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8708566647400461
+      },
+      "delta": -0.019024817392752635
+    },
+    {
+      "reference": "F11",
+      "recordId": "scan-session-20260909-231206:frame-0010.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.762108896833491,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.762108896833491
+      },
+      "candidate": {
+        "iou": 0.7319933318137801,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7319933318137801
+      },
+      "delta": -0.03011556501971091
+    },
+    {
+      "reference": "F12",
+      "recordId": "scan-session-20260909-231206:frame-0011.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.6768150985187205,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6768150985187205
+      },
+      "candidate": {
+        "iou": 0.7401724858673185,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7401724858673185
+      },
+      "delta": 0.06335738734859808
+    },
+    {
+      "reference": "F13",
+      "recordId": "scan-session-20260909-231206:frame-0012.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.6352625603334425,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6352625603334425
+      },
+      "candidate": {
+        "iou": 0.6300513244849616,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6300513244849616
+      },
+      "delta": -0.005211235848480933
+    },
+    {
+      "reference": "F14",
+      "recordId": "scan-session-20260909-231206:frame-0013.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8121366757655968,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8121366757655968
+      },
+      "candidate": {
+        "iou": 0.8096137797104117,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8096137797104117
+      },
+      "delta": -0.0025228960551850754
+    },
+    {
+      "reference": "F15",
+      "recordId": "scan-session-20260909-231206:frame-0014.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.753917557244426,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.753917557244426
+      },
+      "candidate": {
+        "iou": 0.7785544696201309,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7785544696201309
+      },
+      "delta": 0.024636912375704867
+    },
+    {
+      "reference": "F15",
+      "recordId": "scan-session-20260909-231206:frame-0014.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": 0.0
+    },
+    {
+      "reference": "F16",
+      "recordId": "scan-session-20260909-231206:frame-0015.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8495129037638709,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8495129037638709
+      },
+      "candidate": {
+        "iou": 0.8320139164058629,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8320139164058629
+      },
+      "delta": -0.017498987358008034
+    },
+    {
+      "reference": "F17",
+      "recordId": "scan-session-20260909-231206:frame-0016.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8034237171445625,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8034237171445625
+      },
+      "candidate": {
+        "iou": 0.8242329420897128,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8242329420897128
+      },
+      "delta": 0.02080922494515025
+    },
+    {
+      "reference": "F18",
+      "recordId": "scan-session-20260909-231206:frame-0017.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.10868681391358692,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.10868681391358692
+      },
+      "candidate": {
+        "iou": 0.13256703839016948,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.13256703839016948
+      },
+      "delta": 0.023880224476582557
+    },
+    {
+      "reference": "F18",
+      "recordId": "scan-session-20260909-231206:frame-0017.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": 0.0
+    },
+    {
+      "reference": "F19",
+      "recordId": "scan-session-20260909-231206:frame-0018.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.4906321550923463,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.4906321550923463
+      },
+      "candidate": {
+        "iou": 0.06489932835189088,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.06489932835189088
+      },
+      "delta": -0.42573282674045543
+    },
+    {
+      "reference": "F19",
+      "recordId": "scan-session-20260909-231206:frame-0018.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8508071502127839,
+        "prediction": 4,
+        "bestUnrestrictedIoU": 0.8508071502127839
+      },
+      "candidate": {
+        "iou": 0.6486366130465064,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6486366130465064
+      },
+      "delta": -0.20217053716627742
+    },
+    {
+      "reference": "F20",
+      "recordId": "scan-session-20260909-231206:frame-0019.jpg",
+      "card": 1,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8871781512108942,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8871781512108942
+      },
+      "candidate": {
+        "iou": 0.4286394328795799,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.4286394328795799
+      },
+      "delta": -0.45853871833131427
+    },
+    {
+      "reference": "F20",
+      "recordId": "scan-session-20260909-231206:frame-0019.jpg",
+      "card": 2,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8045290578683333,
+        "prediction": 3,
+        "bestUnrestrictedIoU": 0.8045290578683333
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": -0.8045290578683333
+    },
+    {
+      "reference": "F20",
+      "recordId": "scan-session-20260909-231206:frame-0019.jpg",
+      "card": 3,
+      "multiCard": true,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7849754965279925,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.7849754965279925
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": -0.7849754965279925
+    },
+    {
+      "reference": "F21",
+      "recordId": "scan-session-20260909-231206:frame-0020.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9373955159321399,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9373955159321399
+      },
+      "candidate": {
+        "iou": 0.1686136612365355,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.1686136612365355
+      },
+      "delta": -0.7687818546956043
+    },
+    {
+      "reference": "F22",
+      "recordId": "scan-session-20260909-231206:frame-0021.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.4656655481149953,
+        "prediction": 5,
+        "bestUnrestrictedIoU": 0.4656655481149953
+      },
+      "candidate": {
+        "iou": 0.40882177164910544,
+        "prediction": 2,
+        "bestUnrestrictedIoU": 0.40882177164910544
+      },
+      "delta": -0.05684377646588984
+    },
+    {
+      "reference": "F23",
+      "recordId": "scan-session-20260909-231206:frame-0022.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.43606156423812714,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.43606156423812714
+      },
+      "candidate": {
+        "iou": 0.0,
+        "prediction": null,
+        "bestUnrestrictedIoU": 0.0
+      },
+      "delta": -0.43606156423812714
+    },
+    {
+      "reference": "F24",
+      "recordId": "scan-session-20260909-231206:frame-0023.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.35862842295083963,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.35862842295083963
+      },
+      "candidate": {
+        "iou": 0.38783809746757847,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.38783809746757847
+      },
+      "delta": 0.029209674516738837
+    },
+    {
+      "reference": "F25",
+      "recordId": "scan-session-20260909-231206:frame-0024.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7489664007512316,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7489664007512316
+      },
+      "candidate": {
+        "iou": 0.48232242303643225,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.48232242303643225
+      },
+      "delta": -0.2666439777147993
+    },
+    {
+      "reference": "F26",
+      "recordId": "scan-session-20260909-231206:frame-0025.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8620768009443273,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8620768009443273
+      },
+      "candidate": {
+        "iou": 0.7538633450764437,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7538633450764437
+      },
+      "delta": -0.10821345586788356
+    },
+    {
+      "reference": "F27",
+      "recordId": "scan-session-20260909-231206:frame-0026.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8051684282721063,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8051684282721063
+      },
+      "candidate": {
+        "iou": 0.7806870056223845,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7806870056223845
+      },
+      "delta": -0.024481422649721862
+    },
+    {
+      "reference": "F28",
+      "recordId": "scan-session-20260909-231206:frame-0027.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7437676395548449,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7437676395548449
+      },
+      "candidate": {
+        "iou": 0.7757517576756132,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7757517576756132
+      },
+      "delta": 0.03198411812076829
+    },
+    {
+      "reference": "F29",
+      "recordId": "scan-session-20260909-231206:frame-0028.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7871205445300792,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7871205445300792
+      },
+      "candidate": {
+        "iou": 0.7496732210976078,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7496732210976078
+      },
+      "delta": -0.03744732343247137
+    },
+    {
+      "reference": "F30",
+      "recordId": "scan-session-20260909-231206:frame-0029.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8499536790790464,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8499536790790464
+      },
+      "candidate": {
+        "iou": 0.8475580238339606,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8475580238339606
+      },
+      "delta": -0.0023956552450857815
+    },
+    {
+      "reference": "F31",
+      "recordId": "scan-session-20260909-231206:frame-0030.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8285785470185724,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8285785470185724
+      },
+      "candidate": {
+        "iou": 0.9020360269380564,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9020360269380564
+      },
+      "delta": 0.07345747991948404
+    },
+    {
+      "reference": "F32",
+      "recordId": "scan-session-20260909-231206:frame-0031.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8040231367058174,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8040231367058174
+      },
+      "candidate": {
+        "iou": 0.8896182118451936,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8896182118451936
+      },
+      "delta": 0.08559507513937625
+    },
+    {
+      "reference": "F33",
+      "recordId": "scan-session-20260909-231206:frame-0032.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8898766050876946,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8898766050876946
+      },
+      "candidate": {
+        "iou": 0.8518812784963888,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8518812784963888
+      },
+      "delta": -0.03799532659130578
+    },
+    {
+      "reference": "F34",
+      "recordId": "scan-session-20260909-231206:frame-0033.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.6804474616056904,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6804474616056904
+      },
+      "candidate": {
+        "iou": 0.7094958351196005,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7094958351196005
+      },
+      "delta": 0.029048373513910097
+    },
+    {
+      "reference": "F35",
+      "recordId": "scan-session-20260909-231206:frame-0034.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8429226266082798,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8429226266082798
+      },
+      "candidate": {
+        "iou": 0.8145817071129721,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8145817071129721
+      },
+      "delta": -0.028340919495307704
+    },
+    {
+      "reference": "F36",
+      "recordId": "scan-session-20260909-231206:frame-0035.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8057143050558175,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8057143050558175
+      },
+      "candidate": {
+        "iou": 0.7520474089232649,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7520474089232649
+      },
+      "delta": -0.0536668961325526
+    },
+    {
+      "reference": "F37",
+      "recordId": "scan-session-20260909-231206:frame-0036.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8437091966857707,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8437091966857707
+      },
+      "candidate": {
+        "iou": 0.6044277244906812,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6044277244906812
+      },
+      "delta": -0.23928147219508955
+    },
+    {
+      "reference": "F38",
+      "recordId": "scan-session-20260909-231206:frame-0037.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9265542046878631,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9265542046878631
+      },
+      "candidate": {
+        "iou": 0.5446171540985968,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.5446171540985968
+      },
+      "delta": -0.3819370505892663
+    },
+    {
+      "reference": "F39",
+      "recordId": "scan-session-20260909-231206:frame-0038.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8554835507347702,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8554835507347702
+      },
+      "candidate": {
+        "iou": 0.8135292122640121,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8135292122640121
+      },
+      "delta": -0.041954338470758135
+    },
+    {
+      "reference": "F40",
+      "recordId": "scan-session-20260909-231206:frame-0039.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8225595405131643,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8225595405131643
+      },
+      "candidate": {
+        "iou": 0.8192188713720623,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8192188713720623
+      },
+      "delta": -0.0033406691411019818
+    },
+    {
+      "reference": "F41",
+      "recordId": "scan-session-20260909-231206:frame-0040.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8091664758461767,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8091664758461767
+      },
+      "candidate": {
+        "iou": 0.6481866441465305,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6481866441465305
+      },
+      "delta": -0.16097983169964625
+    },
+    {
+      "reference": "F42",
+      "recordId": "scan-session-20260909-231206:frame-0041.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7734894907783373,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7734894907783373
+      },
+      "candidate": {
+        "iou": 0.3902795629120188,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.3902795629120188
+      },
+      "delta": -0.38320992786631847
+    },
+    {
+      "reference": "F43",
+      "recordId": "scan-session-20260909-231206:frame-0042.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8167920352441808,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8167920352441808
+      },
+      "candidate": {
+        "iou": 0.8444550835333957,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8444550835333957
+      },
+      "delta": 0.027663048289214953
+    },
+    {
+      "reference": "F44",
+      "recordId": "scan-session-20260909-231206:frame-0043.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8761457283642189,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8761457283642189
+      },
+      "candidate": {
+        "iou": 0.7877277938689778,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7877277938689778
+      },
+      "delta": -0.08841793449524105
+    },
+    {
+      "reference": "F45",
+      "recordId": "scan-session-20260909-231206:frame-0044.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8623857845804414,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8623857845804414
+      },
+      "candidate": {
+        "iou": 0.8373143846450379,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8373143846450379
+      },
+      "delta": -0.025071399935403416
+    },
+    {
+      "reference": "F46",
+      "recordId": "scan-session-20260909-231206:frame-0045.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.925218416920496,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.925218416920496
+      },
+      "candidate": {
+        "iou": 0.9161372182907752,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9161372182907752
+      },
+      "delta": -0.009081198629720788
+    },
+    {
+      "reference": "F47",
+      "recordId": "scan-session-20260909-231206:frame-0046.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9277049913291472,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9277049913291472
+      },
+      "candidate": {
+        "iou": 0.837181641768376,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.837181641768376
+      },
+      "delta": -0.09052334956077124
+    },
+    {
+      "reference": "F48",
+      "recordId": "scan-session-20260909-231206:frame-0047.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9524201190143824,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9524201190143824
+      },
+      "candidate": {
+        "iou": 0.9400339607660448,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9400339607660448
+      },
+      "delta": -0.012386158248337553
+    },
+    {
+      "reference": "F49",
+      "recordId": "scan-session-20260909-231206:frame-0048.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9362935551590482,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9362935551590482
+      },
+      "candidate": {
+        "iou": 0.903308487430152,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.903308487430152
+      },
+      "delta": -0.0329850677288962
+    },
+    {
+      "reference": "F50",
+      "recordId": "scan-session-20260909-231206:frame-0049.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9175628095509466,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9175628095509466
+      },
+      "candidate": {
+        "iou": 0.951278354498702,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.951278354498702
+      },
+      "delta": 0.033715544947755416
+    },
+    {
+      "reference": "F51",
+      "recordId": "scan-session-20260909-231206:frame-0050.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8995473903565276,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8995473903565276
+      },
+      "candidate": {
+        "iou": 0.8409400810748051,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8409400810748051
+      },
+      "delta": -0.05860730928172253
+    },
+    {
+      "reference": "F52",
+      "recordId": "scan-session-20260909-231206:frame-0051.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9710426529240285,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9710426529240285
+      },
+      "candidate": {
+        "iou": 0.9581786392048232,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9581786392048232
+      },
+      "delta": -0.012864013719205314
+    },
+    {
+      "reference": "F53",
+      "recordId": "scan-session-20260909-231206:frame-0052.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8682008500725339,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8682008500725339
+      },
+      "candidate": {
+        "iou": 0.9016887694745609,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9016887694745609
+      },
+      "delta": 0.033487919402027
+    },
+    {
+      "reference": "F54",
+      "recordId": "scan-session-20260909-231206:frame-0053.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9193560791548043,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9193560791548043
+      },
+      "candidate": {
+        "iou": 0.9375612644179839,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9375612644179839
+      },
+      "delta": 0.018205185263179602
+    },
+    {
+      "reference": "F55",
+      "recordId": "scan-session-20260909-231206:frame-0054.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.900973721698219,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.900973721698219
+      },
+      "candidate": {
+        "iou": 0.8557592505152641,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8557592505152641
+      },
+      "delta": -0.04521447118295485
+    },
+    {
+      "reference": "F56",
+      "recordId": "scan-session-20260909-231206:frame-0055.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8411712262808956,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8411712262808956
+      },
+      "candidate": {
+        "iou": 0.8871315491093573,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8871315491093573
+      },
+      "delta": 0.04596032282846174
+    },
+    {
+      "reference": "F57",
+      "recordId": "scan-session-20260909-231206:frame-0056.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9488631644246043,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9488631644246043
+      },
+      "candidate": {
+        "iou": 0.9077396952227715,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9077396952227715
+      },
+      "delta": -0.04112346920183274
+    },
+    {
+      "reference": "F58",
+      "recordId": "scan-session-20260909-231206:frame-0057.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.933921347955707,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.933921347955707
+      },
+      "candidate": {
+        "iou": 0.892514215470912,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.892514215470912
+      },
+      "delta": -0.041407132484794995
+    },
+    {
+      "reference": "F59",
+      "recordId": "scan-session-20260909-231206:frame-0058.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8918781103372428,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8918781103372428
+      },
+      "candidate": {
+        "iou": 0.8674176090093189,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8674176090093189
+      },
+      "delta": -0.02446050132792399
+    },
+    {
+      "reference": "F60",
+      "recordId": "scan-session-20260909-231206:frame-0059.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7535658567564563,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7535658567564563
+      },
+      "candidate": {
+        "iou": 0.610344966183618,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.610344966183618
+      },
+      "delta": -0.14322089057283827
+    },
+    {
+      "reference": "F61",
+      "recordId": "scan-session-20260909-231206:frame-0060.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7658587726218161,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7658587726218161
+      },
+      "candidate": {
+        "iou": 0.7607079755020136,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7607079755020136
+      },
+      "delta": -0.005150797119802486
+    },
+    {
+      "reference": "F62",
+      "recordId": "scan-session-20260909-231206:frame-0061.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8120867101274548,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8120867101274548
+      },
+      "candidate": {
+        "iou": 0.8325443092804063,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8325443092804063
+      },
+      "delta": 0.020457599152951533
+    },
+    {
+      "reference": "F63",
+      "recordId": "scan-session-20260909-231206:frame-0062.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.09944023615503732,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.09944023615503732
+      },
+      "candidate": {
+        "iou": 0.13599512831407173,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.13599512831407173
+      },
+      "delta": 0.036554892159034416
+    },
+    {
+      "reference": "F64",
+      "recordId": "scan-session-20260909-231206:frame-0063.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.6828150094614266,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6828150094614266
+      },
+      "candidate": {
+        "iou": 0.5292985952088446,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.5292985952088446
+      },
+      "delta": -0.153516414252582
+    },
+    {
+      "reference": "F65",
+      "recordId": "scan-session-20260909-231206:frame-0064.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9431016776167125,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9431016776167125
+      },
+      "candidate": {
+        "iou": 0.9010020035290395,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9010020035290395
+      },
+      "delta": -0.04209967408767301
+    },
+    {
+      "reference": "F66",
+      "recordId": "scan-session-20260909-231206:frame-0065.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.911470893709437,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.911470893709437
+      },
+      "candidate": {
+        "iou": 0.8937323098155361,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8937323098155361
+      },
+      "delta": -0.017738583893900928
+    },
+    {
+      "reference": "F67",
+      "recordId": "scan-session-20260909-231206:frame-0066.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9064387578788297,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9064387578788297
+      },
+      "candidate": {
+        "iou": 0.9048747418365327,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9048747418365327
+      },
+      "delta": -0.0015640160422969451
+    },
+    {
+      "reference": "F68",
+      "recordId": "scan-session-20260909-231206:frame-0067.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.6750238882050279,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6750238882050279
+      },
+      "candidate": {
+        "iou": 0.7582549838106202,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7582549838106202
+      },
+      "delta": 0.08323109560559228
+    },
+    {
+      "reference": "F69",
+      "recordId": "scan-session-20260909-231206:frame-0068.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8865866610731076,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8865866610731076
+      },
+      "candidate": {
+        "iou": 0.8530084486211225,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8530084486211225
+      },
+      "delta": -0.03357821245198511
+    },
+    {
+      "reference": "F70",
+      "recordId": "scan-session-20260909-231206:frame-0069.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7955135921140996,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7955135921140996
+      },
+      "candidate": {
+        "iou": 0.6626456463805227,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.6626456463805227
+      },
+      "delta": -0.13286794573357685
+    },
+    {
+      "reference": "F71",
+      "recordId": "scan-session-20260909-231206:frame-0070.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.9139603823693873,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.9139603823693873
+      },
+      "candidate": {
+        "iou": 0.4982101513324398,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.4982101513324398
+      },
+      "delta": -0.41575023103694747
+    },
+    {
+      "reference": "F72",
+      "recordId": "scan-session-20260909-231206:frame-0071.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.904123351786029,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.904123351786029
+      },
+      "candidate": {
+        "iou": 0.906516296116394,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.906516296116394
+      },
+      "delta": 0.0023929443303649656
+    },
+    {
+      "reference": "F73",
+      "recordId": "scan-session-20260909-231206:frame-0072.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.8298531910589547,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.8298531910589547
+      },
+      "candidate": {
+        "iou": 0.7994927591160566,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7994927591160566
+      },
+      "delta": -0.03036043194289817
+    },
+    {
+      "reference": "F74",
+      "recordId": "scan-session-20260909-231206:frame-0073.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.7078895923008992,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.7078895923008992
+      },
+      "candidate": {
+        "iou": 0.5538380238141989,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.5538380238141989
+      },
+      "delta": -0.15405156848670032
+    },
+    {
+      "reference": "F75",
+      "recordId": "scan-session-20260909-231206:frame-0074.jpg",
+      "card": 1,
+      "multiCard": false,
+      "scene": "single_handheld",
+      "baseline": {
+        "iou": 0.82839476805739,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.82839476805739
+      },
+      "candidate": {
+        "iou": 0.5604901591899927,
+        "prediction": 1,
+        "bestUnrestrictedIoU": 0.5604901591899927
+      },
+      "delta": -0.2679046088673973
+    }
+  ],
+  "comparisonSha256": "fc93a730c876d2961f9ef1c1468cb251f5d7fe0525f9a88444e1da754e75f039"
+}

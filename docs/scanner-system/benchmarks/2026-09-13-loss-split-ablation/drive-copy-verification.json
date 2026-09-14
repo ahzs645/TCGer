@@ -1,0 +1,16 @@
+{
+  "destination": "/Users/ahmadjalil/Library/CloudStorage/GoogleDrive-ahzs645@gmail.com/My Drive/Projects/TCG/Reference/TCGer-Labeling/reports/2026-09-13-loss-split-ablation",
+  "files": {
+    "orientation-inspection.json": "a867772819e5ddddb97bc4d8804c4dda03f508476ef493f51c4100b69edb11a1",
+    "effect-sizes.json": "64f6c4db74e9882bbf97b195f2aa45bd0c33440a43dec95d609093c4109e9a22",
+    "iou-distribution.json": "ac482ef571f8a08e937571bc3524dbf1ff39575df07e512a18cb90cb23669e0b",
+    "historical-final-matrix.json": "f4541a7d2bccb63bfa8ec83724fa68f36dea15f6d2ef0d908cd5c9ee908c7c4e",
+    "RESULTS.json": "7fa7df89cce375a1d10fddc1ecdfe094d6d839c343d510fb247bfa4a835581a6",
+    "README.md": "762c772ebe81aa26414ae95776972fbc7894ebc4f72823d158d0b6e24d57abd4",
+    "iou-distribution.png": "a93a80947888b5db5623e7b55c47bc9331d44dd0f7d135fa86a3a27e405740f2",
+    "protocol.json": "dac57c78cbfd67ec6386a5f60b2eac9f63cd18bc31d97169134a18972d105f41",
+    "orientation-summary.json": "057d8b8f215405036b48703cb7634c109412def5a816db784edc1d00ea94e71e"
+  },
+  "localBytesVerified": true,
+  "remoteSyncMeasured": false
+}

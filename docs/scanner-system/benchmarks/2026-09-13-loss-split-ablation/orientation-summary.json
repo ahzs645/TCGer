@@ -1,0 +1,27 @@
+{
+  "protocolSha256": "68a7384065439140f020bb2d04358fbe1096c6005d2a4cdfbe44bd6a075c3794",
+  "rowsSha256": "3c91c443b2d603deae6a3f77d9105b78026d73afe357cac7b83c83df847aca81",
+  "complete": true,
+  "known": {
+    "total": 600,
+    "proposals": 169,
+    "agreeing": 150,
+    "disagreeing": 19
+  },
+  "unknown": {
+    "total": 610,
+    "proposals": 354,
+    "reasons": {
+      "identity-not-confident": 233,
+      "orientation-proposal": 354,
+      "encoders-disagree-on-top": 15,
+      "ambiguous-orientation": 8
+    },
+    "proposedBySplit": {
+      "test": 354
+    }
+  },
+  "labelChanges": 0,
+  "releaseChanges": 0,
+  "caveat": "Recognition agreement does not make a human label. Unknown-target accuracy remains unmeasured; no source or frozen labels have been changed."
+}

@@ -1,0 +1,428 @@
+{
+  "complete": true,
+  "primaryCheckpoint": "50th epoch for every loss/split cell",
+  "matrix": {
+    "oldSplitFixed": {
+      "checkpoint": {
+        "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/loss-split-ablation-20260913/fixed-old-split-epoch49.pt",
+        "checkpointSha256": "a814b2a20d8ae1679a2ba14a4f7c2c3341cf006687a8afeeb4fbe0d8b74f6056",
+        "id": "fixed-old-split-epoch50"
+      },
+      "found": 89,
+      "tight": 33,
+      "meanIoU": 0.7541251702294223,
+      "protocol": {
+        "labelsSha256": "7a586bf33768e8195a5ff008134e2e2f167f0978b6b2e1bcb28baa126d39586b",
+        "derivedGeometrySha256": "76bfcd87fdef10736ccf61904e5b53e4991195db32c5f0c9de3b72e8ecda9357",
+        "sessionInputsSha256": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618",
+        "receiptSha256": "fba8437597cecf2495f46ec7774bb0fcfcd803f105318bd0ba350819b5f46675",
+        "decoder": {
+          "aspectRatioBands": {
+            "rawCard": [
+              0.5,
+              3.0
+            ],
+            "slab": [
+              0.5,
+              3.0
+            ],
+            "unknown": [
+              0.5,
+              3.0
+            ]
+          },
+          "exteriorMargin": 0.25,
+          "minimumConfidence": 0.05,
+          "minimumQuadArea": 0.001,
+          "nmsIouThreshold": 0.5
+        },
+        "evaluationContract": {
+          "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+          "fastvitInputColor": "rgb",
+          "version": 2,
+          "yolo11InputColor": "bgr",
+          "yoloxInputColor": "bgr"
+        },
+        "contextMargin": {
+          "bottom": 192,
+          "left": 192,
+          "right": 192,
+          "top": 192
+        },
+        "resolution": 640,
+        "matching": "shared deterministic one-to-one greedy IoU matcher",
+        "device": "cpu",
+        "threads": 4,
+        "torch": "2.6.0",
+        "ultralytics": "8.4.138"
+      },
+      "comparisonSha256": "8c61f4c5f66e0daa5e3a298776766320c0ab584be128077a8e4fd659c5c6c352"
+    },
+    "oldSplitCyclic": {
+      "checkpoint": {
+        "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/cyclic-yolo11s-20260909/diagnosis/final-checkpoint/training/repeat-0/weights/best.pt",
+        "checkpointSha256": "54af5ba715e3620cfd74cbb6e85f85aa1ad7162db9dad3a120a56cf91ea711df",
+        "id": "cyclic-epoch50"
+      },
+      "found": 86,
+      "tight": 26,
+      "meanIoU": 0.7126522745351678,
+      "protocol": {
+        "labelsSha256": "7a586bf33768e8195a5ff008134e2e2f167f0978b6b2e1bcb28baa126d39586b",
+        "derivedGeometrySha256": "76bfcd87fdef10736ccf61904e5b53e4991195db32c5f0c9de3b72e8ecda9357",
+        "sessionInputsSha256": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618",
+        "receiptSha256": "fba8437597cecf2495f46ec7774bb0fcfcd803f105318bd0ba350819b5f46675",
+        "decoder": {
+          "aspectRatioBands": {
+            "rawCard": [
+              0.5,
+              3.0
+            ],
+            "slab": [
+              0.5,
+              3.0
+            ],
+            "unknown": [
+              0.5,
+              3.0
+            ]
+          },
+          "exteriorMargin": 0.25,
+          "minimumConfidence": 0.05,
+          "minimumQuadArea": 0.001,
+          "nmsIouThreshold": 0.5
+        },
+        "evaluationContract": {
+          "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+          "fastvitInputColor": "rgb",
+          "version": 2,
+          "yolo11InputColor": "bgr",
+          "yoloxInputColor": "bgr"
+        },
+        "contextMargin": {
+          "bottom": 192,
+          "left": 192,
+          "right": 192,
+          "top": 192
+        },
+        "resolution": 640,
+        "matching": "shared deterministic one-to-one greedy IoU matcher",
+        "device": "cpu",
+        "threads": 4,
+        "torch": "2.6.0",
+        "ultralytics": "8.4.138"
+      },
+      "comparisonSha256": "7826d2eec4d9e6ef4fad1d4ae757cf422711611544b635d698a8a3eae948b07c"
+    },
+    "newSplitCyclic": {
+      "checkpoint": {
+        "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/orientation-validation-20260910/results/selected.pt",
+        "checkpointSha256": "13c2eb19b41a03ef1a68a6d2dacb4f480f57c9d25ffdf54046f24f3b6f62c7de",
+        "id": "orientation-validation-selected"
+      },
+      "found": 86,
+      "tight": 33,
+      "meanIoU": 0.7127491931167425,
+      "protocol": {
+        "labelsSha256": "7a586bf33768e8195a5ff008134e2e2f167f0978b6b2e1bcb28baa126d39586b",
+        "derivedGeometrySha256": "76bfcd87fdef10736ccf61904e5b53e4991195db32c5f0c9de3b72e8ecda9357",
+        "sessionInputsSha256": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618",
+        "receiptSha256": "fba8437597cecf2495f46ec7774bb0fcfcd803f105318bd0ba350819b5f46675",
+        "decoder": {
+          "aspectRatioBands": {
+            "rawCard": [
+              0.5,
+              3.0
+            ],
+            "slab": [
+              0.5,
+              3.0
+            ],
+            "unknown": [
+              0.5,
+              3.0
+            ]
+          },
+          "exteriorMargin": 0.25,
+          "minimumConfidence": 0.05,
+          "minimumQuadArea": 0.001,
+          "nmsIouThreshold": 0.5
+        },
+        "evaluationContract": {
+          "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+          "fastvitInputColor": "rgb",
+          "version": 2,
+          "yolo11InputColor": "bgr",
+          "yoloxInputColor": "bgr"
+        },
+        "contextMargin": {
+          "bottom": 192,
+          "left": 192,
+          "right": 192,
+          "top": 192
+        },
+        "resolution": 640,
+        "matching": "shared deterministic one-to-one greedy IoU matcher",
+        "device": "cpu",
+        "threads": 4,
+        "torch": "2.6.0",
+        "ultralytics": "8.4.138"
+      },
+      "comparisonSha256": "fc93a730c876d2961f9ef1c1468cb251f5d7fe0525f9a88444e1da754e75f039"
+    },
+    "newSplitFixed": {
+      "checkpoint": {
+        "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/loss-split-ablation-20260913/fixed-new-split/results/training/repeat-0/weights/epoch49.pt",
+        "checkpointSha256": "f20b7e3da3557948e61dc429d5235c8c45a7467d94d2d83c4282205ef89111ad",
+        "id": "fixed-new-split-final"
+      },
+      "found": 91,
+      "tight": 31,
+      "meanIoU": 0.7411465962135867,
+      "protocol": {
+        "labelsSha256": "7a586bf33768e8195a5ff008134e2e2f167f0978b6b2e1bcb28baa126d39586b",
+        "derivedGeometrySha256": "76bfcd87fdef10736ccf61904e5b53e4991195db32c5f0c9de3b72e8ecda9357",
+        "sessionInputsSha256": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618",
+        "receiptSha256": "fba8437597cecf2495f46ec7774bb0fcfcd803f105318bd0ba350819b5f46675",
+        "decoder": {
+          "aspectRatioBands": {
+            "rawCard": [
+              0.5,
+              3.0
+            ],
+            "slab": [
+              0.5,
+              3.0
+            ],
+            "unknown": [
+              0.5,
+              3.0
+            ]
+          },
+          "exteriorMargin": 0.25,
+          "minimumConfidence": 0.05,
+          "minimumQuadArea": 0.001,
+          "nmsIouThreshold": 0.5
+        },
+        "evaluationContract": {
+          "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+          "fastvitInputColor": "rgb",
+          "version": 2,
+          "yolo11InputColor": "bgr",
+          "yoloxInputColor": "bgr"
+        },
+        "contextMargin": {
+          "bottom": 192,
+          "left": 192,
+          "right": 192,
+          "top": 192
+        },
+        "resolution": 640,
+        "matching": "shared deterministic one-to-one greedy IoU matcher",
+        "device": "cpu",
+        "threads": 4,
+        "torch": "2.6.0",
+        "ultralytics": "8.4.138"
+      },
+      "comparisonSha256": "b070121c8af687f8ed500ae789777eb838f6d46988fbbec1859336d90d4cba1e"
+    }
+  },
+  "seedRepeatBest": {
+    "checkpoint": {
+      "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/loss-split-ablation-20260913/baseline-new-seed/results/training/repeat-0/weights/best.pt",
+      "checkpointSha256": "1a62ae263c35211307ce5f7e72b136d8e36340d974a84746aeda89f9c339f2fc",
+      "id": "baseline-new-seed-best"
+    },
+    "found": 98,
+    "tight": 29,
+    "meanIoU": 0.7782755273345427,
+    "protocol": {
+      "labelsSha256": "7a586bf33768e8195a5ff008134e2e2f167f0978b6b2e1bcb28baa126d39586b",
+      "derivedGeometrySha256": "76bfcd87fdef10736ccf61904e5b53e4991195db32c5f0c9de3b72e8ecda9357",
+      "sessionInputsSha256": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618",
+      "receiptSha256": "fba8437597cecf2495f46ec7774bb0fcfcd803f105318bd0ba350819b5f46675",
+      "decoder": {
+        "aspectRatioBands": {
+          "rawCard": [
+            0.5,
+            3.0
+          ],
+          "slab": [
+            0.5,
+            3.0
+          ],
+          "unknown": [
+            0.5,
+            3.0
+          ]
+        },
+        "exteriorMargin": 0.25,
+        "minimumConfidence": 0.05,
+        "minimumQuadArea": 0.001,
+        "nmsIouThreshold": 0.5
+      },
+      "evaluationContract": {
+        "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+        "fastvitInputColor": "rgb",
+        "version": 2,
+        "yolo11InputColor": "bgr",
+        "yoloxInputColor": "bgr"
+      },
+      "contextMargin": {
+        "bottom": 192,
+        "left": 192,
+        "right": 192,
+        "top": 192
+      },
+      "resolution": 640,
+      "matching": "shared deterministic one-to-one greedy IoU matcher",
+      "device": "cpu",
+      "threads": 4,
+      "torch": "2.6.0",
+      "ultralytics": "8.4.138"
+    },
+    "comparisonSha256": "f9d2c76261c5cc8c6767ffe3b3147e7ca60ea41567624fbd380d05a216ccb8b2"
+  },
+  "seedRepeatFinal": {
+    "checkpoint": {
+      "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/loss-split-ablation-20260913/baseline-new-seed/results/training/repeat-0/weights/epoch49.pt",
+      "checkpointSha256": "dff4e1fa87fb6bc69e15e4e5eb2ba1b301f86742a9cfbd7759a95bbb412056dc",
+      "id": "baseline-new-seed-final"
+    },
+    "found": 98,
+    "tight": 30,
+    "meanIoU": 0.7818803605408726,
+    "protocol": {
+      "labelsSha256": "7a586bf33768e8195a5ff008134e2e2f167f0978b6b2e1bcb28baa126d39586b",
+      "derivedGeometrySha256": "76bfcd87fdef10736ccf61904e5b53e4991195db32c5f0c9de3b72e8ecda9357",
+      "sessionInputsSha256": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618",
+      "receiptSha256": "fba8437597cecf2495f46ec7774bb0fcfcd803f105318bd0ba350819b5f46675",
+      "decoder": {
+        "aspectRatioBands": {
+          "rawCard": [
+            0.5,
+            3.0
+          ],
+          "slab": [
+            0.5,
+            3.0
+          ],
+          "unknown": [
+            0.5,
+            3.0
+          ]
+        },
+        "exteriorMargin": 0.25,
+        "minimumConfidence": 0.05,
+        "minimumQuadArea": 0.001,
+        "nmsIouThreshold": 0.5
+      },
+      "evaluationContract": {
+        "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+        "fastvitInputColor": "rgb",
+        "version": 2,
+        "yolo11InputColor": "bgr",
+        "yoloxInputColor": "bgr"
+      },
+      "contextMargin": {
+        "bottom": 192,
+        "left": 192,
+        "right": 192,
+        "top": 192
+      },
+      "resolution": 640,
+      "matching": "shared deterministic one-to-one greedy IoU matcher",
+      "device": "cpu",
+      "threads": 4,
+      "torch": "2.6.0",
+      "ultralytics": "8.4.138"
+    },
+    "comparisonSha256": "0650c51061cb2251f8d7fcada93caba8c34eaed05f28092f94e56c657f2a5ab5"
+  },
+  "newFixedValidationSelected": {
+    "checkpoint": {
+      "checkpoint": "/Users/ahmadjalil/github/TCGer/.artifacts/card-geometry/loss-split-ablation-20260913/fixed-new-split/results/training/repeat-0/weights/epoch49.pt",
+      "checkpointSha256": "f20b7e3da3557948e61dc429d5235c8c45a7467d94d2d83c4282205ef89111ad",
+      "id": "fixed-new-split-final"
+    },
+    "found": 91,
+    "tight": 31,
+    "meanIoU": 0.7411465962135867,
+    "protocol": {
+      "labelsSha256": "7a586bf33768e8195a5ff008134e2e2f167f0978b6b2e1bcb28baa126d39586b",
+      "derivedGeometrySha256": "76bfcd87fdef10736ccf61904e5b53e4991195db32c5f0c9de3b72e8ecda9357",
+      "sessionInputsSha256": "43bcbc4b2908fcb6e0e7569590845e1d76b91c99fd38d737070ce59cac33e618",
+      "receiptSha256": "fba8437597cecf2495f46ec7774bb0fcfcd803f105318bd0ba350819b5f46675",
+      "decoder": {
+        "aspectRatioBands": {
+          "rawCard": [
+            0.5,
+            3.0
+          ],
+          "slab": [
+            0.5,
+            3.0
+          ],
+          "unknown": [
+            0.5,
+            3.0
+          ]
+        },
+        "exteriorMargin": 0.25,
+        "minimumConfidence": 0.05,
+        "minimumQuadArea": 0.001,
+        "nmsIouThreshold": 0.5
+      },
+      "evaluationContract": {
+        "changedFromVersion1": "yolo11 numpy input was RGB where Ultralytics expects BGR",
+        "fastvitInputColor": "rgb",
+        "version": 2,
+        "yolo11InputColor": "bgr",
+        "yoloxInputColor": "bgr"
+      },
+      "contextMargin": {
+        "bottom": 192,
+        "left": 192,
+        "right": 192,
+        "top": 192
+      },
+      "resolution": 640,
+      "matching": "shared deterministic one-to-one greedy IoU matcher",
+      "device": "cpu",
+      "threads": 4,
+      "torch": "2.6.0",
+      "ultralytics": "8.4.138"
+    },
+    "comparisonSha256": "b070121c8af687f8ed500ae789777eb838f6d46988fbbec1859336d90d4cba1e"
+  },
+  "orientation": {
+    "protocolSha256": "68a7384065439140f020bb2d04358fbe1096c6005d2a4cdfbe44bd6a075c3794",
+    "rowsSha256": "3c91c443b2d603deae6a3f77d9105b78026d73afe357cac7b83c83df847aca81",
+    "complete": true,
+    "known": {
+      "total": 600,
+      "proposals": 169,
+      "agreeing": 150,
+      "disagreeing": 19
+    },
+    "unknown": {
+      "total": 610,
+      "proposals": 354,
+      "reasons": {
+        "identity-not-confident": 233,
+        "orientation-proposal": 354,
+        "encoders-disagree-on-top": 15,
+        "ambiguous-orientation": 8
+      },
+      "proposedBySplit": {
+        "test": 354
+      }
+    },
+    "labelChanges": 0,
+    "releaseChanges": 0,
+    "caveat": "Recognition agreement does not make a human label. Unknown-target accuracy remains unmeasured; no source or frozen labels have been changed."
+  },
+  "productionPromotion": false,
+  "largerModelSubmitted": false,
+  "interpretation": "Single-seed loss/split contrasts and one seed repeat. No sole-cause proof or reliable variance estimate. Objective includes its dataset/trainer adapter. Use these results to choose the next experiment; no automatic model promotion."
+}
