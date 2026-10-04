@@ -14,7 +14,7 @@ struct GamePackageCapabilitiesView: View {
         Section("Optional features") {
             if package.manifest.pricing != nil { capabilityButton("pricing", "Price snapshots", ready: store.priceSnapshot(for: package) != nil) }
             if package.manifest.offlinePacks != nil { capabilityButton("packs", "Pack opening", ready: store.packLibrary(for: package) != nil) }
-            if package.manifest.scanner?.ios != nil { capabilityButton("scanner", "Scanner", ready: TCGGame(rawValue: package.manifest.game.id).flatMap { ScannerAssetStore.shared.runtime(for: $0) } != nil) }
+            if package.manifest.scanner?.ios != nil { capabilityButton("scanner", "Scanner", ready: ScannerAssetStore.shared.runtime(for: package.manifest.game.id) != nil) }
             if let error { Text(error).foregroundStyle(.red) }
             if let library = store.packLibrary(for: package) {
                 ForEach(library.packs) { pack in
