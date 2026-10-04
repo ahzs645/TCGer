@@ -1,4 +1,5 @@
 import path from 'path';
+import { appLinkRedirects } from './src/lib/app-links.mjs';
 import { fileURLToPath } from 'url';
 
 /** @type {import('next').NextConfig} */
@@ -65,6 +66,7 @@ const nextConfig = {
             }
           ]
         },
+        async redirects() { return appLinkRedirects; },
         async rewrites() {
           const rewrites = [
             {

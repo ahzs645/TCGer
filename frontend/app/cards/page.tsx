@@ -1,5 +1,6 @@
 // @tcger-feature {"id":"cards.search","platform":"web","status":"implemented"}
 
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { CardSearchPanel } from "@/components/cards/card-search-panel";
@@ -24,7 +25,7 @@ export default function CardSearchPage() {
             unified adapter layer.
           </p>
         </div>
-        <CardSearchPanel data-oid="-cpcv:d" />
+        <Suspense fallback={<p>Loading…</p>}><CardSearchPanel data-oid="-cpcv:d" /></Suspense>
       </div>
     </AppShell>
   );

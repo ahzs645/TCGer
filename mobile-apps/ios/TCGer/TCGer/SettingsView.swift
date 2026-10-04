@@ -1,4 +1,4 @@
-// @tcger-feature {"id":"release.readiness","platform":"ios","status":"planned","limitation":"App target and unsigned Debug simulator testing exist; signed archive, provisioning, privacy/store submission and release-device smoke criteria remain unverified."}
+// @tcger-feature {"id":"release.readiness","platform":"ios","status":"partial","limitation":"Release archive/export settings and artifact/physical-device readiness tooling are configured; no distribution signing identity, exported IPA or physical-device evidence is verified here."}
 // @tcger-feature {"id":"settings.browse","platform":"ios","status":"implemented"}
 // @tcger-feature {"id":"scanner.debug.developerAccess","platform":"ios","status":"implemented"}
 

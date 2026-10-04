@@ -1,4 +1,4 @@
-// @tcger-feature {"id":"release.readiness","platform":"web","status":"planned","limitation":"App and container build configuration exist; production deploy, PWA install/update and release smoke criteria are not exercised by this capability record."}
+// @tcger-feature {"id":"release.readiness","platform":"web","status":"partial","limitation":"Production build and hosted smoke tooling are configured; production deployment, signed app associations and physical PWA install/update checks remain unverified."}
 "use client";
 
 import { useEffect } from "react";

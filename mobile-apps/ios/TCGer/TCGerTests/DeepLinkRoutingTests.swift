@@ -2,6 +2,24 @@ import XCTest
 @testable import TCGer
 
 final class DeepLinkRoutingTests: XCTestCase {
+    func testSharedAppLinkFixture() throws {
+        struct Fixture: Decodable { let url: String; let ios: String?; let id: String?; let query: String? }
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "AppLinks.generated", withExtension: "json"))
+        for fixture in try JSONDecoder().decode([Fixture].self, from: Data(contentsOf: url)) {
+            let destination = EnvironmentStore.deepLinkDestination(for: try XCTUnwrap(URL(string: fixture.url)))
+            let expected: AppDeepLinkDestination?
+            switch fixture.ios {
+            case "binder": expected = .binder(id: fixture.id!)
+            case "wishlist": expected = .wishlist(id: fixture.id!)
+            case "search": expected = .search(query: fixture.query)
+            case "scan": expected = .scan(game: nil)
+            case "packs": expected = .packOpening
+            default: expected = nil
+            }
+            XCTAssertEqual(destination, expected, fixture.url)
+        }
+    }
+
     func testWidgetBinderURLPreservesBinderIdentifier() throws {
         let url = try XCTUnwrap(URL(string: "tcger://binder/binder-123"))
         XCTAssertEqual(

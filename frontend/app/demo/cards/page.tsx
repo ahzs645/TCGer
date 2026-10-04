@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { CardSearchPanel } from "@/components/cards/card-search-panel";
 
@@ -17,7 +18,7 @@ export default function CardSearchPage() {
             unified adapter layer.
           </p>
         </div>
-        <CardSearchPanel data-oid="27n9xqn" />
+        <Suspense fallback={<p>Loading…</p>}><CardSearchPanel data-oid="27n9xqn" /></Suspense>
       </div>
     </AppShell>
   );

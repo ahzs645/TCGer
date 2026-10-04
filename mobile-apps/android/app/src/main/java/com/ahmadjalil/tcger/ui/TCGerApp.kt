@@ -1,4 +1,4 @@
-// @tcger-feature {"id":"release.readiness","platform":"android","status":"planned","limitation":"Release minification is configured; no release signingConfig is declared in app Gradle, and signed bundle, store/privacy and release-device smoke criteria remain unverified."}
+// @tcger-feature {"id":"release.readiness","platform":"android","status":"partial","limitation":"Direct-install release APK signing and certificate verification are configured; physical-device smoke and deployed domain association are outstanding. Play Store publishing is out of scope."}
 package com.ahmadjalil.tcger.ui
 
 import android.net.Uri
@@ -143,6 +143,24 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
     val viewModel: AppViewModel = viewModel(factory = AppViewModel.factory(container))
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val connectivityContext = LocalContext.current
+    DisposableEffect(lifecycleOwner, connectivityContext) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.refreshServerCapabilities()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        val connectivity = connectivityContext.getSystemService(android.net.ConnectivityManager::class.java)
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) { viewModel.refreshServerCapabilities() }
+        }
+        connectivity.registerDefaultNetworkCallback(callback)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            connectivity.unregisterNetworkCallback(callback)
+        }
+    }
+
     LaunchedEffect(ParityTestMode.isEnabled) {
         if (ParityTestMode.isEnabled) container.preferences.useOnDevice()
     }
@@ -189,7 +207,7 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
         }
         val availableDestinations = BottomNavigationItem.entries.filter {
             it.isAvailable(state.preferences.dataSourceMode == DataSourceMode.SERVER && state.preferences.isSignedIn, supportsPokedex, state.preferences.sealedProductsEnabled) &&
-                it.isSupportedBy(state.serverFeatures)
+                it.isSupportedBy(if (state.preferences.dataSourceMode == DataSourceMode.SERVER) state.serverFeatures else emptyMap())
         }
         val visibleDestinations = requestedDestinations.filter { it in availableDestinations }
             .ifEmpty { listOf(BottomNavigationItem.SETTINGS) }
@@ -319,9 +337,13 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
             }
         }
 
-        LaunchedEffect(availableDestinations, route) {
+        val blockedCapability = if (state.preferences.dataSourceMode == DataSourceMode.SERVER) {
+            requiredServerCapability(route)?.takeIf { state.serverFeatures[it] == false }
+        } else null
+        LaunchedEffect(availableDestinations, route, blockedCapability) {
             val currentDestination = BottomNavigationItem.entries.firstOrNull { it.route == route }
-            if (currentDestination != null && currentDestination !in availableDestinations) {
+                ?: requiredServerDestination(route)
+            if (blockedCapability != null || (currentDestination != null && currentDestination !in availableDestinations)) {
                 val fallback = if (currentDestination == BottomNavigationItem.POKEDEX && !supportsPokedex) {
                     BottomNavigationItem.SETTINGS
                 } else {
@@ -390,8 +412,16 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
                     }
                 }
             },
+            topBar = {
+                if (state.capabilityError != null) {
+                    Row(Modifier.padding(12.dp)) {
+                        Text("Couldn’t refresh server features.", Modifier.weight(1f))
+                        TextButton(onClick = { viewModel.refreshServerCapabilities() }) { Text("Retry") }
+                    }
+                }
+            },
         ) { padding ->
-            NavHost(navController, startDestination = BottomNavigationItem.HOME.route, modifier = Modifier) {
+            if (blockedCapability == null && requiredServerDestination(route)?.let { it !in availableDestinations } != true) NavHost(navController, startDestination = BottomNavigationItem.HOME.route, modifier = Modifier) {
                 composable(BottomNavigationItem.HOME.route) {
                     DashboardScreen(
                         state = state,

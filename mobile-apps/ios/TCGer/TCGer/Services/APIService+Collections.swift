@@ -152,7 +152,7 @@ extension APIService {
                     message: "On-device imports currently support TCGer CSV only. Connect to a server for JSON and Cardmarket text."
                 )
             }
-            return LocalStore.shared.previewImport(csv: content, options: options)
+            return localStore.previewImport(csv: content, options: options)
         }
 
         let (data, response) = try await makeRequest(
@@ -196,8 +196,8 @@ extension APIService {
                     message: "On-device imports currently support TCGer CSV only. Connect to a server for JSON and Cardmarket text."
                 )
             }
-            let result = LocalStore.shared.commitImport(csv: content, options: options)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            let result = localStore.commitImport(csv: content, options: options)
+            try localStore.requireLatestMutationPersisted()
             return result
         }
 
@@ -336,7 +336,7 @@ extension APIService {
         useCache: Bool = false
     ) async throws -> [Collection] {
         if config.isOnDevice {
-            return LocalStore.shared.getCollections()
+            return localStore.getCollections()
         }
 
         let cacheKey = CacheManager.CacheKey.collections(config: config, token: token)
@@ -412,7 +412,7 @@ extension APIService {
         id: String
     ) async throws -> Collection {
         if config.isOnDevice {
-            return try LocalStore.shared.getCollection(id: id)
+            return try localStore.getCollection(id: id)
         }
 
         let (data, response) = try await makeRequest(
@@ -448,7 +448,7 @@ extension APIService {
         binderId: String
     ) async throws -> [SavedBinderPage] {
         if config.isOnDevice {
-            return LocalStore.shared.getBinderPages(binderId: binderId)
+            return localStore.getBinderPages(binderId: binderId)
         }
         let (data, response) = try await makeRequest(
             config: config,
@@ -474,13 +474,13 @@ extension APIService {
         placements: [BinderPagePlacement]
     ) async throws -> SavedBinderPage {
         if config.isOnDevice {
-            let page = LocalStore.shared.upsertBinderPage(
+            let page = localStore.upsertBinderPage(
                 binderId: binderId,
                 pageNumber: pageNumber,
                 capturedAt: capturedAt,
                 placements: placements
             )
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return page
         }
         let body = UpsertBinderPageRequest(
@@ -513,7 +513,7 @@ extension APIService {
         imageData: Data
     ) async throws -> SavedBinderPage {
         if config.isOnDevice {
-            return try LocalStore.shared.replaceBinderPageImage(
+            return try localStore.replaceBinderPageImage(
                 binderId: binderId,
                 pageNumber: pageNumber,
                 imageData: imageData
@@ -553,8 +553,8 @@ extension APIService {
         pageNumber: Int
     ) async throws {
         if config.isOnDevice {
-            LocalStore.shared.removeBinderPageImage(binderId: binderId, pageNumber: pageNumber)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            localStore.removeBinderPageImage(binderId: binderId, pageNumber: pageNumber)
+            try localStore.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(
@@ -595,7 +595,7 @@ extension APIService {
         associatedSetName: String? = nil
     ) async throws -> Collection {
         if config.isOnDevice {
-            let collection = LocalStore.shared.createCollection(
+            let collection = localStore.createCollection(
                 name: name,
                 description: description,
                 colorHex: colorHex,
@@ -606,7 +606,7 @@ extension APIService {
                 associatedSetCode: associatedSetCode,
                 associatedSetName: associatedSetName
             )
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return collection
         }
 
@@ -702,7 +702,7 @@ extension APIService {
         replacePresentation: Bool = false
     ) async throws -> Collection {
         if config.isOnDevice {
-            return try LocalStore.shared.updateCollection(
+            return try localStore.updateCollection(
                 id: id,
                 name: name,
                 description: description,
@@ -758,7 +758,7 @@ extension APIService {
         id: String
     ) async throws {
         if config.isOnDevice {
-            try LocalStore.shared.deleteCollection(id: id)
+            try localStore.deleteCollection(id: id)
             return
         }
 
@@ -857,7 +857,7 @@ extension APIService {
         token: String
     ) async throws -> [CollectionCardTag] {
         if config.isOnDevice {
-            return LocalStore.shared.getTags()
+            return localStore.getTags()
         }
 
         let (data, response) = try await makeRequest(
@@ -887,8 +887,8 @@ extension APIService {
         colorHex: String? = nil
     ) async throws -> CollectionCardTag {
         if config.isOnDevice {
-            let tag = LocalStore.shared.createTag(label: label, colorHex: colorHex)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            let tag = localStore.createTag(label: label, colorHex: colorHex)
+            try localStore.requireLatestMutationPersisted()
             return tag
         }
 
@@ -1125,7 +1125,7 @@ extension APIService {
         card: Card? = nil
     ) async throws -> String? {
         if config.isOnDevice {
-            try LocalStore.shared.addCardToBinder(
+            try localStore.addCardToBinder(
                 binderId: binderId,
                 cardId: cardId,
                 quantity: quantity,
@@ -1265,7 +1265,7 @@ extension APIService {
         targetBinderId: String? = nil
     ) async throws -> CollectionCard {
         if config.isOnDevice {
-            return try LocalStore.shared.updateCardInBinder(
+            return try localStore.updateCardInBinder(
                 binderId: binderId,
                 collectionCardOrCopyId: collectionCardId,
                 quantity: quantity,
@@ -1404,7 +1404,7 @@ extension APIService {
         collectionCardId: String
     ) async throws {
         if config.isOnDevice {
-            try LocalStore.shared.deleteCardFromBinder(
+            try localStore.deleteCardFromBinder(
                 binderId: binderId,
                 collectionCardOrCopyId: collectionCardId
             )
@@ -1437,7 +1437,7 @@ extension APIService {
         format: String = "json"
     ) async throws -> Data {
         if config.isOnDevice {
-            return LocalStore.shared.exportCollections(format: format)
+            return localStore.exportCollections(format: format)
         }
 
         let (data, response) = try await makeRequest(

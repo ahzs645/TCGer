@@ -322,7 +322,7 @@ extension APIService {
 
     func getSettings(config: ServerConfiguration) async throws -> AppSettings {
         if config.isOnDevice {
-            return LocalStore.shared.getSettings()
+            return localStore.getSettings()
         }
 
         let (data, response) = try await makeRequest(config: config, path: "settings")
@@ -354,13 +354,13 @@ extension APIService {
         appName: String? = nil
     ) async throws -> AppSettings {
         if config.isOnDevice {
-            let settings = LocalStore.shared.updateSettings(
+            let settings = localStore.updateSettings(
                 publicDashboard: publicDashboard,
                 publicCollections: publicCollections,
                 requireAuth: requireAuth,
                 appName: appName
             )
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return settings
         }
 
@@ -469,7 +469,7 @@ extension APIService {
         token: String
     ) async throws -> UserPreferences {
         if config.isOnDevice {
-            return LocalStore.shared.getUserPreferences()
+            return localStore.getUserPreferences()
         }
 
         let (data, response) = try await makeRequest(
@@ -558,7 +558,7 @@ extension APIService {
         setCompletionMode: String? = nil
     ) async throws -> UserPreferences {
         if config.isOnDevice {
-            let preferences = LocalStore.shared.updateUserPreferences(
+            let preferences = localStore.updateUserPreferences(
                 showCardNumbers: showCardNumbers,
                 showPricing: showPricing,
                 enabledYugioh: enabledYugioh,
@@ -571,7 +571,7 @@ extension APIService {
                 focusedSetOrder: focusedSetOrder,
                 setCompletionMode: setCompletionMode
             )
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return preferences
         }
 

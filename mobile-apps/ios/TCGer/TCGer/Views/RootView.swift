@@ -11,7 +11,7 @@ struct RootView: View {
     @State private var setupRequired: Bool?
     @State private var showingSignup = false
     @State private var errorMessage: String?
-    @State private var isAppLocked = true
+    @StateObject private var appLock = DeviceAppLockStore()
     @StateObject private var serverFeatureStore = ServerFeatureRefreshStore()
     @StateObject private var catalogStore = CatalogStore.shared
     @StateObject private var gamePackages = GamePackageStore.shared
@@ -76,28 +76,26 @@ struct RootView: View {
             Text(errorMessage ?? environmentStore.tokenPersistenceWarning ?? "Unknown error")
         }
         .overlay {
-            if environmentStore.biometricLockEnabled && isAppLocked {
+            if environmentStore.biometricLockEnabled && appLock.isLocked {
                 BiometricLockScreen {
-                    Task {
-                        let success = await BiometricAuthManager.authenticate()
-                        if success { isAppLocked = false }
-                    }
+                    Task { await appLock.unlock() }
                 }
                 .transition(.opacity)
             }
         }
-        .task {
-            if environmentStore.biometricLockEnabled {
-                let success = await BiometricAuthManager.authenticate()
-                if success { isAppLocked = false }
-            } else {
-                isAppLocked = false
-            }
+        .task(id: environmentStore.biometricLockEnabled) {
+            appLock.configure(enabled: environmentStore.biometricLockEnabled)
+            await appLock.unlock()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            if environmentStore.biometricLockEnabled {
-                isAppLocked = true
-            }
+            appLock.shield()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            appLock.background()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            appLock.becomeActive()
+            Task { await appLock.unlock() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .localStorePersistenceFailed)) { notification in
             guard let failure = notification.userInfo?["failure"] as? LocalStorePersistenceFailure else {

@@ -29,8 +29,11 @@ final class APIService {
 
     private let session: URLSession
     let collectionCache: CacheManager
+    private let injectedLocalStore: LocalStore?
+    var localStore: LocalStore { injectedLocalStore ?? .shared }
 
-    init(session: URLSession = .shared, collectionCache: CacheManager = .shared) {
+    init(session: URLSession = .shared, collectionCache: CacheManager = .shared, localStore: LocalStore? = nil) {
+        self.injectedLocalStore = localStore
         self.session = session
         self.collectionCache = collectionCache
     }

@@ -68,7 +68,7 @@ extension APIService {
         tcg: String? = nil
     ) async throws -> [SealedProduct] {
         if config.isOnDevice {
-            let all = LocalStore.shared.getSealedProducts()
+            let all = localStore.getSealedProducts()
             if let tcg { return all.filter { $0.tcg == tcg } }
             return all
         }
@@ -97,7 +97,7 @@ extension APIService {
         productId: String
     ) async throws -> SealedProduct {
         if config.isOnDevice {
-            guard let product = LocalStore.shared.getSealedProducts().first(where: { $0.id == productId }) else {
+            guard let product = localStore.getSealedProducts().first(where: { $0.id == productId }) else {
                 throw APIError.serverError(status: 404, message: "Sealed product not found.")
             }
             return product
@@ -134,7 +134,7 @@ extension APIService {
                     ? String(normalized.dropFirst())
                     : normalized
             ])
-            guard let product = LocalStore.shared.getSealedProducts().first(where: {
+            guard let product = localStore.getSealedProducts().first(where: {
                 guard let upc = $0.upc else { return false }
                 return equivalents.contains(upc.filter(\.isNumber))
             }) else {
@@ -165,7 +165,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [SealedInventoryItem] {
-        if config.isOnDevice { return LocalStore.shared.getSealedInventory() }
+        if config.isOnDevice { return localStore.getSealedInventory() }
         let (data, response) = try await makeRequest(config: config, path: "sealed/inventory", token: token)
 
         guard response.statusCode == 200 else {
@@ -281,10 +281,10 @@ extension APIService {
         notes: String? = nil
     ) async throws -> SealedInventoryItem {
         if config.isOnDevice {
-            guard let item = LocalStore.shared.addSealedInventory(productId: productId, quantity: quantity ?? 1, purchasePrice: purchasePrice) else {
+            guard let item = localStore.addSealedInventory(productId: productId, quantity: quantity ?? 1, purchasePrice: purchasePrice) else {
                 throw APIError.serverError(status: 404, message: "Product not found")
             }
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return item
         }
         let body = AddSealedInventoryRequest(
@@ -322,7 +322,7 @@ extension APIService {
         clearNotes: Bool = false
     ) async throws -> SealedInventoryItem {
         if config.isOnDevice {
-            return try LocalStore.shared.updateSealedInventory(
+            return try localStore.updateSealedInventory(
                 itemId: itemId,
                 quantity: quantity,
                 purchasePrice: purchasePrice,
@@ -363,8 +363,8 @@ extension APIService {
         itemId: String
     ) async throws {
         if config.isOnDevice {
-            LocalStore.shared.deleteSealedInventory(itemId: itemId)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            localStore.deleteSealedInventory(itemId: itemId)
+            try localStore.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(

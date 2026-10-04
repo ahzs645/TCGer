@@ -482,8 +482,8 @@ extension APIService {
         period: String = "30d"
     ) async throws -> CollectionValueHistory {
         if config.isOnDevice {
-            let value = LocalStore.shared.getCollections().reduce(0) { $0 + $1.totalValue }
-            if LocalStore.shared.isSampleDataLoaded, value > 0 {
+            let value = localStore.getCollections().reduce(0) { $0 + $1.totalValue }
+            if localStore.isSampleDataLoaded, value > 0 {
                 let history = LocalSampleAnalytics.history(currentValue: value, period: period)
                 let startingValue = history.first?.value ?? value
                 let changePercent = startingValue == 0
@@ -520,7 +520,7 @@ extension APIService {
         token: String
     ) async throws -> CollectionValueBreakdown {
         if config.isOnDevice {
-            let collections = LocalStore.shared.getCollections()
+            let collections = localStore.getCollections()
             let allCards = collections.flatMap(\.cards)
             let games = Dictionary(grouping: allCards, by: { $0.tcg }).map { tcg, cards in
                 CollectionValueBreakdown.GameValue(
@@ -569,7 +569,7 @@ extension APIService {
         dimension: String
     ) async throws -> CollectionDistribution {
         if config.isOnDevice {
-            let cards = LocalStore.shared.getCollections().flatMap(\.cards)
+            let cards = localStore.getCollections().flatMap(\.cards)
             let labels: [String]
             switch dimension {
             case "rarity": labels = cards.map { $0.rarity ?? "Unknown" }
@@ -602,7 +602,7 @@ extension APIService {
         period: Int = 30
     ) async throws -> PriceAnalyticsMovers {
         if config.isOnDevice {
-            if LocalStore.shared.isSampleDataLoaded {
+            if localStore.isSampleDataLoaded {
                 return LocalSampleAnalytics.movers(period: period)
             }
             // No local price-snapshot series means there is no defensible

@@ -11,9 +11,9 @@ Generated from [product definitions](features.definitions.json) and platform sou
 
 | Platform | Implemented | Partial | Planned | Unavailable | Not applicable | Waived |
 |---|---|---|---|---|---|---|
-| Web | 90 | 11 | 11 | 0 | 2 | 0 |
-| iOS | 108 | 4 | 2 | 0 | 0 | 0 |
-| Android | 92 | 10 | 11 | 0 | 1 | 0 |
+| Web | 90 | 12 | 10 | 0 | 2 | 0 |
+| iOS | 108 | 5 | 1 | 0 | 0 | 0 |
+| Android | 93 | 10 | 10 | 0 | 1 | 0 |
 
 ## Feature matrix
 
@@ -111,8 +111,8 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | account.management | Profile password signup deletion and preferences | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.binderReview | Save selected cards and reopen saved binder photos | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
 | pricing.gradingWorkspace | Grading planner: prices, costs, decision, population, history and receipts | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
-| collections.manage | Rename and delete binders | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| server.capabilities | Server capability flags | track | Implemented | — | Implemented | — | Partial | — | Tracked gap |
+| collections.manage | Rename and delete binders | track | Implemented | — | Implemented | Not run | Implemented | — | Aligned |
+| server.capabilities | Server capability flags | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
 | widgets.sessionPrivacy | Clear home screen widget snapshots when sessions change | track | Not applicable | — | Implemented | — | Not applicable | — | Tracked gap |
 | storage.containers | Create and edit physical containers and compartments | track | Implemented | — | Implemented | Not run | Implemented | — | Aligned |
 | storage.placements | Assign and remove owned copies at physical storage slots | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
@@ -126,12 +126,12 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | collections.historyUndo | Browse collection mutation history and undo eligible changes | track | Partial | — | Partial | — | Partial | — | Aligned |
 | games.catalogDownloads | Download and verify publisher game catalogs for offline browsing | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
 | games.packageUpdates | Check and install monotonic publisher game-package updates | track | Implemented | — | Implemented | Not run | Implemented | Not run | Aligned |
-| games.capability.scannerDownload | Download the game package scanner runtime separately from its catalog | track | Implemented | — | Partial | — | Implemented | — | Tracked gap |
+| games.capability.scannerDownload | Download the game package scanner runtime separately from its catalog | track | Implemented | — | Partial | Not run | Implemented | — | Tracked gap |
 | games.capability.priceDownload | Download verified game price snapshots separately from the catalog | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | games.capability.packDownload | Download verified game pack libraries separately from the catalog | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| navigation.appLinks | Open scanner, search, binder and wishlist app links | track | Partial | — | Partial | Not run | Partial | — | Aligned |
-| security.biometricLock | Lock the native app with device authentication | track | Not applicable | — | Partial | — | Partial | — | Tracked gap |
-| release.readiness | Verify production release configuration and signed distribution | track | Planned | — | Planned | — | Planned | — | Aligned |
+| navigation.appLinks | Open scanner, search, binder and wishlist app links | track | Partial | Not run | Partial | Not run | Partial | Not run | Aligned |
+| security.biometricLock | Lock the native app with device authentication | track | Not applicable | — | Partial | Not run | Partial | Not run | Tracked gap |
+| release.readiness | Verify production release configuration and signed distribution | track | Partial | Not run | Partial | Not run | Partial | Not run | Aligned |
 | collections.copies | Add, edit and move physical copies; remove printing groups | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
 
 ## Availability and limitations
@@ -205,7 +205,7 @@ These declarations live beside platform implementations. Unspecified modes are u
 | scanner.debug.performance.footerFirstOcr | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L16) |
 | server.capabilities | Web | Implemented | server | — | — | [Source](../frontend/src/lib/api/health.ts#L1) |
 | server.capabilities | iOS | Implemented | server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift#L2) |
-| server.capabilities | Android | Partial | server | — | Health responses decode capability flags, but verifyServer discards them; feature gating and automatic capability refresh after recovery are absent. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt#L1) |
+| server.capabilities | Android | Implemented | server | — | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt#L1) |
 | widgets.sessionPrivacy | Web | Not applicable | Not specified | — | No home screen widget extension is shipped on this surface. | [Source](../frontend/src/components/account/account-settings-dialog.tsx#L2) |
 | widgets.sessionPrivacy | Android | Not applicable | Not specified | — | No home screen widget extension is shipped on this surface. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt#L2) |
 | storage.containers | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/collections/storage-editor.tsx#L1) |
@@ -245,7 +245,7 @@ These declarations live beside platform implementations. Unspecified modes are u
 | games.packageUpdates | iOS | Implemented | local | network-for-download, publisher-game-package | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift#L2) |
 | games.packageUpdates | Android | Implemented | local | network-for-download, publisher-game-package | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt#L2) |
 | games.capability.scannerDownload | Web | Implemented | local | network-for-download, package-web-scanner-bundle | — | [Source](../frontend/src/lib/game-packages/game-package-client.ts#L3) |
-| games.capability.scannerDownload | iOS | Partial | local | network-for-download, package-ios-scanner-bundle | Scanner installation accepts package bundle sources for built-in TCGGame identifiers; arbitrary publisher game IDs cannot pass the enum guard and remain unsupported. | [Source](../mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift#L3) |
+| games.capability.scannerDownload | iOS | Partial | local | network-for-download, package-ios-scanner-bundle | Package scanner bundles install by stable game ID with integrity checks; recognition selectors still use built-in games, so arbitrary-game recognition remains unsupported. | [Source](../mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift#L3) |
 | games.capability.scannerDownload | Android | Implemented | local | network-for-download, package-android-scanner-bundle | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt#L1) |
 | games.capability.priceDownload | Web | Implemented | local | network-for-download, publisher-game-package | — | [Source](../frontend/src/lib/game-packages/game-package-client.ts#L4) |
 | games.capability.priceDownload | iOS | Implemented | local | network-for-download, publisher-game-package | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift#L4) |
@@ -253,15 +253,15 @@ These declarations live beside platform implementations. Unspecified modes are u
 | games.capability.packDownload | Web | Implemented | local | network-for-download, publisher-game-package | — | [Source](../frontend/src/lib/game-packages/game-package-client.ts#L5) |
 | games.capability.packDownload | iOS | Implemented | local | network-for-download, publisher-game-package | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift#L5) |
 | games.capability.packDownload | Android | Implemented | local | network-for-download, publisher-game-package | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt#L4) |
-| navigation.appLinks | Web | Partial | Not specified | — | Top-level scan/cards/collections/wishlists routes exist; native /search, /binder/:id and /wishlist/:id HTTPS links lack equivalent web fallback routes. | [Source](../frontend/app/layout.tsx#L1) |
+| navigation.appLinks | Web | Partial | Not specified | — | Canonical native search/binder/wishlist URLs redirect to web screens and preserve selection; static demo aliases, hosted associations and signed-device cold starts remain unverified. | [Source](../frontend/app/layout.tsx#L1) |
 | navigation.appLinks | iOS | Partial | Not specified | — | Custom-scheme and associated-domain routing exists, including pending binder/wishlist resolution; deployed association files and release-device cold starts are not verified. | [Source](../mobile-apps/ios/TCGer/TCGer/ContentView.swift#L1) |
-| navigation.appLinks | Android | Partial | Not specified | — | Custom-scheme parsing and HTTPS intent filters exist for scan/search/binder/collection/wishlist; deployed domain association and release-device cold starts are not verified. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppLink.kt#L1) |
+| navigation.appLinks | Android | Partial | Not specified | — | Custom and HTTPS routes share tested destinations and reject untrusted inputs; configured hosted associations and signed-device cold starts remain unverified. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppLink.kt#L1) |
 | security.biometricLock | Web | Not applicable | Not specified | — | No native app lock or device-authentication overlay is shipped for the browser; web account authentication is separate. | [Source](../frontend/src/components/account/account-settings-dialog.tsx#L1) |
-| security.biometricLock | iOS | Partial | Not specified | enrolled-device-biometrics | Face ID/Touch ID lock exists; authentication uses biometric-only policy even though cancellation says Use Passcode, so device-credential fallback is absent. | [Source](../mobile-apps/ios/TCGer/TCGer/Utils/BiometricAuthManager.swift#L1) |
-| security.biometricLock | Android | Partial | Not specified | device-authentication | Biometric or device-credential lock exists; unavailable authenticators currently unlock the app, and release/hardware lifecycle coverage is absent. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt#L1) |
-| release.readiness | Web | Planned | Not specified | — | App and container build configuration exist; production deploy, PWA install/update and release smoke criteria are not exercised by this capability record. | [Source](../frontend/src/components/pwa/service-worker-register.tsx#L1) |
-| release.readiness | iOS | Planned | Not specified | — | App target and unsigned Debug simulator testing exist; signed archive, provisioning, privacy/store submission and release-device smoke criteria remain unverified. | [Source](../mobile-apps/ios/TCGer/TCGer/SettingsView.swift#L1) |
-| release.readiness | Android | Planned | Not specified | — | Release minification is configured; no release signingConfig is declared in app Gradle, and signed bundle, store/privacy and release-device smoke criteria remain unverified. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt#L1) |
+| security.biometricLock | iOS | Partial | Not specified | device-screen-lock | Device-owner authentication supports biometrics and system passcode fallback and fails closed; physical-device enrollment, lockout and release lifecycle checks remain outstanding. | [Source](../mobile-apps/ios/TCGer/TCGer/Utils/BiometricAuthManager.swift#L1) |
+| security.biometricLock | Android | Partial | Not specified | device-authentication | Biometric or device-credential lock exists; unavailable authenticators remain locked with device-security setup access; physical-device enrollment, lockout and release lifecycle verification remain outstanding. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt#L1) |
+| release.readiness | Web | Partial | Not specified | — | Production build and hosted smoke tooling are configured; production deployment, signed app associations and physical PWA install/update checks remain unverified. | [Source](../frontend/src/components/pwa/service-worker-register.tsx#L1) |
+| release.readiness | iOS | Partial | Not specified | — | Release archive/export settings and artifact/physical-device readiness tooling are configured; no distribution signing identity, exported IPA or physical-device evidence is verified here. | [Source](../mobile-apps/ios/TCGer/TCGer/SettingsView.swift#L1) |
+| release.readiness | Android | Partial | Not specified | — | Direct-install release APK signing and certificate verification are configured; physical-device smoke and deployed domain association are outstanding. Play Store publishing is out of scope. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt#L1) |
 | collections.copies | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/lib/api/collections.ts#L1) |
 | collections.copies | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift#L1) |
 | collections.copies | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt#L1) |

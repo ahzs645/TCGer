@@ -137,7 +137,11 @@ unrelated imported or existing records.
 and atomic commit coordination; `LocalStorePersistence.swift` owns recovery files,
 `LocalStoreBackupCodec.swift` owns portable/legacy mapping, and
 `LocalStorePhotoRepository.swift` owns immutable photo files and lifetime checks.
-Keep these boundaries intact and retain their injected repositories.
+Keep these boundaries intact and retain their injected repositories. Immutable demo
+catalogs belong to `LocalSampleCatalog`; derived wishlist ownership belongs to
+`LocalWishlistProjection`. Local API helpers must use `APIService.localStore`,
+so an injected repository also reaches detail, finance, wishlist and guide flows.
+Pass that API service into child workflows instead of creating another instance.
 
 Image requests need per-request identity and cancellation. A late success or
 failure must not publish after replacement, even if its transport ignores
@@ -158,3 +162,19 @@ the established DELETE card endpoint removes the whole printing group. Scan-save
 contracts verify persistence requests, not recognition or UI review. Sealed opening
 contracts verify ownership, decrements and linked-copy ledgers, not offline or
 idempotent replay. Keep these distinctions in tests and feature declarations.
+
+
+### Release evidence and APK distribution
+
+Android currently ships as a directly installed APK; Play Store publishing is not
+required. `npm run release:apk` reuses the persistent local key outside Git and
+copies the signed artifact into ignored release results. Preserve that key for
+future updates. Never commit signing secrets or silently rotate an existing key.
+`frontend/src/lib/release-identities.json` contains only public association IDs;
+verify them against the actual signed artifact before deployment.
+
+Follow [release readiness](docs/release-readiness.md). `release:check` requires
+committed source, signed artifact checks, hosted associations and current,
+artifact-bound physical-device evidence. `--allow-pending` produces an audit;
+it does not establish release readiness. Simulator and contract passes do not
+prove biometric hardware, camera, browser installation or hosted app links.

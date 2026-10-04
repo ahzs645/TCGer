@@ -64,13 +64,15 @@ struct CollectionDetailView: View {
     @State private var yugiohBanlist: YugiohBanlistSnapshot?
     @State private var banlistFormat = "tcg"
 
-    private let apiService = APIService()
+    private let apiService: APIService
     init(
         collection: Collection,
         startsInEditMode: Bool = false,
         initialSearchText: String = "",
-        parentProvidesNavigation: Bool = false
+        parentProvidesNavigation: Bool = false,
+        apiService: APIService? = nil
     ) {
+        self.apiService = apiService ?? APIService()
         self.collection = collection
         self.parentProvidesNavigation = parentProvidesNavigation
         _isEditing = State(initialValue: startsInEditMode)
@@ -778,7 +780,7 @@ struct CollectionDetailView: View {
                     }
                 }
                 .sheet(isPresented: $showingShareLinks) {
-                    BinderShareLinksView(binderId: collection.id)
+                    BinderShareLinksView(binderId: collection.id, apiService: apiService)
                         .environmentObject(environmentStore)
                 }
                 .sheet(item: $binderPagesPresentation, onDismiss: {
@@ -1762,7 +1764,7 @@ private struct BinderShareLinksView: View {
     @State private var errorMessage: String?
     @State private var pendingRevocation: BinderShareLink?
 
-    private let apiService = APIService()
+    let apiService: APIService
 
     var body: some View {
         NavigationStack {

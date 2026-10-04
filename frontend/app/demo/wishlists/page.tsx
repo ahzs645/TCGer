@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { WishlistContent } from "@/components/wishlists/wishlist-content";
 
@@ -19,7 +20,7 @@ export default function WishlistsPage() {
             is compared to your collection.
           </p>
         </div>
-        <WishlistContent data-oid="kecjj3g" />
+        <Suspense fallback={<p>Loading…</p>}><WishlistContent data-oid="kecjj3g" /></Suspense>
       </div>
     </AppShell>
   );

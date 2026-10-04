@@ -1,6 +1,6 @@
 // @tcger-feature {"id":"games.catalogDownloads","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
 // @tcger-feature {"id":"games.packageUpdates","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
-// @tcger-feature {"id":"games.capability.scannerDownload","platform":"ios","status":"partial","modes":["local"],"requires":["network-for-download","package-ios-scanner-bundle"],"limitation":"Scanner installation accepts package bundle sources for built-in TCGGame identifiers; arbitrary publisher game IDs cannot pass the enum guard and remain unsupported."}
+// @tcger-feature {"id":"games.capability.scannerDownload","platform":"ios","status":"partial","modes":["local"],"requires":["network-for-download","package-ios-scanner-bundle"],"limitation":"Package scanner bundles install by stable game ID with integrity checks; recognition selectors still use built-in games, so arbitrary-game recognition remains unsupported."}
 // @tcger-feature {"id":"games.capability.priceDownload","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
 // @tcger-feature {"id":"games.capability.packDownload","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
 import CryptoKit
@@ -528,8 +528,7 @@ final class GamePackageStore: ObservableObject {
 
     func enableCapability(_ kind: String, for package: InstalledGamePackage) async throws {
         if kind == "scanner" {
-            guard let game = TCGGame(rawValue: package.manifest.game.id) else { throw GameCapabilityError.invalidContract }
-            try await ScannerAssetStore.shared.install(game)
+            try await ScannerAssetStore.shared.install(package.manifest.game.id)
             return
         }
         let asset = kind == "pricing" ? package.manifest.pricing?.asset : package.manifest.offlinePacks?.manifest

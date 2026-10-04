@@ -9,11 +9,11 @@ extension APIService {
     ) async throws -> CardDiscoveryResponse {
         if config.isOnDevice {
             await prepareLocalCatalog(for: game)
-            let sets = await LocalStore.shared.getSets(tcg: game == .all ? nil : game.rawValue)
+            let sets = await localStore.getSets(tcg: game == .all ? nil : game.rawValue)
             guard let set = sets.randomElement() else {
                 return CardDiscoveryResponse(cards: [], total: 0, sampledFrom: nil)
             }
-            let cards = await LocalStore.shared.getSetCards(tcg: set.tcg, setCode: set.code)
+            let cards = await localStore.getSetCards(tcg: set.tcg, setCode: set.code)
                 .shuffled()
                 .prefix(max(1, min(24, count)))
             let sampled = CardDiscoveryResponse.SampledFrom(
@@ -57,7 +57,7 @@ extension APIService {
         }
         if config.isOnDevice {
             await prepareLocalCatalog(for: game)
-            let response = await LocalStore.shared.searchCardsAsync(query: query, game: game)
+            let response = await localStore.searchCardsAsync(query: query, game: game)
             return CardSearchResponse(
                 cards: response.cards,
                 total: response.total
@@ -109,7 +109,7 @@ extension APIService {
             // The on-device catalog is already fully local, so its regular
             // search is exhaustive.
             await prepareLocalCatalog(for: game)
-            let cards = await LocalStore.shared.searchCardsAsync(query: query, game: game).cards
+            let cards = await localStore.searchCardsAsync(query: query, game: game).cards
             return cards
         }
 
@@ -238,7 +238,7 @@ extension APIService {
             if let game = TCGGame(rawValue: tcg) {
                 await prepareLocalCatalog(for: game)
             }
-            let cards = LocalStore.shared.getCardPrints(tcg: tcg, cardId: cardId)
+            let cards = localStore.getCardPrints(tcg: tcg, cardId: cardId)
             return cards
         }
 
@@ -300,7 +300,7 @@ extension APIService {
                 await prepareLocalCatalog(for: .all)
             }
             return SetCatalogResult(
-                sets: LocalStore.shared.getSets(tcg: tcg),
+                sets: localStore.getSets(tcg: tcg),
                 failedProviders: []
             )
         }
@@ -341,7 +341,7 @@ extension APIService {
                TCGGame.catalogGames.contains(game) {
                 await CatalogStore.shared.loadIfNeeded(game)
             }
-            let cards = LocalStore.shared.getSetCards(tcg: tcg, setCode: setCode)
+            let cards = localStore.getSetCards(tcg: tcg, setCode: setCode)
             return cards
         }
 

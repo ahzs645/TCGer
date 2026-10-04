@@ -16,7 +16,7 @@ extension APIService {
         token: String? = nil
     ) async throws -> UserProfile {
         if config.isOnDevice {
-            return LocalStore.shared.getUserProfile()
+            return localStore.getUserProfile()
         }
 
         let (data, response) = try await makeRequest(
@@ -60,8 +60,8 @@ extension APIService {
         email: String? = nil
     ) async throws -> UpdatedProfile {
         if config.isOnDevice {
-            let profile = LocalStore.shared.updateUserProfile(username: username, email: email)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            let profile = localStore.updateUserProfile(username: username, email: email)
+            try localStore.requireLatestMutationPersisted()
             return profile
         }
 
@@ -108,7 +108,7 @@ extension APIService {
         newPassword: String
     ) async throws {
         if config.isOnDevice {
-            LocalStore.shared.changePassword(
+            localStore.changePassword(
                 currentPassword: currentPassword,
                 newPassword: newPassword
             )

@@ -77,6 +77,7 @@ data class AppUiState(
     val isAdmin: Boolean = false,
     val serverSetupRequired: Boolean = false,
     val serverFeatures: Map<String, Boolean> = emptyMap(),
+    val capabilityError: String? = null,
     val publicCollections: Boolean = false,
     val searchCollectionOnly: Boolean = false,
     val currencyRevision: Long = 0,
@@ -117,7 +118,25 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     val state: StateFlow<AppUiState> = _state.asStateFlow()
     private val latestSearch = LatestSearchRequest(viewModelScope)
 
+    private val capabilities = com.ahmadjalil.tcger.data.remote.ServerCapabilityStore(viewModelScope) { source ->
+        com.ahmadjalil.tcger.data.remote.RemoteServiceFactory().create(source.url).health().features
+    }
+
+    fun refreshServerCapabilities() = viewModelScope.launch {
+        val settings = container.preferences.current()
+        if (settings.dataSourceMode == DataSourceMode.SERVER) {
+            runCatching { refreshServerStatus() }.onFailure {
+                if (it is kotlinx.coroutines.CancellationException) throw it
+            }
+        }
+    }
+
     init {
+        viewModelScope.launch {
+            capabilities.state.collectLatest { snapshot ->
+                _state.update { it.copy(serverFeatures = snapshot.features, capabilityError = snapshot.error) }
+            }
+        }
         viewModelScope.launch {
             container.gamePackages.state.collectLatest { packages ->
                 container.scannerAssets.setGamePackages(packages.installed)
@@ -164,6 +183,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun refresh() = viewModelScope.launch {
+        refreshServerCapabilities()
         if (_state.value.preferences.dataSourceMode == DataSourceMode.SERVER && !_state.value.preferences.isSignedIn) {
             runCatching { refreshServerStatus() }.onFailure(::showError)
             _state.update { it.copy(isLoading = false) }
@@ -174,7 +194,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             Triple(
                 repository.getBinders(),
                 repository.getWishlists(),
-                runCatching { if (_state.value.preferences.sealedProductsEnabled) repository.getSealedInventory() else emptyList() },
+                runCatching { if (_state.value.preferences.sealedProductsEnabled && (_state.value.preferences.dataSourceMode != DataSourceMode.SERVER || _state.value.serverFeatures["sealed"] != false)) repository.getSealedInventory() else emptyList() },
             )
         }.onSuccess { (binders, wishlists, sealedInventoryResult) ->
             _state.update {
@@ -695,17 +715,18 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     suspend fun refreshServerStatus() {
         val settings = container.preferences.current()
         if (settings.dataSourceMode != DataSourceMode.SERVER) {
+            capabilities.reset()
             _state.update { it.copy(isAdmin = false, serverSetupRequired = false, serverFeatures = emptyMap(), publicCollections = false) }; return
         }
         val api = com.ahmadjalil.tcger.data.remote.RemoteServiceFactory().create(settings.serverUrl)
-        val health = api.health()
+        val features = capabilities.refresh(com.ahmadjalil.tcger.data.remote.CapabilitySource(settings.serverUrl, settings.authToken)) ?: return
         val setup = runCatching { api.setupStatus()["setupRequired"]?.jsonPrimitive?.booleanOrNull == true }.getOrDefault(false)
         val policy = runCatching { api.appSettings() }.getOrNull()
         val public = policy?.get("publicCollections")?.jsonPrimitive?.booleanOrNull == true && policy["requireAuth"]?.jsonPrimitive?.booleanOrNull == false
         val profile = runCatching { api.profile(settings.authToken?.let { "Bearer $it" }) }.getOrNull()
         val current = container.preferences.current()
         if (current.serverUrl != settings.serverUrl || current.authToken != settings.authToken || current.dataSourceMode != settings.dataSourceMode) return
-        _state.update { it.copy(isAdmin = profile?.get("isAdmin")?.jsonPrimitive?.booleanOrNull == true, serverSetupRequired = setup, serverFeatures = health.features, publicCollections = public) }
+        _state.update { it.copy(isAdmin = profile?.get("isAdmin")?.jsonPrimitive?.booleanOrNull == true, serverSetupRequired = setup, serverFeatures = features, publicCollections = public) }
         if (!settings.isSignedIn && public) {
             val binders = api.getBinders(null).map { it.toDomain() }
             if (container.preferences.current().let { it.serverUrl == settings.serverUrl && it.authToken == settings.authToken && it.dataSourceMode == settings.dataSourceMode })

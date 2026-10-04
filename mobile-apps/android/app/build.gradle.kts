@@ -14,6 +14,24 @@ val requireSignedOfficialGamePackages = providers.gradleProperty("tcgerRequireSi
     .map(String::toBoolean)
     .orElse(false)
 
+// Release credentials come from local Gradle properties or the CI environment.
+fun releaseSetting(property: String, environment: String) = providers.gradleProperty(property).orElse(providers.environmentVariable(environment)).orNull
+val releaseStoreFile = releaseSetting("tcgerReleaseStoreFile", "TCGER_RELEASE_STORE_FILE")
+val releaseStorePassword = releaseSetting("tcgerReleaseStorePassword", "TCGER_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = releaseSetting("tcgerReleaseKeyAlias", "TCGER_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = releaseSetting("tcgerReleaseKeyPassword", "TCGER_RELEASE_KEY_PASSWORD")
+val releaseSigningConfigured = listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { !it.isNullOrBlank() }
+val allowUnsignedRelease = providers.gradleProperty("tcgerAllowUnsignedRelease").orNull == "true"
+
+// Fail before building an accidentally unsigned distribution artifact. The
+// explicit unsigned option is for compiler/R8 checks, never store readiness.
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.project == project && it.name in setOf("assembleRelease", "bundleRelease", "packageRelease", "packageReleaseBundle") }) {
+        check(releaseSigningConfigured || allowUnsignedRelease) { "Release signing is missing. Configure TCGER_RELEASE_STORE_FILE/STORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD; use -PtcgerAllowUnsignedRelease=true only for unsigned verification." }
+        if (releaseSigningConfigured) check(file(releaseStoreFile!!).isFile) { "The configured release keystore does not exist." }
+    }
+}
+
 android {
     namespace = "com.ahmadjalil.tcger"
     compileSdk = 35
@@ -45,8 +63,17 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) create("release") {
+            storeFile = file(releaseStoreFile!!)
+            storePassword = releaseStorePassword
+            keyAlias = releaseKeyAlias
+            keyPassword = releaseKeyPassword
+        }
+    }
     buildTypes {
         release {
+            if (releaseSigningConfigured) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -92,6 +119,7 @@ android {
         "../../../docs/scanner-system/examples",
     )
     sourceSets.getByName("test").resources.srcDir("../../../mobile-parity/api-contracts")
+    sourceSets.getByName("test").resources.srcDir("../../../mobile-parity/fixtures")
 }
 
 dependencies {

@@ -1,4 +1,4 @@
-// @tcger-feature {"id":"security.biometricLock","platform":"android","status":"partial","requires":["device-authentication"],"limitation":"Biometric or device-credential lock exists; unavailable authenticators currently unlock the app, and release/hardware lifecycle coverage is absent."}
+// @tcger-feature {"id":"security.biometricLock","platform":"android","status":"partial","requires":["device-authentication"],"limitation":"Biometric or device-credential lock exists; unavailable authenticators remain locked with device-security setup access; physical-device enrollment, lockout and release lifecycle verification remain outstanding."}
 // @tcger-feature {"id":"widgets.sessionPrivacy","platform":"android","status":"not_applicable","limitation":"No home screen widget extension is shipped on this surface."}
 package com.ahmadjalil.tcger
 
@@ -16,6 +16,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,10 +42,14 @@ import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : FragmentActivity() {
     private val pendingLink = mutableStateOf<String?>(null)
-    private val unlocked = mutableStateOf(false)
-    private var biometricEnabled = false
+    private val appLock = com.ahmadjalil.tcger.ui.DeviceAppLockState()
+    private val unlocked get() = appLock.unlocked
+    private val unlockError get() = appLock.error
     private var preferencesLoaded = false
-    private var promptActive = false
+
+    private val legacyCredential = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        appLock.complete(result.resultCode == RESULT_OK, lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED), "Device authentication was cancelled.")
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,18 +65,15 @@ class MainActivity : FragmentActivity() {
                 if (!unlocked.value) Dialog(
                     onDismissRequest = {},
                     properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false, usePlatformDefaultWidth = false, securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
-                ) { LockedAppScreen(onUnlock = ::authenticate) }
+                ) { LockedAppScreen(error = unlockError.value, onUnlock = ::authenticate, onSecuritySettings = { startActivity(Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)) }) }
             }
         }
         lifecycleScope.launch {
             container.preferences.preferences.collectLatest { preferences ->
-                val firstValue = !preferencesLoaded
-                biometricEnabled = preferences.biometricLockEnabled
                 preferencesLoaded = true
-                when {
-                    !biometricEnabled || ParityTestMode.isEnabled -> unlocked.value = true
-                    firstValue -> authenticate()
-                }
+                if (preferences.biometricLockEnabled) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                if (appLock.configure(preferences.biometricLockEnabled, ParityTestMode.isEnabled)) authenticate()
             }
         }
     }
@@ -88,36 +91,44 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (preferencesLoaded && biometricEnabled && !unlocked.value && !promptActive && !ParityTestMode.isEnabled) {
+        if (preferencesLoaded && appLock.enabled && !unlocked.value && !appLock.promptActive && !ParityTestMode.isEnabled) {
             authenticate()
         }
     }
 
     override fun onStop() {
         super.onStop()
-        if (biometricEnabled && !promptActive && !isChangingConfigurations) unlocked.value = false
+        appLock.background()
     }
 
     private fun authenticate() {
-        if (promptActive) return
+        if (!appLock.begin()) return
+        if (android.os.Build.VERSION.SDK_INT < 30) {
+            val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+            val intent = keyguard.createConfirmDeviceCredentialIntent("Unlock TCGer", "Use your device screen lock")
+            if (intent == null) {
+                appLock.unavailable("Set up a device screen lock to unlock TCGer.")
+            } else {
+                legacyCredential.launch(intent)
+            }
+            return
+        }
         val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
             BiometricManager.Authenticators.DEVICE_CREDENTIAL
         if (BiometricManager.from(this).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-            unlocked.value = true
+            appLock.unavailable("Device authentication is unavailable. Set up your screen lock or try again when it becomes available.")
             return
         }
-        promptActive = true
         val prompt = BiometricPrompt(
             this,
             ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    promptActive = false
-                    unlocked.value = true
+                    appLock.complete(true, lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    promptActive = false
+                    appLock.complete(false, lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED), errString.toString())
                 }
             },
         )
@@ -132,7 +143,7 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-private fun LockedAppScreen(onUnlock: () -> Unit) {
+private fun LockedAppScreen(error: String?, onUnlock: () -> Unit, onSecuritySettings: () -> Unit) {
     MaterialTheme {
         Column(
             Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -140,7 +151,9 @@ private fun LockedAppScreen(onUnlock: () -> Unit) {
             verticalArrangement = Arrangement.Center,
         ) {
             Text("TCGer is locked", style = MaterialTheme.typography.headlineSmall)
+            error?.let { Text(it, Modifier.padding(24.dp)) }
             Button(onClick = onUnlock) { Text("Unlock") }
+            if (error != null) Button(onClick = onSecuritySettings) { Text("Device security settings") }
         }
     }
 }

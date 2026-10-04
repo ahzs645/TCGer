@@ -1,0 +1,14 @@
+[
+  {"url":"tcger://search?q=Black%20Lotus","web":"/cards?q=Black%20Lotus","android":"search","ios":"search","query":"Black Lotus"},
+  {"url":"https://tcger.ahmadjalil.com/search?q=Pikachu","web":"/cards?q=Pikachu","android":"search","ios":"search","query":"Pikachu"},
+  {"url":"tcger://binder/binder-123","web":"/collections?binder=binder-123","android":"binder/binder-123","ios":"binder","id":"binder-123"},
+  {"url":"https://tcger.ahmadjalil.com/wishlist/wishlist-456","web":"/wishlists?wishlist=wishlist-456","android":"wishlist/wishlist-456","ios":"wishlist","id":"wishlist-456"},
+  {"url":"tcger://scan","web":"/scan","android":"scanner","ios":"scan"},
+  {"url":"https://tcger.ahmadjalil.com/packs","web":"/packs","android":"pack-opening","ios":"packs"},
+  {"url":"https://example.com/binder/binder-123","web":null,"android":null,"ios":null},
+  {"url":"https://tcger.ahmadjalil.com:8443/search","web":null,"android":null,"ios":null},
+  {"url":"https://attacker@tcger.ahmadjalil.com/search","web":null,"android":null,"ios":null},
+  {"url":"tcger://binder/binder-123/extra","web":null,"android":null,"ios":null},
+  {"url":"tcger://binder/%2Fwrong","web":null,"android":null,"ios":null},
+  {"url":"tcger://not-a-route","web":null,"android":null,"ios":null}
+]

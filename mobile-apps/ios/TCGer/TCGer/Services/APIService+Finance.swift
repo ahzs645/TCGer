@@ -76,7 +76,7 @@ extension APIService {
         collectionEntryId: String? = nil
     ) async throws -> [Transaction] {
         if config.isOnDevice {
-            return LocalStore.shared.getTransactions(collectionEntryId: collectionEntryId)
+            return localStore.getTransactions(collectionEntryId: collectionEntryId)
         }
         let queryItems = collectionEntryId.map {
             [URLQueryItem(name: "collectionEntryId", value: $0)]
@@ -121,14 +121,14 @@ extension APIService {
         date: String? = nil
     ) async throws -> Transaction {
         if config.isOnDevice {
-            let transaction = LocalStore.shared.createTransaction(
+            let transaction = localStore.createTransaction(
                 type: type, collectionEntryId: collectionEntryId, cardId: cardId,
                 externalId: externalId, cardName: cardName, tcg: tcg,
                 quantity: quantity ?? 1, amount: amount, currency: currency ?? "USD",
                 platform: platform, sourceUrl: sourceUrl, costBasis: costBasis, fees: fees,
                 shippingCost: shippingCost, acquiredAt: acquiredAt, notes: notes, date: date
             )
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return transaction
         }
         let body = CreateTransactionRequest(
@@ -172,7 +172,7 @@ extension APIService {
         date: String
     ) async throws -> Transaction {
         if config.isOnDevice {
-            let transaction = try LocalStore.shared.updateTransaction(
+            let transaction = try localStore.updateTransaction(
                 id: transactionId,
                 collectionEntryId: collectionEntryId,
                 cardId: cardId,
@@ -187,7 +187,7 @@ extension APIService {
                 notes: notes,
                 date: date
             )
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return transaction
         }
         let body = UpdateTransactionRequest(
@@ -230,8 +230,8 @@ extension APIService {
         transactionId: String
     ) async throws {
         if config.isOnDevice {
-            LocalStore.shared.deleteTransaction(id: transactionId)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            localStore.deleteTransaction(id: transactionId)
+            try localStore.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(
@@ -248,7 +248,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> FinanceSummary {
-        if config.isOnDevice { return LocalStore.shared.getFinanceSummary() }
+        if config.isOnDevice { return localStore.getFinanceSummary() }
         let (data, response) = try await makeRequest(config: config, path: "finance/summary", token: token)
 
         guard response.statusCode == 200 else {
@@ -266,7 +266,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> RealizedPerformance {
-        if config.isOnDevice { return LocalStore.shared.getRealizedPerformance() }
+        if config.isOnDevice { return localStore.getRealizedPerformance() }
         let (data, response) = try await makeRequest(
             config: config, path: "finance/realized-performance", token: token
         )

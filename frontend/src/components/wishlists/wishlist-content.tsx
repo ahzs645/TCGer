@@ -5,6 +5,7 @@
 import { gameLabel } from "@/lib/utils";
 
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -78,6 +79,7 @@ import { copyCountNoun } from "@/lib/copy-labels";
 import { PriceAlertDialog } from "@/components/prices/price-alert-dialog";
 
 export function WishlistContent() {
+  const requestedWishlistId = useSearchParams().get("wishlist");
   const [confirm, confirmDialog] = useConfirm();
   const { token, isAuthenticated } = useAuthStore();
   const {
@@ -152,10 +154,17 @@ export function WishlistContent() {
   }, [isAuthenticated, token, hasFetched, fetchWishlists]);
 
   useEffect(() => {
-    if (wishlists.length && !activeWishlistId) {
+    if (!requestedWishlistId && wishlists.length && !activeWishlistId) {
       setActiveWishlistId(wishlists[0].id);
     }
-  }, [wishlists, activeWishlistId]);
+  }, [wishlists, activeWishlistId, requestedWishlistId]);
+
+  useEffect(() => {
+    if (!requestedWishlistId || !hasFetched) return;
+    const target = wishlists.find((wishlist) => wishlist.id === requestedWishlistId);
+    setActiveWishlistId(target?.id ?? null);
+    setMobileView(target ? "detail" : "list");
+  }, [wishlists, requestedWishlistId, hasFetched]);
 
   const activeWishlist = useMemo(
     () => wishlists.find((w) => w.id === activeWishlistId) ?? null,
@@ -900,6 +909,9 @@ export function WishlistContent() {
 
   return (
     <>
+      {requestedWishlistId && hasFetched && !wishlists.some((wishlist) => wishlist.id === requestedWishlistId) && (
+        <p role="alert">This wishlist is unavailable for the current account.</p>
+      )}
       {error && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           <span>{error}</span>

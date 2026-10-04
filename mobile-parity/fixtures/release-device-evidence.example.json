@@ -1,0 +1,48 @@
+[
+  {
+    "platform": "ios",
+    "revision": "REPLACE_WITH_TESTED_COMMIT",
+    "artifactSha256": "REPLACE_WITH_TESTED_IPA_SHA256",
+    "device": "REPLACE_WITH_PHYSICAL_DEVICE",
+    "os": "REPLACE_WITH_OS_VERSION",
+    "checkedAt": "REPLACE_WITH_EXECUTION_TIME",
+    "checks": {
+      "authenticationSuccess": false,
+      "authenticationCancel": false,
+      "authenticationUnavailable": false,
+      "backgroundPrivacy": false,
+      "coldAppLink": false,
+      "warmAppLink": false,
+      "camera": false
+    }
+  },
+  {
+    "platform": "android",
+    "revision": "REPLACE_WITH_TESTED_COMMIT",
+    "artifactSha256": "REPLACE_WITH_TESTED_APK_SHA256",
+    "device": "REPLACE_WITH_PHYSICAL_DEVICE",
+    "os": "REPLACE_WITH_OS_VERSION",
+    "checkedAt": "REPLACE_WITH_EXECUTION_TIME",
+    "checks": {
+      "authenticationSuccess": false,
+      "authenticationCancel": false,
+      "authenticationUnavailable": false,
+      "backgroundPrivacy": false,
+      "coldAppLink": false,
+      "warmAppLink": false,
+      "camera": false
+    }
+  },
+  {
+    "platform": "web",
+    "revision": "REPLACE_WITH_DEPLOYED_COMMIT",
+    "baseURL": "https://tcger.ahmadjalil.com",
+    "browser": "REPLACE_WITH_BROWSER_VERSION",
+    "checkedAt": "REPLACE_WITH_EXECUTION_TIME",
+    "checks": {
+      "installation": false,
+      "offlineLaunch": false,
+      "serviceWorkerUpdate": false
+    }
+  }
+]

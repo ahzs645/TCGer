@@ -93,13 +93,22 @@
           "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/CacheManager.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
-          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
         ],
         "tests": [
           {
             "runner": "xctest",
             "id": "collections.browse",
             "path": "mobile-apps/ios/TCGer/TCGerTests/CachedImageLoaderTests.swift"
+          },
+          {
+            "runner": "xctest",
+            "id": "collections.browse",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LocalAPIRepositoryInjectionTests.swift"
           }
         ],
         "status": "implemented",
@@ -168,7 +177,18 @@
           "mobile-parity/api-contracts/interactions.json",
           "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/CacheManager.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "collections.create",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LocalAPIRepositoryInjectionTests.swift"
+          }
         ],
         "status": "implemented",
         "implementation": {
@@ -302,7 +322,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Wishlists.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -348,7 +369,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Wishlists.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -405,7 +427,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"
+          "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Settings.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -600,7 +623,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/CollectionGuidesView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/CollectionGuidesView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Guides.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -645,7 +669,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/SealedInventoryView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/SealedInventoryView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Sealed.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -1366,7 +1391,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/OnlineCodesView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/OnlineCodesView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+OnlineCodes.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -1411,7 +1437,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/PricesView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/PricesView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Finance.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -1456,7 +1483,8 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/AnalyticsView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/AnalyticsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Portfolio.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -3761,7 +3789,9 @@
           "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
           "mobile-apps/ios/TCGer/TCGerTests/LocalStorePersistenceTests.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/LocalStorePhotoRepository.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/LocalStoreBackupCodec.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStoreBackupCodec.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
         ],
         "tests": [
           {
@@ -3920,7 +3950,9 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
         ],
         "tests": [
           {
@@ -4011,7 +4043,9 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/ProfileView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/ProfileView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Auth.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+User.swift"
         ],
         "status": "implemented",
         "implementation": {
@@ -4148,7 +4182,18 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "collections.manage",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LocalAPIRepositoryInjectionTests.swift"
+          }
         ],
         "status": "implemented",
         "implementation": {
@@ -4201,14 +4246,30 @@
       },
       "android": {
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ServerCapabilityStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppLink.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/domain/Models.kt"
         ],
-        "status": "partial",
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "server.capabilities",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerCapabilityStoreTest.kt"
+          },
+          {
+            "runner": "junit",
+            "id": "server.capabilities",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/AppLinkTest.kt"
+          }
+        ],
+        "status": "implemented",
         "implementation": {
           "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt",
           "line": 1
         },
-        "limitation": "Health responses decode capability flags, but verifyServer discards them; feature gating and automatic capability refresh after recovery are absent.",
         "modes": [
           "server"
         ]
@@ -4703,7 +4764,8 @@
       "ios": {
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Finance.swift"
         ],
         "tests": [
           {
@@ -5035,12 +5097,19 @@
           "mobile-apps/ios/TCGer/TCGer/Views/GamePackageCapabilitiesView.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/ScannerAssetStore.swift"
         ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "games.capability.scannerDownload",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/PackageScannerDownloadTests.swift"
+          }
+        ],
         "status": "partial",
         "implementation": {
           "path": "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
           "line": 3
         },
-        "limitation": "Scanner installation accepts package bundle sources for built-in TCGGame identifiers; arbitrary publisher game IDs cannot pass the enum guard and remain unsupported.",
+        "limitation": "Package scanner bundles install by stable game ID with integrity checks; recognition selectors still use built-in games, so arbitrary-game recognition remains unsupported.",
         "modes": [
           "local"
         ],
@@ -5200,14 +5269,42 @@
           "frontend/app/scan/page.tsx",
           "frontend/app/cards/page.tsx",
           "frontend/app/collections/page.tsx",
-          "frontend/app/wishlists/page.tsx"
+          "frontend/app/wishlists/page.tsx",
+          "frontend/next.config.mjs",
+          "frontend/src/lib/app-links.mjs",
+          "frontend/src/lib/app-associations.mjs",
+          "frontend/src/components/cards/card-search-panel.tsx",
+          "frontend/src/components/wishlists/wishlist-content.tsx",
+          "frontend/app/.well-known/assetlinks.json/route.ts",
+          "frontend/app/.well-known/apple-app-site-association/route.ts",
+          "frontend/src/lib/release-identities.json",
+          "mobile-parity/fixtures/app-links-v1.json",
+          "frontend/app/demo/cards/page.tsx",
+          "frontend/app/demo/wishlists/page.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "node",
+            "id": "navigation.appLinks",
+            "path": "frontend/src/lib/app-links.test.mjs"
+          },
+          {
+            "runner": "node",
+            "id": "navigation.appLinks",
+            "path": "frontend/src/lib/app-associations.test.mjs"
+          },
+          {
+            "runner": "playwright",
+            "id": "navigation.appLinks",
+            "path": "frontend/tests/parity/app-links.spec.ts"
+          }
         ],
         "status": "partial",
         "implementation": {
           "path": "frontend/app/layout.tsx",
           "line": 1
         },
-        "limitation": "Top-level scan/cards/collections/wishlists routes exist; native /search, /binder/:id and /wishlist/:id HTTPS links lack equivalent web fallback routes."
+        "limitation": "Canonical native search/binder/wishlist URLs redirect to web screens and preserve selection; static demo aliases, hosted associations and signed-device cold starts remain unverified."
       },
       "ios": {
         "sources": [
@@ -5215,7 +5312,9 @@
           "mobile-apps/ios/TCGer/TCGer/Models/AppTab.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/CollectionsView.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift",
-          "mobile-apps/ios/TCGer/TCGer.entitlements"
+          "mobile-apps/ios/TCGer/TCGer.entitlements",
+          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
+          "mobile-parity/fixtures/app-links-v1.json"
         ],
         "tests": [
           {
@@ -5236,14 +5335,22 @@
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppLink.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
-          "mobile-apps/android/app/src/main/AndroidManifest.xml"
+          "mobile-apps/android/app/src/main/AndroidManifest.xml",
+          "mobile-parity/fixtures/app-links-v1.json"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "navigation.appLinks",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/AppLinkTest.kt"
+          }
         ],
         "status": "partial",
         "implementation": {
           "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppLink.kt",
           "line": 1
         },
-        "limitation": "Custom-scheme parsing and HTTPS intent filters exist for scan/search/binder/collection/wishlist; deployed domain association and release-device cold starts are not verified."
+        "limitation": "Custom and HTTPS routes share tested destinations and reject untrusted inputs; configured hosted associations and signed-device cold starts remain unverified."
       }
     },
     {
@@ -5265,29 +5372,45 @@
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Utils/BiometricAuthManager.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/RootView.swift",
-          "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"
+          "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/DeviceAppLockStore.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "security.biometricLock",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/DeviceAuthenticationTests.swift"
+          }
         ],
         "status": "partial",
         "implementation": {
           "path": "mobile-apps/ios/TCGer/TCGer/Utils/BiometricAuthManager.swift",
           "line": 1
         },
-        "limitation": "Face ID/Touch ID lock exists; authentication uses biometric-only policy even though cancellation says Use Passcode, so device-credential fallback is absent.",
+        "limitation": "Device-owner authentication supports biometrics and system passcode fallback and fails closed; physical-device enrollment, lockout and release lifecycle checks remain outstanding.",
         "requires": [
-          "enrolled-device-biometrics"
+          "device-screen-lock"
         ]
       },
       "android": {
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt",
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/preferences/PreferencesStore.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/preferences/PreferencesStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/DeviceAppLockState.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "security.biometricLock",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/DeviceAppLockStateTest.kt"
+          }
         ],
         "status": "partial",
         "implementation": {
           "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt",
           "line": 1
         },
-        "limitation": "Biometric or device-credential lock exists; unavailable authenticators currently unlock the app, and release/hardware lifecycle coverage is absent.",
+        "limitation": "Biometric or device-credential lock exists; unavailable authenticators remain locked with device-security setup access; physical-device enrollment, lockout and release lifecycle verification remain outstanding.",
         "requires": [
           "device-authentication"
         ]
@@ -5301,40 +5424,76 @@
         "sources": [
           "frontend/src/components/pwa/service-worker-register.tsx",
           "frontend/app/layout.tsx",
-          ".github/workflows/build-images.yml"
+          ".github/workflows/build-images.yml",
+          "tools/release/readiness.mjs",
+          "mobile-parity/fixtures/release-device-evidence.example.json",
+          "docs/release-readiness.md",
+          "frontend/src/lib/release-identities.json"
         ],
-        "status": "planned",
+        "tests": [
+          {
+            "runner": "node-test",
+            "id": "release.readiness",
+            "path": "tools/release/readiness.test.mjs"
+          }
+        ],
+        "status": "partial",
         "implementation": {
           "path": "frontend/src/components/pwa/service-worker-register.tsx",
           "line": 1
         },
-        "limitation": "App and container build configuration exist; production deploy, PWA install/update and release smoke criteria are not exercised by this capability record."
+        "limitation": "Production build and hosted smoke tooling are configured; production deployment, signed app associations and physical PWA install/update checks remain unverified."
       },
       "ios": {
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
           "mobile-apps/ios/TCGer/TCGer.xcodeproj/project.pbxproj",
-          ".github/workflows/ios.yml"
+          ".github/workflows/ios.yml",
+          "mobile-apps/ios/release/ExportOptions.plist",
+          "mobile-apps/ios/release/archive.sh",
+          "tools/release/readiness.mjs",
+          "mobile-parity/fixtures/release-device-evidence.example.json",
+          "docs/release-readiness.md",
+          "frontend/src/lib/release-identities.json"
         ],
-        "status": "planned",
+        "tests": [
+          {
+            "runner": "node-test",
+            "id": "release.readiness",
+            "path": "tools/release/readiness.test.mjs"
+          }
+        ],
+        "status": "partial",
         "implementation": {
           "path": "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
           "line": 1
         },
-        "limitation": "App target and unsigned Debug simulator testing exist; signed archive, provisioning, privacy/store submission and release-device smoke criteria remain unverified."
+        "limitation": "Release archive/export settings and artifact/physical-device readiness tooling are configured; no distribution signing identity, exported IPA or physical-device evidence is verified here."
       },
       "android": {
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
           "mobile-apps/android/app/build.gradle.kts",
-          "mobile-apps/android/app/src/main/AndroidManifest.xml"
+          "mobile-apps/android/app/src/main/AndroidManifest.xml",
+          "tools/release/readiness.mjs",
+          "mobile-parity/fixtures/release-device-evidence.example.json",
+          "docs/release-readiness.md",
+          "frontend/src/lib/release-identities.json",
+          "tools/release/apk-signing.mjs"
         ],
-        "status": "planned",
+        "tests": [
+          {
+            "runner": "node-test",
+            "id": "release.readiness",
+            "path": "tools/release/readiness.test.mjs"
+          }
+        ],
+        "status": "partial",
         "implementation": {
           "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
           "line": 1
         },
-        "limitation": "Release minification is configured; no release signingConfig is declared in app Gradle, and signed bundle, store/privacy and release-device smoke criteria remain unverified."
+        "limitation": "Direct-install release APK signing and certificate verification are configured; physical-device smoke and deployed domain association are outstanding. Play Store publishing is out of scope."
       }
     },
     {
@@ -5369,7 +5528,9 @@
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/CollectionDetailView.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
         ],
         "tests": [
           {

@@ -18,6 +18,7 @@ on:
       - "mobile-parity/**"
       - "tools/mobile-parity/**"
       - "tools/api-contracts/**"
+      - "tools/release/**"
       - "backend/jest.config.cjs"
       - "package-lock.json"
       - "package.json"
@@ -39,6 +40,7 @@ on:
       - "mobile-parity/**"
       - "tools/mobile-parity/**"
       - "tools/api-contracts/**"
+      - "tools/release/**"
       - "backend/jest.config.cjs"
       - "package-lock.json"
       - "package.json"
@@ -64,6 +66,8 @@ jobs:
         with:
           node-version: 22
       - run: npm run parity:check
+      - run: npm run release:test
+      - run: node --test frontend/src/lib/app-links.test.mjs frontend/src/lib/app-associations.test.mjs
       - name: Summarize affected features
         env:
           PARITY_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
@@ -87,6 +91,9 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install workspace dependencies
+        env:
+          # These suites never execute native ONNX inference; avoid the optional CUDA download.
+          ONNXRUNTIME_NODE_INSTALL: skip
         run: npm ci
       - name: Verify web consumers and Express routes
         run: npm run api-contracts:js
@@ -122,6 +129,8 @@ jobs:
           java-version: 17
       - name: Configure Gradle cache
         uses: gradle/actions/setup-gradle@v5
+      - name: Verify Android capability, link and lock regressions
+        run: mobile-apps/android/gradlew -p mobile-apps/android testDebugUnitTest --tests '*ServerCapabilityStoreTest' --tests '*AppLinkTest' --tests '*DeviceAppLockStateTest' --no-daemon
       - name: Verify Android API serialization and decoding
         run: npm run api-contracts:android
       - name: Upload Android API evidence
@@ -191,6 +200,9 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install workspace dependencies
+        env:
+          # These suites never execute native ONNX inference; avoid the optional CUDA download.
+          ONNXRUNTIME_NODE_INSTALL: skip
         run: npm ci
       - name: Build shared API types
         run: npm --prefix packages/api-types run build
@@ -229,6 +241,19 @@ jobs:
           node-version: 22
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+      - name: Select one simulator for XCTest and Maestro
+        run: |
+          simulator_id=$(xcrun simctl list devices available -j | node tools/mobile-parity/select-ios-simulator.mjs)
+          echo "MAESTRO_DEVICE_ID=$simulator_id" >> "$GITHUB_ENV"
+          echo "API_CONTRACT_IOS_DESTINATION=platform=iOS Simulator,id=$simulator_id" >> "$GITHUB_ENV"
+          echo "IOS_DERIVED_DATA=$RUNNER_TEMP/parity-ios-build" >> "$GITHUB_ENV"
+          echo "API_CONTRACT_IOS_DERIVED_DATA=$RUNNER_TEMP/parity-ios-build" >> "$GITHUB_ENV"
+      - name: Verify iOS lock, link, repository and package regressions
+        run: >-
+          xcodebuild -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer
+          -destination "$API_CONTRACT_IOS_DESTINATION" -derivedDataPath "$IOS_DERIVED_DATA"
+          -only-testing:TCGerTests/DeviceAuthenticationTests -only-testing:TCGerTests/DeepLinkRoutingTests
+          -only-testing:TCGerTests/LocalAPIRepositoryInjectionTests -only-testing:TCGerTests/PackageScannerDownloadTests test
       - name: Verify iOS API serialization and decoding
         run: npm run api-contracts:ios
       - name: Upload iOS API evidence
@@ -281,6 +306,7 @@ jobs:
           cat mobile-parity/results/REPORT.md >> "$GITHUB_STEP_SUMMARY"
           exit "$parity_exit"
       - name: Download API contract evidence
+        if: always()
         uses: actions/download-artifact@v8
         continue-on-error: true
         with:
@@ -288,6 +314,7 @@ jobs:
           path: mobile-parity/results/api
           merge-multiple: true
       - name: Require complete API compatibility coverage
+        if: always()
         run: |
           api_contract_exit=0
           npm --silent run api-contracts:report -- --require-pass > mobile-parity/results/api-summary.md || api_contract_exit=$?

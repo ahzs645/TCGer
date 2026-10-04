@@ -316,6 +316,7 @@ export function renderReport(manifest, options = {}) {
 function expectedFiles(manifest) {
   return new Map([
     [manifestPath, `${JSON.stringify(manifest, null, 2)}\n`],
+    [path.join(rootDir, "mobile-apps/ios/TCGer/TCGerTests/AppLinks.generated.json"), fs.readFileSync(path.join(rootDir, "mobile-parity/fixtures/app-links-v1.json"), "utf8")],
     [swiftPath, renderSwift(manifest)],
     [kotlinPath, renderKotlin(manifest)],
     [typescriptPath, renderTypeScript(manifest)],

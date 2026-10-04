@@ -48,7 +48,7 @@ extension APIService {
         token: String,
         tcg: String? = nil
     ) async throws -> [OnlineCode] {
-        if config.isOnDevice { return LocalStore.shared.getOnlineCodes(tcg: tcg) }
+        if config.isOnDevice { return localStore.getOnlineCodes(tcg: tcg) }
         let queryItems = tcg.map { [URLQueryItem(name: "tcg", value: $0)] } ?? []
         let (data, response) = try await makeRequest(
             config: config,
@@ -79,7 +79,7 @@ extension APIService {
         notes: String? = nil
     ) async throws -> OnlineCodeBatchResult {
         if config.isOnDevice {
-            return try LocalStore.shared.createOnlineCodes(
+            return try localStore.createOnlineCodes(
                 tcg: tcg,
                 codes: codes,
                 source: source,
@@ -121,7 +121,7 @@ extension APIService {
         status: OnlineCodeStatus
     ) async throws -> OnlineCode {
         if config.isOnDevice {
-            return try LocalStore.shared.updateOnlineCode(
+            return try localStore.updateOnlineCode(
                 id: id,
                 status: status,
                 productName: nil,
@@ -146,7 +146,7 @@ extension APIService {
         notes: String?
     ) async throws -> OnlineCode {
         if config.isOnDevice {
-            return try LocalStore.shared.updateOnlineCode(
+            return try localStore.updateOnlineCode(
                 id: id,
                 status: status,
                 productName: productName,
@@ -198,7 +198,7 @@ extension APIService {
         id: String
     ) async throws {
         if config.isOnDevice {
-            try LocalStore.shared.deleteOnlineCode(id: id)
+            try localStore.deleteOnlineCode(id: id)
             return
         }
         let (data, response) = try await makeRequest(

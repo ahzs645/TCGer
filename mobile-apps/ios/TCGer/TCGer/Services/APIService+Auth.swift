@@ -6,8 +6,8 @@ extension APIService {
         credentials: LoginCredentials
     ) async throws -> AuthResponse {
         if config.isOnDevice {
-            let response = LocalStore.shared.authenticate(username: credentials.username)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            let response = localStore.authenticate(username: credentials.username)
+            try localStore.requireLatestMutationPersisted()
             return response
         }
 
@@ -43,8 +43,8 @@ extension APIService {
         username: String
     ) async throws -> AuthResponse {
         if config.isOnDevice {
-            let response = LocalStore.shared.authenticate(username: username, email: email)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            let response = localStore.authenticate(username: username, email: email)
+            try localStore.requireLatestMutationPersisted()
             return response
         }
 
@@ -64,8 +64,8 @@ extension APIService {
         username: String
     ) async throws -> AuthResponse {
         if config.isOnDevice {
-            let response = LocalStore.shared.authenticate(username: username, email: email)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            let response = localStore.authenticate(username: username, email: email)
+            try localStore.requireLatestMutationPersisted()
             return response
         }
 
@@ -119,7 +119,7 @@ extension APIService {
 
     func checkSetupRequired(config: ServerConfiguration) async throws -> SetupCheckResponse {
         if config.isOnDevice {
-            return LocalStore.shared.checkSetupRequired()
+            return localStore.checkSetupRequired()
         }
 
         let (data, response) = try await makeRequest(

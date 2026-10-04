@@ -1160,6 +1160,7 @@ final class EnvironmentStore: ObservableObject {
     static let appGroupSuite = "group.firstform.TCGer.shared"
 
     static func deepLinkDestination(for url: URL) -> AppDeepLinkDestination? {
+        guard url.user == nil, url.password == nil, url.port == nil || url.port == 443 else { return nil }
         let scheme = url.scheme?.lowercased()
         let urlHost = url.host?.lowercased()
         let pathComponents = url.pathComponents.dropFirst()
@@ -1177,6 +1178,9 @@ final class EnvironmentStore: ObservableObject {
             return nil
         }
 
+        let routeParts = (scheme == "tcger" ? [urlHost ?? ""] : []) + Array(pathComponents)
+        guard routeParts.count <= 2 else { return nil }
+        if let component = identifierComponent, component.range(of: "^[A-Za-z0-9_.:-]+$", options: .regularExpression) == nil { return nil }
         let identifier = identifierComponent?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems

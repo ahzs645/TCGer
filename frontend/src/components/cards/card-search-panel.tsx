@@ -2,6 +2,8 @@
 
 "use client";
 
+import { useSearchParams } from "next/navigation";
+
 import { gameLabel } from "@/lib/utils";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -78,8 +80,13 @@ export function CardSearchPanel() {
   );
   const latestRequest = useRef(new LatestRequest());
   const [requestError, setRequestError] = useState<Error | null>(null);
-  const [inputValue, setInputValue] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const linkQuery = useSearchParams().get("q")?.trim() ?? "";
+  const [inputValue, setInputValue] = useState(linkQuery);
+  const [searchQuery, setSearchQuery] = useState(linkQuery);
+  useEffect(() => {
+    setInputValue(linkQuery);
+    setSearchQuery(linkQuery);
+  }, [linkQuery]);
   const [setFilter, setSetFilter] = useState("");
   const [visibleCount, setVisibleCount] = useState(48);
   const [rarityFilter, setRarityFilter] = useState("");

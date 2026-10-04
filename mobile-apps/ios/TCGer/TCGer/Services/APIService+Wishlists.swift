@@ -120,7 +120,7 @@ extension APIService {
         config: ServerConfiguration,
         token: String
     ) async throws -> [Wishlist] {
-        if config.isOnDevice { return LocalStore.shared.getWishlists() }
+        if config.isOnDevice { return localStore.getWishlists() }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists",
@@ -143,7 +143,7 @@ extension APIService {
         token: String,
         id: String
     ) async throws -> Wishlist {
-        if config.isOnDevice { return try LocalStore.shared.getWishlist(id: id) }
+        if config.isOnDevice { return try localStore.getWishlist(id: id) }
         let (data, response) = try await makeRequest(
             config: config,
             path: "wishlists/\(id)",
@@ -170,13 +170,13 @@ extension APIService {
         matchAnyPrinting: Bool? = nil
     ) async throws -> Wishlist {
         if config.isOnDevice {
-            let wishlist = LocalStore.shared.createWishlist(
+            let wishlist = localStore.createWishlist(
                 name: name,
                 description: description,
                 colorHex: colorHex,
                 matchAnyPrinting: matchAnyPrinting
             )
-            try LocalStore.shared.requireLatestMutationPersisted()
+            try localStore.requireLatestMutationPersisted()
             return wishlist
         }
         let body = CreateWishlistRequest(
@@ -214,7 +214,7 @@ extension APIService {
         matchAnyPrinting: Bool? = nil
     ) async throws -> Wishlist {
         if config.isOnDevice {
-            return try LocalStore.shared.updateWishlist(
+            return try localStore.updateWishlist(
                 id: id,
                 name: name,
                 description: description,
@@ -253,8 +253,8 @@ extension APIService {
         id: String
     ) async throws {
         if config.isOnDevice {
-            LocalStore.shared.deleteWishlist(id: id)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            localStore.deleteWishlist(id: id)
+            try localStore.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(
@@ -278,7 +278,7 @@ extension APIService {
         wishlistId: String,
         card: Card
     ) async throws -> WishlistCard {
-        if config.isOnDevice { return try LocalStore.shared.addCardToWishlist(wishlistId: wishlistId, card: card) }
+        if config.isOnDevice { return try localStore.addCardToWishlist(wishlistId: wishlistId, card: card) }
         let body = Self.wishlistCardRequest(from: card)
         let (data, response) = try await makeRequest(
             config: config,
@@ -309,7 +309,7 @@ extension APIService {
         cards: [Card]
     ) async throws -> Wishlist {
         if config.isOnDevice {
-            return try LocalStore.shared.addCardsToWishlist(wishlistId: wishlistId, cards: cards)
+            return try localStore.addCardsToWishlist(wishlistId: wishlistId, cards: cards)
         }
         let body = BatchAddWishlistCardsRequest(cards: cards.map(Self.wishlistCardRequest(from:)))
         let (data, response) = try await makeRequest(
@@ -346,7 +346,7 @@ extension APIService {
         autoSync: Bool = true
     ) async throws -> WishlistRule {
         if config.isOnDevice {
-            return try LocalStore.shared.addWishlistRule(
+            return try localStore.addWishlistRule(
                 wishlistId: wishlistId,
                 type: type,
                 tcg: tcg,
@@ -397,7 +397,7 @@ extension APIService {
         lastMatchCount: Int? = nil
     ) async throws -> WishlistRule {
         if config.isOnDevice {
-            return try LocalStore.shared.updateWishlistRule(
+            return try localStore.updateWishlistRule(
                 wishlistId: wishlistId,
                 ruleId: ruleId,
                 autoSync: autoSync,
@@ -438,8 +438,8 @@ extension APIService {
         ruleId: String
     ) async throws {
         if config.isOnDevice {
-            LocalStore.shared.removeWishlistRule(wishlistId: wishlistId, ruleId: ruleId)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            localStore.removeWishlistRule(wishlistId: wishlistId, ruleId: ruleId)
+            try localStore.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(
@@ -462,8 +462,8 @@ extension APIService {
         cardId: String
     ) async throws {
         if config.isOnDevice {
-            LocalStore.shared.removeCardFromWishlist(wishlistId: wishlistId, cardId: cardId)
-            try LocalStore.shared.requireLatestMutationPersisted()
+            localStore.removeCardFromWishlist(wishlistId: wishlistId, cardId: cardId)
+            try localStore.requireLatestMutationPersisted()
             return
         }
         let (data, response) = try await makeRequest(

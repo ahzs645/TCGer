@@ -33,7 +33,7 @@ extension APIService {
         token: String
     ) async throws -> [CollectionGuide] {
         if config.isOnDevice {
-            return Self.localGuides()
+            return localGuides()
         }
         let (data, response) = try await makeRequest(
             config: config,
@@ -57,7 +57,7 @@ extension APIService {
         wishlistName: String? = nil
     ) async throws -> FollowCollectionGuideResponse {
         if config.isOnDevice {
-            return try Self.followLocalGuide(slug: slug, wishlistName: wishlistName)
+            return try followLocalGuide(slug: slug, wishlistName: wishlistName)
         }
         let (data, response) = try await makeRequest(
             config: config,
@@ -76,7 +76,7 @@ extension APIService {
         return result
     }
 
-    private static func localGuides() -> [CollectionGuide] {
+    private func localGuides() -> [CollectionGuide] {
         let fallbackDefinitions = [CollectionGuide(
             id: "local-guide-pokemon-clay-art",
             slug: "pokemon-clay-art",
@@ -147,8 +147,8 @@ extension APIService {
             followed: false,
             wishlistId: nil
         )]
-        let definitions = bundledGuideDefinitions() ?? fallbackDefinitions
-        let wishlists = LocalStore.shared.getWishlists()
+        let definitions = Self.bundledGuideDefinitions() ?? fallbackDefinitions
+        let wishlists = localStore.getWishlists()
         return definitions.map { definition in
             let existing = wishlists.first { wishlist in
                 if definition.rule.type == .manual {
@@ -227,7 +227,7 @@ extension APIService {
         return guides.isEmpty ? nil : guides
     }
 
-    private static func followLocalGuide(
+    private func followLocalGuide(
         slug: String,
         wishlistName: String?
     ) throws -> FollowCollectionGuideResponse {
@@ -237,19 +237,19 @@ extension APIService {
         if let wishlistId = guide.wishlistId {
             return FollowCollectionGuideResponse(guide: guide, wishlistId: wishlistId, created: false)
         }
-        let wishlist = LocalStore.shared.createWishlist(
+        let wishlist = localStore.createWishlist(
             name: wishlistName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? guide.title,
             description: "Following the “\(guide.title)” collection guide.",
             colorHex: "B86F47",
             matchAnyPrinting: false
         )
         if guide.rule.type == .manual {
-            _ = try LocalStore.shared.addCardsToWishlist(
+            _ = try localStore.addCardsToWishlist(
                 wishlistId: wishlist.id,
-                cards: localConnectedArtItems().map(\.card)
+                cards: Self.localConnectedArtItems().map(\.card)
             )
         } else if let ruleType = WishlistRule.RuleType(rawValue: guide.rule.type.rawValue) {
-            _ = try LocalStore.shared.addWishlistRule(
+            _ = try localStore.addWishlistRule(
                 wishlistId: wishlist.id,
                 type: ruleType,
                 tcg: guide.tcg,
@@ -350,12 +350,12 @@ extension APIService {
         guideSlug: String?,
         limit: Int
     ) async throws -> GuideCardSearchResponse {
-        let guides = Self.localGuides().filter { guide in
+        let guides = localGuides().filter { guide in
             (game == .all || guide.tcg == game.rawValue)
                 && (category == nil || guide.category == category)
                 && (guideSlug == nil || guide.slug == guideSlug)
         }
-        let ownedQuantities = LocalStore.shared.getCollections().reduce(into: [String: Int]()) { result, collection in
+        let ownedQuantities = localStore.getCollections().reduce(into: [String: Int]()) { result, collection in
             for card in collection.cards {
                 result["\(card.tcg):\(card.externalId ?? card.cardId)", default: 0] += card.quantity
             }
