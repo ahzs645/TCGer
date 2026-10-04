@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+import identities from "../../src/lib/release-identities.json";
 
 async function enterDemo(page: Page) {
   await page.goto("/demo");
@@ -38,4 +39,17 @@ test("[navigation.appLinks] a wishlist link selects its record and rejects a mis
   await page.goto("/demo/wishlists?wishlist=missing-target");
   await expect(page.getByText("This wishlist is unavailable for the current account.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Every Pikachu", exact: true })).toHaveCount(0);
+});
+
+test("[navigation.appLinks] public association routes serve configured release identities", async ({ request }) => {
+  const android = await request.get("/.well-known/assetlinks.json", { maxRedirects: 0 });
+  expect(android.status()).toBe(200);
+  expect(android.headers()["content-type"]).toContain("application/json");
+  const links = await android.json();
+  expect(links[0].target.package_name).toBe("com.ahmadjalil.tcger");
+  expect(links[0].target.sha256_cert_fingerprints).toContain(identities.TCGER_ANDROID_CERT_SHA256);
+  const ios = await request.get("/.well-known/apple-app-site-association", { maxRedirects: 0 });
+  expect(ios.status()).toBe(200);
+  expect(ios.headers()["content-type"]).toContain("application/json");
+  expect((await ios.json()).applinks.details[0].appID).toBe(identities.TCGER_IOS_APP_ID);
 });

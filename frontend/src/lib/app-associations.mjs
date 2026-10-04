@@ -1,5 +1,4 @@
-import fs from 'node:fs';
-const publicIdentities = JSON.parse(fs.readFileSync(new URL('./release-identities.json', import.meta.url), 'utf8'));
+import publicIdentities from './release-identities.json' with { type: 'json' };
 export function associationEnvironment(env = process.env) { return { ...publicIdentities, ...env }; }
 const fingerprintPattern = /^(?:[A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2}$/;
 export function appAssociations(env = associationEnvironment()) {
