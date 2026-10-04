@@ -40,15 +40,20 @@ properties:
 - assertVisible: "Lightning Bolt"
 - pressKey: Enter
 - extendedWaitUntil:
-    visible: ".*Lightning Bolt.*per card.*Scryfall.*estimate.*"
+    visible:
+      id: "status.cards.searchPrice.scryfall"
+      text: ".*Lightning Bolt.*per card.*"
     timeout: 60000
+- assertNotVisible: ".*Scryfall.*estimate.*"
 - takeScreenshot: search-live-scryfall-prices
 - tapOn:
     id: "option.cards.searchScope"
     point: "75%,50%"
     retryTapIfNoChange: true
 - extendedWaitUntil:
-    visible: ".*Lightning Bolt.*cop(y|ies).*per card.*Scryfall.*estimate.*"
+    visible:
+      id: "status.cards.searchPrice.scryfall"
+      text: ".*Lightning Bolt.*cop(y|ies).*per card.*"
     timeout: 60000
 - assertVisible: ".*Favorites Binder.*"
 - takeScreenshot: owned-search-live-scryfall-prices
@@ -60,7 +65,9 @@ properties:
 - assertVisible: "Pikachu"
 - pressKey: Enter
 - extendedWaitUntil:
-    visible: ".*Pikachu.*per card.*TCGCSV.*estimate.*"
+    visible:
+      id: "status.cards.searchPrice.tcgcsv"
+      text: ".*Pikachu.*per card.*"
     timeout: 60000
 - takeScreenshot: owned-search-live-tcgcsv-prices
 - tapOn:
@@ -68,8 +75,11 @@ properties:
     point: "25%,50%"
     retryTapIfNoChange: true
 - extendedWaitUntil:
-    visible: ".*Pikachu.*per card.*TCGCSV.*estimate.*"
+    visible:
+      id: "status.cards.searchPrice.tcgcsv"
+      text: ".*Pikachu.*per card.*"
     timeout: 60000
+- assertNotVisible: ".*TCGCSV.*estimate.*"
 - takeScreenshot: search-live-tcgcsv-prices
 - scrollUntilVisible:
     element:
@@ -105,5 +115,8 @@ properties:
     visible: ".*Pikachu.*Celebrations.*"
     timeout: 20000
 - assertNotVisible: ".*per card.*"
-- assertNotVisible: ".*TCGCSV.*estimate.*"
+- assertNotVisible:
+    id: "status.cards.searchPrice.tcgcsv"
+- assertNotVisible:
+    id: "status.cards.searchPrice.scryfall"
 - takeScreenshot: search-prices-hidden

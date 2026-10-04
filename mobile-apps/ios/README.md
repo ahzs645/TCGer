@@ -175,8 +175,8 @@ badges; catalog search shows the price badge without implying ownership.
 Settings → Show Pricing hides all price badges. New installations enable pricing.
 Collection badges use stored prices. Search refreshes visible Magic and Pokémon
 results with compatible USD market references while online and Show Pricing is
-enabled. The caption distinguishes the provider/cached quote from a stored
-estimate. A failed lookup retains the stored estimate; unsupported games and
+enabled. Cards show the price badge without provider/date/cache captions; quote
+metadata stays internal. A failed lookup retains the stored estimate; unsupported games and
 offline mode remain usable. Quotes do not rewrite owned-copy values or costs.
 Full catalog search requires a downloaded game, while owned and explicitly
 loaded demo cards remain searchable without installing its catalog. The Prices

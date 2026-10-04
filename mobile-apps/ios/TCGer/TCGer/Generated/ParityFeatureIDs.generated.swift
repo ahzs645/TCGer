@@ -482,4 +482,6 @@ enum ParityControlID {
     static let actionCollectionsNewBinder = "action.collections.newBinder"
     static let optionSettingsShowPricing = "option.settings.showPricing"
     static let optionCardsSearchScope = "option.cards.searchScope"
+    static let statusCardsSearchPriceScryfall = "status.cards.searchPrice.scryfall"
+    static let statusCardsSearchPriceTcgcsv = "status.cards.searchPrice.tcgcsv"
 }

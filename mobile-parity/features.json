@@ -5843,6 +5843,8 @@
     "option.collections.layout",
     "action.collections.newBinder",
     "option.settings.showPricing",
-    "option.cards.searchScope"
+    "option.cards.searchScope",
+    "status.cards.searchPrice.scryfall",
+    "status.cards.searchPrice.tcgcsv"
   ]
 }

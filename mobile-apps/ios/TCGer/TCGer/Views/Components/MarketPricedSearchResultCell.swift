@@ -28,8 +28,7 @@ struct MarketPricedSearchResultCell: View {
         let identity = context
         CardSearchResultCell(
             card: card, showPricing: showPricing, showCardNumbers: showCardNumbers,
-            quantity: quantity, marketEstimate: request.value(for: identity),
-            showsEstimateSource: true
+            quantity: quantity, marketEstimate: request.value(for: identity)
         )
         .task(id: identity) {
             let config = environmentStore.serverConfiguration

@@ -6,11 +6,6 @@ struct CardSearchMarketEstimate: Equatable {
     let price: Double
     let source: String
     let cached: Bool
-
-    var label: String {
-        let provider = source == "scryfall" ? "Scryfall" : source == "tcgcsv" ? "TCGCSV" : source
-        return "\(provider) · \(cached ? "cached" : "market") estimate"
-    }
 }
 
 /// Quotes are presentation state. They must never update an owned copy or its cost.

@@ -457,6 +457,8 @@ export const ParityControlIDs = {
   actionCollectionsNewBinder: "action.collections.newBinder",
   optionSettingsShowPricing: "option.settings.showPricing",
   optionCardsSearchScope: "option.cards.searchScope",
+  statusCardsSearchPriceScryfall: "status.cards.searchPrice.scryfall",
+  statusCardsSearchPriceTcgcsv: "status.cards.searchPrice.tcgcsv",
 } as const;
 
 export type ParityControlID = (typeof ParityControlIDs)[keyof typeof ParityControlIDs];

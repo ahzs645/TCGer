@@ -128,11 +128,13 @@ struct CardSearchResultCell: View {
     let showCardNumbers: Bool
     var quantity: Int? = nil
     var marketEstimate: CardSearchMarketEstimate? = nil
-    var showsEstimateSource = false
 
     private var displayedPrice: Double? { marketEstimate?.price ?? card.price }
-    private var estimateLabel: String {
-        marketEstimate?.label ?? (CardPriceBadgeValue(price: card.price).text == "—" ? "Price unavailable" : "Stored estimate")
+    private var marketPriceIdentifier: String {
+        guard showPricing, let source = marketEstimate?.source else { return "" }
+        if source == "scryfall" { return ParityControlID.statusCardsSearchPriceScryfall }
+        if source.hasPrefix("TCGCSV") { return ParityControlID.statusCardsSearchPriceTcgcsv }
+        return ""
     }
 
     var body: some View {
@@ -171,13 +173,6 @@ struct CardSearchResultCell: View {
             .overlay(alignment: .topLeading) {
                 CardArtworkBadges(quantity: quantity, price: displayedPrice, showPricing: showPricing)
                     .padding(4)
-            }
-
-            if showPricing && showsEstimateSource {
-                Text(estimateLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
 
             // Card Info
@@ -277,6 +272,7 @@ struct CardSearchResultCell: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier(marketPriceIdentifier)
     }
 
     private var cardTitleRow: some View {
@@ -373,7 +369,6 @@ struct CardSearchResultCell: View {
         if let quantity { parts.append("\(quantity) \(quantity == 1 ? "copy" : "copies")") }
         if showPricing {
             parts.append(CardPriceBadgeValue(price: displayedPrice).accessibilityLabel)
-            if showsEstimateSource { parts.append(estimateLabel) }
         }
 
         return parts.joined(separator: ", ")

@@ -67,7 +67,8 @@ filters that hid/excluded owned and opt-in sample records, retained their exact
 provider IDs in local search projections, and added market references for rendered
 phone-only Magic/Pokémon search cells. Scryfall requests use the printing ID;
 Pokémon uses exact English TCGCSV product/set matching and its daily durable cache.
-Captions identify the provider and cached/stored estimate. Missing, failed or
+Provider/cache metadata remains internal; cards show prices without repetitive
+source captions. Invisible test selectors identify successfully refreshed quotes. Missing, failed or
 non-USD quotes retain stored values. Offline mode and Show Pricing gate requests.
 Quotes remain presentation state and do not rewrite owned values or intake costs.
 
@@ -82,7 +83,7 @@ including 42 existing server API interactions, Scryfall/TCGCSV transport fixture
 cache/relaunch, missing/foreign-currency quotes, source/session cancellation,
 search metadata and grouping. The additional iOS-only live Maestro flow typed
 “Lightning Bolt” and “Pikachu”, asserted Scryfall and TCGCSV estimates in both
-search scopes, and verified that disabling pricing hides badges and provenance.
+search scopes, and verified that disabling pricing hides badges and their quote selectors.
 It uses real provider responses with demo identities/card-back artwork; it is
 separate from the shared core smoke suite and requires network availability.
 No GitHub macOS/iOS runner is configured. Web/Android behavior is unchanged apart

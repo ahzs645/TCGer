@@ -461,4 +461,6 @@ object ParityControlIDs {
     const val ACTION_COLLECTIONS_NEW_BINDER = "action.collections.newBinder"
     const val OPTION_SETTINGS_SHOW_PRICING = "option.settings.showPricing"
     const val OPTION_CARDS_SEARCH_SCOPE = "option.cards.searchScope"
+    const val STATUS_CARDS_SEARCH_PRICE_SCRYFALL = "status.cards.searchPrice.scryfall"
+    const val STATUS_CARDS_SEARCH_PRICE_TCGCSV = "status.cards.searchPrice.tcgcsv"
 }
