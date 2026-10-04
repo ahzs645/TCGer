@@ -1,3 +1,11 @@
+// @tcger-feature {"id":"scanner.identify","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.capture.manual","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.capture.photo","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.capture.bulkPhoto","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.addToBinder","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.serverCapture","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.debug.testingInputs","platform":"ios","status":"implemented"}
+
 import PhotosUI
 import SwiftUI
 import UIKit

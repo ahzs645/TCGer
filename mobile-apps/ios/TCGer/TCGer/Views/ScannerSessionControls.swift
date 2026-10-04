@@ -1,3 +1,10 @@
+// @tcger-feature {"id":"scanner.options.language","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.options.torch","platform":"ios","status":"implemented","requires":["camera-torch"]}
+// @tcger-feature {"id":"scanner.results.autoOpen","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.sessionTray","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.sharedWebSession","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.binder.savePagePhotos","platform":"ios","status":"implemented"}
+
 import SwiftUI
 import UIKit
 

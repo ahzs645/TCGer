@@ -1,6 +1,7 @@
+// @tcger-feature {"id":"widgets.sessionPrivacy","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"server.capabilities","platform":"ios","status":"implemented","modes":["server"]}
 import Combine
 import Foundation
-import Security
 import SwiftUI
 import WidgetKit
 
@@ -88,10 +89,13 @@ final class EnvironmentStore: ObservableObject {
         UUID(uuidString: "8E3347A1-C95F-4BBA-9B30-000000000002")!
     ]
 
+    @Published private(set) var widgetSessionID = UUID()
+
     @Published var serverConfiguration: ServerConfiguration
     @Published var credentials: LoginCredentials
     @Published var isAuthenticated: Bool
     @Published var authToken: String?
+    @Published private(set) var tokenPersistenceWarning: String?
     @Published var isUsingSingleUserMode: Bool
     @Published var currentUser: User?
     @Published var appSettings: AppSettings?
@@ -132,13 +136,16 @@ final class EnvironmentStore: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var setPreferencesSyncTask: Task<Void, Never>?
-    private let storage = UserDefaults.standard
+    private let storage: UserDefaults
+    private let tokenStore: any AuthTokenStore
+    private let widgetDefaults: UserDefaults?
 
     private enum Keys {
         static let server = "tcg.manager.server"
         static let credentials = "tcg.manager.credentials"
         static let authenticated = "tcg.manager.authenticated"
         static let token = "tcg.manager.auth.token"
+        static let tokenDiscarded = "tcg.manager.auth.tokenDiscarded"
         static let singleUserMode = "tcg.manager.auth.singleUserMode"
         static let verified = "tcg.manager.server.verified"
         static let enabledYugioh = "enabledYugioh"
@@ -182,18 +189,27 @@ final class EnvironmentStore: ObservableObject {
         static let token = "single-user-token-static"
     }
 
-    init() {
+    init(
+        storage: UserDefaults = .standard,
+        widgetDefaults: UserDefaults? = UserDefaults(suiteName: EnvironmentStore.appGroupSuite),
+        tokenStore: any AuthTokenStore = KeychainAuthTokenStore()
+    ) {
+        self.storage = storage
+        self.tokenStore = tokenStore
+        self.widgetDefaults = widgetDefaults
         pendingDeepLinkTab = nil
         pendingDeepLinkRequest = nil
+        let initialConfiguration: ServerConfiguration
         if let data = storage.data(forKey: Keys.server),
            let decoded = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
             // A previously-saved empty config falls back to on-device mode so a
             // fresh launch lands in a working phone-only experience instead of a
             // failed connection to a server that was never set up.
-            serverConfiguration = decoded.baseURL.isEmpty ? .onDevice : decoded
+            initialConfiguration = decoded.baseURL.isEmpty ? .onDevice : decoded
         } else {
-            serverConfiguration = .onDevice
+            initialConfiguration = .onDevice
         }
+        serverConfiguration = initialConfiguration
 
         if let data = storage.data(forKey: Keys.credentials),
            let decoded = try? JSONDecoder().decode(LoginCredentials.self, from: data) {
@@ -208,20 +224,41 @@ final class EnvironmentStore: ObservableObject {
             credentials = .empty
         }
 
-        isAuthenticated = storage.bool(forKey: Keys.authenticated)
-        let legacyToken = storage.string(forKey: Keys.token)
-        let keychainToken = KeychainTokenStore.loadToken()
-        authToken = keychainToken ?? legacyToken
+        let shouldRestoreToken = !initialConfiguration.isOnDevice && !storage.bool(forKey: Keys.tokenDiscarded)
+        let legacyToken = shouldRestoreToken ? storage.string(forKey: Keys.token) : nil
+        var keychainToken: String?
+        var readFailed = false
+        var initialWarning: String?
+        if shouldRestoreToken {
+            do {
+                keychainToken = try tokenStore.loadToken()
+            } catch {
+                readFailed = true
+                initialWarning = "Saved sign-in could not be read. It has been retained so a later launch can retry. \(error.localizedDescription)"
+            }
+        }
+        let restoredToken = keychainToken ?? legacyToken
+        authToken = restoredToken
+        isAuthenticated = storage.bool(forKey: Keys.authenticated) && restoredToken != nil
         isUsingSingleUserMode =
             (storage.object(forKey: Keys.singleUserMode) as? Bool)
-            ?? ((keychainToken ?? legacyToken) == SingleUserDefaults.token)
+            ?? (restoredToken == SingleUserDefaults.token)
         currentUser = nil
         appSettings = nil
         serverFeatures = .allEnabled
-        if keychainToken == nil, let legacyToken {
-            KeychainTokenStore.saveToken(legacyToken)
+        // Do not overwrite a credential that was unreadable, or remove the
+        // only legacy copy before the Keychain has accepted its replacement.
+        if shouldRestoreToken, !readFailed, keychainToken == nil, let legacyToken {
+            do {
+                try tokenStore.saveToken(legacyToken)
+                storage.removeObject(forKey: Keys.token)
+            } catch {
+                initialWarning = "Your existing sign-in still works, but its storage upgrade could not finish. It will retry on a later launch. \(error.localizedDescription)"
+            }
+        } else if shouldRestoreToken, keychainToken != nil {
             storage.removeObject(forKey: Keys.token)
         }
+        tokenPersistenceWarning = initialWarning
         isServerVerified = storage.bool(forKey: Keys.verified)
 
         // Load enabled games, defaulting to true if not set
@@ -350,10 +387,19 @@ final class EnvironmentStore: ObservableObject {
             enableLocalSession(force: false)
         }
 
+        // Clear legacy shared snapshots at launch and on every session change.
+        resetWidgetSession()
+        $authToken.dropFirst().removeDuplicates().sink { [weak self] _ in
+            self?.cancelSetPreferencesSync()
+            self?.resetWidgetSession()
+        }.store(in: &cancellables)
+
         $serverConfiguration
             .dropFirst()
             .sink { [weak self] configuration in
                 guard let self else { return }
+                self.cancelSetPreferencesSync()
+                self.resetWidgetSession()
                 if let data = try? JSONEncoder().encode(configuration) {
                     storage.set(data, forKey: Keys.server)
                 }
@@ -383,8 +429,7 @@ final class EnvironmentStore: ObservableObject {
             .sink { [weak self] flag in
                 self?.storage.set(flag, forKey: Keys.authenticated)
                 if !flag {
-                    self?.storage.removeObject(forKey: Keys.token)
-                    KeychainTokenStore.deleteToken()
+                    self?.discardSavedToken()
                     self?.authToken = nil
                 }
             }
@@ -790,8 +835,13 @@ final class EnvironmentStore: ObservableObject {
                 focusedSetOrder: order,
                 setCompletionMode: completionMode.rawValue
             )
-            self?.setPreferencesSyncTask = nil
+            if !Task.isCancelled { self?.setPreferencesSyncTask = nil }
         }
+    }
+
+    private func cancelSetPreferencesSync() {
+        setPreferencesSyncTask?.cancel()
+        setPreferencesSyncTask = nil
     }
 
     func isGameEnabled(_ game: TCGGame) -> Bool {
@@ -828,10 +878,40 @@ final class EnvironmentStore: ObservableObject {
         }
     }
 
-    func storeToken(_ token: String) {
+    /// A successful login remains usable in memory even if secure storage is
+    /// temporarily unavailable. The warning explicitly distinguishes durability.
+    @discardableResult
+    func storeToken(_ token: String) -> Bool {
         authToken = token
-        KeychainTokenStore.saveToken(token)
+        if serverConfiguration.isOnDevice {
+            return true // Local mode needs no durable account credential.
+        }
+        do {
+            try tokenStore.saveToken(token)
+            storage.removeObject(forKey: Keys.token)
+            storage.removeObject(forKey: Keys.tokenDiscarded)
+            tokenPersistenceWarning = nil
+            return true
+        } catch {
+            tokenPersistenceWarning = "You are signed in for this session, but TCGer could not save the sign-in. Any previously saved sign-in has been retained; you may need to sign in again after closing the app. \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func dismissTokenPersistenceWarning() {
+        tokenPersistenceWarning = nil
+    }
+
+    private func discardSavedToken() {
+        // A failed Keychain deletion must never silently sign the user back in.
+        storage.set(true, forKey: Keys.tokenDiscarded)
         storage.removeObject(forKey: Keys.token)
+        do {
+            try tokenStore.deleteToken()
+            tokenPersistenceWarning = nil
+        } catch {
+            tokenPersistenceWarning = "You are signed out. The saved credential could not be removed from secure storage, and TCGer will not restore it. \(error.localizedDescription)"
+        }
     }
 
     var isCurrentUserAdmin: Bool {
@@ -892,6 +972,8 @@ final class EnvironmentStore: ObservableObject {
     }
 
     func signOut() {
+        cancelSetPreferencesSync()
+        resetWidgetSession()
         isUsingSingleUserMode = false
         isAuthenticated = false
         authToken = nil
@@ -950,7 +1032,7 @@ final class EnvironmentStore: ObservableObject {
         storage.removeObject(forKey: Keys.credentials)
         storage.removeObject(forKey: Keys.token)
         storage.removeObject(forKey: Keys.singleUserMode)
-        KeychainTokenStore.deleteToken()
+        discardSavedToken()
         storage.set(false, forKey: Keys.authenticated)
         storage.set(false, forKey: Keys.verified)
         storage.removeObject(forKey: Keys.showCardNumbers)
@@ -1167,8 +1249,19 @@ final class EnvironmentStore: ObservableObject {
         pendingDeepLinkTab = tab
     }
 
-    func updateWidgetData(collections: [Collection]) {
-        guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
+    func resetWidgetSession() {
+        widgetSessionID = UUID()
+        if let shared = widgetDefaults {
+            for key in shared.dictionaryRepresentation().keys where key.hasPrefix("widget.") {
+                shared.removeObject(forKey: key)
+            }
+        }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func updateWidgetData(collections: [Collection], sessionID: UUID) {
+        guard sessionID == widgetSessionID, isAuthenticated else { return }
+        guard let shared = widgetDefaults else { return }
 
         let totalBinders = collections.filter { !$0.isUnsortedBinder }.count
         let uniqueCards = collections.reduce(0) { $0 + $1.cards.count }
@@ -1222,8 +1315,9 @@ final class EnvironmentStore: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    func updateWishlistWidgetData(wishlists: [Wishlist]) {
-        guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
+    func updateWishlistWidgetData(wishlists: [Wishlist], sessionID: UUID) {
+        guard sessionID == widgetSessionID, isAuthenticated else { return }
+        guard let shared = widgetDefaults else { return }
 
         let widgetWishlists: [[String: Any]] = wishlists.map { wishlist in
             [
@@ -1251,7 +1345,7 @@ final class EnvironmentStore: ObservableObject {
 
         // Installs configured before phone-only mode was split from demo mode
         // still hold the old marker token; swap it for the local one.
-        if force || authToken == nil || authToken == LocalDefaults.legacyToken {
+        if force || authToken != LocalDefaults.token {
             storeToken(LocalDefaults.token)
         }
 
@@ -1292,6 +1386,8 @@ final class EnvironmentStore: ObservableObject {
 
         isServerVerified = true
         storage.set(true, forKey: Keys.verified)
+        updateWidgetData(collections: LocalStore.shared.getCollections(), sessionID: widgetSessionID)
+        updateWishlistWidgetData(wishlists: LocalStore.shared.getWishlists(), sessionID: widgetSessionID)
     }
 
     func enableSingleUserSession(profile: APIService.UserProfile) {
@@ -1318,56 +1414,5 @@ final class EnvironmentStore: ObservableObject {
         isUsingSingleUserMode = true
         storeToken(SingleUserDefaults.token)
         isAuthenticated = true
-    }
-}
-
-private enum KeychainTokenStore {
-    private static let service = "com.tcger.auth"
-    private static let account = "jwt-token"
-
-    static func saveToken(_ token: String) {
-        guard let encoded = token.data(using: .utf8) else {
-            return
-        }
-
-        deleteToken()
-
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
-            kSecValueData as String: encoded
-        ]
-
-        SecItemAdd(query as CFDictionary, nil)
-    }
-
-    static func loadToken() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else {
-            return nil
-        }
-
-        return String(data: data, encoding: .utf8)
-    }
-
-    static func deleteToken() {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-
-        SecItemDelete(query as CFDictionary)
     }
 }

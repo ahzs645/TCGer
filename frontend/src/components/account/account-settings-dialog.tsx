@@ -1,3 +1,8 @@
+// @tcger-feature {"id":"security.biometricLock","platform":"web","status":"not_applicable","limitation":"No native app lock or device-authentication overlay is shipped for the browser; web account authentication is separate."}
+// @tcger-feature {"id":"widgets.sessionPrivacy","platform":"web","status":"not_applicable","limitation":"No home screen widget extension is shipped on this surface."}
+// @tcger-feature {"id":"settings.browse","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"account.management","platform":"web","status":"implemented"}
+
 "use client";
 
 import { gameLabel } from "@/lib/utils";

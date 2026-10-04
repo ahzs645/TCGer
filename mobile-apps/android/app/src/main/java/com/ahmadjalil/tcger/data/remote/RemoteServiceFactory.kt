@@ -8,11 +8,12 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 
-class RemoteServiceFactory {
-    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
-    private val client = OkHttpClient.Builder()
+class RemoteServiceFactory(
+    private val client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
-        .build()
+        .build(),
+) {
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
     fun create(rawUrl: String): TCGerApi = Retrofit.Builder()
         .baseUrl(normalizeServerUrl(rawUrl))

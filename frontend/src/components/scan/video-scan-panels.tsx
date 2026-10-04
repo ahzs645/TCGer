@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.liveConfiguration","platform":"web","status":"implemented"}
+
 
 import { gameLabel } from "@/lib/utils";
 import {

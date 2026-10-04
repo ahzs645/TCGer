@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.attemptImages","platform":"android","status":"partial","limitation":"Source and canonical guide crop are retained; every internal recognition-attempt crop is not exposed."}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import android.content.Context

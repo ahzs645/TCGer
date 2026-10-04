@@ -18,6 +18,62 @@ final class LocalStorePersistenceTests: XCTestCase {
         root = nil
     }
 
+    func testBackupRotationFailurePrecedesLiveCommitAndKeepsMemoryConsistent() throws {
+        let manager = RotationFailureFileManager()
+        let repository = FileLocalStorePersistenceRepository(rootDirectory: root, maxBackups: 1, fileManager: manager)
+        let store = LocalStore(persistenceRepository: repository)
+        _ = store.createCollection(name: "First", description: nil, colorHex: nil)
+        _ = store.createCollection(name: "Second", description: nil, colorHex: nil)
+        let before = try repository.load()
+        manager.failRemoval = true
+        _ = store.createCollection(name: "Rejected", description: nil, colorHex: nil)
+        XCTAssertThrowsError(try store.requireLatestMutationPersisted())
+        XCTAssertEqual(try repository.load(), before)
+        XCTAssertFalse(store.getCollections().contains { $0.name == "Rejected" })
+        let relaunched = LocalStore(persistenceRepository: repository)
+        XCTAssertEqual(store.getCollections(), relaunched.getCollections())
+    }
+
+    func testRemovingExpiredRecoveryPointsReleasesOnlyUnreferencedPhotoFiles() throws {
+        let repository = FileLocalStorePersistenceRepository(rootDirectory: root, maxBackups: 10)
+        let store = LocalStore(persistenceRepository: repository)
+        let binder = store.createCollection(name: "Photos", description: nil, colorHex: nil)
+        _ = store.upsertBinderPage(binderId: binder.id, pageNumber: 1, capturedAt: Date(), placements: [])
+        let first = try store.replaceBinderPageImage(binderId: binder.id, pageNumber: 1, imageData: Data("A".utf8))
+        _ = try store.createLocalBackup()
+        let second = try store.replaceBinderPageImage(binderId: binder.id, pageNumber: 1, imageData: Data("B".utf8))
+        let a = try XCTUnwrap(URL(string: try XCTUnwrap(first.imageUrl)))
+        let b = try XCTUnwrap(URL(string: try XCTUnwrap(second.imageUrl)))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: a.path))
+        for backup in try store.availableLocalBackups() { try store.removeLocalBackup(at: backup) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: a.path))
+        XCTAssertEqual(try Data(contentsOf: b), Data("B".utf8))
+    }
+
+    func testRecoveryRetainsPhotoBytesAfterReplaceRemoveAndBinderDeletion() throws {
+        for operation in ["replace", "remove", "delete"] {
+            let repository = FileLocalStorePersistenceRepository(rootDirectory: root.appendingPathComponent(operation), maxBackups: 10)
+            let store = LocalStore(persistenceRepository: repository)
+            let binder = store.createCollection(name: "Photos", description: nil, colorHex: nil)
+            _ = store.upsertBinderPage(binderId: binder.id, pageNumber: 1, capturedAt: Date(), placements: [])
+            let original = Data("immutable photo A".utf8)
+            let page = try store.replaceBinderPageImage(binderId: binder.id, pageNumber: 1, imageData: original)
+            let imageURL = try XCTUnwrap(URL(string: try XCTUnwrap(page.imageUrl)))
+            defer { try? FileManager.default.removeItem(at: imageURL) }
+            let backup = try store.createLocalBackup()
+            switch operation {
+            case "replace":
+                _ = try store.replaceBinderPageImage(binderId: binder.id, pageNumber: 1, imageData: Data("B".utf8))
+            case "remove": store.removeBinderPageImage(binderId: binder.id, pageNumber: 1)
+            default: try store.deleteCollection(id: binder.id)
+            }
+            try store.restoreLocalBackup(from: backup)
+            let relaunched = LocalStore(persistenceRepository: repository)
+            let restored = try XCTUnwrap(relaunched.getBinderPages(binderId: binder.id).first?.imageUrl)
+            XCTAssertEqual(try Data(contentsOf: XCTUnwrap(URL(string: restored))), original)
+        }
+    }
+
     func testRepositoryWritesAtomicallyAndRotatesVersionedBackups() throws {
         let repository = FileLocalStorePersistenceRepository(rootDirectory: root, maxBackups: 2)
         let first = Data(#"{"revision":1}"#.utf8)
@@ -94,7 +150,7 @@ final class LocalStorePersistenceTests: XCTestCase {
         XCTAssertEqual(summary.wishlistCount, 1)
         XCTAssertEqual(summary.onlineCodeCount, 1)
 
-        try destination.importPortableBackup(backup)
+        try destination.importPortableBackup(backup, mode: .replace)
 
         XCTAssertTrue(destination.getCollections().contains { $0.name == "Travel Binder" })
         XCTAssertFalse(destination.getCollections().contains { $0.name == "Replace Me" })
@@ -102,6 +158,68 @@ final class LocalStorePersistenceTests: XCTestCase {
         XCTAssertEqual(destination.getOnlineCodes().map(\.code), ["ABCD-1234-EFGH"])
         XCTAssertEqual(try destination.availableLocalBackups().count, 1)
         XCTAssertNil(destination.persistenceFailure)
+    }
+
+    func testSharedMergeFixturePreservesMovesAndUpdatesPhysicalCopies() throws {
+        var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("mobile-parity").path), directory.path != "/" { directory.deleteLastPathComponent() }
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("mobile-parity/fixtures/portable-backup-merge-v2.json"))) as? [String: Any])
+        let before = try XCTUnwrap(fixture["before"] as? [String: Any])
+        let incoming = try XCTUnwrap(fixture["incoming"] as? [String: Any])
+        let expected = try XCTUnwrap(fixture["expected"] as? [String: Any])
+        let store = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root))
+        try store.importPortableBackup(JSONSerialization.data(withJSONObject: before), mode: .replace)
+        try store.importPortableBackup(JSONSerialization.data(withJSONObject: incoming))
+        try store.importPortableBackup(JSONSerialization.data(withJSONObject: incoming))
+        let output = try XCTUnwrap(JSONSerialization.jsonObject(with: store.exportPortableBackup()) as? [String: Any])
+        let binders = try XCTUnwrap(output["binders"] as? [[String: Any]])
+        XCTAssertEqual(binders.compactMap { $0["id"] as? String }, expected["binderIDs"] as? [String])
+        let copies = binders.flatMap { $0["cards"] as? [[String: Any]] ?? [] }
+        XCTAssertEqual(copies.count, 4)
+        XCTAssertEqual(Set(copies.compactMap { $0["id"] as? String }), Set(expected["copyIDs"] as? [String] ?? []))
+        XCTAssertEqual(copies.first { $0["id"] as? String == expected["updatedCopyID"] as? String }?["price"] as? Int, 77)
+    }
+
+    func testExplicitReplacementDoesNotRetainOldUnsortedCards() throws {
+        var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("mobile-parity").path), directory.path != "/" { directory.deleteLastPathComponent() }
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("mobile-parity/fixtures/portable-backup-merge-v2.json"))) as? [String: Any])
+        var before = try XCTUnwrap(fixture["before"] as? [String: Any])
+        var library = try XCTUnwrap((before["binders"] as? [[String: Any]])?.first)
+        library["id"] = "__library__"
+        before["binders"] = [library]
+        let repository = FileLocalStorePersistenceRepository(rootDirectory: root)
+        let store = LocalStore(persistenceRepository: repository)
+        try store.importPortableBackup(JSONSerialization.data(withJSONObject: before), mode: .replace)
+        XCTAssertFalse(store.getCollections().first { $0.isUnsortedBinder }!.cards.isEmpty)
+        let empty = Data(#"{"format":"com.tcger.portable-backup","formatVersion":2,"binders":[],"wishlists":[],"sealedInventory":[],"sections":{}}"#.utf8)
+        try store.importPortableBackup(empty, mode: .replace)
+        XCTAssertTrue(store.getCollections().allSatisfy { $0.cards.isEmpty })
+        XCTAssertEqual(store.getCollections(), LocalStore(persistenceRepository: repository).getCollections())
+    }
+
+    func testDefaultImportMergesUnrelatedRecordsAndRepeatedImportIsIdempotent() throws {
+        let source = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root.appendingPathComponent("source")))
+        _ = source.createCollection(name: "Imported", description: nil, colorHex: nil)
+        let target = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root.appendingPathComponent("target")))
+        _ = target.createCollection(name: "Collision", description: nil, colorHex: nil)
+        _ = target.createCollection(name: "Unrelated", description: nil, colorHex: nil)
+        _ = source.createWishlist(name: "Imported list", description: nil, colorHex: nil)
+        _ = target.createWishlist(name: "Collision list", description: nil, colorHex: nil)
+        _ = target.createWishlist(name: "Unrelated list", description: nil, colorHex: nil)
+        let backup = try source.exportPortableBackup()
+        try target.importPortableBackup(backup)
+        try target.importPortableBackup(backup)
+        XCTAssertEqual(Set(target.getCollections().filter { !$0.isUnsortedBinder }.map(\.name)), ["Imported", "Unrelated"])
+        XCTAssertEqual(target.getCollections().filter { !$0.isUnsortedBinder }.count, 2)
+        let newList = target.createWishlist(name: "After import", description: nil, colorHex: nil)
+        XCTAssertEqual(newList.id, "local-wishlist-3")
+        XCTAssertEqual(target.getWishlists().count, 3)
+        let relaunched = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root.appendingPathComponent("target")))
+        XCTAssertEqual(target.getCollections(), relaunched.getCollections())
+        let disk = try XCTUnwrap(FileLocalStorePersistenceRepository(rootDirectory: root.appendingPathComponent("target")).load())
+        let state = try XCTUnwrap(JSONSerialization.jsonObject(with: disk) as? [String: Any])
+        XCTAssertTrue((state["collections"] as? [[String: Any]] ?? []).contains { $0["id"] as? String == "__library__" })
     }
 
     func testPortableBackupRejectsInvalidDataWithoutReplacingCurrentLibrary() throws {
@@ -416,4 +534,12 @@ private final class CountingPersistenceRepository: LocalStorePersistenceReposito
     func createBackup(_ payload: Data) throws -> URL { throw WriteFailure() }
     func loadBackup(at url: URL) throws -> Data { throw WriteFailure() }
     func removeBackup(at url: URL) throws { throw WriteFailure() }
+}
+
+private final class RotationFailureFileManager: FileManager, @unchecked Sendable {
+    var failRemoval = false
+    override func removeItem(at url: URL) throws {
+        if failRemoval && url.lastPathComponent.hasPrefix("snapshot-") { throw CocoaError(.fileWriteNoPermission) }
+        try super.removeItem(at: url)
+    }
 }

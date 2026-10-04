@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"release.readiness","platform":"web","status":"planned","limitation":"App and container build configuration exist; production deploy, PWA install/update and release smoke criteria are not exercised by this capability record."}
 "use client";
 
 import { useEffect } from "react";

@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.model.dinov2","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.scanner.model
 
 import android.content.Context

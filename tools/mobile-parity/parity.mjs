@@ -4,10 +4,16 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { execFileSync } from "node:child_process";
+import { collectSourceRegistrations, compileSourceContract } from "./source-contract.mjs";
+import { featureImpact, renderFeatureImpact } from "./feature-impact.mjs";
+import { sourceIdentity, validateEvidence } from "./evidence.mjs";
+import { loadContracts, apiContractImpact, main as checkAPIContracts } from "../api-contracts/contracts.mjs";
 
 const toolDir = path.dirname(fileURLToPath(import.meta.url));
 export const rootDir = path.resolve(toolDir, "../..");
 export const manifestPath = path.join(rootDir, "mobile-parity/features.json");
+export const definitionsPath = path.join(rootDir, "mobile-parity/features.definitions.json");
 const swiftPath = path.join(rootDir, "mobile-apps/ios/TCGer/TCGer/Generated/ParityFeatureIDs.generated.swift");
 const kotlinPath = path.join(rootDir, "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/generated/ParityFeatureIDs.generated.kt");
 const typescriptPath = path.join(rootDir, "frontend/src/generated/parity.generated.ts");
@@ -19,6 +25,15 @@ const featureProperties = new Set(["id", "title", "policy", "flow"]);
 
 export function loadManifest(file = manifestPath) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+export function loadSourceManifest() {
+  const definitions = loadManifest(definitionsPath);
+  const collected = collectSourceRegistrations(rootDir);
+  const compiled = compileSourceContract(definitions, collected.registrations);
+  const errors = [...collected.errors, ...compiled.errors];
+  if (errors.length) throw new Error(errors.map((error) => `- ${error}`).join("\n"));
+  return compiled.manifest;
 }
 
 function lowerCamel(id) {
@@ -49,9 +64,9 @@ function validateGeneratedNames(items, transform, label, errors) {
   }
 }
 
-export function validateManifest(manifest, { checkFiles = true } = {}) {
+export function validateManifest(manifest, { checkFiles = true, today = new Date().toISOString().slice(0, 10) } = {}) {
   const errors = [];
-  if (manifest.schemaVersion !== 2) errors.push("schemaVersion must be 2");
+  if (manifest.schemaVersion !== 3) errors.push("schemaVersion must be 3");
   if (!Array.isArray(manifest.platforms) || manifest.platforms.length === 0) {
     errors.push("platforms must be a non-empty array");
   }
@@ -93,8 +108,15 @@ export function validateManifest(manifest, { checkFiles = true } = {}) {
         errors.push(`${feature.id}: ${platform} sources are required`);
       }
       for (const key of Object.keys(state)) {
-        if (!["status", "sources", "tests", "waiver"].includes(key)) errors.push(`${feature.id}: unsupported ${platform} state property ${key}`);
+        if (!["status", "sources", "tests", "waiver", "implementation", "limitation", "modes", "requires"].includes(key)) errors.push(`${feature.id}: unsupported ${platform} state property ${key}`);
       }
+      if (!state.implementation || !isNonEmptyString(state.implementation.path) || !Number.isInteger(state.implementation.line) || state.implementation.line < 1 || !state.sources?.includes(state.implementation.path)) errors.push(`${feature.id}: ${platform} implementation must locate its source registration`);
+      if (state.status !== "implemented" && !isNonEmptyString(state.limitation)) errors.push(`${feature.id}: ${platform} non-implemented support requires a limitation`);
+      if (state.limitation !== undefined && !isNonEmptyString(state.limitation)) errors.push(`${feature.id}: ${platform} limitation must be non-empty`);
+      for (const key of ["modes", "requires"]) {
+        if (state[key] !== undefined && (!Array.isArray(state[key]) || !state[key].length || state[key].some((value) => !isNonEmptyString(value)) || new Set(state[key]).size !== state[key].length)) errors.push(`${feature.id}: invalid ${platform} ${key}`);
+      }
+      if (Array.isArray(state.modes) && state.modes.some((mode) => !["local", "server", "demo"].includes(mode))) errors.push(`${feature.id}: invalid ${platform} mode`);
       if (state.tests !== undefined && !Array.isArray(state.tests)) {
         errors.push(`${feature.id}: ${platform} tests must be an array`);
       }
@@ -120,6 +142,10 @@ export function validateManifest(manifest, { checkFiles = true } = {}) {
       if (state.status === "waived") {
         if (!state.waiver || !isNonEmptyString(state.waiver.reason) || !isNonEmptyString(state.waiver.owner) || !/^\d{4}-\d{2}-\d{2}$/.test(state.waiver.expires ?? "")) {
           errors.push(`${feature.id}: ${platform} waived status requires waiver reason, owner, and YYYY-MM-DD expiry`);
+        } else {
+          const parsed = new Date(`${state.waiver.expires}T00:00:00Z`);
+          if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== state.waiver.expires) errors.push(`${feature.id}: ${platform} waiver expiry must be a real calendar date`);
+          else if (state.waiver.expires < today) errors.push(`${feature.id}: ${platform} waiver expired on ${state.waiver.expires}`);
         }
       } else if (state.waiver !== undefined) {
         errors.push(`${feature.id}: ${platform} waiver is only valid with waived status`);
@@ -135,6 +161,12 @@ export function validateManifest(manifest, { checkFiles = true } = {}) {
       const missing = [...platforms].filter((platform) => feature[platform]?.status !== "implemented");
       if (missing.length > 0) errors.push(`${feature.id}: parity policy requires every platform to be implemented (missing: ${missing.join(", ")})`);
       if (!isNonEmptyString(feature.flow)) errors.push(`${feature.id}: parity policy requires a shared flow`);
+      const webTest = feature.web?.tests?.find((test) => test.runner === "playwright" && isNonEmptyString(test.path));
+      if (platforms.has("web") && !webTest) errors.push(`${feature.id}: parity policy requires web Playwright evidence with a source path`);
+      if (checkFiles && webTest && fs.existsSync(path.join(rootDir, webTest.path))) {
+        const testSource = fs.readFileSync(path.join(rootDir, webTest.path), "utf8");
+        if (!testSource.includes(feature.id) && !testSource.includes(`ParityFeatureIDs.${lowerCamel(feature.id)}`)) errors.push(`${feature.id}: web Playwright test does not reference its feature ID`);
+      }
     }
 
     if (feature.flow) {
@@ -170,30 +202,47 @@ export function renderSwift(manifest) {
   const features = manifest.features.map((feature) => `    case ${lowerCamel(feature.id)} = "${feature.id}"`).join("\n");
   const implemented = manifest.features.filter((feature) => feature.ios?.status === "implemented").map((feature) => `        .${lowerCamel(feature.id)},`).join("\n");
   const controls = manifest.controls.map((id) => `    static let ${lowerCamel(id)} = "${id}"`).join("\n");
-  return `// Generated by tools/mobile-parity/parity.mjs. Do not edit by hand.\nimport Foundation\n\nenum ParityFeatureID: String, CaseIterable, Sendable {\n${features}\n\n    static let implemented: Set<ParityFeatureID> = [\n${implemented}\n    ]\n\n    var screenIdentifier: String { "feature.\\(rawValue)" }\n}\n\nenum ParityControlID {\n${controls}\n}\n`;
+  const support = manifest.features.map((feature) => {
+    const state = feature.ios;
+    const status = state.status.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    const strings = (values) => `[${values.map((value) => JSON.stringify(value)).join(", ")}]`;
+    return `        .${lowerCamel(feature.id)}: ParityFeatureSupport(status: .${status}, limitation: ${state.limitation ? JSON.stringify(state.limitation) : "nil"}, modes: ${state.modes ? strings(state.modes) : "nil"}, requirements: ${strings(state.requires ?? [])}, source: ${JSON.stringify(state.implementation?.path ?? state.sources[0])}),`;
+  }).join("\n");
+  return `// Generated by tools/mobile-parity/parity.mjs. Do not edit by hand.\nimport Foundation\n\nenum ParitySupportStatus: String, Sendable {\n    case implemented, partial, planned, unavailable, waived\n    case notApplicable = "not_applicable"\n}\n\nstruct ParityFeatureSupport: Sendable {\n    let status: ParitySupportStatus\n    let limitation: String?\n    let modes: [String]?\n    let requirements: [String]\n    let source: String\n}\n\nenum ParityFeatureID: String, CaseIterable, Sendable {\n${features}\n\n    static let implemented: Set<ParityFeatureID> = [\n${implemented}\n    ]\n\n    static let supportByID: [ParityFeatureID: ParityFeatureSupport] = [\n${support}\n    ]\n\n    var support: ParityFeatureSupport { Self.supportByID[self]! }\n    var screenIdentifier: String { "feature.\\(rawValue)" }\n}\n\nenum ParityControlID {\n${controls}\n}\n`;
 }
 
 export function renderKotlin(manifest) {
   const features = manifest.features.map((feature) => `    const val ${upperSnake(feature.id)} = "${feature.id}"`).join("\n");
   const implemented = manifest.features.filter((feature) => feature.android?.status === "implemented").map((feature) => `        ${upperSnake(feature.id)},`).join("\n");
   const controls = manifest.controls.map((id) => `    const val ${upperSnake(id)} = "${id}"`).join("\n");
-  return `// Generated by tools/mobile-parity/parity.mjs. Do not edit by hand.\npackage com.ahmadjalil.tcger.generated\n\nobject ParityFeatureIDs {\n${features}\n\n    val implemented: Set<String> = setOf(\n${implemented}\n    )\n\n    fun screen(featureId: String): String = "feature.$featureId"\n}\n\nobject ParityControlIDs {\n${controls}\n}\n`;
+  const kotlinString = (value) => JSON.stringify(value).replaceAll("$", "\\$");
+  const support = manifest.features.map((feature) => {
+    const state = feature.android;
+    const strings = (values) => `listOf(${values.map(kotlinString).join(", ")})`;
+    return `        ${upperSnake(feature.id)} to ParityFeatureSupport(ParitySupportStatus.${state.status.toUpperCase()}, ${state.limitation ? kotlinString(state.limitation) : "null"}, ${state.modes ? strings(state.modes) : "null"}, ${strings(state.requires ?? [])}, ${kotlinString(state.implementation?.path ?? state.sources[0])}),`;
+  }).join("\n");
+  return `// Generated by tools/mobile-parity/parity.mjs. Do not edit by hand.\npackage com.ahmadjalil.tcger.generated\n\nenum class ParitySupportStatus { IMPLEMENTED, PARTIAL, PLANNED, UNAVAILABLE, NOT_APPLICABLE, WAIVED }\n\ndata class ParityFeatureSupport(\n    val status: ParitySupportStatus,\n    val limitation: String?,\n    val modes: List<String>?,\n    val requirements: List<String>,\n    val source: String,\n)\n\nobject ParityFeatureIDs {\n${features}\n\n    val implemented: Set<String> = setOf(\n${implemented}\n    )\n\n    val support: Map<String, ParityFeatureSupport> = mapOf(\n${support}\n    )\n\n    fun screen(featureId: String): String = "feature.$featureId"\n}\n\nobject ParityControlIDs {\n${controls}\n}\n`;
 }
 
 export function renderTypeScript(manifest) {
   const features = manifest.features.map((feature) => `  ${lowerCamel(feature.id)}: "${feature.id}",`).join("\n");
   const implemented = manifest.features.filter((feature) => feature.web?.status === "implemented").map((feature) => `  ParityFeatureIDs.${lowerCamel(feature.id)},`).join("\n");
   const controls = manifest.controls.map((id) => `  ${lowerCamel(id)}: "${id}",`).join("\n");
-  return `// Generated by tools/mobile-parity/parity.mjs. Do not edit by hand.\n\nexport const ParityFeatureIDs = {\n${features}\n} as const;\n\nexport type ParityFeatureID = (typeof ParityFeatureIDs)[keyof typeof ParityFeatureIDs];\n\nexport const implementedParityFeatureIDs: ReadonlySet<ParityFeatureID> = new Set([\n${implemented}\n]);\n\nexport const parityScreenID = (featureID: ParityFeatureID): string => \`feature.\${featureID}\`;\n\nexport const ParityControlIDs = {\n${controls}\n} as const;\n\nexport type ParityControlID = (typeof ParityControlIDs)[keyof typeof ParityControlIDs];\n`;
+  const support = manifest.features.map((feature) => {
+    const state = feature.web;
+    const metadata = { status: state.status, limitation: state.limitation ?? null, modes: state.modes ?? null, requirements: state.requires ?? [], source: state.implementation?.path ?? state.sources[0] };
+    return `  [ParityFeatureIDs.${lowerCamel(feature.id)}]: ${JSON.stringify(metadata)},`;
+  }).join("\n");
+  return `// Generated by tools/mobile-parity/parity.mjs. Do not edit by hand.\n\nexport const ParityFeatureIDs = {\n${features}\n} as const;\n\nexport type ParityFeatureID = (typeof ParityFeatureIDs)[keyof typeof ParityFeatureIDs];\n\nexport interface ParityFeatureSupport {\n  readonly status: "implemented" | "partial" | "planned" | "unavailable" | "not_applicable" | "waived";\n  readonly limitation: string | null;\n  readonly modes: readonly ("local" | "server" | "demo")[] | null;\n  readonly requirements: readonly string[];\n  readonly source: string;\n}\n\nexport const parityFeatureSupport: Readonly<Record<ParityFeatureID, ParityFeatureSupport>> = {\n${support}\n};\n\nexport const implementedParityFeatureIDs: ReadonlySet<ParityFeatureID> = new Set([\n${implemented}\n]);\n\nexport const parityScreenID = (featureID: ParityFeatureID): string => \`feature.\${featureID}\`;\n\nexport const ParityControlIDs = {\n${controls}\n} as const;\n\nexport type ParityControlID = (typeof ParityControlIDs)[keyof typeof ParityControlIDs];\n`;
 }
 
 export function parseJUnit(file) {
   if (!file || !fs.existsSync(file)) return new Map();
   const xml = fs.readFileSync(file, "utf8");
   const collected = new Map();
-  for (const match of xml.matchAll(/<testcase\b([^>]*)>([\s\S]*?)<\/testcase>|<testcase\b([^>]*)\/>/g)) {
-    const attrs = match[1] ?? match[3] ?? "";
-    const body = match[2] ?? "";
+  for (const match of xml.matchAll(/<testcase\b([^>]*)\/>|<testcase\b([^>]*)>([\s\S]*?)<\/testcase>/g)) {
+    const attrs = match[1] ?? match[2] ?? "";
+    const body = match[3] ?? "";
     const name = /\bname="([^"]+)"/.exec(attrs)?.[1] ?? "";
     const id = /\[([a-z][a-zA-Z0-9]*(?:\.[a-z][a-zA-Z0-9]*)+)\]/.exec(name)?.[1];
     if (!id) continue;
@@ -216,12 +265,16 @@ function platformResultOptions(manifest, options) {
 
 export function renderReport(manifest, options = {}) {
   const resultFiles = platformResultOptions(manifest, options);
-  const results = Object.fromEntries(manifest.platforms.map((platform) => [platform, parseJUnit(resultFiles[platform])]));
+  const identity = Object.values(resultFiles).some(Boolean) && !options.testOnlyUnboundEvidence ? sourceIdentity() : null;
+  const evidenceIssues = Object.fromEntries(manifest.platforms.map(platform => [platform,
+    resultFiles[platform] && !options.testOnlyUnboundEvidence ? validateEvidence(resultFiles[platform], platform, identity) : null
+  ]));
+  const results = Object.fromEntries(manifest.platforms.map((platform) => [platform, evidenceIssues[platform] ? new Map() : parseJUnit(resultFiles[platform])]));
   const rows = manifest.features.map((feature) => {
     const execution = Object.fromEntries(manifest.platforms.map((platform) => {
       const observed = results[platform].get(feature.id);
       const hasDeclaredTest = Boolean(feature.flow) || (feature[platform]?.tests?.length ?? 0) > 0;
-      return [platform, observed ?? (hasDeclaredTest ? "Not run" : "—")];
+      return [platform, evidenceIssues[platform] ?? observed ?? (hasDeclaredTest ? "Not run" : "—")];
     }));
     const executionValues = manifest.platforms.map((platform) => execution[platform]);
     const statuses = manifest.platforms.map((platform) => feature[platform].status);
@@ -246,14 +299,23 @@ export function renderReport(manifest, options = {}) {
     ]));
     return `| ${platformTitle(platform)} | ${declarationStatuses.map((status) => counts[status]).join(" | ")} |`;
   });
+  const escapeCell = (value) => String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
+  const supportRows = manifest.features.flatMap((feature) => manifest.platforms.filter((platform) => feature[platform].limitation || feature[platform].modes || feature[platform].requires?.length).map((platform) => {
+    const state = feature[platform];
+    const source = state.implementation?.path ?? state.sources[0];
+    const location = state.implementation?.line ? `#L${state.implementation.line}` : "";
+    return `| ${feature.id} | ${platformTitle(platform)} | ${statusLabel(state.status)} | ${state.modes?.join(", ") ?? "Not specified"} | ${escapeCell(state.requires?.join(", ") || "—")} | ${escapeCell(state.limitation ?? "—")} | [Source](../${source}${location}) |`;
+  }));
+  const supportSection = `\n## Availability and limitations\n\nThese declarations live beside platform implementations. Unspecified modes are unknown, not a promise of support in every mode. Requirements describe prerequisites; this metadata does not replace runtime server, package, or hardware checks.\n\n| ID | Platform | Support | Modes | Requirements | Limitation or fallback | Registration |\n|---|---|---|---|---|---|---|\n${supportRows.join("\n")}\n`;
   const platformHeaders = manifest.platforms.flatMap((platform) => [`${platformTitle(platform)} declaration`, `${platformTitle(platform)} evidence`]);
   const header = ["ID", "Feature", "Policy", ...platformHeaders, "Result"];
   const declarationSummaryHeaders = ["Platform", ...declarationStatuses.map(statusLabel)];
-  return `# Cross-platform feature parity\n\nGenerated from [features.json](features.json). Do not edit this report by hand.\n\n- Platforms: ${platformSummary}.\n- ${parityCount} features are parity-required.\n- ${trackedCount} features are explicitly tracked.\n- A declaration is backed by source paths in the manifest. “Verified” additionally requires passing current JUnit evidence on every declared platform; a declared test that was not supplied is “Not run.”\n\n## Declaration summary\n\n| ${declarationSummaryHeaders.join(" | ")} |\n|${declarationSummaryHeaders.map(() => "---").join("|")}|\n${declarationSummaryRows.join("\n")}\n\n## Feature matrix\n\n| ${header.join(" | ")} |\n|${header.map(() => "---").join("|")}|\n${rows.join("\n")}\n`;
+  return `# Cross-platform feature parity\n\nGenerated from [product definitions](features.definitions.json) and platform source registrations into [features.json](features.json). Do not edit generated files by hand. API boundary compatibility is tracked separately in the [API contract workflow](api-contracts/README.md); API passes do not substitute for UI verification.\n\n- Platforms: ${platformSummary}.\n- ${parityCount} features are parity-required.\n- ${trackedCount} features are explicitly tracked.\n- A declaration is backed by source paths in the manifest. “Verified” additionally requires passing current JUnit evidence on every declared platform; a declared test that was not supplied is “Not run.”\n\n## Declaration summary\n\n| ${declarationSummaryHeaders.join(" | ")} |\n|${declarationSummaryHeaders.map(() => "---").join("|")}|\n${declarationSummaryRows.join("\n")}\n\n## Feature matrix\n\n| ${header.join(" | ")} |\n|${header.map(() => "---").join("|")}|\n${rows.join("\n")}\n${supportSection}`;
 }
 
 function expectedFiles(manifest) {
   return new Map([
+    [manifestPath, `${JSON.stringify(manifest, null, 2)}\n`],
     [swiftPath, renderSwift(manifest)],
     [kotlinPath, renderKotlin(manifest)],
     [typescriptPath, renderTypeScript(manifest)],
@@ -285,7 +347,9 @@ function argumentValue(name) {
 
 function main() {
   const command = process.argv[2] ?? "check";
-  const manifest = loadManifest();
+  let manifest;
+  try { manifest = loadSourceManifest(); }
+  catch (error) { console.error(error.message); process.exit(1); }
   const manifestErrors = validateManifest(manifest, { checkFiles: command !== "generate-contract-only" });
   if (manifestErrors.length) {
     console.error(manifestErrors.map((error) => `- ${error}`).join("\n"));
@@ -293,7 +357,19 @@ function main() {
   }
 
   if (command === "generate") generate(manifest);
+  else if (command === "impact") {
+    const base = argumentValue("--base") ?? "HEAD";
+    if (base.startsWith("-")) { console.error("--base must be a Git revision"); process.exit(2); }
+    const tracked = execFileSync("git", ["diff", "--name-only", "-z", base, "--"], { cwd: rootDir, encoding: "utf8" });
+    const untracked = execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd: rootDir, encoding: "utf8" });
+    const changedFiles = `${tracked}${untracked}`.split("\0").filter(Boolean);
+    const impact = featureImpact(manifest, changedFiles);
+    console.log(renderFeatureImpact(impact));
+    const apiImpact = apiContractImpact(loadContracts(), changedFiles);
+    if (apiImpact.length) console.log("## API contracts requiring review\n\n" + apiImpact.map(item => `- ${item.id} → ${item.featureId} (${item.surfaces.join(", ")})`).join("\n"));
+  }
   else if (command === "check") {
+    checkAPIContracts("check");
     const errors = checkGenerated(manifest);
     if (errors.length) {
       console.error(errors.map((error) => `- ${error}`).join("\n"));
@@ -307,6 +383,16 @@ function main() {
     const output = argumentValue("--output") ?? reportPath;
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(output, report);
+    if (process.argv.includes("--require-pass")) {
+      const identity = sourceIdentity();
+      for (const platform of manifest.platforms) {
+        const file = argumentValue(`--${platform}-results`);
+        const issue = validateEvidence(file, platform, identity);
+        const cases = issue ? new Map() : parseJUnit(file);
+        const missing = manifest.features.filter(feature => feature.policy === "parity" && cases.get(feature.id) !== "Pass");
+        if (issue || missing.length) { console.error(`${platform}: ${issue ?? missing.map(feature => feature.id).join(", ")}`); process.exitCode = 1; }
+      }
+    }
     console.log(`wrote ${path.relative(rootDir, output)}`);
   } else {
     console.error(`Unknown command: ${command}`);

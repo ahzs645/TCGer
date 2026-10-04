@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.copies","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"collections.manage","platform":"web","status":"implemented"}
 import type {
   CollectionTag,
   CollectionCardCopy,

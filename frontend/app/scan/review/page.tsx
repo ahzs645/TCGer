@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.replay","platform":"web","status":"implemented"}
+
 import type { Metadata } from "next";
 import { ScanReviewLab } from "@/components/scan/scan-review-lab";
 import { ScannerAssetDiagnostics } from "@/components/scan/scanner-asset-diagnostics";

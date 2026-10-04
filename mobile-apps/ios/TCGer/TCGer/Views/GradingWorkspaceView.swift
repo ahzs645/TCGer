@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"pricing.gradingWorkspace","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 struct GradingWorkspaceView: View {
@@ -59,6 +61,7 @@ struct GradingWorkspaceView: View {
                 Text("Scenarios are saved on this device. They do not change collection cost basis.").font(.caption).foregroundStyle(.secondary)
             }
         }
+        .keyboardDismissToolbar()
         .navigationTitle("Grading planner")
         .accessibilityIdentifier("feature.pricing.gradingWorkspace")
         .task { restore() }

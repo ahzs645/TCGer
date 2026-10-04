@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.decisionDiagnostics","platform":"android","status":"partial","limitation":"Boundary engine, OCR, candidates, and timing are available; internal gate, quad, and ANN stages are not exposed."}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import com.ahmadjalil.tcger.domain.CardScanResult

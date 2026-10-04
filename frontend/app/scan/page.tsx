@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"scanner.identify","platform":"web","status":"partial","limitation":"Recognition engines and developer scenarios do not yet have equivalent coverage across all runtimes."}
+// @tcger-feature {"id":"scanner.engine.automatic","platform":"web","status":"partial","limitation":"Automatic cross-engine and cross-game selection is not equivalent across runtimes."}
+
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { CardScanPanel } from "@/components/scan/card-scan-panel";

@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      platform: ios
+    commands:
+      - tapOn:
+          id: "action.keyboard.dismiss"
+- runFlow:
+    when:
+      platform: android
+    commands:
+      - hideKeyboard

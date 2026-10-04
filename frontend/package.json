@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "npm run sync-pack-assets && next dev",
     "dev:host": "npm run sync-pack-assets && next dev --port 3003",
-    "prebuild": "npm run sync-pack-assets && npm --prefix ../packages/api-types run build",
+    "prebuild": "node ../tools/mobile-parity/parity.mjs check && npm run sync-pack-assets && npm --prefix ../packages/api-types run build",
     "build": "next build",
-    "prebuild:demo": "npm run sync-pack-assets && npm --prefix ../packages/api-types run build && rm -rf app/api",
+    "prebuild:demo": "node ../tools/mobile-parity/parity.mjs check && npm run sync-pack-assets && npm --prefix ../packages/api-types run build && rm -rf app/api",
     "build:demo": "DEMO_EXPORT=true next build",
     "postbuild:demo": "git checkout -- app/api",
     "start": "next start",
@@ -17,7 +17,9 @@
     "test:visual": "playwright test",
     "test:visual:update": "playwright test --update-snapshots",
     "format": "prettier --write \"**/*.{ts,tsx,css,md}\"",
-    "sync-pack-assets": "node ../packages/pack-core/scripts/sync-assets.mjs public"
+    "sync-pack-assets": "node ../packages/pack-core/scripts/sync-assets.mjs public",
+    "predev": "node ../tools/mobile-parity/parity.mjs check",
+    "predev:host": "node ../tools/mobile-parity/parity.mjs check"
   },
   "dependencies": {
     "@convex-dev/better-auth": "^0.12.5",

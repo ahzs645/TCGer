@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"analytics.browse","platform":"web","status":"implemented"}
+
 "use client";
 
 import { gameLabel } from "@/lib/utils";

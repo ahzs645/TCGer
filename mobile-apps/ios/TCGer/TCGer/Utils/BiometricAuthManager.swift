@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"security.biometricLock","platform":"ios","status":"partial","requires":["enrolled-device-biometrics"],"limitation":"Face ID/Touch ID lock exists; authentication uses biometric-only policy even though cancellation says Use Passcode, so device-credential fallback is absent."}
 import LocalAuthentication
 
 enum BiometricAuthManager {

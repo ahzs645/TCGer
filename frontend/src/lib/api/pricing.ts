@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"pricing.provenance","platform":"web","status":"partial","modes":["server","local"],"limitation":"Tracked quote APIs retain source/provenance and package snapshots; a dedicated native-style original-quote, FX and match-confidence inspection view is absent."}
 import type {
   PriceAlertResponse,
   TransactionResponse,

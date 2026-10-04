@@ -1,3 +1,8 @@
+// @tcger-feature {"id":"packOpening.oddsReference","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.mode.normal","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.mode.quick","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.orientation","platform":"ios","status":"implemented"}
+
 import Foundation
 
 struct PackOpeningInterfaceState: Codable, Equatable {

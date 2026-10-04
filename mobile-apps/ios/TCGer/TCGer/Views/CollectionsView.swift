@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.browse","platform":"ios","status":"implemented"}
+
 import Combine
 import SwiftUI
 
@@ -381,14 +383,15 @@ struct CollectionsView: View {
 
     @MainActor
     private func loadCollections() async {
+        let sessionID = environmentStore.widgetSessionID
         await collectionStore.load(
             config: environmentStore.serverConfiguration,
             token: environmentStore.authToken,
             useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
         )
 
-        if collectionStore.errorMessage == nil {
-            environmentStore.updateWidgetData(collections: collections)
+        if sessionID == environmentStore.widgetSessionID, collectionStore.errorMessage == nil {
+            environmentStore.updateWidgetData(collections: collections, sessionID: sessionID)
             resolvePendingBinder()
         }
     }

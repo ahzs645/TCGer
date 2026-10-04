@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.smartFolders","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import android.content.Context

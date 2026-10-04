@@ -15,6 +15,7 @@ properties:
 - tapOn:
     id: "input.wishlists.name"
 - inputText: "Parity Wishlist"
+- runFlow: ../subflows/dismiss-keyboard.yaml
 - tapOn:
     id: "action.wishlists.confirmCreate"
 - assertVisible: "Parity Wishlist"

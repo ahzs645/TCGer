@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"account.management","platform":"ios","status":"implemented"}
+
 //
 //  ProfileView.swift
 //  TCGer

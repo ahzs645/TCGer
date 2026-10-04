@@ -1,3 +1,8 @@
+// @tcger-feature {"id":"games.catalogDownloads","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.packageUpdates","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.capability.scannerDownload","platform":"ios","status":"partial","modes":["local"],"requires":["network-for-download","package-ios-scanner-bundle"],"limitation":"Scanner installation accepts package bundle sources for built-in TCGGame identifiers; arbitrary publisher game IDs cannot pass the enum guard and remain unsupported."}
+// @tcger-feature {"id":"games.capability.priceDownload","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.capability.packDownload","platform":"ios","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
 import CryptoKit
 import Combine
 import Foundation

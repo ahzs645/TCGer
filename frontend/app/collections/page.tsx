@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.browse","platform":"web","status":"implemented"}
+
 "use client";
 
 import { Suspense } from "react";

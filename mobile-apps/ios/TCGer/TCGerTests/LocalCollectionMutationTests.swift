@@ -32,6 +32,21 @@ final class LocalCollectionMutationTests: XCTestCase {
         XCTAssertEqual(restored.excludedCardKeys, [])
     }
 
+    func testPartialBinderRenamePreservesPresentationAndFullEditorCanClearIt() throws {
+        let binder = store.createCollection(name: "Before", description: nil, colorHex: nil,
+            containerType: "binder", imageUrl: "https://example.test/binder.png", associatedTcg: "pokemon")
+        let renamed = try store.updateCollection(id: binder.id, name: "After", description: nil, colorHex: nil, replacePresentation: false)
+        XCTAssertEqual(renamed.containerType, "binder")
+        XCTAssertEqual(renamed.imageUrl, binder.imageUrl)
+        XCTAssertEqual(renamed.associatedTcg, "pokemon")
+        let cleared = try store.updateCollection(id: binder.id, name: nil, description: nil, colorHex: nil, replacePresentation: true)
+        XCTAssertNil(cleared.containerType)
+        XCTAssertNil(cleared.imageUrl)
+        XCTAssertNil(cleared.associatedTcg)
+        let reloaded = LocalStore(persistenceRepository: FileLocalStorePersistenceRepository(rootDirectory: root))
+        XCTAssertEqual(reloaded.getCollections().first { $0.id == binder.id }, cleared)
+    }
+
     private func card(_ game: String = "pokemon", id: String = "001") -> Card {
         Card(id: id, name: "Card \(game)", tcg: game, setCode: "set", setName: "Set", rarity: "Rare",
              artist: "Artist", imageUrl: "https://example.test/card.png", imageUrlSmall: nil, price: 10,

@@ -1,3 +1,11 @@
+// @tcger-feature {"id":"storage.containers","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"storage.placements","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.rapidEntry","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.acquisitionCosts","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.psaCertification","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"pricing.provenance","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"storage.audit","platform":"ios","status":"planned","limitation":"Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent."}
+// @tcger-feature {"id":"collections.historyUndo","platform":"ios","status":"partial","modes":["server"],"requires":["authenticated-server"],"limitation":"Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent."}
 import SwiftUI
 
 struct LibraryOperationsView: View {

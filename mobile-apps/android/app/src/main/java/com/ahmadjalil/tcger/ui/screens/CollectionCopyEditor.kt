@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.copyMetadata","platform":"android","status":"implemented"}
+
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.ahmadjalil.tcger.ui.screens
 

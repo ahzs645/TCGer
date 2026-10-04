@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"settings.browse","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement

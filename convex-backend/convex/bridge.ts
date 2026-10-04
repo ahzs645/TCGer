@@ -1110,6 +1110,9 @@ export const updateBinder = internalMutation({
         message: "The Unsorted Library cannot be edited"
       });
     }
+    if (args.name !== undefined && !args.name.trim()) {
+      throw new ConvexError({code: "BAD_REQUEST", message: "Name is required"});
+    }
     const timestamp = now();
     const nextShareToken =
       args.isPublic === true && (!binder.shareToken || args.rotateShareToken)

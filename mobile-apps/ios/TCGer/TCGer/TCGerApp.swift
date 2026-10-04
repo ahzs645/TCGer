@@ -9,11 +9,27 @@ import SwiftUI
 
 @main
 struct TCGerApp: App {
-    @StateObject private var environmentStore = EnvironmentStore()
+    @StateObject private var environmentStore: EnvironmentStore
     @StateObject private var featureDependencies: AppFeatureDependencies
     @StateObject private var wishlistStore: WishlistStore
 
     init() {
+        #if DEBUG && targetEnvironment(simulator)
+        if UserDefaults.standard.string(forKey: "tcgerParityTest") == "true" {
+            let suite = UserDefaults(suiteName: "TCGerParitySession")!
+            suite.removePersistentDomain(forName: "TCGerParitySession")
+            LocalStore.shared.resetLocalData()
+            LocalStore.shared.loadSampleData()
+            let environment = EnvironmentStore(storage: suite)
+            environment.serverConfiguration = .onDevice
+            environment.enableLocalSession(force: true)
+            _environmentStore = StateObject(wrappedValue: environment)
+        } else {
+            _environmentStore = StateObject(wrappedValue: EnvironmentStore())
+        }
+        #else
+        _environmentStore = StateObject(wrappedValue: EnvironmentStore())
+        #endif
         let apiService = APIService()
         let featureDependencies = AppFeatureDependencies(
             collections: APICollectionRepository(apiService: apiService),

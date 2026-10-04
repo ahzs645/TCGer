@@ -1,5 +1,8 @@
+// @tcger-feature {"id":"data.portableBackup","platform":"web","status":"implemented"}
+
 import {
   normalizePortableBackup,
+  mergePortableBackups,
   updatePreferencesSchema,
   type PortableBackup,
 } from "@tcg/api-types";
@@ -118,7 +121,8 @@ function mergeRows<T extends { _id: string }>(before: T[], after: T[]): T[] {
   ];
 }
 export async function importLocalBackup(input: unknown): Promise<void> {
-  const backup = normalizePortableBackup(input);
+  const incoming = normalizePortableBackup(input);
+  const backup = mergePortableBackups(await exportLocalBackup(), incoming);
   const before = await demoBackupSnapshot();
   const now = new Date().toISOString();
   const binders = backup.binders.map((binder) => ({

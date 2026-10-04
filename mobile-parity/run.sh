@@ -17,13 +17,18 @@ run_maestro() {
   local app_id="$2"
   local platform="$3"
   mkdir -p "$results_dir/$platform-artifacts"
+  local maestro_status=0
   maestro --device "$device_id" test \
     --include-tags parity \
     --format junit \
     --output "$results_dir/$platform.xml" \
     --test-output-dir "$results_dir/$platform-artifacts" \
     -e "APP_ID=$app_id" \
-    "$flows_dir"
+    "$flows_dir" || maestro_status=$?
+  if [[ -f "$results_dir/$platform.xml" ]]; then
+    node tools/mobile-parity/evidence.mjs complete "$results_dir/$platform.xml" "$platform"
+  fi
+  return "$maestro_status"
 }
 
 cd "$repo_root"
@@ -36,6 +41,8 @@ case "${1:-}" in
     web_raw_results="$results_dir/web-playwright.xml"
     web_results="$results_dir/web.xml"
     web_summary="$results_dir/web-summary.json"
+    rm -f "$web_raw_results"
+    node tools/mobile-parity/evidence.mjs begin "$web_results" web
     set +e
     (
       cd "$repo_root/frontend"
@@ -50,6 +57,7 @@ case "${1:-}" in
         --input "$web_raw_results" \
         --output "$web_results" \
         --summary "$web_summary"
+      node tools/mobile-parity/evidence.mjs complete "$web_results" web
     else
       echo "Playwright did not produce $web_raw_results" >&2
       exit 1
@@ -57,6 +65,7 @@ case "${1:-}" in
     exit "$playwright_status"
     ;;
   android)
+    node tools/mobile-parity/evidence.mjs begin "$results_dir/android.xml" android
     require_command adb
     require_command maestro
     if [[ "${PARITY_ANDROID_SKIP_BUILD:-false}" != "true" ]]; then
@@ -85,24 +94,25 @@ case "${1:-}" in
     run_maestro "$android_device" "com.ahmadjalil.tcger" android
     ;;
   ios)
+    node tools/mobile-parity/evidence.mjs begin "$results_dir/ios.xml" ios
     require_command maestro
     require_command xcodebuild
     require_command xcrun
     ios_simulator="${IOS_SIMULATOR:-iPhone 17 Pro}"
+    ios_device="${MAESTRO_DEVICE_ID:-$(xcrun simctl list devices available -j | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const devices=Object.values(JSON.parse(s).devices).flat().filter(d=>d.name===process.argv[1]||d.udid===process.argv[1]);if(devices.length!==1){console.error("Choose one simulator UUID with MAESTRO_DEVICE_ID");process.exit(1)}process.stdout.write(devices[0].udid)})' "$ios_simulator")}"
     ios_derived_data="${IOS_DERIVED_DATA:-$repo_root/mobile-parity/build/ios-derived-data}"
-    xcrun simctl boot "$ios_simulator" 2>/dev/null || true
-    xcrun simctl bootstatus "$ios_simulator" -b
+    xcrun simctl boot "$ios_device" 2>/dev/null || true
+    xcrun simctl bootstatus "$ios_device" -b
     xcodebuild \
       -quiet \
       -project mobile-apps/ios/TCGer/TCGer.xcodeproj \
       -scheme TCGer \
       -configuration Debug \
-      -destination "platform=iOS Simulator,name=$ios_simulator,OS=latest" \
+      -destination "platform=iOS Simulator,id=$ios_device" \
       -derivedDataPath "$ios_derived_data" \
       CODE_SIGNING_ALLOWED=NO \
       build
-    xcrun simctl install booted "$ios_derived_data/Build/Products/Debug-iphonesimulator/TCGer.app"
-    ios_device="${MAESTRO_DEVICE_ID:-$(xcrun simctl list devices booted | sed -n 's/.*(\([0-9A-Fa-f-]\{36\}\)) (Booted).*/\1/p' | head -n 1)}"
+    xcrun simctl install "$ios_device" "$ios_derived_data/Build/Products/Debug-iphonesimulator/TCGer.app"
     if [[ -z "$ios_device" ]]; then
       echo "No booted iOS simulator was found." >&2
       exit 1
@@ -115,7 +125,7 @@ case "${1:-}" in
     [[ -f "$results_dir/web.xml" ]] && report_args+=(--web-results "$results_dir/web.xml")
     [[ -f "$results_dir/ios.xml" ]] && report_args+=(--ios-results "$results_dir/ios.xml")
     [[ -f "$results_dir/android.xml" ]] && report_args+=(--android-results "$results_dir/android.xml")
-    node tools/mobile-parity/parity.mjs "${report_args[@]}"
+    node tools/mobile-parity/parity.mjs "${report_args[@]}" "${@:2}"
     ;;
   *)
     echo "Usage: $0 {web|android|ios|report}" >&2

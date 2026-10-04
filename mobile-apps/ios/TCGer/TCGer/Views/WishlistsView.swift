@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"wishlists.browse","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"wishlists.create","platform":"ios","status":"implemented"}
+
 import Combine
 import SwiftUI
 
@@ -141,7 +144,9 @@ struct WishlistsView: View {
             await loadWishlists()
         }
         .onChange(of: wishlistStore.revision) {
-            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists)
+            if wishlistStore.matches(config: environmentStore.serverConfiguration, token: environmentStore.authToken) {
+            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: environmentStore.widgetSessionID)
+        }
         }
         .sheet(isPresented: $showingCreateSheet) {
             createWishlistSheet
@@ -187,6 +192,7 @@ struct WishlistsView: View {
             }
             .navigationTitle("New Wishlist")
             .navigationBarTitleDisplayMode(.inline)
+            .keyboardDismissToolbar()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

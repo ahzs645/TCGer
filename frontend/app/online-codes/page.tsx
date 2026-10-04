@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"codes.vault","platform":"web","status":"implemented"}
+
 import type { Metadata } from "next";
 import { OnlineCodesContent } from "@/components/online-codes/online-codes-content";
 

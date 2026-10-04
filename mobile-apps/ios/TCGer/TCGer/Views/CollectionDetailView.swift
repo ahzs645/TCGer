@@ -1094,7 +1094,8 @@ struct CollectionDetailView: View {
                 imageUrl: editedImageUrl.binderMetadataValue,
                 associatedTcg: collection.associatedTcg,
                 associatedSetCode: collection.associatedSetCode,
-                associatedSetName: collection.associatedSetName
+                associatedSetName: collection.associatedSetName,
+                replacePresentation: true
             )
 
             cards = updated.cards

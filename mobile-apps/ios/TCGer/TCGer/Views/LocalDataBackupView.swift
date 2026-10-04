@@ -38,7 +38,7 @@ struct LocalDataBackupView: View {
             } header: {
                 Text("Transfer")
             } footer: {
-                Text("Import validates the whole backup before replacing this phone’s data. TCGer keeps the data it replaces as a local recovery point.")
+                Text("Import validates the whole backup, updates matching IDs, and retains unrelated records. TCGer saves the previous state as a recovery point.")
             }
 
             Section {
@@ -117,7 +117,7 @@ struct LocalDataBackupImportButton: View {
             switch alert {
             case .confirmation(let pending):
                 return Alert(
-                    title: Text("Replace This Phone’s Data?"),
+                    title: Text("Merge This Backup?"),
                     message: Text(confirmationMessage(for: pending.summary)),
                     primaryButton: .default(Text("Import")) {
                         restore(pending)

@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"collections.browse","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"collections.create","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import androidx.compose.foundation.background

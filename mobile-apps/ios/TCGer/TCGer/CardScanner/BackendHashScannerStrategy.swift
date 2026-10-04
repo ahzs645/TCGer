@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"scanner.engine.serverHash","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.engine.serverEmbedding","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 import CoreGraphics
 import Foundation
 import UIKit

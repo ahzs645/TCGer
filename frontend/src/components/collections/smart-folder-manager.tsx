@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.smartFolders","platform":"web","status":"implemented"}
+
 "use client";
 
 import { useMemo, useState } from "react";

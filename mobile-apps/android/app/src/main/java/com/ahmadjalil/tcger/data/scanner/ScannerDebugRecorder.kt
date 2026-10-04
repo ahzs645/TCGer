@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"scanner.debug.recording","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.devModeRecording","platform":"android","status":"partial","limitation":"Production inputs and results are retained; internal per-model-stage hypotheses are not exposed."}
+// @tcger-feature {"id":"scanner.debug.replay","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import java.time.Instant

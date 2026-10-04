@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"prices.browse","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"analytics.browse","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.feature.portfolio
 
 import com.ahmadjalil.tcger.data.preferences.normalizeServerUrl

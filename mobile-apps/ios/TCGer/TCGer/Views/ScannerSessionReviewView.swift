@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.results.sessionReview","platform":"ios","status":"implemented"}
+
 import SwiftUI
 import UIKit
 

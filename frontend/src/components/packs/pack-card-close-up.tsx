@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"packOpening.results.inspect","platform":"web","status":"implemented"}
+
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";

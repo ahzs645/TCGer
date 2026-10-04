@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"home.dashboard","platform":"web","status":"implemented"}
+
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";

@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"analytics.browse","platform":"ios","status":"implemented"}
+
 import Charts
 import SwiftUI
 

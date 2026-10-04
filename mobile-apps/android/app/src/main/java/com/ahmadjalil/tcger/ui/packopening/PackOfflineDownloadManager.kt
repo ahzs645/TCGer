@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"packOpening.offline.downloads","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.packopening
 
 import android.content.Context

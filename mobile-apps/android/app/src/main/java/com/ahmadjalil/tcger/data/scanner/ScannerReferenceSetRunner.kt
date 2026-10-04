@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.referenceSets","platform":"android","status":"partial","limitation":"The production-handler runner exists; its native reference-set browser is not wired."}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import com.ahmadjalil.tcger.domain.CardScanResult

@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"packOpening.oddsReference","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.mode.normal","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.mode.quick","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.packopening
 
 import com.ahmadjalil.tcger.domain.CatalogCard

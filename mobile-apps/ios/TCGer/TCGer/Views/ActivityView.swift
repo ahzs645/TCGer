@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"activity.browse","platform":"ios","status":"implemented","modes":["server"]}
+
 import SwiftUI
 
 struct ActivityView: View {

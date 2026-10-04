@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.capture.binderPage","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.scanner.binder
 
 import android.graphics.Bitmap

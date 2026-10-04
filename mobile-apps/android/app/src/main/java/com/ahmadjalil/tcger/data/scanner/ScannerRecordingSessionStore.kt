@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.sessionManagement","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import android.content.Context

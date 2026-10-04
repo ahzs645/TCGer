@@ -1,3 +1,10 @@
+// @tcger-feature {"id":"scanner.mode.pokemon","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.yugioh","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.mtg","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.engine.automatic","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.engine.localOnly","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.feedbackLabels","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 import CoreGraphics
 import Foundation
 

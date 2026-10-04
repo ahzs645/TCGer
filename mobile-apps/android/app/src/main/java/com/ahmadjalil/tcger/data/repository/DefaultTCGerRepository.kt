@@ -152,11 +152,12 @@ class DefaultTCGerRepository(
 
     override suspend fun importBackup(raw: String) = backupMutex.withLock {
         startupRecovery.await()
-        val backup = if (raw.trimStart().startsWith("{")) CollectionBackupJson.decode(raw) else parseCollectionCsv(raw)
+        var backup = if (raw.trimStart().startsWith("{")) CollectionBackupJson.decode(raw) else parseCollectionCsv(raw)
         if (preferencesStore.current().dataSourceMode == DataSourceMode.SERVER) {
             withSource(local = { Unit }, remote = { api, auth -> api.importBackup(auth, Json.parseToJsonElement(CollectionBackupJson.encode(backup)).jsonObject); Unit })
             return@withLock
         }
+        backup = CollectionBackupJson.decode(PortableBackupMerge.merge(Json.parseToJsonElement(exportBackup()).jsonObject, Json.parseToJsonElement(CollectionBackupJson.encode(backup)).jsonObject).toString())
         withContext(Dispatchers.IO) { backupSections.validate(backup.sections) }
         ensureLocalSealedCatalog()
         val plan = backup.importPlan(dao.getSealedProducts())

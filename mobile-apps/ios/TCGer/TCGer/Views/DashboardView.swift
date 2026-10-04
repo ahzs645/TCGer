@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"home.dashboard","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 struct DashboardView: View {
@@ -113,18 +115,21 @@ struct DashboardView: View {
 
     @MainActor
     private func loadData() async {
+        let sessionID = environmentStore.widgetSessionID
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
 
         do {
-            collections = try await apiService.getCollections(
+            let loadedCollections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
                 token: environmentStore.authToken,
                 useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
+            guard sessionID == environmentStore.widgetSessionID else { isLoading = false; return }
+            collections = loadedCollections
             hasLoaded = true
-            environmentStore.updateWidgetData(collections: collections)
+            environmentStore.updateWidgetData(collections: collections, sessionID: sessionID)
             isLoading = false
         } catch {
             if let apiError = error as? APIService.APIError, case .unauthorized = apiError {

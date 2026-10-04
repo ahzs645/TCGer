@@ -6,13 +6,14 @@ final class ImageCache {
     static let shared = ImageCache()
 
     private let memoryCache = NSCache<NSString, UIImage>()
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
     private let cacheDirectory: URL
     private let queue = DispatchQueue(label: "com.tcg.imagecache.queue")
 
-    private init() {
+    init(directory: URL? = nil, fileManager: FileManager = .default) {
+        self.fileManager = fileManager
         let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        cacheDirectory = documentsPath.appendingPathComponent("TCGerCache/Images", isDirectory: true)
+        cacheDirectory = directory ?? documentsPath.appendingPathComponent("TCGerCache/Images", isDirectory: true)
 
         if !fileManager.fileExists(atPath: cacheDirectory.path) {
             try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
@@ -61,13 +62,21 @@ final class ImageCache {
     /// Offline set downloads must not report completion while their native
     /// thumbnails are still queued for disk writes. The normal scrolling path
     /// remains asynchronous through `store(_:data:for:)`.
-    func storeForOffline(_ image: UIImage, data: Data, for url: URL) {
+    func storeForOffline(_ image: UIImage, data: Data, for url: URL) throws {
+        try queue.sync {
+            try fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+            try data.write(to: diskURL(for: url), options: [.atomic])
+            guard try Data(contentsOf: diskURL(for: url)) == data else { throw CocoaError(.fileReadCorruptFile) }
+        }
+        // Memory must not masquerade as durable completion after a failed write.
         memoryCache.setObject(image, forKey: cacheKey(for: url))
+    }
+
+    func hasDurableImage(for url: URL, verifyContents: Bool = true) -> Bool {
         queue.sync {
-            if !fileManager.fileExists(atPath: cacheDirectory.path) {
-                try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
-            }
-            try? data.write(to: diskURL(for: url), options: [.atomic])
+            if !verifyContents { return ((try? diskURL(for: url).resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) > 0 }
+            guard let data = try? Data(contentsOf: diskURL(for: url)) else { return false }
+            return UIImage(data: data) != nil
         }
     }
 

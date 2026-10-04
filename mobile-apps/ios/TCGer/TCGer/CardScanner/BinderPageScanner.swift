@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.capture.binderPage","platform":"ios","status":"implemented"}
+
 import CoreGraphics
 import CoreImage
 import CoreImage.CIFilterBuiltins

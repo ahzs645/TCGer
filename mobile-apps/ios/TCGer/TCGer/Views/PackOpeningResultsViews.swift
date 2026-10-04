@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"packOpening.results.grouped","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.results.inspect","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 struct PackOpeningNativeResultsView: View {

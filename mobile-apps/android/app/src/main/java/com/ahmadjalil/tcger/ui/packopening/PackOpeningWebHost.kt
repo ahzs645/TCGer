@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"packOpening.animation.tear","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.reveal","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.packopening
 
 import android.annotation.SuppressLint

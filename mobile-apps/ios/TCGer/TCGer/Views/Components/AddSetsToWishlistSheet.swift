@@ -442,7 +442,9 @@ struct AddSetsToWishlistSheet: View {
             token: token,
             force: true
         )
-        environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists)
+        if wishlistStore.matches(config: environmentStore.serverConfiguration, token: environmentStore.authToken) {
+            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: environmentStore.widgetSessionID)
+        }
 
         isAdding = false
         if failures.isEmpty {

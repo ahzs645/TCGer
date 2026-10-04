@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.assetDiagnostics","platform":"ios","status":"implemented"}
+
 import Foundation
 
 /// Checks shared bundled assets and reports whether historical evaluation

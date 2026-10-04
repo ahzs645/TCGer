@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.capture.automatic","platform":"ios","status":"implemented"}
+
 import Foundation
 
 /// Turns per-frame scanner proposals into stable live results.

@@ -1,3 +1,14 @@
+// @tcger-feature {"id":"scanner.debug.performance.vectorizedAnn","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.scopeCache","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.stagedHypotheses","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.batchedOrientation","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.concurrentOrientation","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.warmStart","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.fastCapture","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.fastFooterOcr","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.leanOcrStrips","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.footerFirstOcr","platform":"ios","status":"implemented"}
+
 import Foundation
 
 /// Scanner performance options, individually toggleable so the speedups can

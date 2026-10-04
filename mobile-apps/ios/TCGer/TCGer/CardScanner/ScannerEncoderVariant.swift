@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"scanner.model.arcface","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.model.dinov2","platform":"ios","status":"implemented"}
+
 import Foundation
 
 /// Which embedding encoder the scanner runs. Two are bundled:

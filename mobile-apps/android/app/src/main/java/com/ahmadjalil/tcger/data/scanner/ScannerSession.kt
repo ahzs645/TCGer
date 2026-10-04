@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"scanner.capture.automatic","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.sessionTray","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.sessionReview","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import android.content.Context

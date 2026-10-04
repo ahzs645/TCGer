@@ -1,0 +1,1755 @@
+{
+  "schemaVersion": 1,
+  "scope": "REST boundary compatibility; UI behavior and live authentication remain separate evidence.",
+  "consumers": {
+    "web": {
+      "source": [
+        "frontend/src/lib/api/collections.ts",
+        "frontend/src/lib/api/cards.ts",
+        "frontend/src/lib/api-client.ts",
+        "frontend/src/lib/api/backups.ts",
+        "frontend/src/lib/api/sealed.ts",
+        "frontend/src/components/scan/scanner-workbench.tsx"
+      ],
+      "test": "frontend/src/lib/api/server.api-contract.test.ts"
+    },
+    "ios": {
+      "source": [
+        "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+        "mobile-apps/ios/TCGer/TCGer/Services/APIService+Cards.swift",
+        "mobile-apps/ios/TCGer/TCGer/Services/CacheManager.swift",
+        "mobile-apps/ios/TCGer/TCGer/Services/APIService+Sealed.swift"
+      ],
+      "test": "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift"
+    },
+    "android": {
+      "source": [
+        "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+        "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/RemoteServiceFactory.kt"
+      ],
+      "test": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
+    }
+  },
+  "providers": {
+    "express": {
+      "source": [
+        "backend/src/api/routes/collections.router.ts",
+        "backend/src/api/routes/cards.router.ts",
+        "backend/src/api/middleware/auth.ts",
+        "backend/src/api/routes/backups.router.ts",
+        "backend/src/api/routes/convex-http.proxy.ts",
+        "backend/src/api/routes/sealed.router.ts"
+      ],
+      "test": "backend/src/api/routes/server.api-contract.test.ts",
+      "limitation": "Domain services and auth-session lookup are stubbed; this verifies real routing, validation, middleware and HTTP envelopes, not Prisma persistence or live identity."
+    },
+    "convex": {
+      "source": [
+        "convex-backend/convex/http.ts",
+        "convex-backend/convex/bridge.ts",
+        "convex-backend/convex/backups.ts",
+        "convex-backend/convex/backupsHttp.ts",
+        "convex-backend/convex/sealed.ts",
+        "convex-backend/convex/sealedHttp.ts"
+      ],
+      "test": "convex-backend/convex/serverApiContracts.test.ts",
+      "limitation": "Executes real HTTP actions and mutations against convex-test storage using test bridge identity; not a deployed gateway or live identity service."
+    }
+  },
+  "interactions": [
+    {
+      "id": "collections.browse.populated",
+      "featureId": "collections.browse",
+      "operation": "listBinders",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/collections",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": [
+          {
+            "id": "__library__",
+            "name": "Unsorted",
+            "cards": [],
+            "createdAt": "2026-10-03T12:00:00.000Z",
+            "updatedAt": "2026-10-03T12:00:00.000Z"
+          },
+          {
+            "id": "contract-binder",
+            "name": "Contract Binder",
+            "description": "Cross-platform contract fixture",
+            "colorHex": "336699",
+            "defaultCondition": "NM",
+            "containerType": "binder",
+            "associatedTcg": "pokemon",
+            "associatedSetCode": "SV1",
+            "associatedSetName": "Scarlet & Violet",
+            "cards": [],
+            "createdAt": "2026-10-03T12:00:00.000Z",
+            "updatedAt": "2026-10-03T12:00:00.000Z"
+          }
+        ],
+        "matchers": {
+          "/0/createdAt": "iso-date-time",
+          "/0/updatedAt": "iso-date-time",
+          "/1/id": "nonempty-string",
+          "/1/createdAt": "iso-date-time",
+          "/1/updatedAt": "iso-date-time",
+          "/0/name": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsBrowsePopulated"
+    },
+    {
+      "id": "collections.browse.empty",
+      "featureId": "collections.browse",
+      "operation": "listBinders",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/collections",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": [
+          {
+            "id": "__library__",
+            "name": "Unsorted",
+            "cards": [],
+            "createdAt": "2026-10-03T12:00:00.000Z",
+            "updatedAt": "2026-10-03T12:00:00.000Z"
+          }
+        ],
+        "matchers": {
+          "/0/createdAt": "iso-date-time",
+          "/0/updatedAt": "iso-date-time",
+          "/0/name": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsBrowseEmpty"
+    },
+    {
+      "id": "collections.browse.unauthorized",
+      "featureId": "collections.browse",
+      "operation": "listBinders",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/collections",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsBrowseUnauthorized"
+    },
+    {
+      "id": "collections.create.success",
+      "featureId": "collections.create",
+      "operation": "createBinder",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "name": "Contract Binder",
+          "description": "Cross-platform contract fixture",
+          "colorHex": "336699",
+          "defaultCondition": "NM",
+          "containerType": "binder",
+          "associatedTcg": "pokemon",
+          "associatedSetCode": "SV1",
+          "associatedSetName": "Scarlet & Violet"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "id": "contract-binder",
+          "name": "Contract Binder",
+          "description": "Cross-platform contract fixture",
+          "colorHex": "336699",
+          "defaultCondition": "NM",
+          "containerType": "binder",
+          "associatedTcg": "pokemon",
+          "associatedSetCode": "SV1",
+          "associatedSetName": "Scarlet & Violet",
+          "cards": [],
+          "createdAt": "2026-10-03T12:00:00.000Z",
+          "updatedAt": "2026-10-03T12:00:00.000Z"
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/createdAt": "iso-date-time",
+          "/updatedAt": "iso-date-time"
+        }
+      },
+      "iosTest": "testCollectionsCreateSuccess"
+    },
+    {
+      "id": "collections.create.invalid",
+      "featureId": "collections.create",
+      "operation": "createBinder",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "name": ""
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "BAD_REQUEST",
+          "message": "Name is required"
+        },
+        "matchers": {
+          "/message": "nonempty-string",
+          "/error": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCreateInvalid"
+    },
+    {
+      "id": "collections.create.unauthorized",
+      "featureId": "collections.create",
+      "operation": "createBinder",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "body": {
+          "name": "Contract Binder",
+          "description": "Cross-platform contract fixture",
+          "colorHex": "336699",
+          "defaultCondition": "NM",
+          "containerType": "binder",
+          "associatedTcg": "pokemon",
+          "associatedSetCode": "SV1",
+          "associatedSetName": "Scarlet & Violet"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCreateUnauthorized"
+    },
+    {
+      "id": "cards.search.results",
+      "featureId": "cards.search",
+      "operation": "searchCards",
+      "state": "search-results",
+      "providers": [
+        "express"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/cards/search/all",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "query": {
+          "query": "Pikachu & friends",
+          "tcg": "pokemon",
+          "unique": "prints",
+          "limit": "1000"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "cards": [
+            {
+              "id": "pokemon:sv1-025",
+              "externalId": "sv1-025",
+              "name": "Pikachu",
+              "tcg": "pokemon",
+              "setCode": "SV1",
+              "collectorNumber": "025",
+              "rarity": "Common",
+              "imageUrl": "https://example.test/card.png",
+              "price": 1.25
+            }
+          ],
+          "total": 1
+        },
+        "matchers": {}
+      },
+      "iosTest": "testCardsSearchResults"
+    },
+    {
+      "id": "cards.search.empty",
+      "featureId": "cards.search",
+      "operation": "searchCards",
+      "state": "empty",
+      "providers": [
+        "express"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/cards/search/all",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "query": {
+          "query": "Pikachu & friends",
+          "tcg": "pokemon",
+          "unique": "prints",
+          "limit": "1000"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "cards": [],
+          "total": 0
+        },
+        "matchers": {}
+      },
+      "iosTest": "testCardsSearchEmpty"
+    },
+    {
+      "id": "cards.search.unauthorized",
+      "featureId": "cards.search",
+      "operation": "searchCards",
+      "state": "empty",
+      "providers": [
+        "express"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/cards/search/all",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "query": {
+          "query": "Pikachu & friends",
+          "tcg": "pokemon",
+          "unique": "prints",
+          "limit": "1000"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCardsSearchUnauthorized"
+    },
+    {
+      "id": "collections.update.success",
+      "featureId": "collections.manage",
+      "operation": "updateBinder",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "name": "Renamed Contract Binder"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "contract-binder",
+          "name": "Renamed Contract Binder",
+          "description": "Cross-platform contract fixture",
+          "colorHex": "336699",
+          "defaultCondition": "NM",
+          "containerType": "binder",
+          "associatedTcg": "pokemon",
+          "associatedSetCode": "SV1",
+          "associatedSetName": "Scarlet & Violet",
+          "cards": [],
+          "createdAt": "2026-10-03T12:00:00.000Z",
+          "updatedAt": "2026-10-03T12:00:00.000Z"
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/createdAt": "iso-date-time",
+          "/updatedAt": "iso-date-time"
+        }
+      },
+      "iosTest": "testCollectionsUpdateSuccess"
+    },
+    {
+      "id": "collections.update.invalid",
+      "featureId": "collections.manage",
+      "operation": "updateBinder",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "name": ""
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "BAD_REQUEST",
+          "message": "Invalid input"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsUpdateInvalid"
+    },
+    {
+      "id": "collections.update.unauthorized",
+      "featureId": "collections.manage",
+      "operation": "updateBinder",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "body": {
+          "name": "Renamed Contract Binder"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsUpdateUnauthorized"
+    },
+    {
+      "id": "collections.update.foreign",
+      "featureId": "collections.manage",
+      "operation": "updateBinder",
+      "state": "foreign",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "name": "Renamed Contract Binder"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Binder not found"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsUpdateForeign"
+    },
+    {
+      "id": "collections.delete.success",
+      "featureId": "collections.manage",
+      "operation": "deleteBinder",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 204,
+        "body": null,
+        "matchers": {}
+      },
+      "iosTest": "testCollectionsDeleteSuccess"
+    },
+    {
+      "id": "collections.delete.unauthorized",
+      "featureId": "collections.manage",
+      "operation": "deleteBinder",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsDeleteUnauthorized"
+    },
+    {
+      "id": "collections.delete.foreign",
+      "featureId": "collections.manage",
+      "operation": "deleteBinder",
+      "state": "foreign",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Binder not found"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsDeleteForeign"
+    },
+    {
+      "id": "data.import.success",
+      "featureId": "data.portableBackup",
+      "operation": "importBackup",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/backups",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "format": "com.tcger.portable-backup",
+          "formatVersion": 2,
+          "exportedAt": "2026-10-03T12:00:00.000Z",
+          "binders": [
+            {
+              "id": "imported-binder",
+              "name": "Imported Contract Binder",
+              "colorHex": "336699",
+              "cards": []
+            }
+          ],
+          "wishlists": [],
+          "sealedInventory": [],
+          "sections": {
+            "futureFeature": {
+              "retained": true
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "importedCopies": 0,
+          "importedBinders": 1,
+          "recoveryAvailable": true
+        },
+        "matchers": {}
+      },
+      "iosTest": "testDataImportSuccess"
+    },
+    {
+      "id": "data.import.invalid",
+      "featureId": "data.portableBackup",
+      "operation": "importBackup",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/backups",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "format": "com.tcger.portable-backup",
+          "formatVersion": 100,
+          "exportedAt": "2026-10-03T12:00:00.000Z",
+          "binders": [
+            {
+              "id": "imported-binder",
+              "name": "Imported Contract Binder",
+              "colorHex": "336699",
+              "cards": []
+            }
+          ],
+          "wishlists": [],
+          "sealedInventory": [],
+          "sections": {
+            "futureFeature": {
+              "retained": true
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "BAD_REQUEST",
+          "message": "Invalid input"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testDataImportInvalid"
+    },
+    {
+      "id": "data.import.unauthorized",
+      "featureId": "data.portableBackup",
+      "operation": "importBackup",
+      "state": "empty",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/backups",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "body": {
+          "format": "com.tcger.portable-backup",
+          "formatVersion": 2,
+          "exportedAt": "2026-10-03T12:00:00.000Z",
+          "binders": [
+            {
+              "id": "imported-binder",
+              "name": "Imported Contract Binder",
+              "colorHex": "336699",
+              "cards": []
+            }
+          ],
+          "wishlists": [],
+          "sealedInventory": [],
+          "sections": {
+            "futureFeature": {
+              "retained": true
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testDataImportUnauthorized"
+    },
+    {
+      "id": "collections.copyAdd.success",
+      "featureId": "collections.copies",
+      "operation": "addCopy",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/cards",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "cardId": "sv1-025",
+          "quantity": 1,
+          "condition": "NM",
+          "language": "en",
+          "price": 12,
+          "acquisitionPrice": 3.5,
+          "isFoil": false,
+          "isSealedPromo": false,
+          "isOversized": false,
+          "isPeelOff": false,
+          "cardData": {
+            "externalId": "sv1-025",
+            "name": "Pikachu",
+            "tcg": "pokemon",
+            "setCode": "SV1"
+          }
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "id": "contract-copy",
+          "cardId": "pokemon:sv1-025",
+          "externalId": "sv1-025",
+          "name": "Pikachu",
+          "tcg": "pokemon",
+          "quantity": 1,
+          "copies": [
+            {
+              "id": "contract-copy",
+              "condition": "NM",
+              "language": "en",
+              "price": 12,
+              "acquisitionPrice": 3.5,
+              "isFoil": false,
+              "tags": []
+            }
+          ]
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/cardId": "nonempty-string",
+          "/copies/0/id": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyAddSuccess"
+    },
+    {
+      "id": "collections.copyAdd.invalid",
+      "featureId": "collections.copies",
+      "operation": "addCopy",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/cards",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "cardId": "sv1-025",
+          "quantity": 0,
+          "condition": "NM",
+          "language": "en",
+          "price": 12,
+          "acquisitionPrice": 3.5,
+          "isFoil": false,
+          "isSealedPromo": false,
+          "isOversized": false,
+          "isPeelOff": false,
+          "cardData": {
+            "externalId": "sv1-025",
+            "name": "Pikachu",
+            "tcg": "pokemon",
+            "setCode": "SV1"
+          }
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "BAD_REQUEST",
+          "message": "Invalid copy"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyAddInvalid"
+    },
+    {
+      "id": "collections.copyAdd.unauthorized",
+      "featureId": "collections.copies",
+      "operation": "addCopy",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/cards",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "body": {
+          "cardId": "sv1-025",
+          "quantity": 1,
+          "condition": "NM",
+          "language": "en",
+          "price": 12,
+          "acquisitionPrice": 3.5,
+          "isFoil": false,
+          "isSealedPromo": false,
+          "isOversized": false,
+          "isPeelOff": false,
+          "cardData": {
+            "externalId": "sv1-025",
+            "name": "Pikachu",
+            "tcg": "pokemon",
+            "setCode": "SV1"
+          }
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyAddUnauthorized"
+    },
+    {
+      "id": "collections.copyAdd.foreign",
+      "featureId": "collections.copies",
+      "operation": "addCopy",
+      "state": "foreign",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/cards",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "cardId": "sv1-025",
+          "quantity": 1,
+          "condition": "NM",
+          "language": "en",
+          "price": 12,
+          "acquisitionPrice": 3.5,
+          "isFoil": false,
+          "isSealedPromo": false,
+          "isOversized": false,
+          "isPeelOff": false,
+          "cardData": {
+            "externalId": "sv1-025",
+            "name": "Pikachu",
+            "tcg": "pokemon",
+            "setCode": "SV1"
+          }
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Binder not found"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyAddForeign"
+    },
+    {
+      "id": "scanner.save.success",
+      "featureId": "scanner.results.addToBinder",
+      "operation": "addCopy",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/cards",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "cardId": "sv1-025",
+          "quantity": 1,
+          "isFoil": false,
+          "isSealedPromo": false,
+          "isOversized": false,
+          "isPeelOff": false,
+          "cardData": {
+            "externalId": "sv1-025",
+            "name": "Pikachu",
+            "tcg": "pokemon",
+            "setCode": "SV1"
+          }
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "id": "contract-copy",
+          "cardId": "pokemon:sv1-025",
+          "externalId": "sv1-025",
+          "name": "Pikachu",
+          "tcg": "pokemon",
+          "quantity": 1,
+          "copies": [
+            {
+              "id": "contract-copy",
+              "isFoil": false,
+              "tags": []
+            }
+          ]
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/cardId": "nonempty-string",
+          "/copies/0/id": "nonempty-string"
+        }
+      },
+      "iosTest": "testScannerSaveSuccess"
+    },
+    {
+      "id": "collections.copyUpdate.success",
+      "featureId": "collections.copies",
+      "operation": "updateCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "condition": "LP",
+          "notes": "Reviewed copy"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "contract-copy",
+          "cardId": "pokemon:sv1-025",
+          "externalId": "sv1-025",
+          "name": "Pikachu",
+          "tcg": "pokemon",
+          "quantity": 2,
+          "copies": [
+            {
+              "id": "contract-copy",
+              "condition": "LP",
+              "language": "en",
+              "price": 12,
+              "acquisitionPrice": 3.5,
+              "isFoil": false,
+              "tags": [],
+              "notes": "Reviewed copy",
+              "acquiredAt": "2026-10-03T12:00:00.000Z",
+              "gradingCompany": "PSA",
+              "gradingScore": "9",
+              "certNumber": "CERT-123",
+              "storageLocation": "Box A"
+            },
+            {
+              "id": "sibling-copy",
+              "condition": "NM",
+              "language": "en",
+              "price": 12,
+              "acquisitionPrice": 3.5,
+              "isFoil": false,
+              "tags": [],
+              "acquiredAt": "2026-10-03T12:00:00.000Z",
+              "gradingCompany": "PSA",
+              "gradingScore": "9",
+              "certNumber": "CERT-123",
+              "storageLocation": "Box A"
+            }
+          ]
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/cardId": "nonempty-string",
+          "/copies/0/id": "nonempty-string",
+          "/copies/1/id": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyUpdateSuccess"
+    },
+    {
+      "id": "collections.copyUpdate.clear",
+      "featureId": "collections.copies",
+      "operation": "updateCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "acquisitionPrice": null,
+          "acquiredAt": null,
+          "gradingCompany": null,
+          "gradingScore": null,
+          "certNumber": null,
+          "storageLocation": null
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "contract-copy",
+          "cardId": "pokemon:sv1-025",
+          "externalId": "sv1-025",
+          "name": "Pikachu",
+          "tcg": "pokemon",
+          "quantity": 2,
+          "copies": [
+            {
+              "id": "contract-copy",
+              "condition": "NM",
+              "language": "en",
+              "price": 12,
+              "isFoil": false,
+              "tags": []
+            },
+            {
+              "id": "sibling-copy",
+              "condition": "NM",
+              "language": "en",
+              "price": 12,
+              "acquisitionPrice": 3.5,
+              "isFoil": false,
+              "tags": [],
+              "acquiredAt": "2026-10-03T12:00:00.000Z",
+              "gradingCompany": "PSA",
+              "gradingScore": "9",
+              "certNumber": "CERT-123",
+              "storageLocation": "Box A"
+            }
+          ]
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/cardId": "nonempty-string",
+          "/copies/0/id": "nonempty-string",
+          "/copies/1/id": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyUpdateClear"
+    },
+    {
+      "id": "collections.copyUpdate.invalid",
+      "featureId": "collections.copies",
+      "operation": "updateCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "quantity": 0
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "BAD_REQUEST",
+          "message": "Invalid copy"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyUpdateInvalid"
+    },
+    {
+      "id": "collections.copyUpdate.unauthorized",
+      "featureId": "collections.copies",
+      "operation": "updateCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "body": {
+          "condition": "LP"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyUpdateUnauthorized"
+    },
+    {
+      "id": "collections.copyUpdate.foreign",
+      "featureId": "collections.copies",
+      "operation": "updateCopy",
+      "state": "foreign-copy",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "condition": "LP"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Collection entry not found"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyUpdateForeign"
+    },
+    {
+      "id": "collections.copyRemove.success",
+      "featureId": "collections.copies",
+      "operation": "removeCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 204,
+        "body": null,
+        "matchers": {}
+      },
+      "iosTest": "testCollectionsCopyRemoveSuccess"
+    },
+    {
+      "id": "collections.copyRemove.unauthorized",
+      "featureId": "collections.copies",
+      "operation": "removeCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyRemoveUnauthorized"
+    },
+    {
+      "id": "collections.copyRemove.foreign",
+      "featureId": "collections.copies",
+      "operation": "removeCopy",
+      "state": "foreign-copy",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Collection entry not found"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyRemoveForeign"
+    },
+    {
+      "id": "sealed.open.success",
+      "featureId": "packOpening.save.sealedLedger",
+      "operation": "openSealed",
+      "state": "inventory",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/sealed/inventory/contract-inventory/open",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "openedQuantity": 1,
+          "collectionIds": [],
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "id": "contract-opening",
+          "userId": "contract-user",
+          "sealedInventoryId": "contract-inventory",
+          "openedQuantity": 1,
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening",
+          "createdAt": "2026-10-03T12:00:00.000Z",
+          "updatedAt": "2026-10-03T12:00:00.000Z"
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/userId": "nonempty-string",
+          "/sealedInventoryId": "nonempty-string",
+          "/createdAt": "iso-date-time",
+          "/updatedAt": "iso-date-time"
+        }
+      },
+      "iosTest": "testSealedOpenSuccess"
+    },
+    {
+      "id": "sealed.open.invalid",
+      "featureId": "packOpening.save.sealedLedger",
+      "operation": "openSealed",
+      "state": "inventory",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/sealed/inventory/contract-inventory/open",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "openedQuantity": 0,
+          "collectionIds": [],
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "BAD_REQUEST",
+          "message": "Invalid opening"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testSealedOpenInvalid"
+    },
+    {
+      "id": "sealed.open.unauthorized",
+      "featureId": "packOpening.save.sealedLedger",
+      "operation": "openSealed",
+      "state": "inventory",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/sealed/inventory/contract-inventory/open",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "body": {
+          "openedQuantity": 1,
+          "collectionIds": [],
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testSealedOpenUnauthorized"
+    },
+    {
+      "id": "sealed.open.foreign",
+      "featureId": "packOpening.save.sealedLedger",
+      "operation": "openSealed",
+      "state": "foreign-inventory",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/sealed/inventory/contract-inventory/open",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "openedQuantity": 1,
+          "collectionIds": [],
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Sealed inventory not found"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testSealedOpenForeign"
+    },
+    {
+      "id": "sealed.open.exceeds",
+      "featureId": "packOpening.save.sealedLedger",
+      "operation": "openSealed",
+      "state": "inventory",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/sealed/inventory/contract-inventory/open",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "openedQuantity": 4,
+          "collectionIds": [],
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening"
+        }
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "error": "CONFLICT",
+          "message": "Opened quantity exceeds sealed inventory"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testSealedOpenExceeds"
+    },
+    {
+      "id": "sealed.open.linkedCopy",
+      "featureId": "packOpening.save.sealedLedger",
+      "operation": "openSealed",
+      "state": "inventory",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/sealed/inventory/contract-inventory/open",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "openedQuantity": 1,
+          "collectionIds": [
+            "00000000-0000-4000-8000-000000000001"
+          ],
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "id": "contract-opening",
+          "userId": "contract-user",
+          "sealedInventoryId": "contract-inventory",
+          "openedQuantity": 1,
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening",
+          "createdAt": "2026-10-03T12:00:00.000Z",
+          "updatedAt": "2026-10-03T12:00:00.000Z"
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/userId": "nonempty-string",
+          "/sealedInventoryId": "nonempty-string",
+          "/createdAt": "iso-date-time",
+          "/updatedAt": "iso-date-time"
+        }
+      },
+      "iosTest": "testSealedOpenLinkedCopy"
+    },
+    {
+      "id": "sealed.open.foreignCopy",
+      "featureId": "packOpening.save.sealedLedger",
+      "operation": "openSealed",
+      "state": "inventory-foreign-copy",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/sealed/inventory/contract-inventory/open",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "openedQuantity": 1,
+          "collectionIds": [
+            "00000000-0000-4000-8000-000000000001"
+          ],
+          "openedAt": "2026-10-03T12:00:00.000Z",
+          "notes": "Contract opening"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "One or more collection copies were not found"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testSealedOpenForeignCopy"
+    },
+    {
+      "id": "collections.copyUpdate.move",
+      "featureId": "collections.copies",
+      "operation": "updateCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/contract-binder/cards/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "targetBinderId": "__library__"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "contract-copy",
+          "cardId": "pokemon:sv1-025",
+          "externalId": "sv1-025",
+          "name": "Pikachu",
+          "tcg": "pokemon",
+          "quantity": 1,
+          "copies": [
+            {
+              "id": "contract-copy",
+              "condition": "NM",
+              "language": "en",
+              "price": 12,
+              "acquisitionPrice": 3.5,
+              "isFoil": false,
+              "tags": [],
+              "acquiredAt": "2026-10-03T12:00:00.000Z",
+              "gradingCompany": "PSA",
+              "gradingScore": "9",
+              "certNumber": "CERT-123",
+              "storageLocation": "Box A"
+            }
+          ]
+        },
+        "matchers": {
+          "/id": "nonempty-string",
+          "/cardId": "nonempty-string",
+          "/copies/0/id": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsCopyUpdateMove"
+    },
+    {
+      "id": "scanner.save.invalid",
+      "featureId": "scanner.results.addToBinder",
+      "operation": "addCopy",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/cards",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "cardId": "sv1-025",
+          "quantity": 0,
+          "condition": "NM",
+          "language": "en",
+          "price": 12,
+          "acquisitionPrice": 3.5,
+          "isFoil": false,
+          "isSealedPromo": false,
+          "isOversized": false,
+          "isPeelOff": false,
+          "cardData": {
+            "externalId": "sv1-025",
+            "name": "Pikachu",
+            "tcg": "pokemon",
+            "setCode": "SV1"
+          }
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "BAD_REQUEST",
+          "message": "Invalid copy"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testScannerSaveInvalid"
+    },
+    {
+      "id": "scanner.save.unauthorized",
+      "featureId": "scanner.results.addToBinder",
+      "operation": "addCopy",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/cards",
+        "headers": {
+          "Authorization": "Bearer expired-contract-token"
+        },
+        "body": {
+          "cardId": "sv1-025",
+          "quantity": 1,
+          "condition": "NM",
+          "language": "en",
+          "price": 12,
+          "acquisitionPrice": 3.5,
+          "isFoil": false,
+          "isSealedPromo": false,
+          "isOversized": false,
+          "isPeelOff": false,
+          "cardData": {
+            "externalId": "sv1-025",
+            "name": "Pikachu",
+            "tcg": "pokemon",
+            "setCode": "SV1"
+          }
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/error": "nonempty-string",
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testScannerSaveUnauthorized"
+    }
+  ]
+}

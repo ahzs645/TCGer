@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"guides.browse","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 private enum GuideSearchScope: String, CaseIterable {

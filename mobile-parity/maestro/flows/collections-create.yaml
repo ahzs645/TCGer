@@ -20,11 +20,7 @@ properties:
 - tapOn:
     id: "input.collections.name"
 - inputText: "Parity Binder"
-- runFlow:
-    when:
-      platform: android
-    commands:
-      - hideKeyboard
+- runFlow: ../subflows/dismiss-keyboard.yaml
 - tapOn:
     id: "action.collections.confirmCreate"
 - assertVisible: "Parity Binder"

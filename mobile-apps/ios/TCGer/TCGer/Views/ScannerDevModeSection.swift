@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.sessionManagement","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 /// Settings/debug controls for dev-mode recording: a persistent toggle, an

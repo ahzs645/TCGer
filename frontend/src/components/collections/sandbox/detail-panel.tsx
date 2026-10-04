@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.copyMetadata","platform":"web","status":"implemented"}
+
 "use client";
 import { cardSupportsPrintSelection } from "@tcg/api-types";
 

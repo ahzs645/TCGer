@@ -79,6 +79,7 @@ export function featureIdsForCase(testCase, knownIds) {
 
 function aggregateStatus(cases) {
   if (cases.some((testCase) => testCase.status === "Fail")) return "Fail";
+  if (cases.some((testCase) => testCase.status === "Skipped")) return "Skipped";
   if (cases.some((testCase) => testCase.status === "Pass")) return "Pass";
   return "Skipped";
 }

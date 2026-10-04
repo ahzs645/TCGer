@@ -1,3 +1,8 @@
+// @tcger-feature {"id":"games.catalogDownloads","platform":"web","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.packageUpdates","platform":"web","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.capability.scannerDownload","platform":"web","status":"implemented","modes":["local"],"requires":["network-for-download","package-web-scanner-bundle"]}
+// @tcger-feature {"id":"games.capability.priceDownload","platform":"web","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.capability.packDownload","platform":"web","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
 import {
   gamePriceSnapshotSchema, gamePackLibrarySchema, gamePackageScannerBundleSchema,
   type GamePriceSnapshot, type GamePackLibrary, type GamePackageAsset,

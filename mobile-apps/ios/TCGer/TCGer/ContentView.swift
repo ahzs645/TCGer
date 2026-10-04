@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"navigation.appLinks","platform":"ios","status":"partial","limitation":"Custom-scheme and associated-domain routing exists, including pending binder/wishlist resolution; deployed association files and release-device cold starts are not verified."}
 //
 //  ContentView.swift
 //  TCGer

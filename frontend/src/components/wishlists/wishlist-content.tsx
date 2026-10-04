@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"wishlists.create","platform":"web","status":"implemented"}
+
 "use client";
 
 import { gameLabel } from "@/lib/utils";

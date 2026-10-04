@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"packOpening.offline.downloads","platform":"ios","status":"implemented"}
+
 import Combine
 import Foundation
 import UIKit
@@ -40,6 +42,19 @@ nonisolated struct PackOfflineDownloadRecord: Codable, Equatable, Sendable {
     let cardCount: Int
     let byteCount: Int64
     let removableURLs: [String]
+    let requiredURLs: [String]?
+    let nativeImageURLs: [String]?
+
+    init(setID: String, downloadedAt: Date, cardCount: Int, byteCount: Int64,
+         removableURLs: [String], requiredURLs: [String]? = nil, nativeImageURLs: [String]? = nil) {
+        self.setID = setID
+        self.downloadedAt = downloadedAt
+        self.cardCount = cardCount
+        self.byteCount = byteCount
+        self.removableURLs = removableURLs
+        self.requiredURLs = requiredURLs
+        self.nativeImageURLs = nativeImageURLs
+    }
 }
 
 @MainActor
@@ -56,6 +71,8 @@ final class PackOfflineDownloadManager: ObservableObject {
         case emptySet(String)
         case invalidResponse(URL)
         case invalidManifest
+        case invalidImage(URL)
+        case missingDurableAsset(URL)
 
         var errorDescription: String? {
             switch self {
@@ -65,6 +82,10 @@ final class PackOfflineDownloadManager: ObservableObject {
                 "No downloadable card art was found for \(name)."
             case .invalidResponse(let url):
                 "The download server did not return \(url.lastPathComponent)."
+            case .invalidImage(let url):
+                "The card artwork could not be decoded: \(url.lastPathComponent)."
+            case .missingDurableAsset(let url):
+                "The downloaded asset is unavailable on disk: \(url.lastPathComponent)."
             case .invalidManifest:
                 "The pack artwork manifest could not be read."
             }
@@ -102,6 +123,8 @@ final class PackOfflineDownloadManager: ObservableObject {
     private let assetCache: PackOpeningAssetCache
     private let imageCache: ImageCache
     private let remoteBaseURL: URL
+    private let artworkProvider: (PackOfflineSetDefinition) async -> ([URL], Int)
+    private let isConnected: () -> Bool
     private var activeDownloads: [String: Task<Void, Never>] = [:]
 
     init(
@@ -110,8 +133,15 @@ final class PackOfflineDownloadManager: ObservableObject {
         session: URLSession = .shared,
         assetCache: PackOpeningAssetCache? = nil,
         imageCache: ImageCache? = nil,
-        remoteBaseURL: URL? = nil
+        remoteBaseURL: URL? = nil,
+        isConnected: (() -> Bool)? = nil,
+        artworkProvider: ((PackOfflineSetDefinition) async -> ([URL], Int))? = nil
     ) {
+        self.isConnected = isConnected ?? { NetworkMonitor.shared.isConnected }
+        self.artworkProvider = artworkProvider ?? { definition in
+            let entries = await CardIndexMetadataStore.shared.entries(for: definition.game, setCode: definition.metadataSetCode)
+            return (Self.cardArtworkURLs(from: entries), entries.count)
+        }
         self.fileManager = fileManager
         self.session = session
         self.assetCache = assetCache ?? .shared
@@ -126,11 +156,12 @@ final class PackOfflineDownloadManager: ObservableObject {
                 .appendingPathComponent("OfflinePackSets", isDirectory: true)
         }
         records = Self.loadRecords(from: recordsDirectory, fileManager: fileManager)
+        records = records.filter { durableAssetsExist(for: $0.value, verifyContents: true) }
     }
 
     func status(for definition: PackOfflineSetDefinition) -> Status {
         if let value = progress[definition.id] { return .downloading(value) }
-        if let record = records[definition.id] { return .downloaded(record) }
+        if let record = records[definition.id], durableAssetsExist(for: record) { return .downloaded(record) }
         if let error = errors[definition.id] { return .failed(error) }
         return .notDownloaded
     }
@@ -192,24 +223,20 @@ final class PackOfflineDownloadManager: ObservableObject {
 
     func refresh() {
         records = Self.loadRecords(from: recordsDirectory, fileManager: fileManager)
+        records = records.filter { durableAssetsExist(for: $0.value, verifyContents: true) }
         progress.removeAll()
         errors.removeAll()
         revision += 1
     }
 
-    private func performDownload(_ definition: PackOfflineSetDefinition) async throws {
-        guard NetworkMonitor.shared.isConnected else { throw DownloadError.noConnection }
-
-        let entries = await CardIndexMetadataStore.shared.entries(
-            for: definition.game,
-            setCode: definition.metadataSetCode
-        )
-        let cardURLs = Self.cardArtworkURLs(from: entries)
+    func performDownload(_ definition: PackOfflineSetDefinition) async throws {
+        guard isConnected() else { throw DownloadError.noConnection }
+        let (cardURLs, cardCount) = await artworkProvider(definition)
         guard !cardURLs.isEmpty else { throw DownloadError.emptySet(definition.name) }
 
         let manifestURL = remoteBaseURL.appendingPathComponent("pack/manifest.json")
         let manifestAsset = try await Self.fetch(manifestURL, session: session)
-        assetCache.store(manifestAsset.data, for: manifestURL)
+        try assetCache.storeDurably(manifestAsset.data, for: manifestURL)
         guard let manifest = try? JSONDecoder().decode(PackManifest.self, from: manifestAsset.data) else {
             throw DownloadError.invalidManifest
         }
@@ -250,9 +277,10 @@ final class PackOfflineDownloadManager: ObservableObject {
             }
 
             for asset in assets {
-                assetCache.store(asset.data, for: asset.url)
-                if cardURLSet.contains(asset.url), let image = UIImage(data: asset.data) {
-                    imageCache.storeForOffline(image, data: asset.data, for: asset.url)
+                try assetCache.storeDurably(asset.data, for: asset.url)
+                if cardURLSet.contains(asset.url) {
+                    guard let image = UIImage(data: asset.data) else { throw DownloadError.invalidImage(asset.url) }
+                    try imageCache.storeForOffline(image, data: asset.data, for: asset.url)
                 }
                 completed += 1
                 if setSpecificURLSet.contains(asset.url) {
@@ -266,15 +294,35 @@ final class PackOfflineDownloadManager: ObservableObject {
         let record = PackOfflineDownloadRecord(
             setID: definition.id,
             downloadedAt: Date(),
-            cardCount: entries.count,
+            cardCount: cardCount,
             byteCount: storedBytes,
-            removableURLs: setSpecificURLs.map(\.absoluteString)
+            removableURLs: setSpecificURLs.map(\.absoluteString),
+            requiredURLs: allURLs.map(\.absoluteString),
+            nativeImageURLs: uniqueCardURLs.map(\.absoluteString)
         )
+        try Task.checkCancellation()
+        guard durableAssetsExist(for: record, verifyContents: true) else { throw DownloadError.missingDurableAsset(manifestURL) }
         try save(record)
         records[definition.id] = record
         progress[definition.id] = nil
         errors[definition.id] = nil
         revision += 1
+    }
+
+    private func durableAssetsExist(for record: PackOfflineDownloadRecord, verifyContents: Bool = false) -> Bool {
+        // Legacy completion records lack a complete required-asset list. They
+        // must be downloaded again rather than claiming unverified availability.
+        guard let required = record.requiredURLs, !required.isEmpty,
+              let native = record.nativeImageURLs, !native.isEmpty else { return false }
+        return required.allSatisfy { value in
+            guard let url = URL(string: value) else { return false }
+            if !verifyContents { return assetCache.byteCount(for: url) > 0 }
+            guard let data = assetCache.data(for: url) else { return false }
+            return !data.isEmpty
+        } && native.allSatisfy { value in
+            guard let url = URL(string: value) else { return false }
+            return imageCache.hasDurableImage(for: url, verifyContents: verifyContents)
+        }
     }
 
     private func save(_ record: PackOfflineDownloadRecord) throws {

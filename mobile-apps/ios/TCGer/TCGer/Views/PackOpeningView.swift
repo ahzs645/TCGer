@@ -1,3 +1,9 @@
+// @tcger-feature {"id":"packOpening.browse","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.count","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.customArtwork","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.animation.tear","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.reveal","platform":"ios","status":"implemented"}
+
 import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers

@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.results.priceMode","platform":"ios","status":"implemented"}
+
 import Foundation
 
 nonisolated struct ScannerPriceQuote: Equatable, Sendable {

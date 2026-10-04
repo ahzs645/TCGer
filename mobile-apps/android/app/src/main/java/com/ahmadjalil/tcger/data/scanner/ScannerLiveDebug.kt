@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.livePipeline","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import java.time.Instant

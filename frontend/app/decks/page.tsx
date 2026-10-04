@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"decks.browse","platform":"web","status":"implemented","modes":["demo","server"]}
+
 "use client";
 import { PackageDeckBuilder } from "@/components/decks/package-deck-builder";
 import { listInstalledGamePackages, type InstalledGamePackage } from "@/lib/game-packages/game-package-client";

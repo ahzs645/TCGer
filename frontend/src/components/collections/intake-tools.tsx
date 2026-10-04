@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"intake.rapidEntry","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.acquisitionCosts","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.psaCertification","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 "use client";
 
 import { gameLabel } from "@/lib/utils";

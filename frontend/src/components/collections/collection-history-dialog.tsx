@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"collections.historyUndo","platform":"web","status":"partial","modes":["server","demo"],"limitation":"Server mutation history and eligible undo are available; the offline demo retains 25 recent changes and only the latest may be undone."}
 "use client";
 
 import { useEffect, useState } from "react";

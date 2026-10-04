@@ -94,3 +94,16 @@ test("portable backups preserve wishlist sync exclusions", () => {
     ["pokemon:base5-83"],
   );
 });
+
+test("imports update stable IDs, preserve unrelated copies, move a copy once, and repeat safely", async () => {
+  const { mergePortableBackups } = await import("../../../../packages/api-types/src/portable-backup");
+  const { before, incoming, expected } = JSON.parse(readFileSync(new URL("../../../../mobile-parity/fixtures/portable-backup-merge-v2.json", import.meta.url), "utf8"));
+  const merged = mergePortableBackups(before, incoming);
+  assert.deepEqual(merged.binders.map(b => b.id), expected.binderIDs);
+  assert.deepEqual(merged.binders.flatMap(b => b.cards.map(c => c.id)).sort(), expected.copyIDs.sort());
+  assert.equal(merged.binders.find(b => b.id === "moved-binder")!.cards[0]!.id, expected.movedCopyID);
+  assert.equal(merged.binders.flatMap(b => b.cards).find(c => c.id === expected.updatedCopyID)!.price, expected.updatedPrice);
+  assert.deepEqual(mergePortableBackups(merged, incoming), merged);
+  assert.throws(() => mergePortableBackups(before, {...incoming, formatVersion:100}));
+  assert.equal(before.binders[0].name, fixture.binders[0].name);
+});

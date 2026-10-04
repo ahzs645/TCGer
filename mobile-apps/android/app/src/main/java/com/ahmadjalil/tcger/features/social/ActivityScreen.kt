@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"activity.browse","platform":"android","status":"implemented","modes":["server"]}
+
 package com.ahmadjalil.tcger.features.social
 
 import androidx.compose.foundation.clickable

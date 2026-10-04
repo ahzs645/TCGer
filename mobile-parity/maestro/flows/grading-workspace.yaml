@@ -13,16 +13,22 @@ properties:
       visible: "System UI isn't responding"
     commands:
       - tapOn: "Wait"
+- tapOn:
+    id: "nav.settings"
 - runFlow:
     when:
-      notVisible: "Install a Game"
+      platform: android
     commands:
-      - tapOn: "Settings"
+      - tapOn: "Data & storage"
       - scrollUntilVisible:
           element:
             text: "[Ll]ibrary [Oo]perations"
           direction: DOWN
       - tapOn: "[Ll]ibrary [Oo]perations"
+- scrollUntilVisible:
+    element:
+      text: "Grading planner"
+    direction: DOWN
 - tapOn: "Grading planner"
 - scrollUntilVisible:
     element:
@@ -31,7 +37,7 @@ properties:
 - tapOn:
     id: "grading.raw"
 - inputText: "50"
-- hideKeyboard
+- runFlow: ../subflows/dismiss-keyboard.yaml
 - scrollUntilVisible:
     element:
       id: "grading.psa10.price"
@@ -39,7 +45,7 @@ properties:
 - tapOn:
     id: "grading.psa10.price"
 - inputText: "100"
-- hideKeyboard
+- runFlow: ../subflows/dismiss-keyboard.yaml
 - scrollUntilVisible:
     element:
       id: "grading.psa10.weight"
@@ -47,7 +53,7 @@ properties:
 - tapOn:
     id: "grading.psa10.weight"
 - inputText: "1"
-- hideKeyboard
+- runFlow: ../subflows/dismiss-keyboard.yaml
 - scrollUntilVisible:
     element:
       id: "grading.verdict"

@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"data.portableBackup","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.backup
 
 import com.ahmadjalil.tcger.domain.CollectionDetails

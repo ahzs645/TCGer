@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"server.capabilities","platform":"android","status":"partial","modes":["server"],"limitation":"Health responses decode capability flags, but verifyServer discards them; feature gating and automatic capability refresh after recovery are absent."}
 package com.ahmadjalil.tcger.data.remote
 
 import kotlinx.serialization.Serializable

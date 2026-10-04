@@ -94,99 +94,70 @@ struct CachedAsyncImage<Content: View>: View {
 
 // MARK: - Loader
 @MainActor
-private final class CachedImageLoader: ObservableObject {
+final class CachedImageLoader: ObservableObject {
     @Published private(set) var phase: AsyncImagePhase = .empty
-
     private var currentURL: URL?
-    private var isLoading = false
+    private var requestID = UUID()
+    private var request: Task<DecodedRemoteImage, Error>?
     private let cache: ImageCache
+    private let fetch: (URL) async throws -> DecodedRemoteImage
 
-    @MainActor
-    init(cache: ImageCache) {
+    init(cache: ImageCache = .shared, fetch: ((URL) async throws -> DecodedRemoteImage)? = nil) {
         self.cache = cache
-    }
-
-    @MainActor
-    convenience init() {
-        self.init(cache: ImageCache.shared)
+        self.fetch = fetch ?? Self.fetchImage
     }
 
     func load(for url: URL?) async {
-        if currentURL != url {
-            currentURL = url
-            phase = .empty
-        }
-
-        guard let url else {
-            phase = .empty
+        if currentURL == url, case .success = phase { return }
+        // Every invocation owns publication. A replacement cancels the previous
+        // transport and remains safe even when that transport ignores cancellation.
+        request?.cancel()
+        let id = UUID()
+        requestID = id
+        currentURL = url
+        phase = .empty
+        guard let url else { request = nil; return }
+        if let image = cache.image(for: url) {
+            phase = .success(Image(uiImage: image))
+            request = nil
             return
         }
-
-        if case .success = phase {
-            return
-        }
-
-        if let cachedImage = cache.image(for: url) {
-            phase = .success(Image(uiImage: cachedImage))
-            return
-        }
-
-        if url.isFileURL {
+        let task = Task { try await fetch(url) }
+        request = task
+        await withTaskCancellationHandler {
             do {
-                let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                let response = URLResponse(
-                    url: url,
-                    mimeType: url.pathExtension.lowercased() == "svg"
-                        ? "image/svg+xml"
-                        : "image/webp",
-                    expectedContentLength: data.count,
-                    textEncodingName: nil
-                )
-                guard let decoded = await RemoteImageDecoder.decode(
-                    data: data,
-                    response: response,
-                    url: url
-                ) else {
-                    throw URLError(.cannotDecodeContentData)
-                }
+                let decoded = try await task.value
+                guard requestID == id, currentURL == url, !Task.isCancelled, !task.isCancelled else { return }
                 cache.store(decoded.image, data: decoded.cacheData, for: url)
                 phase = .success(Image(uiImage: decoded.image))
             } catch {
+                guard requestID == id, currentURL == url, !Task.isCancelled, !task.isCancelled else { return }
                 phase = .failure(error)
             }
-            return
+            if requestID == id { request = nil }
+        } onCancel: { task.cancel() }
+    }
+
+    private static func fetchImage(_ url: URL) async throws -> DecodedRemoteImage {
+        let data: Data
+        let response: URLResponse
+        if url.isFileURL {
+            data = try Data(contentsOf: url, options: .mappedIfSafe)
+            response = URLResponse(url: url, mimeType: url.pathExtension.lowercased() == "svg" ? "image/svg+xml" : "image/webp", expectedContentLength: data.count, textEncodingName: nil)
+        } else {
+            guard NetworkMonitor.shared.isConnected else { throw URLError(.notConnectedToInternet) }
+            (data, response) = try await URLSession.shared.data(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
         }
-
-        guard NetworkMonitor.shared.isConnected else {
-            return
-        }
-
-        guard !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                throw URLError(.badServerResponse)
-            }
-
-            guard let decoded = await RemoteImageDecoder.decode(
-                data: data,
-                response: httpResponse,
-                url: url
-            ) else {
-                throw URLError(.cannotDecodeContentData)
-            }
-
-            cache.store(decoded.image, data: decoded.cacheData, for: url)
-            phase = .success(Image(uiImage: decoded.image))
-        } catch {
-            phase = .failure(error)
-        }
+        try Task.checkCancellation()
+        guard let decoded = await RemoteImageDecoder.decode(data: data, response: response, url: url) else { throw URLError(.cannotDecodeContentData) }
+        try Task.checkCancellation()
+        return decoded
     }
 
     func seed(with url: URL, image: UIImage) {
+        request?.cancel()
+        requestID = UUID()
         currentURL = url
         phase = .success(Image(uiImage: image))
     }

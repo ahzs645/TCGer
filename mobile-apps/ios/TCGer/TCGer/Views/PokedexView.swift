@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"pokedex.browse","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 private enum PokedexOwnershipFilter: String, CaseIterable, Identifiable {

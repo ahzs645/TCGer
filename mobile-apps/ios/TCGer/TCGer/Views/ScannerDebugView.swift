@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"scanner.debug.livePipeline","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.liveConfiguration","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.recording","platform":"ios","status":"implemented"}
+
 //
 //  ScannerDebugView.swift
 //  TCGer

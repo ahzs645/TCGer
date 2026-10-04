@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.replay","platform":"ios","status":"implemented"}
+
 import CoreGraphics
 import Foundation
 import ImageIO

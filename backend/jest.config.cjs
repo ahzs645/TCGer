@@ -14,6 +14,7 @@ module.exports = {
   },
   roots: ["<rootDir>/src"],
   testMatch: ["**/*.test.ts"],
+  testPathIgnorePatterns: ["/node_modules/", "server.api-contract.test.ts"],
   moduleNameMapper: {
     "^@tcg/api-types$": "<rootDir>/../packages/api-types/dist/index.js",
     "^@tcg/api-types/(.*)$": "<rootDir>/../packages/api-types/dist/$1",

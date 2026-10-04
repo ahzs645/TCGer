@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.feedbackLabels","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 package com.ahmadjalil.tcger.domain
 
 data class CatalogCard(

@@ -1,3 +1,18 @@
+// @tcger-feature {"id":"scanner.capture.manual","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.capture.photo","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.pokemon","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.yugioh","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.mtg","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.engine.serverHash","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.results.addToBinder","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.serverCapture","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.debug.captureBrowser","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.debug.devModeRecording","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.attemptImages","platform":"web","status":"partial","limitation":"Source and derived artifacts are retained; every internal recognition-attempt crop is not exposed."}
+// @tcger-feature {"id":"scanner.debug.sessionManagement","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.decisionDiagnostics","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.feedbackLabels","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 "use client";
 import { usePackageCapabilities } from "@/components/game-features/package-capabilities";
 

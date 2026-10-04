@@ -1,3 +1,13 @@
+// @tcger-feature {"id":"storage.containers","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"storage.placements","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"decks.checkout","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"decks.refile","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.rapidEntry","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.acquisitionCosts","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"intake.psaCertification","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"pricing.provenance","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"storage.audit","platform":"android","status":"planned","limitation":"Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent."}
+// @tcger-feature {"id":"collections.historyUndo","platform":"android","status":"partial","modes":["server"],"requires":["authenticated-server"],"limitation":"Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent."}
 package com.ahmadjalil.tcger.feature.libraryoperations
 
 import androidx.compose.foundation.layout.Arrangement

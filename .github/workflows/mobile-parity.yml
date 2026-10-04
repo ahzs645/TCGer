@@ -9,8 +9,17 @@ on:
       - "mobile-apps/ios/**"
       - "!mobile-apps/ios/**/*.md"
       - "frontend/**"
+      - "backend/**"
+      - "convex-backend/**"
+      - "packages/**"
+      - "tools/game-packages/**"
+      - "tools/catalogs/**"
+      - "tools/r2/**"
       - "mobile-parity/**"
       - "tools/mobile-parity/**"
+      - "tools/api-contracts/**"
+      - "backend/jest.config.cjs"
+      - "package-lock.json"
       - "package.json"
       - ".github/workflows/mobile-parity.yml"
   push:
@@ -21,8 +30,17 @@ on:
       - "mobile-apps/ios/**"
       - "!mobile-apps/ios/**/*.md"
       - "frontend/**"
+      - "backend/**"
+      - "convex-backend/**"
+      - "packages/**"
+      - "tools/game-packages/**"
+      - "tools/catalogs/**"
+      - "tools/r2/**"
       - "mobile-parity/**"
       - "tools/mobile-parity/**"
+      - "tools/api-contracts/**"
+      - "backend/jest.config.cjs"
+      - "package-lock.json"
       - "package.json"
       - ".github/workflows/mobile-parity.yml"
 
@@ -41,10 +59,46 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm run parity:check
+      - name: Summarize affected features
+        env:
+          PARITY_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: |
+          if ! git cat-file -e "${PARITY_BASE_REF}^{commit}" 2>/dev/null; then
+            PARITY_BASE_REF=HEAD
+          fi
+          npm --silent run parity:impact -- --base "$PARITY_BASE_REF" >> "$GITHUB_STEP_SUMMARY"
+
+  api-contracts-js:
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        run: npm ci
+      - name: Verify web consumers and Express routes
+        run: npm run api-contracts:js
+      - name: Verify Convex HTTP actions and persistence
+        run: npm run api-contracts:convex
+      - name: Upload API contract evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-contracts-js
+          path: mobile-parity/results/api
+          if-no-files-found: warn
 
   android-smoke:
     needs: contract
@@ -68,6 +122,17 @@ jobs:
           java-version: 17
       - name: Configure Gradle cache
         uses: gradle/actions/setup-gradle@v5
+      - name: Verify Android API serialization and decoding
+        run: npm run api-contracts:android
+      - name: Upload Android API evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-contracts-android
+          path: |
+            mobile-parity/results/api/android.json
+            mobile-parity/results/api/android.xml
+          if-no-files-found: warn
       - name: Build Android parity APK
         shell: bash
         run: |
@@ -164,6 +229,18 @@ jobs:
           node-version: 22
       - name: Select Xcode 26
         run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+      - name: Verify iOS API serialization and decoding
+        run: npm run api-contracts:ios
+      - name: Upload iOS API evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-contracts-ios
+          path: |
+            mobile-parity/results/api/ios.json
+            mobile-parity/results/api/ios-tests.json
+            mobile-parity/results/api/*.xcresult
+          if-no-files-found: warn
       - name: Install Maestro
         run: |
           curl -Ls https://get.maestro.mobile.dev | bash
@@ -180,7 +257,7 @@ jobs:
 
   report:
     if: always()
-    needs: [android-smoke, ios-smoke, web-smoke]
+    needs: [android-smoke, ios-smoke, web-smoke, api-contracts-js]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -199,12 +276,30 @@ jobs:
           merge-multiple: true
       - name: Build combined report
         run: |
-          npm run parity:report
+          parity_exit=0
+          npm run parity:report -- --require-pass || parity_exit=$?
           cat mobile-parity/results/REPORT.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$parity_exit"
+      - name: Download API contract evidence
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: api-contracts-*
+          path: mobile-parity/results/api
+          merge-multiple: true
+      - name: Require complete API compatibility coverage
+        run: |
+          api_contract_exit=0
+          npm --silent run api-contracts:report -- --require-pass > mobile-parity/results/api-summary.md || api_contract_exit=$?
+          cat mobile-parity/results/api-summary.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$api_contract_exit"
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: mobile-parity-report
           path: |
             mobile-parity/results/REPORT.md
             mobile-parity/results/web-summary.json
             mobile-parity/results/web.xml
+            mobile-parity/results/api/REPORT.md
+            mobile-parity/results/api/summary.json

@@ -1,3 +1,16 @@
+// @tcger-feature {"id":"scanner.identify","platform":"android","status":"partial","limitation":"Language-aware recognition and granular internal developer diagnostics remain incomplete."}
+// @tcger-feature {"id":"scanner.capture.manual","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.capture.photo","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.capture.bulkPhoto","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.pokemon","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.yugioh","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.mode.mtg","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.options.torch","platform":"android","status":"implemented","requires":["camera-torch"]}
+// @tcger-feature {"id":"scanner.results.autoOpen","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.addToBinder","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.binderCorners","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.binderReview","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import android.Manifest

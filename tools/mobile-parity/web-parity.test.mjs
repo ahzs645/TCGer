@@ -23,7 +23,7 @@ test("normalizes explicit Playwright feature tags into parity-readable JUnit nam
   assert.equal(normalized.summary.mappedFeatureCount, 2);
   assert.deepEqual(cases.map(({ name, status }) => [name, status]), [
     ["[cards.search] Web Playwright parity", "Fail"],
-    ["[home.dashboard] Web Playwright parity", "Pass"],
+    ["[home.dashboard] Web Playwright parity", "Skipped"],
   ]);
 });
 

@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"wishlists.browse","platform":"web","status":"implemented"}
+
 "use client";
 
 import { AppShell } from "@/components/layout/app-shell";

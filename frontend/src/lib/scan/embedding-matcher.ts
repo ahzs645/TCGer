@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"scanner.model.arcface","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.model.dinov2","platform":"web","status":"partial","limitation":"DINOv2 browser paths exist, but production model, gate, and acceptance parity remain incomplete."}
+
 /**
  * Browser-side embedding matcher (client-side, no server in the recognition path).
  *

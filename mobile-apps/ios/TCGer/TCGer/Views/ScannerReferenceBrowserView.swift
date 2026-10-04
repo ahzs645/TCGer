@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.referenceSets","platform":"ios","status":"implemented"}
+
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers

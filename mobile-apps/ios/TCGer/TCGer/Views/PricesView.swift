@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"prices.browse","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 private struct CollectionPricingLot {

@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.create","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 /// Shared "New Binder" form (name, description, color, default condition)
@@ -82,6 +84,7 @@ struct CreateBinderSheet: View {
             .disabled(isCreating)
             .navigationTitle("New Binder")
             .navigationBarTitleDisplayMode(.inline)
+            .keyboardDismissToolbar()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.copies","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"collections.manage","platform":"ios","status":"implemented"}
 import Foundation
 
 extension APIService {
@@ -314,6 +316,20 @@ extension APIService {
         return result.audit
     }
 
+    struct BackupImportResult: Decodable {
+        let importedCopies: Int
+        let importedBinders: Int
+        let recoveryAvailable: Bool
+    }
+
+    func importServerBackup(config: ServerConfiguration, token: String, document: Data) async throws -> BackupImportResult {
+        let body = try JSONDecoder().decode(JSONValue.self, from: document)
+        let (data, response) = try await makeRequest(config: config, path: "backups", method: "POST", token: token, body: body)
+        if response.statusCode == 401 { throw APIError.unauthorized }
+        guard response.statusCode == 200 else { throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data)) }
+        return try JSONDecoder().decode(BackupImportResult.self, from: data)
+    }
+
     func getCollections(
         config: ServerConfiguration,
         token: String? = nil,
@@ -323,10 +339,13 @@ extension APIService {
             return LocalStore.shared.getCollections()
         }
 
+        let cacheKey = CacheManager.CacheKey.collections(config: config, token: token)
+        // Discard unscoped data from older builds rather than assigning it to a user.
+        try? collectionCache.remove(forKey: CacheManager.CacheKey.collections)
         if useCache || !NetworkMonitor.shared.isConnected {
-            if let cached: [Collection] = try? CacheManager.shared.load(
+            if let cacheKey, let cached: [Collection] = try? collectionCache.load(
                 [Collection].self,
-                forKey: CacheManager.CacheKey.collections
+                forKey: cacheKey
             ) {
                 return cached
             }
@@ -363,16 +382,16 @@ extension APIService {
                 throw APIError.decodingError
             }
 
-            try? CacheManager.shared.save(collections, forKey: CacheManager.CacheKey.collections)
+            if let cacheKey { try? collectionCache.save(collections, forKey: cacheKey) }
             CacheManager.shared.updateLastSyncDate()
 
             return collections
         } catch let error as APIError {
             if case .networkError(let underlyingError) = error,
                !Self.isCancellation(underlyingError),
-               let cached: [Collection] = try? CacheManager.shared.load(
+               let cacheKey, let cached: [Collection] = try? collectionCache.load(
                     [Collection].self,
-                    forKey: CacheManager.CacheKey.collections
+                    forKey: cacheKey
                ) {
                 return cached
             }
@@ -621,6 +640,7 @@ extension APIService {
             throw APIError.decodingError
         }
 
+        invalidateCollectionsCache(config: config, token: token)
         return collection
     }
 
@@ -635,6 +655,7 @@ extension APIService {
         let associatedTcg: String?
         let associatedSetCode: String?
         let associatedSetName: String?
+        var replacePresentation = false
 
         private enum CodingKeys: String, CodingKey {
             case name, description, colorHex, defaultCondition, containerType, imageUrl
@@ -647,13 +668,21 @@ extension APIService {
             try container.encodeIfPresent(description, forKey: .description)
             try container.encodeIfPresent(colorHex, forKey: .colorHex)
             try container.encodeIfPresent(defaultCondition, forKey: .defaultCondition)
-            // Binder presentation values are a complete editor snapshot. Encode
-            // nil as JSON null so clearing a field reaches the nullable API.
-            try container.encode(containerType, forKey: .containerType)
-            try container.encode(imageUrl, forKey: .imageUrl)
-            try container.encode(associatedTcg, forKey: .associatedTcg)
-            try container.encode(associatedSetCode, forKey: .associatedSetCode)
-            try container.encode(associatedSetName, forKey: .associatedSetName)
+            // Partial updates omit absent values. The full editor opts in to
+            // nulls so explicit clearing still reaches the nullable API.
+            if replacePresentation {
+                try container.encode(containerType, forKey: .containerType)
+                try container.encode(imageUrl, forKey: .imageUrl)
+                try container.encode(associatedTcg, forKey: .associatedTcg)
+                try container.encode(associatedSetCode, forKey: .associatedSetCode)
+                try container.encode(associatedSetName, forKey: .associatedSetName)
+            } else {
+                try container.encodeIfPresent(containerType, forKey: .containerType)
+                try container.encodeIfPresent(imageUrl, forKey: .imageUrl)
+                try container.encodeIfPresent(associatedTcg, forKey: .associatedTcg)
+                try container.encodeIfPresent(associatedSetCode, forKey: .associatedSetCode)
+                try container.encodeIfPresent(associatedSetName, forKey: .associatedSetName)
+            }
         }
     }
 
@@ -669,7 +698,8 @@ extension APIService {
         imageUrl: String? = nil,
         associatedTcg: String? = nil,
         associatedSetCode: String? = nil,
-        associatedSetName: String? = nil
+        associatedSetName: String? = nil,
+        replacePresentation: Bool = false
     ) async throws -> Collection {
         if config.isOnDevice {
             return try LocalStore.shared.updateCollection(
@@ -682,7 +712,8 @@ extension APIService {
                 imageUrl: imageUrl,
                 associatedTcg: associatedTcg,
                 associatedSetCode: associatedSetCode,
-                associatedSetName: associatedSetName
+                associatedSetName: associatedSetName,
+                replacePresentation: replacePresentation
             )
         }
 
@@ -695,7 +726,8 @@ extension APIService {
             imageUrl: imageUrl,
             associatedTcg: associatedTcg,
             associatedSetCode: associatedSetCode,
-            associatedSetName: associatedSetName
+            associatedSetName: associatedSetName,
+                replacePresentation: replacePresentation
         )
         let (data, response) = try await makeRequest(
             config: config,
@@ -716,6 +748,7 @@ extension APIService {
             throw APIError.decodingError
         }
 
+        invalidateCollectionsCache(config: config, token: token)
         return collection
     }
 
@@ -741,6 +774,13 @@ extension APIService {
                 throw APIError.unauthorized
             }
             throw APIError.serverError(status: response.statusCode)
+        }
+        invalidateCollectionsCache(config: config, token: token)
+    }
+
+    private func invalidateCollectionsCache(config: ServerConfiguration, token: String) {
+        if let key = CacheManager.CacheKey.collections(config: config, token: token) {
+            try? collectionCache.remove(forKey: key)
         }
     }
 
@@ -1191,7 +1231,9 @@ extension APIService {
             throw APIError.serverError(status: response.statusCode)
         }
 
-        try? CacheManager.shared.remove(forKey: CacheManager.CacheKey.collections)
+        if let cacheKey = CacheManager.CacheKey.collections(config: config, token: token) {
+            try? collectionCache.remove(forKey: cacheKey)
+        }
         NotificationCenter.default.post(name: .collectionDidChange, object: nil)
         return try? JSONDecoder().decode(AddedCollectionCopyResponse.self, from: data).createdCopyID
     }
@@ -1349,6 +1391,9 @@ extension APIService {
             throw APIError.decodingError
         }
 
+        if let cacheKey = CacheManager.CacheKey.collections(config: config, token: token) {
+            try? collectionCache.remove(forKey: cacheKey)
+        }
         return card
     }
 
@@ -1378,6 +1423,9 @@ extension APIService {
                 throw APIError.unauthorized
             }
             throw APIError.serverError(status: response.statusCode)
+        }
+        if let cacheKey = CacheManager.CacheKey.collections(config: config, token: token) {
+            try? collectionCache.remove(forKey: cacheKey)
         }
     }
 

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { normalizePortableBackup, type PortableBackup } from "@tcg/api-types";
 import { Button } from "@/components/ui/button";
+import { importServerBackup } from "@/lib/api/backups";
 import { API_BASE_URL } from "@/lib/api/base-url";
 import { isDemoMode } from "@/lib/demo-mode";
 import {
@@ -130,10 +131,7 @@ export function BackupPanel({ token }: { token: string | null }) {
               void run(async () => {
                 if (isDemoMode()) await importLocalBackup(pending);
                 else
-                  await request("", {
-                    method: "POST",
-                    body: JSON.stringify(pending),
-                  });
+                  await importServerBackup(token!, pending);
                 setPending(null);
                 setMessage(
                   "Import saved. A recovery point is available. Reload to refresh all open views.",

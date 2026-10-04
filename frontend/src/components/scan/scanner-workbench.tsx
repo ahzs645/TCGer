@@ -1,3 +1,24 @@
+// @tcger-feature {"id":"scanner.engine.serverEmbedding","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.options.torch","platform":"web","status":"implemented","requires":["camera-torch"]}
+// @tcger-feature {"id":"scanner.results.autoOpen","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.priceMode","platform":"web","status":"planned","limitation":"Session quotes and currency totals exist; the native price-mode control semantics are not yet equivalent."}
+// @tcger-feature {"id":"scanner.results.cropCorrection","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.binder.savePagePhotos","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.developerAccess","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.recording","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.vectorizedAnn","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.scopeCache","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.stagedHypotheses","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.batchedOrientation","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.concurrentOrientation","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.warmStart","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.fastCapture","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.fastFooterOcr","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.leanOcrStrips","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.footerFirstOcr","platform":"web","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.binderCorners","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.binderReview","platform":"web","status":"implemented"}
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

@@ -303,3 +303,30 @@ export function normalizePortableBackup(input: unknown): PortableBackup {
   });
   return backup;
 }
+
+/** Import is an upsert by stable IDs. Recovery restoration is a separate replace operation. */
+export function mergePortableBackups(beforeInput: unknown, incomingInput: unknown): PortableBackup {
+  const before = normalizePortableBackup(beforeInput);
+  const incoming = normalizePortableBackup(incomingInput);
+  function rows<T extends {id?: string}>(old: T[], next: T[]): T[] {
+    return [...new Map([...old, ...next].map(row => [row.id, row])).values()];
+  }
+  function parents<T extends {id?: string; cards: {id?: string}[]}>(old: T[], next: T[]): T[] {
+    const moved = new Set(next.flatMap(parent => parent.cards.map(card => card.id)));
+    const result = new Map(old.map(parent => [parent.id, {...parent, cards: parent.cards.filter(card => !moved.has(card.id))}]));
+    for (const parent of next) {
+      const previous = result.get(parent.id);
+      result.set(parent.id, {...previous, ...parent, cards: rows(previous?.cards ?? [], parent.cards)});
+    }
+    return [...result.values()] as T[];
+  }
+  const sections: Record<string, unknown> = {...before.sections};
+  for (const [key, value] of Object.entries(incoming.sections)) {
+    if (["transactions", "onlineCodes", "smartFolders", "binderPages"].includes(key) && Array.isArray(value)) {
+      sections[key] = rows((Array.isArray(sections[key]) ? sections[key] : []) as {id?: string}[], value);
+    } else if (["binderPageImages", "copyImages", "preferences"].includes(key) && value && typeof value === "object" && !Array.isArray(value)) {
+      sections[key] = {...(sections[key] as object ?? {}), ...value};
+    } else sections[key] = value;
+  }
+  return normalizePortableBackup({...incoming, binders: parents(before.binders, incoming.binders), wishlists: parents(before.wishlists, incoming.wishlists), sealedInventory: rows(before.sealedInventory, incoming.sealedInventory), sections});
+}

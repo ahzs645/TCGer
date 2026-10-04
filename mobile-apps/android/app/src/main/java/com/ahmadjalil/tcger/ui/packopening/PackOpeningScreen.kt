@@ -1,3 +1,14 @@
+// @tcger-feature {"id":"packOpening.browse","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.selectSet","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.selectVariant","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.possibleCards","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.count","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.orientation","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.customArtwork","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.results.grouped","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.results.inspect","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"packOpening.save.collection","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.packopening
 
 import android.content.Intent

@@ -129,6 +129,22 @@ final class WishlistStore: ObservableObject {
         return Date().timeIntervalSince(lastLoadedAt) < refreshInterval
     }
 
+    func matches(config: ServerConfiguration, token: String?) -> Bool {
+        guard let token else { return false }
+        return source == Source(baseURL: config.baseURL, token: token)
+    }
+
+    func reset() {
+        activeLoad?.cancel()
+        activeLoad = nil
+        source = nil
+        wishlists = []
+        hasLoaded = false
+        isLoading = false
+        errorMessage = nil
+        lastLoadedAt = nil
+    }
+
     private func prepare(for requestedSource: Source) {
         guard source != requestedSource else { return }
         activeLoad?.cancel()

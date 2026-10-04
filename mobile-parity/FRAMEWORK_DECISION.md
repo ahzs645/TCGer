@@ -10,8 +10,10 @@ source code.
 Use a small declarative contract plus the strongest existing black-box runner
 for each surface:
 
-- [`features.json`](features.json) declares every capability, its policy,
-  platform status, source evidence, test evidence, and temporary waivers.
+- [`features.definitions.json`](features.definitions.json) owns capability policy
+  and source/test bindings. Platform implementation files own support status,
+  operating modes, requirements, limitations, and waivers through checked source
+  registrations. The compiler joins these into [`features.json`](features.json).
 - The generator emits typed feature and control IDs for TypeScript, Swift, and
   Kotlin, preventing test selectors and application identifiers from drifting.
 - [Maestro](https://docs.maestro.dev/) runs the same declarative YAML flows on
@@ -70,8 +72,10 @@ repository.
 
 ## Rules for future changes
 
-1. Add the feature declaration and real source evidence in the same change as
-   the implementation.
+1. Add the source registration, product definition, and real source/test
+   evidence in the same change as the implementation. Run `parity:generate`
+   and `parity:check`; generated contracts and application metadata are checked
+   for drift. Use `parity:impact` to review affected features and uncovered paths.
 2. Use `track` while a capability is intentionally incomplete; use `parity`
    only after all three declarations are implemented and automated behavior is
    available.
@@ -81,3 +85,38 @@ repository.
    parity-required behavior.
 5. Never regenerate or approve visual snapshots merely to make parity green;
    functional parity and visual regression remain separate signals.
+
+## Comparable approaches in other projects
+
+Reviewed on 2026-10-03 using the projects' own source and documentation. These
+examples address different layers of compatibility; the TCGer recommendations
+below are our interpretation of how their patterns fit this repository.
+
+| Project | What it does | Application to TCGer |
+| --- | --- | --- |
+| [Rust compiler feature declarations](https://github.com/rust-lang/rust/blob/main/compiler/rustc_feature/src/accepted.rs) | Source declarations carry feature names, stabilization versions, and optional tracking issue numbers; a macro builds the compiler's accepted-feature table. | Keep stable capability identities and implementation metadata in checked source. Our declarations generate typed tables across three languages; they do not control compiler gates. |
+| [MDN browser compatibility data](https://github.com/mdn/browser-compat-data/blob/main/schemas/compat-data-schema.md) | Structured per-browser records include support versions, flags, implementation issue links, and explanatory notes. Partial implementations require a note describing the divergence. | Record the precise missing behavior and prerequisites for each surface. Our required limitations follow this pattern. Release-version history and structured issue links are possible extensions, not current fields. |
+| [Flutter federated plugins](https://docs.flutter.dev/packages-and-plugins/developing-packages#federated-plugins) | A common platform interface connects independently registered platform implementations to the app-facing API. | Define the capability contract once while letting platform implementations remain idiomatic. TCGer's metadata contract describes support; it does not enforce a shared runtime API or require a Flutter migration. |
+| [Pact consumer/provider contracts](https://docs.pact.io/getting_started/how_pact_works) | Consumer tests write interaction contracts; provider verification checks the API's responses against those contracts. | Add executable API compatibility coverage if web and native clients drift in their requests or response expectations. Keep UI parity assertions alongside it, since API compatibility alone cannot verify the user workflow. |
+
+### What to keep and what to extend
+
+Keep the current combination: source-owned support declarations, one product
+inventory, generated IDs/metadata, and behavior evidence linked by feature ID.
+It applies the useful patterns above without replacing the three app stacks.
+The root [agent instructions](../AGENTS.md) make maintaining these records part
+of every capability change.
+
+Shared [API interactions and consumer/provider tests](api-contracts/README.md)
+now cover binder browsing, binder creation, and exhaustive card search through
+the real client APIs. Express routes and Convex HTTP actions verify the same
+fixtures, within their documented isolation boundaries. This uses the existing
+Vitest, XCTest, and JUnit tooling; Pact and a contract broker have not been added.
+
+If release support needs to be tracked, add explicit version and issue-link
+fields to the schemas, source compiler, generators, and checks in one change.
+Release-version history is still a future extension.
+
+Declarations still require review: path coverage cannot automatically discover
+every missing capability, and generated tables do not prove behavior. Passing
+equivalent tests on each required surface remains the basis for verification.

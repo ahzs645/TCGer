@@ -91,6 +91,7 @@ android {
     sourceSets.getByName("test").resources.srcDir(
         "../../../docs/scanner-system/examples",
     )
+    sourceSets.getByName("test").resources.srcDir("../../../mobile-parity/api-contracts")
 }
 
 dependencies {

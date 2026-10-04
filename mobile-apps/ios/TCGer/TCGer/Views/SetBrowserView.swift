@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"sets.browse","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 struct SetBrowserView: View {

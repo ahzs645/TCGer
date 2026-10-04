@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"cards.search","platform":"web","status":"implemented"}
+
 import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { CardSearchPanel } from "@/components/cards/card-search-panel";

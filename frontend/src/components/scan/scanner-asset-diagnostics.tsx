@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.assetDiagnostics","platform":"web","status":"implemented"}
+
 "use client";
 
 import { useState } from "react";

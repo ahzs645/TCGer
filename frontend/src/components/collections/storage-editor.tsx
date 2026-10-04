@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"storage.containers","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"storage.placements","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 "use client";
 
 import { useMemo, useState } from "react";

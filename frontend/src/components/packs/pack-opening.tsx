@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"packOpening.oddsReference","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.animation.tear","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.offline.downloads","platform":"web","status":"implemented"}
+
 "use client";
 
 import {

@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"scanner.debug.testingInputs","platform":"web","status":"partial","limitation":"Demo card/video fixtures exist; equivalent runnable binder-page source fixtures remain incomplete."}
+// @tcger-feature {"id":"scanner.debug.referenceSets","platform":"web","status":"implemented"}
+
 "use client";
 
 /**

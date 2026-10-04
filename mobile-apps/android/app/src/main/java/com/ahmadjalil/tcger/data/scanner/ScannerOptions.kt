@@ -1,3 +1,20 @@
+// @tcger-feature {"id":"scanner.engine.automatic","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.engine.localOnly","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.engine.serverHash","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.engine.serverEmbedding","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"scanner.options.language","platform":"android","status":"partial","limitation":"Language selection is tracked; recognition does not yet implement equivalent language-aware behavior."}
+// @tcger-feature {"id":"scanner.debug.liveConfiguration","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.vectorizedAnn","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.scopeCache","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.stagedHypotheses","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.batchedOrientation","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.concurrentOrientation","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.warmStart","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.fastCapture","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.performance.fastFooterOcr","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.leanOcrStrips","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+// @tcger-feature {"id":"scanner.debug.performance.footerFirstOcr","platform":"android","status":"planned","limitation":"No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import android.content.Context

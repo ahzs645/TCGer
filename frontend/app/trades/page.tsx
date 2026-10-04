@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"trades.browse","platform":"web","status":"implemented","modes":["demo","server"]}
+
 "use client";
 
 import { gameLabel } from "@/lib/utils";

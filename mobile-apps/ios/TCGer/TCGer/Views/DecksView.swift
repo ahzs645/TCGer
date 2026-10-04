@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"decks.browse","platform":"ios","status":"implemented","modes":["server"]}
+
 import SwiftUI
 
 struct DecksView: View {

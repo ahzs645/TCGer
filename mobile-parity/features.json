@@ -1,6 +1,6 @@
 {
   "$schema": "./features.schema.json",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "platforms": [
     "web",
     "ios",
@@ -13,7 +13,6 @@
       "policy": "parity",
       "flow": "maestro/flows/home-dashboard.yaml",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/page.tsx",
           "frontend/src/components/dashboard/dashboard-content.tsx"
@@ -24,19 +23,32 @@
             "id": "home.dashboard",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/DashboardView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/DashboardView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/DashboardScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/DashboardScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -45,10 +57,16 @@
       "policy": "parity",
       "flow": "maestro/flows/collections-browse.yaml",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/collections/page.tsx",
-          "frontend/src/components/collections/sandbox/collection-view.tsx"
+          "frontend/src/components/collections/sandbox/collection-view.tsx",
+          "frontend/src/lib/api/collections.ts",
+          "backend/src/api/routes/collections.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "convex-backend/convex/http.ts",
+          "convex-backend/convex/bridge.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "frontend/src/lib/api/server.api-contract.test.ts"
         ],
         "tests": [
           {
@@ -56,19 +74,57 @@
             "id": "collections.browse",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/collections/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/CollectionsView.swift"
-        ]
+          "mobile-apps/ios/TCGer/TCGer/Views/CollectionsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "backend/src/api/routes/collections.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "convex-backend/convex/http.ts",
+          "convex-backend/convex/bridge.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/CacheManager.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "collections.browse",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CachedImageLoaderTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CollectionsView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt"
-        ]
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/RemoteServiceFactory.kt",
+          "backend/src/api/routes/collections.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "convex-backend/convex/http.ts",
+          "convex-backend/convex/bridge.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -77,10 +133,16 @@
       "policy": "parity",
       "flow": "maestro/flows/collections-create.yaml",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/collections/sandbox/collection-view.tsx",
-          "frontend/src/stores/collections.ts"
+          "frontend/src/stores/collections.ts",
+          "frontend/src/lib/api/collections.ts",
+          "backend/src/api/routes/collections.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "convex-backend/convex/http.ts",
+          "convex-backend/convex/bridge.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "frontend/src/lib/api/server.api-contract.test.ts"
         ],
         "tests": [
           {
@@ -88,19 +150,44 @@
             "id": "collections.create",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/sandbox/collection-view.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/Components/CreateBinderSheet.swift"
-        ]
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CreateBinderSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "backend/src/api/routes/collections.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "convex-backend/convex/http.ts",
+          "convex-backend/convex/bridge.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/CacheManager.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/Components/CreateBinderSheet.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt",
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/RemoteServiceFactory.kt",
+          "backend/src/api/routes/collections.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "convex-backend/convex/http.ts",
+          "convex-backend/convex/bridge.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
         ],
         "tests": [
           {
@@ -113,7 +200,12 @@
             "id": "collections.create",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/BinderRemoteModelsTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -122,10 +214,15 @@
       "policy": "parity",
       "flow": "maestro/flows/cards-search.yaml",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/cards/page.tsx",
-          "frontend/src/components/cards/card-search-panel.tsx"
+          "frontend/src/components/cards/card-search-panel.tsx",
+          "frontend/src/lib/api/cards.ts",
+          "frontend/src/lib/api-client.ts",
+          "backend/src/api/routes/cards.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "frontend/src/lib/api/server.api-contract.test.ts"
         ],
         "tests": [
           {
@@ -133,19 +230,51 @@
             "id": "cards.search",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/cards/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift"
-        ]
+          "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Cards.swift",
+          "backend/src/api/routes/cards.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "cards.search",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CachedImageLoaderTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt"
-        ]
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/RemoteServiceFactory.kt",
+          "backend/src/api/routes/cards.router.ts",
+          "backend/src/api/middleware/auth.ts",
+          "mobile-parity/api-contracts/interactions.json",
+          "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -154,7 +283,6 @@
       "policy": "parity",
       "flow": "maestro/flows/wishlists-browse.yaml",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/wishlists/page.tsx",
           "frontend/src/components/wishlists/wishlist-content.tsx"
@@ -165,21 +293,34 @@
             "id": "wishlists.browse",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/wishlists/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistDetailScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -188,7 +329,6 @@
       "policy": "parity",
       "flow": "maestro/flows/wishlists-create.yaml",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/wishlists/wishlist-content.tsx",
           "frontend/src/stores/wishlists.ts"
@@ -199,16 +339,24 @@
             "id": "wishlists.create",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/wishlists/wishlist-content.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
@@ -224,7 +372,12 @@
             "id": "wishlists.create",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/WishlistRemoteModelsTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -233,7 +386,6 @@
       "policy": "parity",
       "flow": "maestro/flows/settings-browse.yaml",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/account/account-settings-dialog.tsx",
           "frontend/src/components/navigation/user-menu.tsx"
@@ -244,16 +396,24 @@
             "id": "settings.browse",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/account/account-settings-dialog.tsx",
+          "line": 3
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SettingsScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BottomNavigationCustomizationScreen.kt",
@@ -271,7 +431,12 @@
             "id": "settings.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/domain/GameDisableGuardTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SettingsScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -279,20 +444,27 @@
       "title": "Browse card sets",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/sets/page.tsx",
           "frontend/src/components/sets/set-browser.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/sets/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/SetBrowserView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/SetBrowserView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/SetBrowserScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityDataSource.kt",
@@ -304,28 +476,40 @@
             "id": "sets.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityModelsTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/SetBrowserScreen.kt",
+          "line": 1
+        }
       }
     },
     {
       "id": "pokedex.browse",
-      "title": "Pok\u00e9dex progress",
+      "title": "Pokédex progress",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/pokedex/page.tsx",
           "frontend/src/components/pokedex/pokedex-content.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/pokedex/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PokedexView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PokedexView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/PokedexScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
@@ -336,7 +520,12 @@
             "id": "pokedex.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityModelsTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/PokedexScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -344,20 +533,34 @@
       "title": "Decks",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/decks/page.tsx",
           "frontend/src/lib/api/decks.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/decks/page.tsx",
+          "line": 1
+        },
+        "modes": [
+          "demo",
+          "server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/DecksView.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/DecksView.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/DeckScreens.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/SocialRepository.kt",
@@ -369,6 +572,14 @@
             "id": "decks.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/features/social/SocialFeatureControllerTest.kt"
           }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/DeckScreens.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
         ]
       }
     },
@@ -377,20 +588,27 @@
       "title": "Collection guides",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/guides/page.tsx",
           "frontend/src/components/guides/collection-guides-content.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/guides/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CollectionGuidesView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CollectionGuidesView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/CollectionGuidesScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityDataSource.kt",
@@ -402,7 +620,12 @@
             "id": "guides.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/ui/catalogparity/CatalogParityModelsTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/catalogparity/CollectionGuidesScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -410,20 +633,27 @@
       "title": "Sealed inventory",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/sealed/page.tsx",
           "frontend/src/lib/api/sealed.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/sealed/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/SealedInventoryView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/SealedInventoryView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SealedInventoryScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
@@ -441,7 +671,12 @@
             "id": "sealed.inventory",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/PackLedgerApiModelsTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SealedInventoryScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -449,24 +684,36 @@
       "title": "Open the pack-opening experience",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/packs/page.tsx",
           "frontend/src/components/packs/pack-opening.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/packs/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -474,7 +721,6 @@
       "title": "Search and filter pack sets by download availability",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx",
           "frontend/src/lib/packs/pack-browsing.ts",
@@ -486,19 +732,32 @@
             "id": "packOpening.selectSet",
             "path": "frontend/src/lib/packs/pack-browsing.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -506,22 +765,34 @@
       "title": "Choose a pack-art variant within a set",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 2
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 3
+        }
       }
     },
     {
@@ -529,7 +800,6 @@
       "title": "Browse, search, and rarity-filter possible pulls",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx",
           "frontend/src/lib/packs/pack-browsing.ts"
@@ -540,19 +810,32 @@
             "id": "packOpening.possibleCards",
             "path": "frontend/src/lib/packs/pack-browsing.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 3
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 4
+        }
       }
     },
     {
@@ -560,14 +843,18 @@
       "title": "Source-backed pull-odds reference metadata",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
+          "frontend/src/components/packs/pack-opening.tsx",
           "packages/pack-core/src/experience/pack-opening.tsx",
           "packages/pack-core/src/experience/pack-data.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift"
@@ -578,14 +865,23 @@
             "id": "packOpening.oddsReference",
             "path": "mobile-apps/ios/TCGer/TCGerTests/PackOpeningResourceTests.swift"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningModels.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningModels.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -593,22 +889,34 @@
       "title": "Choose 1, 5, or 10 packs",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 4
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 5
+        }
       }
     },
     {
@@ -616,25 +924,37 @@
       "title": "Normal animated pack-opening mode",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx",
           "packages/pack-core/src/experience/pack-opening.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 5
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningModels.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningModels.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -642,25 +962,37 @@
       "title": "Quick-open mode that skips animations",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx",
           "packages/pack-core/src/experience/pack-opening.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 6
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningModels.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningModels.kt",
+          "line": 3
+        }
       }
     },
     {
@@ -668,24 +1000,36 @@
       "title": "Front-facing or backwards pack orientation",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx",
           "packages/pack-core/src/experience/pack-opening.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 7
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift",
+          "line": 4
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 6
+        }
       }
     },
     {
@@ -693,24 +1037,36 @@
       "title": "Upload custom pack artwork",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx",
           "packages/pack-core/src/experience/pack-opening.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 8
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
           "mobile-apps/ios/TCGer/TCGer/Models/PackOpeningInterface.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 7
+        }
       }
     },
     {
@@ -718,25 +1074,37 @@
       "title": "Interactive tear and opening animation",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "packages/pack-core/src/experience/pack-scene.tsx",
           "frontend/src/components/packs/pack-opening.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening.tsx",
+          "line": 2
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
           "mobile-apps/ios/TCGer/TCGer/Resources/PackOpening.bundle/pack-opening.js"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
+          "line": 4
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningWebHost.kt",
           "packages/pack-core/src/experience/pack-tear.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningWebHost.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -744,25 +1112,37 @@
       "title": "Card-by-card reveal, flip, slide, and show-all controls",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx",
           "packages/pack-core/src/experience/pack-opening.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 9
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
           "mobile-apps/ios/TCGer/TCGer/Resources/PackOpening.bundle/pack-opening.js"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift",
+          "line": 5
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningWebHost.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningWebHost.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -770,22 +1150,34 @@
       "title": "Grouped multi-pack results and best-pull summary",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-shell.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-shell.tsx",
+          "line": 10
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningResultsViews.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningResultsViews.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 8
+        }
       }
     },
     {
@@ -793,23 +1185,35 @@
       "title": "Inspect, flip, zoom, share, favorite, and wishlist a pull",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-card-close-up.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-card-close-up.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningResultsViews.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningResultsViews.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 9
+        }
       }
     },
     {
@@ -817,24 +1221,36 @@
       "title": "Save every revealed pull to a collection",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-review-sheet.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-review-sheet.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+          "line": 10
+        }
       }
     },
     {
@@ -842,25 +1258,37 @@
       "title": "Link an opening to sealed inventory and decrement stock",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening-review-sheet.tsx",
           "frontend/src/lib/api/sealed.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening-review-sheet.tsx",
+          "line": 2
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -868,7 +1296,6 @@
       "title": "Download, retry, remove, and open supported packs offline",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/packs/pack-opening.tsx",
           "frontend/src/components/packs/pack-opening-shell.tsx",
@@ -882,22 +1309,44 @@
             "id": "packOpening.offline.downloads",
             "path": "frontend/src/lib/packs/offline-packs.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/packs/pack-opening.tsx",
+          "line": 3
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Services/PackOfflineDownloadManager.swift",
-          "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift"
-        ]
+          "mobile-apps/ios/TCGer/TCGer/Views/PackSelectionSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/PackOpeningAssetCache.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/ImageCache.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "packOpening.offline.downloads",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/PackOfflineDownloadTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/PackOfflineDownloadManager.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOfflineDownloadManager.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningWebHost.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOfflineDownloadManager.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -905,20 +1354,27 @@
       "title": "Online code vault",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/online-codes/page.tsx",
           "frontend/src/components/online-codes/online-codes-content.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/online-codes/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/OnlineCodesView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/OnlineCodesView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/onlinecodes/OnlineCodeFeature.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/onlinecodes/OnlineCodesScreen.kt",
@@ -930,7 +1386,12 @@
             "id": "codes.vault",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/onlinecodes/OnlineCodeFeatureTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/onlinecodes/OnlineCodeFeature.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -938,20 +1399,27 @@
       "title": "Prices",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/prices/page.tsx",
           "frontend/src/lib/api/pricing.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/prices/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/PricesView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/PricesView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeature.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioScreens.kt",
@@ -963,7 +1431,12 @@
             "id": "prices.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeatureTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeature.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -971,20 +1444,27 @@
       "title": "Collection analytics",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/analytics/page.tsx",
           "frontend/src/lib/api/analytics.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/analytics/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/AnalyticsView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/AnalyticsView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeature.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioScreens.kt",
@@ -996,7 +1476,12 @@
             "id": "analytics.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeatureTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/portfolio/PortfolioFeature.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -1004,20 +1489,34 @@
       "title": "Trades",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/trades/page.tsx",
           "frontend/src/lib/api/trading.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/trades/page.tsx",
+          "line": 1
+        },
+        "modes": [
+          "demo",
+          "server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/TradesView.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/TradesView.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/TradeScreens.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/SocialRepository.kt",
@@ -1029,6 +1528,14 @@
             "id": "trades.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/features/social/SocialModelsTest.kt"
           }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/TradeScreens.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
         ]
       }
     },
@@ -1037,7 +1544,6 @@
       "title": "Activity and notifications",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/dashboard/dashboard-content.tsx",
           "frontend/app/demo/activity/page.tsx",
@@ -1051,16 +1557,31 @@
             "id": "activity.browse",
             "path": "frontend/src/lib/api/notifications.test.ts"
           }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/dashboard/dashboard-content.tsx",
+          "line": 1
+        },
+        "modes": [
+          "demo",
+          "server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ActivityView.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ActivityView.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/ActivityScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/SocialRepository.kt",
@@ -1072,6 +1593,14 @@
             "id": "activity.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/features/social/SocialModelsTest.kt"
           }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/ActivityScreen.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
         ]
       }
     },
@@ -1080,25 +1609,39 @@
       "title": "Camera card scanner",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/app/scan/page.tsx",
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/components/scan/video-scan-lab.tsx"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/app/scan/page.tsx",
+          "line": 1
+        },
+        "limitation": "Recognition engines and developer scenarios do not yet have equivalent coverage across all runtimes."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "partial",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 1
+        },
+        "limitation": "Language-aware recognition and granular internal developer diagnostics remain incomplete."
       }
     },
     {
@@ -1106,22 +1649,34 @@
       "title": "Manually capture one card from the live camera",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -1129,24 +1684,36 @@
       "title": "Identify a card from an imported photo",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 2
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 3
+        }
       }
     },
     {
@@ -1154,25 +1721,37 @@
       "title": "Bulk-import and identify multiple photos",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/shared-scan-session.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/shared-scan-session.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "line": 4
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 4
+        }
       }
     },
     {
@@ -1180,25 +1759,38 @@
       "title": "Automatic live capture with multi-frame consensus",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/src/components/scan/video-scan-lab.tsx",
           "frontend/src/components/scan/use-video-scan-processor.ts"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/scan/video-scan-lab.tsx",
+          "line": 1
+        },
+        "limitation": "Consensus capture exists; equivalent camera recognition and acceptance evidence remain incomplete."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/LiveScanConsensus.swift",
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerViewModel.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/LiveScanConsensus.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1206,21 +1798,29 @@
       "title": "Detect and identify multiple cards on binder pages",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/src/components/scan/use-video-scan-processor.ts",
           "frontend/src/lib/scan/yolo-detector.ts"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/scan/use-video-scan-processor.ts",
+          "line": 1
+        },
+        "limitation": "Grid and detection workbench exists; equivalent automatic page-recognition coverage remains incomplete."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/BinderPageScanner.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/BinderPageScanner.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/binder/BinderPageQuadDetector.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/binder/BinderPageGridExtractor.kt",
@@ -1235,31 +1835,48 @@
             "id": "scanner.capture.binderPage",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/scanner/binder/BinderPageQuadDetectorTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/binder/BinderPageQuadDetector.kt",
+          "line": 1
+        }
       }
     },
     {
       "id": "scanner.mode.pokemon",
-      "title": "Pok\u00e9mon card scanning mode",
+      "title": "Pokémon card scanning mode",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/components/scan/video-scan-panels.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 3
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 5
+        }
       }
     },
     {
@@ -1267,23 +1884,35 @@
       "title": "Yu-Gi-Oh! card scanning mode",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/components/scan/video-scan-panels.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 4
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 6
+        }
       }
     },
     {
@@ -1291,23 +1920,35 @@
       "title": "Magic: The Gathering card scanning mode",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/components/scan/video-scan-panels.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 5
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 7
+        }
       }
     },
     {
@@ -1315,27 +1956,40 @@
       "title": "Selectable automatic recognition engine with fallback",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/app/scan/page.tsx",
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/components/scan/video-scan-lab.tsx"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/app/scan/page.tsx",
+          "line": 2
+        },
+        "limitation": "Automatic cross-engine and cross-game selection is not equivalent across runtimes."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
+          "line": 4
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1343,26 +1997,38 @@
       "title": "Selectable fully on-device recognition engine",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/video-scan-lab.tsx",
           "frontend/src/components/scan/use-video-scan-processor.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/video-scan-lab.tsx",
+          "line": 2
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
+          "line": 5
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -1370,25 +2036,55 @@
       "title": "Selectable server perceptual-hash recognition engine",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 6
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 3
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       }
     },
@@ -1397,24 +2093,55 @@
       "title": "Selectable server embedding recognition engine",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 4
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       }
     },
@@ -1423,27 +2150,39 @@
       "title": "ArcFace model, matching index, thresholds, and rejection policy",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/lib/scan/embedding-matcher.ts",
           "frontend/public/scan-index/README.md"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/scan/embedding-matcher.ts",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ArcFaceCardRecognizer.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ArcFaceOnnxEncoder.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/PackedCardEmbeddingIndex.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
           "mobile-apps/android/app/src/androidTest/java/com/ahmadjalil/tcger/data/scanner/model/ArcFaceOnnxRecognitionInstrumentedTest.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ArcFaceCardRecognizer.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1451,27 +2190,40 @@
       "title": "DINOv2 model, matching index, thresholds, and rejection policy",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/src/lib/scan/embedding-matcher.ts",
           "frontend/public/scan-index/README.md"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/lib/scan/embedding-matcher.ts",
+          "line": 2
+        },
+        "limitation": "DINOv2 browser paths exist, but production model, gate, and acceptance parity remain incomplete."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/DinoV2CardRecognizer.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/DinoV2ManualOcrRescue.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/androidTest/java/com/ahmadjalil/tcger/data/scanner/model/DinoV2OnnxRecognitionInstrumentedTest.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/DinoV2CardRecognizer.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1479,7 +2231,6 @@
       "title": "Assumed card-language scanner default",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/shared-scan-session.tsx",
           "frontend/src/lib/scan/scanner-options.ts"
@@ -1490,20 +2241,34 @@
             "id": "scanner.options.language",
             "path": "frontend/src/lib/scan/scanner-options.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/shared-scan-session.tsx",
+          "line": 2
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "partial",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 5
+        },
+        "limitation": "Language selection is tracked; recognition does not yet implement equivalent language-aware behavior."
       }
     },
     {
@@ -1511,21 +2276,43 @@
       "title": "Scanner flashlight control",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 2
+        },
+        "requires": [
+          "camera-torch"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
+          "line": 2
+        },
+        "requires": [
+          "camera-torch"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 8
+        },
+        "requires": [
+          "camera-torch"
         ]
       }
     },
@@ -1534,24 +2321,37 @@
       "title": "Automatically open each recognition result",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 3
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 9
+        }
       }
     },
     {
@@ -1559,26 +2359,40 @@
       "title": "Per-card market prices and running scan-session total",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 4
+        },
+        "limitation": "Session quotes and currency totals exist; the native price-mode control semantics are not yet equivalent."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPriceMode.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPriceMode.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerPriceClient.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerPriceClient.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1586,25 +2400,37 @@
       "title": "Persistent multi-card scan-session tray",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/shared-scan-session.tsx",
           "frontend/src/lib/api/scan-sessions.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/shared-scan-session.tsx",
+          "line": 3
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
+          "line": 4
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
+          "line": 2
+        }
       }
     },
     {
@@ -1612,7 +2438,6 @@
       "title": "Select, remove, clear, and bulk-add scan-session results",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/shared-scan-session.tsx",
           "frontend/src/lib/api/scan-sessions.ts",
@@ -1625,21 +2450,34 @@
             "id": "scanner.results.sessionReview",
             "path": "convex-backend/convex/scanSessions.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/shared-scan-session.tsx",
+          "line": 4
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
+          "line": 3
+        }
       }
     },
     {
@@ -1647,23 +2485,35 @@
       "title": "Add a recognized card directly to a binder",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/components/scan/shared-scan-session.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 7
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "line": 5
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 10
+        }
       }
     },
     {
@@ -1671,25 +2521,38 @@
       "title": "Adjust card corners and retry recognition",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 5
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerCropAdjustView.swift",
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerViewModel.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerCropAdjustView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerGuidedCapture.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/binder/PerspectiveCardCropper.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerGuidedCapture.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1697,21 +2560,40 @@
       "title": "Sync scanner results into a shared web session",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/shared-scan-session.tsx",
           "frontend/src/lib/api/scan-sessions.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/shared-scan-session.tsx",
+          "line": 5
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/APIService+ScanSessions.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
+          "line": 5
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSharedSessionClient.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt",
@@ -1723,6 +2605,17 @@
             "id": "scanner.sharedWebSession",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/scanner/ScannerSharedSessionClientTest.kt"
           }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSharedSessionClient.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       }
     },
@@ -1731,25 +2624,38 @@
       "title": "Save binder-page photos and replace them on retake",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 6
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
+          "line": 6
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/BinderPagePhotoStore.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/BinderPagePhotoStore.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1757,24 +2663,54 @@
       "title": "Persist server-side scan images, crops, timings, and metadata",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 8
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
           "mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "line": 6
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       }
     },
@@ -1783,25 +2719,37 @@
       "title": "Hidden developer-tools unlock and scanner-testing toggle",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "mobile-parity/SCANNER_PACK_MATRIX.md",
           "frontend/src/components/scan/scanner-workbench.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 7
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDeveloperAccess.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDeveloperAccess.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1809,21 +2757,29 @@
       "title": "Deterministic demo card and binder-page scanner inputs",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/src/components/scan/scan-review-lab.tsx",
           "frontend/public/scan-review/sinnoh-ground-truth.v2.json"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/scan/scan-review-lab.tsx",
+          "line": 1
+        },
+        "limitation": "Demo card/video fixtures exist; equivalent runnable binder-page source fixtures remain incomplete."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "line": 7
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDemoInputs.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerGuidedCapture.kt",
@@ -1835,7 +2791,12 @@
             "id": "scanner.debug.testingInputs",
             "path": "mobile-apps/android/app/src/androidTest/java/com/ahmadjalil/tcger/data/scanner/OnDeviceCardTextRecognizerTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDemoInputs.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1843,24 +2804,54 @@
       "title": "Browse, inspect, refresh, and label recent server debug captures",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 9
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerDebugCaptureBrowser.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerDebugCaptureBrowser.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ServerDebugCapturesScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ServerDebugCapturesScreen.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       }
     },
@@ -1869,25 +2860,38 @@
       "title": "Live scanner debug camera, quad overlay, timing, and log",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/src/components/scan/video-scan-lab.tsx",
           "frontend/src/components/scan/video-scan-panels.tsx"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/scan/video-scan-lab.tsx",
+          "line": 3
+        },
+        "limitation": "Imported-video diagnostics exist; developer live-camera capture remains incomplete."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerLiveDebug.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerLiveDebug.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1895,7 +2899,6 @@
       "title": "Debug game, embedding-only, and analysis-interval options",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/video-scan-panels.tsx",
           "frontend/src/components/scan/video-scan-sampling.ts",
@@ -1908,21 +2911,34 @@
             "id": "scanner.debug.liveConfiguration",
             "path": "frontend/src/components/scan/video-scan-sampling.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/video-scan-panels.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 6
+        }
       }
     },
     {
@@ -1930,26 +2946,38 @@
       "title": "Record, pause, clear, save, and share live analyzed frames",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "mobile-parity/SCANNER_PACK_MATRIX.md",
           "frontend/src/components/scan/scanner-workbench.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 8
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDebugRecorder.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerAttemptImages.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerRecordingArchive.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDebugRecorder.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -1957,25 +2985,38 @@
       "title": "Record production scans and decision evidence as training data",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 10
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerDevModeStore.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDevModeSection.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerDevModeStore.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "partial",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDebugRecorder.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDebugRecorder.kt",
+          "line": 2
+        },
+        "limitation": "Production inputs and results are retained; internal per-model-stage hypotheses are not exposed."
       }
     },
     {
@@ -1983,26 +3024,40 @@
       "title": "Optionally persist every crop-attempt image",
       "policy": "track",
       "web": {
-        "status": "partial",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 11
+        },
+        "limitation": "Source and derived artifacts are retained; every internal recognition-attempt crop is not exposed."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerDevModeStore.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDevModeSection.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerDevModeStore.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "partial",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerAttemptImages.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerRecordingArchive.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerAttemptImages.kt",
+          "line": 1
+        },
+        "limitation": "Source and canonical guide crop are retained; every internal recognition-attempt crop is not exposed."
       }
     },
     {
@@ -2010,25 +3065,37 @@
       "title": "Browse, select, share, delete, and export recorded sessions",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/components/scan/scanner-workbench.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 12
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDevModeSection.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerDevModeSection.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerRecordingSessionStore.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerRecordingSessionStore.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -2036,28 +3103,40 @@
       "title": "Import and replay extracted scanner recordings",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/app/scan/review/page.tsx",
           "frontend/src/components/scan/scan-review-lab.tsx",
           "frontend/src/components/scan/scanner-workbench.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/app/scan/review/page.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerReplay.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerReplay.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDebugRecorder.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerRecordingArchive.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDebugRecorder.kt",
+          "line": 3
+        }
       }
     },
     {
@@ -2065,7 +3144,6 @@
       "title": "Browse labeled reference sets and compare expected results",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/scan-review-lab.tsx",
           "frontend/src/lib/scan/scan-reference-sets.ts",
@@ -2077,19 +3155,33 @@
             "id": "scanner.debug.referenceSets",
             "path": "frontend/src/lib/scan/scan-reference-sets.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scan-review-lab.tsx",
+          "line": 2
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerReferenceBrowserView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ScannerReferenceBrowserView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "partial",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerReferenceSetRunner.kt"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerReferenceSetRunner.kt",
+          "line": 1
+        },
+        "limitation": "The production-handler runner exists; its native reference-set browser is not wired."
       }
     },
     {
@@ -2097,7 +3189,6 @@
       "title": "Validate scanner models, indexes, hashes, and reference assets",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/scanner-asset-diagnostics.tsx",
           "frontend/src/components/scan/use-video-scan-data.ts",
@@ -2109,22 +3200,35 @@
             "id": "scanner.debug.assetDiagnostics",
             "path": "frontend/src/lib/scan/scanner-asset-diagnostics.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-asset-diagnostics.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerAssetDiagnostics.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerDebugView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerAssetDiagnostics.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerAssetDiagnostics.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerControls.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerAssetDiagnostics.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -2132,24 +3236,37 @@
       "title": "Capture per-attempt thresholds, geometry, OCR, gate, and timing evidence",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 13
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScanDiagnostics.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScanDiagnostics.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "partial",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerBoundaryDiagnostics.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerDebugRecorder.kt"
-        ]
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerBoundaryDiagnostics.kt",
+          "line": 1
+        },
+        "limitation": "Boundary engine, OCR, candidates, and timing are available; internal gate, quad, and ANN stages are not exposed."
       }
     },
     {
@@ -2157,25 +3274,55 @@
       "title": "Correct/wrong/review statuses and structured failure tags",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
           "frontend/src/lib/api/scan.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/card-scan-panel.tsx",
+          "line": 14
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/CardScannerDebugCaptureBrowser.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift",
+          "line": 6
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/domain/Models.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ServerDebugCapturesScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/domain/Models.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
         ]
       }
     },
@@ -2184,23 +3331,39 @@
       "title": "Fast vectorized ANN index-search toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 9
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 7
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2208,23 +3371,39 @@
       "title": "Allowed-index search-scope cache toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 10
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 8
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2232,23 +3411,39 @@
       "title": "Staged crop-retry hypotheses toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 11
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 3
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 9
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2256,23 +3451,39 @@
       "title": "Batched orientation-check toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 12
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 4
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 10
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2280,23 +3491,39 @@
       "title": "Parallel orientation-check toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 13
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 5
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 11
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2304,24 +3531,38 @@
       "title": "Scanner-model warm-start toggle",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "mobile-parity/SCANNER_PACK_MATRIX.md",
           "frontend/src/components/scan/scanner-workbench.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 14
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 6
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 12
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2329,24 +3570,38 @@
       "title": "Fast shutter-capture toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 15
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 7
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 13
+        }
       }
     },
     {
@@ -2354,23 +3609,39 @@
       "title": "Fast-first footer OCR toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 16
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 8
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 14
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2378,23 +3649,39 @@
       "title": "Lean OCR-strip processing toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 17
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 9
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 15
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2402,23 +3689,39 @@
       "title": "Footer-first OCR ordering toggle",
       "policy": "track",
       "web": {
-        "status": "planned",
         "sources": [
+          "frontend/src/components/scan/scanner-workbench.tsx",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 18
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerPerfOptions.swift",
+          "line": 10
+        }
       },
       "android": {
-        "status": "planned",
         "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
           "mobile-parity/SCANNER_PACK_MATRIX.md"
-        ]
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt",
+          "line": 16
+        },
+        "limitation": "No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity."
       }
     },
     {
@@ -2426,43 +3729,81 @@
       "title": "Portable backup fidelity and recovery",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
-          "frontend/src/lib/storage/portable-backup.ts"
+          "frontend/src/lib/storage/portable-backup.ts",
+          "frontend/src/lib/api/backups.ts",
+          "packages/api-types/src/portable-backup.ts",
+          "frontend/src/components/account/backup-panel.tsx"
         ],
         "tests": [
           {
             "runner": "playwright",
             "id": "data.portableBackup",
             "path": "frontend/tests/parity/portable-workflows.spec.ts"
+          },
+          {
+            "runner": "api-contract",
+            "id": "data.portableBackup",
+            "path": "frontend/src/lib/api/server.api-contract.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/storage/portable-backup.ts",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/PortableBackupMerge.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStorePersistence.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "mobile-apps/ios/TCGer/TCGerTests/LocalStorePersistenceTests.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStorePhotoRepository.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStoreBackupCodec.swift"
         ],
         "tests": [
           {
             "runner": "xctest",
             "id": "data.portableBackup",
             "path": "mobile-apps/ios/TCGer/TCGerTests/LocalStorePersistenceTests.swift"
+          },
+          {
+            "runner": "api-contract",
+            "id": "data.portableBackup",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/CollectionBackup.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/CollectionBackup.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/PortableBackupMerge.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
         ],
         "tests": [
           {
             "runner": "gradle",
             "id": "data.portableBackup",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/backup/PortableParityTest.kt"
+          },
+          {
+            "runner": "api-contract",
+            "id": "data.portableBackup",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/CollectionBackup.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -2470,7 +3811,6 @@
       "title": "Filter cards beyond preview limits",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/cards/card-search-panel.tsx"
         ],
@@ -2480,10 +3820,14 @@
             "id": "cards.filteredSearch",
             "path": "frontend/tests/parity/portable-workflows.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/cards/card-search-panel.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift"
         ],
@@ -2493,13 +3837,22 @@
             "id": "cards.filteredSearch",
             "path": "mobile-apps/ios/TCGer/TCGerTests/CardSearchFilterTests.swift"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
+          "line": 3
+        }
       }
     },
     {
@@ -2507,7 +3860,6 @@
       "title": "Correct and persist binder page crops",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/scanner-workbench.tsx"
         ],
@@ -2517,19 +3869,32 @@
             "id": "scanner.binderCorners",
             "path": "frontend/tests/parity/portable-workflows.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 19
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 11
+        }
       }
     },
     {
@@ -2537,7 +3902,6 @@
       "title": "Edit and retain physical-copy metadata",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/collections/sandbox/detail-panel.tsx"
         ],
@@ -2547,12 +3911,16 @@
             "id": "collections.copyMetadata",
             "path": "frontend/src/lib/storage/portable-backup.test.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/sandbox/detail-panel.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
         ],
         "tests": [
           {
@@ -2560,10 +3928,14 @@
             "id": "collections.copyMetadata",
             "path": "mobile-apps/ios/TCGer/TCGerTests/LocalStorePersistenceTests.swift"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionCopyEditor.kt"
         ],
@@ -2573,7 +3945,12 @@
             "id": "collections.copyMetadata",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/backup/PortableParityTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionCopyEditor.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -2581,19 +3958,26 @@
       "title": "Condition and tag smart folders",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/collections/smart-folder-manager.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/smart-folder-manager.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Models/SmartFolderModels.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Models/SmartFolderModels.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SmartFoldersPanel.kt"
         ],
@@ -2603,7 +3987,12 @@
             "id": "collections.smartFolders",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/backup/PortableParityTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SmartFoldersPanel.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -2611,22 +4000,34 @@
       "title": "Profile password signup deletion and preferences",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/account/account-settings-dialog.tsx"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/account/account-settings-dialog.tsx",
+          "line": 4
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ProfileView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/ProfileView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/AccountManagementPanel.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/AccountManagementPanel.kt",
+          "line": 1
+        }
       }
     },
     {
@@ -2634,7 +4035,6 @@
       "title": "Save selected cards and reopen saved binder photos",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/scan/scanner-workbench.tsx"
         ],
@@ -2644,19 +4044,32 @@
             "id": "scanner.binderReview",
             "path": "frontend/tests/parity/portable-workflows.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/scan/scanner-workbench.tsx",
+          "line": 20
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift",
+          "line": 2
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "line": 12
+        }
       }
     },
     {
@@ -2664,7 +4077,6 @@
       "title": "Grading planner: prices, costs, decision, population, history and receipts",
       "policy": "track",
       "web": {
-        "status": "implemented",
         "sources": [
           "frontend/src/components/grading/grading-workspace.tsx",
           "frontend/app/prices/grading/page.tsx"
@@ -2675,10 +4087,14 @@
             "id": "pricing.gradingWorkspace",
             "path": "frontend/tests/parity/grading-workspace.spec.ts"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/grading/grading-workspace.tsx",
+          "line": 1
+        }
       },
       "ios": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/GradingWorkspaceView.swift",
           "mobile-apps/ios/TCGer/TCGer/Models/GradingModels.swift"
@@ -2689,10 +4105,14 @@
             "id": "pricing.gradingWorkspace",
             "path": "mobile-apps/ios/TCGer/TCGerTests/GradingContractTests.swift"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/GradingWorkspaceView.swift",
+          "line": 1
+        }
       },
       "android": {
-        "status": "implemented",
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/GradingWorkspaceScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/GradingModels.kt"
@@ -2703,9 +4123,1298 @@
             "id": "pricing.gradingWorkspace",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/libraryoperations/GradingContractTest.kt"
           }
-        ]
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/GradingWorkspaceScreen.kt",
+          "line": 1
+        }
       },
       "flow": "maestro/flows/grading-workspace.yaml"
+    },
+    {
+      "id": "collections.manage",
+      "title": "Rename and delete binders",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/api/collections.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/api/collections.ts",
+          "line": 2
+        }
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "line": 2
+        }
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+          "line": 2
+        }
+      }
+    },
+    {
+      "id": "server.capabilities",
+      "title": "Server capability flags",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/api/health.ts",
+          "frontend/src/lib/api/health-features.ts",
+          "frontend/src/lib/api/health-features.test.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/api/health.ts",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt",
+          "line": 1
+        },
+        "limitation": "Health responses decode capability flags, but verifyServer discards them; feature gating and automatic capability refresh after recovery are absent.",
+        "modes": [
+          "server"
+        ]
+      }
+    },
+    {
+      "id": "widgets.sessionPrivacy",
+      "title": "Clear home screen widget snapshots when sessions change",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/account/account-settings-dialog.tsx"
+        ],
+        "status": "not_applicable",
+        "implementation": {
+          "path": "frontend/src/components/account/account-settings-dialog.tsx",
+          "line": 2
+        },
+        "limitation": "No home screen widget extension is shipped on this surface."
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
+          "mobile-apps/ios/TCGer/TCGerWidgets/SharedDataReader.swift",
+          "mobile-apps/ios/TCGer/TCGerTests/WidgetSessionTests.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
+          "line": 1
+        }
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt"
+        ],
+        "status": "not_applicable",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt",
+          "line": 2
+        },
+        "limitation": "No home screen widget extension is shipped on this surface."
+      }
+    },
+    {
+      "id": "storage.containers",
+      "title": "Create and edit physical containers and compartments",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/storage-editor.tsx",
+          "frontend/src/lib/api/collection-operations.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/storage-editor.tsx",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "storage.containers",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LibraryOperationsContractTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "storage.placements",
+      "title": "Assign and remove owned copies at physical storage slots",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/storage-editor.tsx",
+          "frontend/src/lib/api/collection-operations.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/storage-editor.tsx",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "storage.placements",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/libraryoperations/StoragePlacementRulesTest.kt"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "decks.checkout",
+      "title": "Reserve owned deck copies and display a pull list",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/decks/deck-checkout-panel.tsx",
+          "frontend/src/lib/api/decks.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/decks/deck-checkout-panel.tsx",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/DeckCheckoutView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/DeckCheckoutView.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 3
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "decks.refile",
+      "title": "Check in a deck and retain its location snapshot as a refile guide",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/decks/deck-checkout-panel.tsx",
+          "frontend/src/lib/api/decks.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/decks/deck-checkout-panel.tsx",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/DeckCheckoutView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/DeckCheckoutView.swift",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 4
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "intake.rapidEntry",
+      "title": "Add copies by set and collector number with intake receipts",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/intake-tools.tsx",
+          "frontend/src/lib/api/collection-operations.ts"
+        ],
+        "tests": [
+          {
+            "runner": "node",
+            "id": "intake.rapidEntry",
+            "path": "frontend/src/lib/collection-operations.test.ts"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/intake-tools.tsx",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 3
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 5
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "intake.acquisitionCosts",
+      "title": "Allocate purchase costs to physical copies in exact cents",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/intake-tools.tsx",
+          "frontend/src/lib/api/collection-operations.ts"
+        ],
+        "tests": [
+          {
+            "runner": "node",
+            "id": "intake.acquisitionCosts",
+            "path": "frontend/src/lib/collection-operations.test.ts"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/intake-tools.tsx",
+          "line": 2
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 4
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "intake.acquisitionCosts",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/libraryoperations/ExactCentAllocatorTest.kt"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 6
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "intake.psaCertification",
+      "title": "Look up PSA certifications and confirm the acquired printing",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/intake-tools.tsx",
+          "frontend/src/lib/api/collection-operations.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/intake-tools.tsx",
+          "line": 3
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 5
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 7
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "pricing.provenance",
+      "title": "Read tracked quote source, coverage and provenance",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/api/pricing.ts",
+          "frontend/src/components/cards/card-preview.tsx"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/lib/api/pricing.ts",
+          "line": 1
+        },
+        "limitation": "Tracked quote APIs retain source/provenance and package snapshots; a dedicated native-style original-quote, FX and match-confidence inspection view is absent.",
+        "modes": [
+          "server",
+          "local"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "pricing.provenance",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LibraryOperationsContractTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 6
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "pricing.provenance",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsContractTest.kt"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 8
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "storage.audit",
+      "title": "Preview and save read-only physical-location audits",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/storage-audit-dialog.tsx",
+          "frontend/src/lib/api/collection-operations.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/components/collections/storage-audit-dialog.tsx",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 7
+        },
+        "limitation": "Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent."
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 9
+        },
+        "limitation": "Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent."
+      }
+    },
+    {
+      "id": "collections.historyUndo",
+      "title": "Browse collection mutation history and undo eligible changes",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/collection-history-dialog.tsx",
+          "frontend/src/lib/api/collection-operations.ts"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/collections/collection-history-dialog.tsx",
+          "line": 1
+        },
+        "limitation": "Server mutation history and eligible undo are available; the offline demo retains 25 recent changes and only the latest may be undone.",
+        "modes": [
+          "server",
+          "demo"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
+          "line": 8
+        },
+        "limitation": "Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent.",
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsRepository.kt"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt",
+          "line": 10
+        },
+        "limitation": "Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent.",
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
+    },
+    {
+      "id": "games.catalogDownloads",
+      "title": "Download and verify publisher game catalogs for offline browsing",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/game-packages/game-package-client.ts",
+          "frontend/src/components/account/community-game-libraries-panel.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "node",
+            "id": "games.catalogDownloads",
+            "path": "frontend/src/lib/game-packages/future-game.test.ts"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/game-packages/game-package-client.ts",
+          "line": 1
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GameStoreView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GamePackageCapabilitiesView.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "games.catalogDownloads",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/GamePackageFixtureTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "line": 1
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CommunityGamePackages.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "games.catalogDownloads",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageFixtureTest.kt"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "line": 1
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      }
+    },
+    {
+      "id": "games.packageUpdates",
+      "title": "Check and install monotonic publisher game-package updates",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/game-packages/game-package-client.ts",
+          "frontend/src/components/account/community-game-libraries-panel.tsx"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/game-packages/game-package-client.ts",
+          "line": 2
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GameStoreView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GamePackageCapabilitiesView.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "games.packageUpdates",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/GamePackageFixtureTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "line": 2
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CommunityGamePackages.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "games.packageUpdates",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageFixtureTest.kt"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "line": 2
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      }
+    },
+    {
+      "id": "games.capability.scannerDownload",
+      "title": "Download the game package scanner runtime separately from its catalog",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/game-packages/game-package-client.ts",
+          "frontend/src/lib/scan/embedding-matcher.ts"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/game-packages/game-package-client.ts",
+          "line": 3
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "package-web-scanner-bundle"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GamePackageCapabilitiesView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/ScannerAssetStore.swift"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "line": 3
+        },
+        "limitation": "Scanner installation accepts package bundle sources for built-in TCGGame identifiers; arbitrary publisher game IDs cannot pass the enum guard and remain unsupported.",
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "package-ios-scanner-bundle"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ScannerAssetStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CommunityGamePackages.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppViewModel.kt",
+          "line": 1
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "package-android-scanner-bundle"
+        ]
+      }
+    },
+    {
+      "id": "games.capability.priceDownload",
+      "title": "Download verified game price snapshots separately from the catalog",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/game-packages/game-package-client.ts",
+          "frontend/src/components/account/community-game-libraries-panel.tsx"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/game-packages/game-package-client.ts",
+          "line": 4
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GameStoreView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GamePackageCapabilitiesView.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "line": 4
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CommunityGamePackages.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "line": 3
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      }
+    },
+    {
+      "id": "games.capability.packDownload",
+      "title": "Download verified game pack libraries separately from the catalog",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/game-packages/game-package-client.ts",
+          "frontend/src/components/account/community-game-libraries-panel.tsx"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/game-packages/game-package-client.ts",
+          "line": 5
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GameStoreView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GamePackageCapabilitiesView.swift"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift",
+          "line": 5
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CommunityGamePackages.kt"
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/gamepackage/GamePackageStore.kt",
+          "line": 4
+        },
+        "modes": [
+          "local"
+        ],
+        "requires": [
+          "network-for-download",
+          "publisher-game-package"
+        ]
+      }
+    },
+    {
+      "id": "navigation.appLinks",
+      "title": "Open scanner, search, binder and wishlist app links",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/app/layout.tsx",
+          "frontend/app/scan/page.tsx",
+          "frontend/app/cards/page.tsx",
+          "frontend/app/collections/page.tsx",
+          "frontend/app/wishlists/page.tsx"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/app/layout.tsx",
+          "line": 1
+        },
+        "limitation": "Top-level scan/cards/collections/wishlists routes exist; native /search, /binder/:id and /wishlist/:id HTTPS links lack equivalent web fallback routes."
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/ContentView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Models/AppTab.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CollectionsView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift",
+          "mobile-apps/ios/TCGer/TCGer.entitlements"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "navigation.appLinks",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/DeepLinkRoutingTests.swift"
+          }
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/ContentView.swift",
+          "line": 1
+        },
+        "limitation": "Custom-scheme and associated-domain routing exists, including pending binder/wishlist resolution; deployed association files and release-device cold starts are not verified."
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppLink.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
+          "mobile-apps/android/app/src/main/AndroidManifest.xml"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/AppLink.kt",
+          "line": 1
+        },
+        "limitation": "Custom-scheme parsing and HTTPS intent filters exist for scan/search/binder/collection/wishlist; deployed domain association and release-device cold starts are not verified."
+      }
+    },
+    {
+      "id": "security.biometricLock",
+      "title": "Lock the native app with device authentication",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/account/account-settings-dialog.tsx"
+        ],
+        "status": "not_applicable",
+        "implementation": {
+          "path": "frontend/src/components/account/account-settings-dialog.tsx",
+          "line": 1
+        },
+        "limitation": "No native app lock or device-authentication overlay is shipped for the browser; web account authentication is separate."
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Utils/BiometricAuthManager.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/RootView.swift",
+          "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Utils/BiometricAuthManager.swift",
+          "line": 1
+        },
+        "limitation": "Face ID/Touch ID lock exists; authentication uses biometric-only policy even though cancellation says Use Passcode, so device-credential fallback is absent.",
+        "requires": [
+          "enrolled-device-biometrics"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/preferences/PreferencesStore.kt"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt",
+          "line": 1
+        },
+        "limitation": "Biometric or device-credential lock exists; unavailable authenticators currently unlock the app, and release/hardware lifecycle coverage is absent.",
+        "requires": [
+          "device-authentication"
+        ]
+      }
+    },
+    {
+      "id": "release.readiness",
+      "title": "Verify production release configuration and signed distribution",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/pwa/service-worker-register.tsx",
+          "frontend/app/layout.tsx",
+          ".github/workflows/build-images.yml"
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/components/pwa/service-worker-register.tsx",
+          "line": 1
+        },
+        "limitation": "App and container build configuration exist; production deploy, PWA install/update and release smoke criteria are not exercised by this capability record."
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
+          "mobile-apps/ios/TCGer/TCGer.xcodeproj/project.pbxproj",
+          ".github/workflows/ios.yml"
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
+          "line": 1
+        },
+        "limitation": "App target and unsigned Debug simulator testing exist; signed archive, provisioning, privacy/store submission and release-device smoke criteria remain unverified."
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
+          "mobile-apps/android/app/build.gradle.kts",
+          "mobile-apps/android/app/src/main/AndroidManifest.xml"
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt",
+          "line": 1
+        },
+        "limitation": "Release minification is configured; no release signingConfig is declared in app Gradle, and signed bundle, store/privacy and release-device smoke criteria remain unverified."
+      }
+    },
+    {
+      "id": "collections.copies",
+      "title": "Add, edit and move physical copies; remove printing groups",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/api/collections.ts",
+          "frontend/src/components/collections/sandbox/detail-panel.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "api-contract",
+            "id": "collections.copies",
+            "path": "frontend/src/lib/api/server.api-contract.test.ts"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "frontend/src/lib/api/collections.ts",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CollectionDetailView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
+        ],
+        "tests": [
+          {
+            "runner": "api-contract",
+            "id": "collections.copies",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionCopyEditor.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+        ],
+        "tests": [
+          {
+            "runner": "api-contract",
+            "id": "collections.copies",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+          "line": 1
+        },
+        "modes": [
+          "server"
+        ],
+        "requires": [
+          "authenticated-server"
+        ]
+      }
     }
   ],
   "controls": [
@@ -2816,6 +5525,7 @@
     "option.scannerDebug.fastCapture",
     "option.scannerDebug.fastFooterOcr",
     "option.scannerDebug.leanOcrStrips",
-    "option.scannerDebug.footerFirstOcr"
+    "option.scannerDebug.footerFirstOcr",
+    "action.keyboard.dismiss"
   ]
 }

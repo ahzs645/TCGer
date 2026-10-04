@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"sealed.inventory","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 struct SealedInventoryView: View {

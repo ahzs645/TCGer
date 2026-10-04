@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"server.capabilities","platform":"web","status":"implemented","modes":["server"]}
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,73 +6,28 @@ import type { ServerFeatures } from "@tcg/api-types";
 
 import { API_BASE_URL } from "./base-url";
 
-export type FeatureAvailability = Partial<ServerFeatures>;
-
-const featureKeys = [
-  "decks",
-  "finance",
-  "sealed",
-  "analytics",
-  "trades",
-  "prices",
-  "notifications",
-  "alerts",
-  "shops",
-  "automations",
-  "shipments",
-  "public",
-] as const satisfies readonly (keyof ServerFeatures)[];
+import { createServerFeatureCache, type FeatureAvailability } from "./health-features";
+export type { FeatureAvailability } from "./health-features";
 
 const failOpenFeatures: FeatureAvailability = {};
-let featuresPromise: Promise<FeatureAvailability> | null = null;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-async function fetchServerFeatures(): Promise<FeatureAvailability> {
-  const response = await fetch(`${API_BASE_URL}/health`);
-  if (!response.ok) {
-    throw new Error("Failed to load server features");
-  }
-
-  const data: unknown = await response.json();
-  if (!isRecord(data) || !isRecord(data.features)) {
-    return failOpenFeatures;
-  }
-
-  const features: FeatureAvailability = {};
-  for (const key of featureKeys) {
-    const value = data.features[key];
-    if (typeof value === "boolean") {
-      features[key] = value;
-    }
-  }
-  return features;
-}
-
-function getServerFeatures(): Promise<FeatureAvailability> {
-  if (!featuresPromise) {
-    featuresPromise = fetchServerFeatures().catch(() => failOpenFeatures);
-  }
-  return featuresPromise;
-}
+const serverFeatureCache = createServerFeatureCache(async () => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
+    if (!response.ok) throw new Error("Failed to load server features");
+    return await response.json();
+  } finally { clearTimeout(timeout); }
+});
 
 export function useServerFeatures(): FeatureAvailability {
   const [features, setFeatures] =
     useState<FeatureAvailability>(failOpenFeatures);
 
   useEffect(() => {
-    let cancelled = false;
-    void getServerFeatures().then((loadedFeatures) => {
-      if (!cancelled) {
-        setFeatures(loadedFeatures);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    const unsubscribe = serverFeatureCache.subscribe(setFeatures);
+    void serverFeatureCache.get();
+    return unsubscribe;
   }, []);
 
   return features;
@@ -104,7 +60,10 @@ export function useServerStatus(): {
 
     fetch(`${API_BASE_URL}/health`, { signal: controller.signal })
       .then((response) => {
-        if (!cancelled) setStatus(response.ok ? "online" : "offline");
+        if (!cancelled) {
+          setStatus(response.ok ? "online" : "offline");
+          if (response.ok) void serverFeatureCache.refresh();
+        }
       })
       .catch(() => {
         if (!cancelled) setStatus("offline");

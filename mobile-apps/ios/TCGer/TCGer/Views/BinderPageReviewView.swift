@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"scanner.binderCorners","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.binderReview","platform":"ios","status":"implemented"}
+
 import SwiftUI
 import UIKit
 

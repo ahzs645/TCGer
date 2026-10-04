@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"packOpening.save.collection","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.save.sealedLedger","platform":"web","status":"implemented"}
+
 "use client";
 
 import { Download } from "lucide-react";

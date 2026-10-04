@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.results.priceMode","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import com.ahmadjalil.tcger.domain.CatalogCard

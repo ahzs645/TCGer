@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.copies","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"collections.manage","platform":"android","status":"implemented"}
 package com.ahmadjalil.tcger.data.remote
 
 import retrofit2.http.Body

@@ -136,7 +136,7 @@ final class PackOpeningResourceTests: XCTestCase {
     }
 
     @MainActor
-    func testDownloadedSetRemainsOpenableWhenNetworkRouteIsUnusable() throws {
+    func testUnverifiedLegacyCompletionRecordCannotPromiseOfflineOpening() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -154,7 +154,7 @@ final class PackOpeningResourceTests: XCTestCase {
         try encoder.encode(record).write(to: directory.appendingPathComponent("base1.json"))
 
         let manager = PackOfflineDownloadManager(directory: directory)
-        XCTAssertTrue(manager.canOpen(setID: "base1", isConnected: false))
+        XCTAssertFalse(manager.canOpen(setID: "base1", isConnected: false))
         XCTAssertFalse(manager.canOpen(setID: "me5", isConnected: false))
         XCTAssertTrue(manager.canOpen(setID: "me5", isConnected: true))
     }

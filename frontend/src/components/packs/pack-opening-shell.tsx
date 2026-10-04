@@ -1,3 +1,14 @@
+// @tcger-feature {"id":"packOpening.selectSet","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.selectVariant","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.possibleCards","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.count","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.mode.normal","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.mode.quick","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.orientation","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.customArtwork","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.reveal","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"packOpening.results.grouped","platform":"web","status":"implemented"}
+
 "use client";
 
 import { useMemo, useRef, useState, type ReactNode } from "react";

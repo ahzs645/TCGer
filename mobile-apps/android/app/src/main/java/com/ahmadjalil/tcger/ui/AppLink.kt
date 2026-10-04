@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"navigation.appLinks","platform":"android","status":"partial","limitation":"Custom-scheme parsing and HTTPS intent filters exist for scan/search/binder/collection/wishlist; deployed domain association and release-device cold starts are not verified."}
 package com.ahmadjalil.tcger.ui
 
 import java.net.URI

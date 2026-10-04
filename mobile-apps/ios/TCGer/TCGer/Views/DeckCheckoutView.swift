@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"decks.checkout","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"decks.refile","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 import SwiftUI
 
 struct DeckCheckoutView: View {

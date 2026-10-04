@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"guides.browse","platform":"web","status":"implemented"}
+
 "use client";
 
 import { CollectionGuidesContent } from "@/components/guides/collection-guides-content";

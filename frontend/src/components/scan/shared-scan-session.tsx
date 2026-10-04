@@ -1,3 +1,9 @@
+// @tcger-feature {"id":"scanner.capture.bulkPhoto","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.options.language","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.sessionTray","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.results.sessionReview","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.sharedWebSession","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";

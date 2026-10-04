@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"scanner.debug.devModeRecording","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.attemptImages","platform":"ios","status":"implemented"}
+
 import CoreGraphics
 import Foundation
 import ImageIO

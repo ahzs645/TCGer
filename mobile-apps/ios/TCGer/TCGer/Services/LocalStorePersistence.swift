@@ -1,6 +1,7 @@
 import Foundation
 
 protocol LocalStorePersistenceRepository {
+    var imageDirectory: URL? { get }
     func load() throws -> Data?
     func save(_ payload: Data) throws
     func remove() throws
@@ -9,6 +10,8 @@ protocol LocalStorePersistenceRepository {
     func loadBackup(at url: URL) throws -> Data
     func removeBackup(at url: URL) throws
 }
+
+extension LocalStorePersistenceRepository { var imageDirectory: URL? { nil } }
 
 enum LocalStorePersistenceError: LocalizedError, Equatable {
     case unsupportedSchemaVersion(Int)
@@ -112,6 +115,8 @@ final class FileLocalStorePersistenceRepository: LocalStorePersistenceRepository
         self.maxBackups = max(0, maxBackups)
     }
 
+    var imageDirectory: URL? { storeURL.deletingLastPathComponent().appendingPathComponent("BinderPageImages", isDirectory: true) }
+
     func load() throws -> Data? {
         guard fileManager.fileExists(atPath: storeURL.path) else { return nil }
         return try decodeSnapshot(Data(contentsOf: storeURL), allowLegacyPayload: true)
@@ -125,8 +130,10 @@ final class FileLocalStorePersistenceRepository: LocalStorePersistenceRepository
         if fileManager.fileExists(atPath: storeURL.path), maxBackups > 0 {
             try archiveCurrentSnapshot()
         }
-        try encodedEnvelope(for: payload).write(to: storeURL, options: [.atomic])
+        // All throwing housekeeping precedes the commit. A thrown save must
+        // leave the live file unchanged so LocalStore can safely roll back.
         try rotateBackupsIfNeeded()
+        try encodedEnvelope(for: payload).write(to: storeURL, options: [.atomic])
     }
 
     func remove() throws {

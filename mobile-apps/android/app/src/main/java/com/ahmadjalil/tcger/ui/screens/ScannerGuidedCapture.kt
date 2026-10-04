@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.results.cropCorrection","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import android.graphics.Bitmap

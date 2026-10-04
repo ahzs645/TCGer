@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"sets.browse","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.catalogparity
 
 import androidx.compose.foundation.clickable

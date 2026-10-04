@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"account.management","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import androidx.compose.foundation.layout.*

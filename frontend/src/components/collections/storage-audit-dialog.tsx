@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"storage.audit","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 "use client";
 
 import { useMemo, useState } from "react";

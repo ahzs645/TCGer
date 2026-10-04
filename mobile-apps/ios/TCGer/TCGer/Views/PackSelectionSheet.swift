@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"packOpening.selectSet","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.selectVariant","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.possibleCards","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 private enum PackSetAvailabilityFilter: String, CaseIterable, Identifiable {

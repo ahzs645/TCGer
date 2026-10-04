@@ -3,13 +3,23 @@ import XCTest
 @testable import TCGer
 
 final class APIServiceCollectionCachePolicyTests: XCTestCase {
+    private var root: URL!
+    private var cache: CacheManager!
+    private let config = ServerConfiguration(baseURL: "https://example.test")
+    private func key(_ token: String) -> String { CacheManager.CacheKey.collections(config: config, token: token)! }
+
+    override func setUpWithError() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        cache = CacheManager(directory: root)
+    }
+
     override func tearDownWithError() throws {
-        try? CacheManager.shared.remove(forKey: CacheManager.CacheKey.collections)
+        try? FileManager.default.removeItem(at: root)
         MockCollectionURLProtocol.handler = nil
     }
 
     func testUnauthorizedResponseIsNotMaskedByCachedCollections() async throws {
-        try CacheManager.shared.save([Self.cachedCollection], forKey: CacheManager.CacheKey.collections)
+        try cache.save([Self.cachedCollection], forKey: key("expired"))
         MockCollectionURLProtocol.handler = { request in
             let response = try XCTUnwrap(HTTPURLResponse(
                 url: request.url!,
@@ -34,7 +44,7 @@ final class APIServiceCollectionCachePolicyTests: XCTestCase {
     }
 
     func testTransportFailureCanUseCachedCollections() async throws {
-        try CacheManager.shared.save([Self.cachedCollection], forKey: CacheManager.CacheKey.collections)
+        try cache.save([Self.cachedCollection], forKey: key("token"))
         MockCollectionURLProtocol.handler = { _ in
             throw URLError(.notConnectedToInternet)
         }
@@ -47,10 +57,52 @@ final class APIServiceCollectionCachePolicyTests: XCTestCase {
         XCTAssertEqual(collections, [Self.cachedCollection])
     }
 
+    func testExplicitCacheCannotCrossCredentialOrServerBoundaries() async throws {
+        try cache.save([Self.cachedCollection], forKey: key("account-a"))
+        MockCollectionURLProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
+        let same = try await makeService().getCollections(config: config, token: "account-a", useCache: true)
+        XCTAssertEqual(same, [Self.cachedCollection])
+        for (server, token) in [(config, "account-b"), (ServerConfiguration(baseURL: "https://other.test"), "account-a")] {
+            do {
+                _ = try await makeService().getCollections(config: server, token: token, useCache: true)
+                XCTFail("Another identity must not receive cached account A")
+            } catch { }
+        }
+    }
+
+    func testLegacyCacheIsDiscardedAndAnonymousCannotReadPrivateData() async throws {
+        try cache.save([Self.cachedCollection], forKey: CacheManager.CacheKey.collections)
+        MockCollectionURLProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
+        do {
+            _ = try await makeService().getCollections(config: config, token: nil, useCache: true)
+            XCTFail("Legacy unscoped data must not be returned")
+        } catch { }
+        XCTAssertNil(try cache.load([Collection].self, forKey: CacheManager.CacheKey.collections))
+    }
+
+    func testCacheKeyNormalizesServerAndDoesNotExposeCredentials() {
+        let a = CacheManager.CacheKey.collections(config: ServerConfiguration(baseURL: "https://EXAMPLE.test:443/api/"), token: "secret-token")
+        let b = CacheManager.CacheKey.collections(config: ServerConfiguration(baseURL: "https://example.test/api"), token: "secret-token")
+        XCTAssertEqual(a, b)
+        XCTAssertFalse(a!.contains("secret-token"))
+        XCTAssertNotEqual(a, CacheManager.CacheKey.collections(config: config, token: "secret-token"))
+    }
+
+    func testSuccessfulDeleteInvalidatesOnlyItsSessionCache() async throws {
+        try cache.save([Self.cachedCollection], forKey: key("account-a"))
+        try cache.save([Self.cachedCollection], forKey: key("account-b"))
+        MockCollectionURLProtocol.handler = { request in
+            (try XCTUnwrap(HTTPURLResponse(url: request.url!, statusCode: 204, httpVersion: nil, headerFields: nil)), Data())
+        }
+        try await makeService().deleteCollection(config: config, token: "account-a", id: Self.cachedCollection.id)
+        XCTAssertNil(try cache.load([Collection].self, forKey: key("account-a")))
+        XCTAssertEqual(try cache.load([Collection].self, forKey: key("account-b")), [Self.cachedCollection])
+    }
+
     private func makeService() -> APIService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockCollectionURLProtocol.self]
-        return APIService(session: URLSession(configuration: configuration))
+        return APIService(session: URLSession(configuration: configuration), collectionCache: cache)
     }
 
     private static let cachedCollection = Collection(

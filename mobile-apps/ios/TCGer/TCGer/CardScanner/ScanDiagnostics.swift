@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.decisionDiagnostics","platform":"ios","status":"implemented"}
+
 import CoreGraphics
 import Foundation
 

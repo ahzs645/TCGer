@@ -6,7 +6,7 @@ import test from "node:test";
 import { parseJUnit, renderKotlin, renderReport, renderSwift, renderTypeScript, validateManifest } from "./parity.mjs";
 
 const fixture = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   platforms: ["web", "ios", "android"],
   features: [
     {
@@ -17,10 +17,11 @@ const fixture = {
       web: {
         status: "implemented",
         sources: ["page.tsx"],
+        implementation: { path: "page.tsx", line: 1 },
         tests: [{ runner: "playwright", id: "home.dashboard", path: "home.spec.ts" }],
       },
-      ios: { status: "implemented", sources: ["ios.swift"] },
-      android: { status: "implemented", sources: ["android.kt"] },
+      ios: { status: "implemented", sources: ["ios.swift"], implementation: { path: "ios.swift", line: 1 } },
+      android: { status: "implemented", sources: ["android.kt"], implementation: { path: "android.kt", line: 1 } },
     },
   ],
   controls: ["nav.home"],
@@ -62,6 +63,39 @@ test("requires explicit details for a temporary waiver", () => {
   assert.match(validateManifest(tracked, { checkFiles: false }).join("\n"), /requires waiver reason/);
 });
 
+test("parity features require a declared web behavioral test", () => {
+  const invalid = structuredClone(fixture);
+  delete invalid.features[0].web.tests;
+  assert.match(validateManifest(invalid, { checkFiles: false }).join("\n"), /requires web Playwright evidence/);
+});
+
+test("rejects expired and impossible waiver dates", () => {
+  const tracked = structuredClone(fixture);
+  tracked.features[0].policy = "track";
+  const state = tracked.features[0].android;
+  state.status = "waived";
+  state.limitation = "Device acceptance deferred";
+  state.waiver = { reason: "Awaiting hardware", owner: "mobile", expires: "2026-10-02" };
+  assert.match(validateManifest(tracked, { checkFiles: false, today: "2026-10-03" }).join("\n"), /waiver expired/);
+  state.waiver.expires = "2027-02-30";
+  assert.match(validateManifest(tracked, { checkFiles: false, today: "2026-10-03" }).join("\n"), /real calendar date/);
+  state.waiver.expires = "2026-10-03";
+  assert.deepEqual(validateManifest(tracked, { checkFiles: false, today: "2026-10-03" }), []);
+});
+
+test("support metadata is generated for every language with limitations and prerequisites", () => {
+  const tracked = structuredClone(fixture);
+  for (const platform of tracked.platforms) {
+    tracked.features[0][platform].limitation = "Requires a $5 fixture";
+    tracked.features[0][platform].modes = ["server"];
+    tracked.features[0][platform].requires = ["authenticated-server"];
+  }
+  assert.match(renderTypeScript(tracked), /parityFeatureSupport: Readonly<Record<ParityFeatureID, ParityFeatureSupport>>/);
+  assert.match(renderSwift(tracked), /var support: ParityFeatureSupport/);
+  assert.match(renderKotlin(tracked), /Requires a \\\$5 fixture/);
+  assert.match(renderReport(tracked), /Availability and limitations/);
+});
+
 test("generates typed declarations for all application languages", () => {
   assert.match(renderSwift(fixture), /case homeDashboard = "home\.dashboard"/);
   assert.match(renderKotlin(fixture), /const val HOME_DASHBOARD = "home\.dashboard"/);
@@ -87,7 +121,7 @@ test("only reports verified after every platform has passing evidence", (context
     fs.writeFileSync(file, '<testsuite><testcase name="[home.dashboard] dashboard"/></testsuite>');
     resultFiles[platform] = file;
   }
-  assert.match(renderReport(fixture, { results: resultFiles }), /\| Verified \|/);
+  assert.match(renderReport(fixture, { results: resultFiles, testOnlyUnboundEvidence: true }), /\| Verified \|/);
 });
 
 test("a failure wins when several JUnit cases share one feature id", (context) => {
@@ -96,4 +130,12 @@ test("a failure wins when several JUnit cases share one feature id", (context) =
   const file = path.join(directory, "results.xml");
   fs.writeFileSync(file, '<testsuite><testcase name="[home.dashboard] first"/><testcase name="[home.dashboard] second"><failure/></testcase></testsuite>');
   assert.equal(parseJUnit(file).get("home.dashboard"), "Fail");
+});
+
+test("self-closing passes do not swallow the next failed or skipped test", (context) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "tcger-parity-"));
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, "results.xml");
+  fs.writeFileSync(file, '<testsuite><testcase name="[home.dashboard] pass"/><testcase name="[cards.search] failure"><failure/></testcase><testcase name="[home.dashboard] skipped"><skipped/></testcase></testsuite>');
+  assert.deepEqual([...parseJUnit(file)], [["home.dashboard", "Skipped"], ["cards.search", "Fail"]]);
 });

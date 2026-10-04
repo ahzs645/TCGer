@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"pokedex.browse","platform":"web","status":"implemented"}
+
 import type { Metadata } from "next";
 
 import { AppShell } from "@/components/layout/app-shell";

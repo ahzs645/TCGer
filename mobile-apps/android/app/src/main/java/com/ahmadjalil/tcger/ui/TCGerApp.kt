@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"release.readiness","platform":"android","status":"planned","limitation":"Release minification is configured; no release signingConfig is declared in app Gradle, and signed bundle, store/privacy and release-device smoke criteria remain unverified."}
 package com.ahmadjalil.tcger.ui
 
 import android.net.Uri

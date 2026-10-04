@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"packOpening.save.collection","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"packOpening.save.sealedLedger","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 struct PackOpeningReviewSheet: View {

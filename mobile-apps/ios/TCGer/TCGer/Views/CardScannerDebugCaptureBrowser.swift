@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.captureBrowser","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 import SwiftUI
 
 struct RecentDebugCapturesSheet: View {

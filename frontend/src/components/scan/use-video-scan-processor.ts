@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.capture.binderPage","platform":"web","status":"partial","limitation":"Grid and detection workbench exists; equivalent automatic page-recognition coverage remains incomplete."}
+
 import { useCallback, useRef } from "react";
 
 import {

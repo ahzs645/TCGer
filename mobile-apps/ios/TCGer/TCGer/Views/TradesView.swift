@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"trades.browse","platform":"ios","status":"implemented","modes":["server"]}
+
 import SwiftUI
 
 struct TradesView: View {

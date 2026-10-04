@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"scanner.capture.automatic","platform":"web","status":"partial","limitation":"Consensus capture exists; equivalent camera recognition and acceptance evidence remain incomplete."}
+// @tcger-feature {"id":"scanner.engine.localOnly","platform":"web","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.livePipeline","platform":"web","status":"partial","limitation":"Imported-video diagnostics exist; developer live-camera capture remains incomplete."}
+
 "use client";
 
 import {

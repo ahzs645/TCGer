@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.debug.serverCapture","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement

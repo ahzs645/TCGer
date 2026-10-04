@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"games.capability.scannerDownload","platform":"android","status":"implemented","modes":["local"],"requires":["network-for-download","package-android-scanner-bundle"]}
+// @tcger-feature {"id":"packOpening.save.sealedLedger","platform":"android","status":"implemented"}
+// @tcger-feature {"id":"cards.filteredSearch","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui
 
 import androidx.lifecycle.ViewModel

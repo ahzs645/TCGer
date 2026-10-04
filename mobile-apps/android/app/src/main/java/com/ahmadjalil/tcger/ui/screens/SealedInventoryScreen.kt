@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"sealed.inventory","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.ui.screens
 
 import androidx.compose.foundation.clickable

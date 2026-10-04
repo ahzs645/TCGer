@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"security.biometricLock","platform":"android","status":"partial","requires":["device-authentication"],"limitation":"Biometric or device-credential lock exists; unavailable authenticators currently unlock the app, and release/hardware lifecycle coverage is absent."}
+// @tcger-feature {"id":"widgets.sessionPrivacy","platform":"android","status":"not_applicable","limitation":"No home screen widget extension is shipped on this surface."}
 package com.ahmadjalil.tcger
 
 import android.os.Bundle
@@ -45,7 +47,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ParityTestMode.isEnabled = intent.getStringExtra("tcgerParityTest") == "true"
+        ParityTestMode.isEnabled = BuildConfig.DEBUG && intent.getStringExtra("tcgerParityTest") == "true"
         pendingLink.value = if (savedInstanceState == null) intent.dataString else savedInstanceState.getString("pending-app-link")
         enableEdgeToEdge()
         val container = (application as TCGerApplication).container

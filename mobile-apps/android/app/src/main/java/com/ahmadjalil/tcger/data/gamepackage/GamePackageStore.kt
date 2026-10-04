@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"games.catalogDownloads","platform":"android","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.packageUpdates","platform":"android","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.capability.priceDownload","platform":"android","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
+// @tcger-feature {"id":"games.capability.packDownload","platform":"android","status":"implemented","modes":["local"],"requires":["network-for-download","publisher-game-package"]}
 package com.ahmadjalil.tcger.data.gamepackage
 
 import android.content.Context

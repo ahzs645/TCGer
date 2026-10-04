@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"codes.vault","platform":"android","status":"implemented"}
+
 package com.ahmadjalil.tcger.feature.onlinecodes
 
 import android.content.Context

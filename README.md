@@ -157,7 +157,7 @@ Convex bridge:
 - `TCGER_BRIDGE_SECRET` is shared only by Express and Convex and must be a distinct random value of at least 32 characters in production.
 - Docker persists local Convex users, collections, and file storage in the `convex_data` named volume. Production does not publish the Convex backend or site ports to the host.
 
-In `convex` mode, collections, wishlists, decks, finance, sealed inventory, analytics, trades, and public routes use Convex-native implementations. Prices, notifications, alerts, shops, automations, and shipments return `501 Not Implemented`. In `hybrid` mode the legacy routers remain available, and collections/wishlists can be selected independently with `COLLECTIONS_BACKEND` and `WISHLISTS_BACKEND`. Read `GET /health` and its `features` object to capability-gate clients instead of assuming every deployment supports every group.
+In `convex` mode, collections, wishlists, decks, finance, sealed inventory, analytics, trades, and public routes use Convex-native implementations. Notifications, alerts, and automations also have Convex-native routes; prices use the pricing gateway. Shops and shipments return `501 Not Implemented`. In `hybrid` mode the legacy routers remain available, and collections/wishlists can be selected independently with `COLLECTIONS_BACKEND` and `WISHLISTS_BACKEND`. Read `GET /health` and its `features` object to capability-gate clients instead of assuming every deployment supports every group.
 
 ## API overview
 OpenAPI + Swagger:
@@ -210,6 +210,23 @@ The generated artifacts are written to the named Docker volume `tcger_card_scan_
 ## Mobile apps
 - iOS SwiftUI client with dashboard, collections, scanner, and API service layers lives in `mobile-apps/ios/TCGer` (in progress).
 - Android client is in `mobile-apps/android`, with local Room storage and server-backed collections, scanner, account, and backup workflows.
+
+## Cross-platform feature tracking
+
+Feature support is declared beside each web, Swift, and Kotlin implementation.
+The product registry in `mobile-parity/features.definitions.json` binds those
+source declarations to feature policies and tests. Generate the joined matrix
+and typed app metadata with `npm run parity:generate`; check them with
+`npm run parity:check`. Use `npm run parity:impact -- --base origin/main` to
+review affected features and application paths without direct coverage.
+See [the parity workflow](mobile-parity/README.md) for limitations, supported
+modes, source registration syntax, and execution evidence.
+
+Shared [API contracts](mobile-parity/api-contracts/README.md) exercise the real
+web, iOS, and Android clients against reviewed REST interactions, with matching
+Express/Convex provider checks. Run `npm run api-contracts:test` for web/provider
+coverage, the native API commands for client coverage, and
+`npm run api-contracts:report -- --require-pass` for the separate API matrix.
 
 ## Docs and scripts
 - Starlight docs source: `docs/src/content/docs/`

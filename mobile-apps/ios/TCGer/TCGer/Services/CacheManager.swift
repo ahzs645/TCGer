@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 final class CacheManager {
     static let shared = CacheManager()
@@ -6,9 +7,9 @@ final class CacheManager {
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
 
-    private init() {
+    init(directory: URL? = nil) {
         let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        cacheDirectory = documentsPath.appendingPathComponent("TCGerCache", isDirectory: true)
+        cacheDirectory = directory ?? documentsPath.appendingPathComponent("TCGerCache", isDirectory: true)
 
         // Creation is retried by each throwing operation so an initialization
         // failure is surfaced to the caller instead of being silently lost.
@@ -112,7 +113,23 @@ final class CacheManager {
 // MARK: - Cache Keys
 extension CacheManager {
     enum CacheKey {
+        /// Legacy key is never read. A credential change intentionally requires
+        /// a fresh fetch; opaque tokens do not expose a trustworthy stable user ID.
         static let collections = "collections"
+
+        static func collections(config: ServerConfiguration, token: String?) -> String? {
+            guard !config.isOnDevice, let token, !token.isEmpty,
+                  var url = URLComponents(string: config.baseURL) else { return nil }
+            url.scheme = url.scheme?.lowercased()
+            url.host = url.host?.lowercased()
+            if (url.scheme == "https" && url.port == 443) || (url.scheme == "http" && url.port == 80) { url.port = nil }
+            url.path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if !url.path.isEmpty { url.path = "/" + url.path }
+            guard let server = url.string else { return nil }
+            let data = Data((server + "\u{0}" + token).utf8)
+            let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            return "collections-v2-" + digest
+        }
         static let searchResults = "searchResults"
         static let userPreferences = "userPreferences"
         static let appSettings = "appSettings"

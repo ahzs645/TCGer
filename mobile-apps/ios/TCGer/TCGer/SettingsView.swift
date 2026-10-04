@@ -1,3 +1,7 @@
+// @tcger-feature {"id":"release.readiness","platform":"ios","status":"planned","limitation":"App target and unsigned Debug simulator testing exist; signed archive, provisioning, privacy/store submission and release-device smoke criteria remain unverified."}
+// @tcger-feature {"id":"settings.browse","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"scanner.debug.developerAccess","platform":"ios","status":"implemented"}
+
 //
 //  SettingsView.swift
 //  TCGer
@@ -266,6 +270,11 @@ struct SettingsView: View {
                         : "Change your TCG Manager server connection, or switch to keeping everything on this phone.")
                 }
 
+                if isLocalMode {
+                    Section("Collection Workflow") {
+                        NavigationLink("Grading planner") { GradingWorkspaceView() }
+                    }
+                }
                 if !isLocalMode, environmentStore.isAuthenticated {
                     Section("Collection Workflow") {
                         NavigationLink {

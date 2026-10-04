@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.smartFolders","platform":"ios","status":"implemented"}
+
 import Foundation
 import CryptoKit
 

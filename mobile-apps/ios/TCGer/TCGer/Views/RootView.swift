@@ -1,7 +1,9 @@
+import Combine
 import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
+    @EnvironmentObject private var wishlistStore: WishlistStore
 
     @State private var isAuthenticating = false
     @State private var isVerifyingServer = false
@@ -10,7 +12,7 @@ struct RootView: View {
     @State private var showingSignup = false
     @State private var errorMessage: String?
     @State private var isAppLocked = true
-    @State private var featureConfigurationURL: String?
+    @StateObject private var serverFeatureStore = ServerFeatureRefreshStore()
     @StateObject private var catalogStore = CatalogStore.shared
     @StateObject private var gamePackages = GamePackageStore.shared
 
@@ -22,7 +24,7 @@ struct RootView: View {
                 if needsGameInstallation {
                     GameInstallationView(catalogStore: catalogStore)
                 } else {
-                    MainContentView()
+                    MainContentView().id(environmentStore.widgetSessionID)
                 }
             } else {
                 NavigationStack {
@@ -30,9 +32,10 @@ struct RootView: View {
                 }
             }
         }
+        .onChange(of: environmentStore.widgetSessionID) { wishlistStore.reset() }
         .task(id: "\(environmentStore.serverConfiguration.baseURL)|\(environmentStore.isServerVerified)") {
             guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else {
-                featureConfigurationURL = nil
+                serverFeatureStore.reset()
                 return
             }
             await refreshServerFeatures()
@@ -41,13 +44,36 @@ struct RootView: View {
         .task(id: environmentStore.displayCurrencyCode) {
             await environmentStore.refreshExchangeRate()
         }
-        .alert("Oops", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { self.errorMessage = nil } }
+        .onReceive(NetworkMonitor.shared.$isConnected.removeDuplicates()) { connected in
+            guard connected else { return }
+            Task { await refreshServerFeatures(force: true) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task { await refreshServerFeatures(force: true) }
+        }
+        .safeAreaInset(edge: .top) {
+            if serverFeatureStore.errorMessage != nil {
+                HStack {
+                    Text("Couldn’t check available server features.")
+                        .font(.caption)
+                    Spacer()
+                    Button("Retry") { Task { await refreshServerFeatures(force: true) } }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(.regularMaterial)
+            }
+        }
+        .alert(errorMessage == nil ? "Sign-in Storage" : "Oops", isPresented: Binding(
+            get: { errorMessage != nil || environmentStore.tokenPersistenceWarning != nil },
+            set: { if !$0 {
+                if errorMessage != nil { self.errorMessage = nil }
+                else { environmentStore.dismissTokenPersistenceWarning() }
+            } }
         )) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "Unknown error")
+            Text(errorMessage ?? environmentStore.tokenPersistenceWarning ?? "Unknown error")
         }
         .overlay {
             if environmentStore.biometricLockEnabled && isAppLocked {
@@ -92,7 +118,10 @@ struct RootView: View {
     }
 
     private var needsGameInstallation: Bool {
-        GameInstallationState.needsInstallation(
+        #if DEBUG && targetEnvironment(simulator)
+        if UserDefaults.standard.string(forKey: "tcgerParityTest") == "true" { return false }
+        #endif
+        return GameInstallationState.needsInstallation(
             enabledGameCount: environmentStore.enabledGames.count,
             installedPackageCount: gamePackages.installed.count
         )
@@ -178,7 +207,7 @@ struct RootView: View {
 
     @MainActor
     private func resetServerSelection() {
-        featureConfigurationURL = nil
+        serverFeatureStore.reset()
         setupRequired = nil
         showingSignup = false
         errorMessage = nil
@@ -188,20 +217,13 @@ struct RootView: View {
     }
 
     @MainActor
-    private func refreshServerFeatures() async {
+    private func refreshServerFeatures(force: Bool = false) async {
         let configuration = environmentStore.serverConfiguration
-        guard configuration.isValid else { return }
-        guard featureConfigurationURL != configuration.baseURL else { return }
-
-        featureConfigurationURL = configuration.baseURL
-        do {
-            let features = try await apiService.getServerFeatures(config: configuration)
-            guard environmentStore.serverConfiguration.baseURL == configuration.baseURL else { return }
-            environmentStore.serverFeatures = features
-        } catch {
-            guard environmentStore.serverConfiguration.baseURL == configuration.baseURL else { return }
-            environmentStore.serverFeatures = .allEnabled
-        }
+        guard configuration.isValid, environmentStore.isServerVerified else { return }
+        guard let features = await serverFeatureStore.refresh(config: configuration, force: force),
+              environmentStore.serverConfiguration.baseURL == configuration.baseURL,
+              environmentStore.isServerVerified else { return }
+        environmentStore.serverFeatures = features
     }
 
     @MainActor

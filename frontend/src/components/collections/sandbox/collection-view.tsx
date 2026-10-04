@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"collections.create","platform":"web","status":"implemented"}
+
 "use client";
 import { cardSupportsPrintSelection, packageCardPresentation } from "@tcg/api-types";
 

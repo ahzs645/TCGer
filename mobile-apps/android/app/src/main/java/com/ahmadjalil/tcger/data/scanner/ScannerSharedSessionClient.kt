@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"scanner.sharedWebSession","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+
 package com.ahmadjalil.tcger.data.scanner
 
 import java.io.IOException

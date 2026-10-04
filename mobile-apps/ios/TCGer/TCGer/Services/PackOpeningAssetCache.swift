@@ -39,14 +39,15 @@ final class PackOpeningAssetCache: @unchecked Sendable {
     }
 
     func store(_ data: Data, for remoteURL: URL) {
-        queue.sync {
-            do {
-                try ensureDirectory()
-                try data.write(to: fileURL(for: remoteURL), options: [.atomic])
-            } catch {
-                // Asset caching must never make an otherwise successful pack
-                // request fail. A later request can retry the write.
-            }
+        // Ordinary browsing remains a best-effort cache optimization.
+        try? storeDurably(data, for: remoteURL)
+    }
+
+    func storeDurably(_ data: Data, for remoteURL: URL) throws {
+        try queue.sync {
+            try ensureDirectory()
+            try data.write(to: fileURL(for: remoteURL), options: [.atomic])
+            guard try Data(contentsOf: fileURL(for: remoteURL)) == data else { throw CocoaError(.fileReadCorruptFile) }
         }
     }
 

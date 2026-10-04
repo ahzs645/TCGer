@@ -1,3 +1,6 @@
+// @tcger-feature {"id":"cards.search","platform":"ios","status":"implemented"}
+// @tcger-feature {"id":"cards.filteredSearch","platform":"ios","status":"implemented"}
+
 import SwiftUI
 
 private enum CardSearchScope: String, CaseIterable, Identifiable {
