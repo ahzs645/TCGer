@@ -362,6 +362,7 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .accessibilityIdentifier(ParityControlID.optionSettingsShowPricing)
                     .disabled(!canEditPreferences)
                     .onChange(of: environmentStore.showPricing) {
                         Task { await updatePreferences(showPricing: environmentStore.showPricing) }

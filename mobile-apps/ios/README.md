@@ -161,3 +161,33 @@ repository root on a Mac with Xcode and Maestro. It runs regression/API XCTest
 before Maestro on one selected simulator and shared build directory. Use local
 Xcode Test for the full unit suite. See [the parity execution policy](../../mobile-parity/README.md#ios-execution-policy)
 for combining fresh local iOS evidence with web/Android CI results.
+
+## Card prices in collections
+
+Binder details default to a two-column artwork grid (one column at accessibility
+text sizes). Red badges show owned quantity; blue badges show the **per-card**
+stored estimate in the selected display currency. A dash means no usable price,
+while an actual zero quote shows zero. The List/Grid picker remembers the choice;
+List and selection mode retain individual-copy controls. Grid cards open details,
+with edit/move/sell available from the context menu. Owned search uses the same
+badges; catalog search shows the price badge without implying ownership.
+
+Settings → Show Pricing hides all price badges. New installations enable pricing.
+These badges do not fetch quotes or replace stored collection prices. The Prices
+workspace owns market refresh and source/finish/condition selection. With the
+default Best Available source, phone-only mode uses **Scryfall for Magic** and
+**TCGCSV TCGplayer market data for Pokémon**, without a personal API key. A stored
+JustTCG key enables that provider for compatible games; it is optional. Coverage
+depends on an exact compatible card/printing match, and TCGCSV market references
+are daily estimates, not condition-specific or graded valuations. Other games
+have no general free on-device tracked-price fallback.
+
+`collections.artworkBadges` remains tracked: web has row prices and Android has
+prices below its grid artwork, rather than this badge presentation. Local checks:
+`CardArtworkBadgesTests`, `CurrencyConversionTests`, `APIServiceTrackedPricesTests`
+and `TCGCSVPriceClientTests`, followed by the iOS-specific Maestro flow:
+
+```sh
+maestro --device "$MAESTRO_DEVICE_ID" test -e APP_ID=firstform.TCGer \
+  mobile-parity/maestro/ios/collection-price-badges.yaml
+```

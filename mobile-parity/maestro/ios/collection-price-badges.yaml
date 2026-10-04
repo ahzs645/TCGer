@@ -1,0 +1,91 @@
+appId: ${APP_ID}
+name: "[collections.artworkBadges] iOS album prices and layout"
+tags: [ios, pricing]
+properties:
+  featureId: "collections.artworkBadges"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- tapOn:
+    id: "nav.settings"
+- scrollUntilVisible:
+    element:
+      id: "option.settings.showPricing"
+- runFlow:
+    when:
+      visible:
+        id: "option.settings.showPricing"
+        checked: false
+    commands:
+      - tapOn:
+          id: "option.settings.showPricing"
+          point: "90%,50%"
+- assertVisible:
+    id: "option.settings.showPricing"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "nav.collections"
+    direction: UP
+- tapOn:
+    id: "nav.collections"
+- tapOn: "Favorites Binder"
+- scrollUntilVisible:
+    element:
+      id: "option.collections.layout"
+- tapOn:
+    id: "option.collections.layout"
+    point: "75%,50%"
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: "feature.collections.artworkBadges"
+    visibilityPercentage: 10
+- assertVisible: ".*cop(y|ies).*per card.*"
+- takeScreenshot: collection-price-badges
+- scrollUntilVisible:
+    element:
+      id: "option.collections.layout"
+    direction: UP
+- tapOn:
+    id: "option.collections.layout"
+    point: "25%,50%"
+    retryTapIfNoChange: true
+- assertNotVisible:
+    id: "feature.collections.artworkBadges"
+- scrollUntilVisible:
+    element: ".*cop(y|ies).*per card.*"
+- assertVisible: ".*cop(y|ies).*per card.*"
+- scrollUntilVisible:
+    element:
+      id: "option.collections.layout"
+    direction: UP
+- tapOn:
+    id: "option.collections.layout"
+    point: "75%,50%"
+    retryTapIfNoChange: true
+- assertVisible:
+    id: "feature.collections.artworkBadges"
+- tapOn:
+    id: "nav.settings"
+- scrollUntilVisible:
+    element:
+      id: "option.settings.showPricing"
+- tapOn:
+    id: "option.settings.showPricing"
+    point: "90%,50%"
+- assertVisible:
+    id: "option.settings.showPricing"
+    checked: false
+- scrollUntilVisible:
+    element:
+      id: "nav.collections"
+    direction: UP
+- tapOn:
+    id: "nav.collections"
+- assertVisible:
+    id: "feature.collections.artworkBadges"
+- assertNotVisible: ".*per card.*"
+- assertVisible: ".*cop(y|ies).*"

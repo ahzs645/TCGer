@@ -4,16 +4,16 @@ Generated from [product definitions](features.definitions.json) and platform sou
 
 - Platforms: Web, iOS, Android.
 - 7 features are parity-required.
-- 107 features are explicitly tracked.
+- 108 features are explicitly tracked.
 - A declaration is backed by source paths in the manifest. “Verified” additionally requires passing current JUnit evidence on every declared platform; a declared test that was not supplied is “Not run.”
 
 ## Declaration summary
 
 | Platform | Implemented | Partial | Planned | Unavailable | Not applicable | Waived |
 |---|---|---|---|---|---|---|
-| Web | 90 | 12 | 10 | 0 | 2 | 0 |
-| iOS | 108 | 5 | 1 | 0 | 0 | 0 |
-| Android | 93 | 10 | 10 | 0 | 1 | 0 |
+| Web | 90 | 13 | 10 | 0 | 2 | 0 |
+| iOS | 109 | 5 | 1 | 0 | 0 | 0 |
+| Android | 93 | 11 | 10 | 0 | 1 | 0 |
 
 ## Feature matrix
 
@@ -21,6 +21,7 @@ Generated from [product definitions](features.definitions.json) and platform sou
 |---|---|---|---|---|---|---|---|---|---|
 | home.dashboard | Dashboard | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | collections.browse | Browse binders | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
+| collections.artworkBadges | Artwork quantity and per-card price badges | track | Partial | — | Implemented | Not run | Partial | — | Tracked gap |
 | collections.create | Create a binder | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | cards.search | Search cards | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | wishlists.browse | Browse wishlists | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
@@ -140,6 +141,9 @@ These declarations live beside platform implementations. Unspecified modes are u
 
 | ID | Platform | Support | Modes | Requirements | Limitation or fallback | Registration |
 |---|---|---|---|---|---|---|
+| collections.artworkBadges | Web | Partial | Not specified | — | Collection rows display quantity and per-card prices; no artwork grid with overlaid badges. | [Source](../frontend/src/components/collections/sandbox/collection-view.tsx#L1) |
+| collections.artworkBadges | iOS | Implemented | local, server, demo | — | Displays stored per-card estimates; market refresh remains in Prices. Mixed finishes/conditions share the collection printing's stored estimate. | [Source](../mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift#L1) |
+| collections.artworkBadges | Android | Partial | Not specified | — | Binder grid/list shows quantity and per-card prices below artwork, without overlaid badges. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt#L1) |
 | decks.browse | Web | Implemented | demo, server | — | — | [Source](../frontend/app/decks/page.tsx#L1) |
 | decks.browse | iOS | Implemented | server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/DecksView.swift#L1) |
 | decks.browse | Android | Implemented | server | — | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/DeckScreens.kt#L1) |

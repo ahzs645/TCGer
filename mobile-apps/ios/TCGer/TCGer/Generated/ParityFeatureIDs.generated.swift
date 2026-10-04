@@ -17,6 +17,7 @@ struct ParityFeatureSupport: Sendable {
 enum ParityFeatureID: String, CaseIterable, Sendable {
     case homeDashboard = "home.dashboard"
     case collectionsBrowse = "collections.browse"
+    case collectionsArtworkBadges = "collections.artworkBadges"
     case collectionsCreate = "collections.create"
     case cardsSearch = "cards.search"
     case wishlistsBrowse = "wishlists.browse"
@@ -133,6 +134,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     static let implemented: Set<ParityFeatureID> = [
         .homeDashboard,
         .collectionsBrowse,
+        .collectionsArtworkBadges,
         .collectionsCreate,
         .cardsSearch,
         .wishlistsBrowse,
@@ -244,6 +246,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     static let supportByID: [ParityFeatureID: ParityFeatureSupport] = [
         .homeDashboard: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/DashboardView.swift"),
         .collectionsBrowse: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/CollectionsView.swift"),
+        .collectionsArtworkBadges: ParityFeatureSupport(status: .implemented, limitation: "Displays stored per-card estimates; market refresh remains in Prices. Mixed finishes/conditions share the collection printing's stored estimate.", modes: ["local", "server", "demo"], requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift"),
         .collectionsCreate: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/Components/CreateBinderSheet.swift"),
         .cardsSearch: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift"),
         .wishlistsBrowse: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"),
@@ -472,4 +475,7 @@ enum ParityControlID {
     static let optionScannerDebugLeanOcrStrips = "option.scannerDebug.leanOcrStrips"
     static let optionScannerDebugFooterFirstOcr = "option.scannerDebug.footerFirstOcr"
     static let actionKeyboardDismiss = "action.keyboard.dismiss"
+    static let optionCollectionsLayout = "option.collections.layout"
+    static let actionCollectionsNewBinder = "action.collections.newBinder"
+    static let optionSettingsShowPricing = "option.settings.showPricing"
 }

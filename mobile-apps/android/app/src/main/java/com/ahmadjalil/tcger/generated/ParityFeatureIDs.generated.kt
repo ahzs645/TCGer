@@ -14,6 +14,7 @@ data class ParityFeatureSupport(
 object ParityFeatureIDs {
     const val HOME_DASHBOARD = "home.dashboard"
     const val COLLECTIONS_BROWSE = "collections.browse"
+    const val COLLECTIONS_ARTWORK_BADGES = "collections.artworkBadges"
     const val COLLECTIONS_CREATE = "collections.create"
     const val CARDS_SEARCH = "cards.search"
     const val WISHLISTS_BROWSE = "wishlists.browse"
@@ -226,6 +227,7 @@ object ParityFeatureIDs {
     val support: Map<String, ParityFeatureSupport> = mapOf(
         HOME_DASHBOARD to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/DashboardScreen.kt"),
         COLLECTIONS_BROWSE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt"),
+        COLLECTIONS_ARTWORK_BADGES to ParityFeatureSupport(ParitySupportStatus.PARTIAL, "Binder grid/list shows quantity and per-card prices below artwork, without overlaid badges.", null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt"),
         COLLECTIONS_CREATE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt"),
         CARDS_SEARCH to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt"),
         WISHLISTS_BROWSE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt"),
@@ -453,4 +455,7 @@ object ParityControlIDs {
     const val OPTION_SCANNER_DEBUG_LEAN_OCR_STRIPS = "option.scannerDebug.leanOcrStrips"
     const val OPTION_SCANNER_DEBUG_FOOTER_FIRST_OCR = "option.scannerDebug.footerFirstOcr"
     const val ACTION_KEYBOARD_DISMISS = "action.keyboard.dismiss"
+    const val OPTION_COLLECTIONS_LAYOUT = "option.collections.layout"
+    const val ACTION_COLLECTIONS_NEW_BINDER = "action.collections.newBinder"
+    const val OPTION_SETTINGS_SHOW_PRICING = "option.settings.showPricing"
 }

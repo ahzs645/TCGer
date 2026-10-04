@@ -18,6 +18,9 @@ struct CollectionDetailView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage("tcg.collection.artworkGrid") private var showsArtworkGrid = true
+    @State private var detailCard: Card?
     @State private var isEditing = false
     @State private var editedName: String
     @State private var editedDescription: String
@@ -354,6 +357,17 @@ struct CollectionDetailView: View {
                                 }
                             }
 
+                            if !cards.isEmpty, !isSelectMode, identityViewMode == .collector {
+                                Section {
+                                    Picker("Card layout", selection: $showsArtworkGrid) {
+                                        Label("List", systemImage: "list.bullet").tag(false)
+                                        Label("Grid", systemImage: "square.grid.2x2").tag(true)
+                                    }
+                                    .pickerStyle(.segmented)
+                                    .accessibilityIdentifier(ParityControlID.optionCollectionsLayout)
+                                }
+                            }
+
                             Section {
                                 if cards.isEmpty {
                                     emptyStateView
@@ -413,6 +427,10 @@ struct CollectionDetailView: View {
                                             }
                                         }
                                     }
+                                } else if showsArtworkGrid && !isSelectMode {
+                                    artworkGrid
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color(.systemBackground))
                                 } else {
                                     ForEach(filteredCards) { card in
                                     if isSelectMode {
@@ -836,6 +854,13 @@ struct CollectionDetailView: View {
                             )
                         }
                     }
+                }
+                .sheet(item: $detailCard) { card in
+                    CardDetailSheet(
+                        card: card,
+                        showPricing: environmentStore.showPricing,
+                        showCardNumbers: environmentStore.showCardNumbers
+                    )
                 }
                 .sheet(item: $moveContext) { context in
                     MoveCardToBinderSheet(
@@ -1409,6 +1434,43 @@ struct CollectionDetailView: View {
         }
 
         movingCardId = nil
+    }
+
+    private var artworkGrid: some View {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
+            alignment: .leading,
+            spacing: 18
+        ) {
+            ForEach(filteredCards) { card in
+                Button {
+                    detailCard = card.previewCard
+                } label: {
+                    CollectionCardGridCell(card: card, showPricing: environmentStore.showPricing)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens card details. Use List to manage individual copies.")
+                .contextMenu {
+                    Button {
+                        detailCard = card.previewCard
+                    } label: {
+                        Label("Card Details", systemImage: "info.circle")
+                    }
+                    if environmentStore.isAuthenticated {
+                        Button { beginEditing(card) } label: {
+                            Label("Edit", systemImage: "square.and.pencil")
+                        }
+                        Button { moveContext = CardCopyContext(card: card) } label: {
+                            Label("Move Copies", systemImage: "arrowshape.turn.up.right")
+                        }
+                        Button { cardToSell = card } label: {
+                            Label("Sold", systemImage: "dollarsign.circle")
+                        }
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier(ParityFeatureID.collectionsArtworkBadges.screenIdentifier)
     }
 
     @MainActor

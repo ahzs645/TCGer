@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"collections.artworkBadges","platform":"android","status":"partial","limitation":"Binder grid/list shows quantity and per-card prices below artwork, without overlaid badges."}
 package com.ahmadjalil.tcger.ui.screens
 
 import androidx.compose.foundation.layout.aspectRatio

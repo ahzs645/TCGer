@@ -137,6 +137,65 @@
       }
     },
     {
+      "id": "collections.artworkBadges",
+      "title": "Artwork quantity and per-card price badges",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/collections/sandbox/collection-view.tsx"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/collections/sandbox/collection-view.tsx",
+          "line": 1
+        },
+        "limitation": "Collection rows display quantity and per-card prices; no artwork grid with overlaid badges."
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CollectionCardRow.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardSearchResults.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CollectionDetailView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "collections.artworkBadges",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CardArtworkBadgesTests.swift"
+          },
+          {
+            "runner": "maestro",
+            "id": "collections.artworkBadges",
+            "path": "mobile-parity/maestro/ios/collection-price-badges.yaml"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift",
+          "line": 1
+        },
+        "limitation": "Displays stored per-card estimates; market refresh remains in Prices. Mixed finishes/conditions share the collection printing's stored estimate.",
+        "modes": [
+          "local",
+          "server",
+          "demo"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt",
+          "line": 1
+        },
+        "limitation": "Binder grid/list shows quantity and per-card prices below artwork, without overlaid badges."
+      }
+    },
+    {
       "id": "collections.create",
       "title": "Create a binder",
       "policy": "parity",
@@ -163,7 +222,7 @@
         "status": "implemented",
         "implementation": {
           "path": "frontend/src/components/collections/sandbox/collection-view.tsx",
-          "line": 1
+          "line": 2
         }
       },
       "ios": {
@@ -5704,6 +5763,9 @@
     "option.scannerDebug.fastFooterOcr",
     "option.scannerDebug.leanOcrStrips",
     "option.scannerDebug.footerFirstOcr",
-    "action.keyboard.dismiss"
+    "action.keyboard.dismiss",
+    "option.collections.layout",
+    "action.collections.newBinder",
+    "option.settings.showPricing"
   ]
 }

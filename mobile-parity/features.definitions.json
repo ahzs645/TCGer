@@ -113,6 +113,45 @@
       }
     },
     {
+      "id": "collections.artworkBadges",
+      "title": "Artwork quantity and per-card price badges",
+      "policy": "track",
+      "web": {
+        "registration": "frontend/src/components/collections/sandbox/collection-view.tsx",
+        "sources": [
+          "frontend/src/components/collections/sandbox/collection-view.tsx"
+        ]
+      },
+      "ios": {
+        "registration": "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CollectionCardRow.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardSearchResults.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CollectionDetailView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "collections.artworkBadges",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CardArtworkBadgesTests.swift"
+          },
+          {
+            "runner": "maestro",
+            "id": "collections.artworkBadges",
+            "path": "mobile-parity/maestro/ios/collection-price-badges.yaml"
+          }
+        ]
+      },
+      "android": {
+        "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt"
+        ]
+      }
+    },
+    {
       "id": "collections.create",
       "title": "Create a binder",
       "policy": "parity",
@@ -3836,6 +3875,9 @@
     "option.scannerDebug.fastFooterOcr",
     "option.scannerDebug.leanOcrStrips",
     "option.scannerDebug.footerFirstOcr",
-    "action.keyboard.dismiss"
+    "action.keyboard.dismiss",
+    "option.collections.layout",
+    "action.collections.newBinder",
+    "option.settings.showPricing"
   ]
 }

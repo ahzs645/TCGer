@@ -304,12 +304,7 @@ struct CollectionCardRow: View {
                         }
                     }
 
-                    if showPricing, let price = card.price {
-                        Text((price * Double(card.quantity)).priceText)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.green)
-                    }
+                    CardArtworkBadges(quantity: card.quantity, price: card.price, showPricing: showPricing)
                 }
             }
 

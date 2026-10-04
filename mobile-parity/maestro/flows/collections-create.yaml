@@ -16,7 +16,8 @@ properties:
     when:
       platform: ios
     commands:
-      - tapOn: "New Binder"
+      - tapOn:
+          id: "action.collections.newBinder"
 - tapOn:
     id: "input.collections.name"
 - inputText: "Parity Binder"

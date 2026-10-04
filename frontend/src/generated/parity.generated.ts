@@ -3,6 +3,7 @@
 export const ParityFeatureIDs = {
   homeDashboard: "home.dashboard",
   collectionsBrowse: "collections.browse",
+  collectionsArtworkBadges: "collections.artworkBadges",
   collectionsCreate: "collections.create",
   cardsSearch: "cards.search",
   wishlistsBrowse: "wishlists.browse",
@@ -130,6 +131,7 @@ export interface ParityFeatureSupport {
 export const parityFeatureSupport: Readonly<Record<ParityFeatureID, ParityFeatureSupport>> = {
   [ParityFeatureIDs.homeDashboard]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/page.tsx"},
   [ParityFeatureIDs.collectionsBrowse]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/collections/page.tsx"},
+  [ParityFeatureIDs.collectionsArtworkBadges]: {"status":"partial","limitation":"Collection rows display quantity and per-card prices; no artwork grid with overlaid badges.","modes":null,"requirements":[],"source":"frontend/src/components/collections/sandbox/collection-view.tsx"},
   [ParityFeatureIDs.collectionsCreate]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/collections/sandbox/collection-view.tsx"},
   [ParityFeatureIDs.cardsSearch]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/cards/page.tsx"},
   [ParityFeatureIDs.wishlistsBrowse]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/wishlists/page.tsx"},
@@ -449,6 +451,9 @@ export const ParityControlIDs = {
   optionScannerDebugLeanOcrStrips: "option.scannerDebug.leanOcrStrips",
   optionScannerDebugFooterFirstOcr: "option.scannerDebug.footerFirstOcr",
   actionKeyboardDismiss: "action.keyboard.dismiss",
+  optionCollectionsLayout: "option.collections.layout",
+  actionCollectionsNewBinder: "action.collections.newBinder",
+  optionSettingsShowPricing: "option.settings.showPricing",
 } as const;
 
 export type ParityControlID = (typeof ParityControlIDs)[keyof typeof ParityControlIDs];

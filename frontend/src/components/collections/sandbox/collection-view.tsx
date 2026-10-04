@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"collections.artworkBadges","platform":"web","status":"partial","limitation":"Collection rows display quantity and per-card prices; no artwork grid with overlaid badges."}
 // @tcger-feature {"id":"collections.create","platform":"web","status":"implemented"}
 
 "use client";

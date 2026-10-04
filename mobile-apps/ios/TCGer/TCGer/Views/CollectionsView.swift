@@ -244,6 +244,7 @@ struct CollectionsView: View {
                         } label: {
                             Label("New Binder", systemImage: "folder.badge.plus")
                         }
+                        .accessibilityIdentifier(ParityControlID.actionCollectionsNewBinder)
                         Button {
                             showingSmartFolderEditor = true
                         } label: {

@@ -723,7 +723,8 @@ private struct OwnedCardSearchResultsList: View {
                             CardSearchResultCell(
                                 card: result.previewCard,
                                 showPricing: showPricing,
-                                showCardNumbers: showCardNumbers
+                                showCardNumbers: showCardNumbers,
+                                quantity: result.card.quantity
                             )
 
                             HStack(spacing: 6) {

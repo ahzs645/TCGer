@@ -135,6 +135,7 @@ struct CardSearchResultCell: View {
     let card: Card
     let showPricing: Bool
     let showCardNumbers: Bool
+    var quantity: Int? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -169,6 +170,10 @@ struct CardSearchResultCell: View {
                 }
             }
             .cornerRadius(8)
+            .overlay(alignment: .topLeading) {
+                CardArtworkBadges(quantity: quantity, price: card.price, showPricing: showPricing)
+                    .padding(4)
+            }
 
             // Card Info
             VStack(alignment: .leading, spacing: 4) {
@@ -259,12 +264,6 @@ struct CardSearchResultCell: View {
                     }
                 }
 
-                if showPricing, let price = card.price {
-                    Text(price.priceText)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                }
             }
         }
         .padding(8)
@@ -366,8 +365,9 @@ struct CardSearchResultCell: View {
         if card.sanctionedPlayLegal == false {
             parts.append("Not tournament legal")
         }
-        if showPricing, let price = card.price {
-            parts.append("Price \(price.priceText)")
+        if let quantity { parts.append("\(quantity) \(quantity == 1 ? "copy" : "copies")") }
+        if showPricing {
+            parts.append(CardPriceBadgeValue(price: card.price).accessibilityLabel)
         }
 
         return parts.joined(separator: ", ")
