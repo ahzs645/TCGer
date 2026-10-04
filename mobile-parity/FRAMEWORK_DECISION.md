@@ -22,8 +22,9 @@ for each surface:
   behavior checks whose titles carry the same feature IDs.
 - All runners emit JUnit. The parity reporter joins results by feature ID and
   only marks a parity-required feature `Verified` when every platform passes.
-- CI validates the manifest, generated files, all three suites, and publishes
-  one matrix in the GitHub job summary.
+- GitHub CI validates the manifest/generated files and web/Android execution
+  on Linux. iOS suites run locally only. The published matrix retains the iOS
+  gap; full verification still requires current evidence from all three.
 
 This approach lets each app remain idiomatic while giving the repository one
 machine-readable answer to “does this feature exist, and was its behavior

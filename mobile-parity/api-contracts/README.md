@@ -98,5 +98,10 @@ API results never feed the UI matrix's `Verified` calculation.
    the compatibility matrix with `--require-pass`.
 
 `AGENTS.md` requires this workflow for covered server-backed changes. The
-three-platform CI runs the suites, uploads their execution evidence, and fails
-its API report if any required interaction lacks passing current evidence.
+GitHub CI runs web, Android and the two provider suites on Linux. Its explicit
+`--require-targets web,android,express,convex` gate rejects missing, failed,
+skipped or stale evidence for those targets; the matrix still shows iOS Not run
+and full compatibility incomplete. iOS XCTest runs locally only through
+`npm run verify:ios:local` (regression/API tests followed by Maestro) or
+`npm run api-contracts:ios`. The default `--require-pass` still requires every
+consumer and applicable provider. CI subset success never proves iOS compatibility.

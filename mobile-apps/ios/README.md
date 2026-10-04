@@ -152,3 +152,12 @@ scanner-package installation flow.
 Binder, wishlist, scanner, and search links are associated with `tcger.ahmadjalil.com`. The AASA source is checked in at `marketing-site/public/.well-known/apple-app-site-association`; the Pages workflow verifies that Vite copies it into the deployed artifact. App Shortcuts use these HTTPS links because `OpenURLIntent` requires a universal link rather than the app's custom URL scheme.
 
 Changing the app's signing team or bundle identifier also requires updating the AASA `appIDs` entry and redeploying the marketing site. After deployment, confirm that `https://tcger.ahmadjalil.com/.well-known/apple-app-site-association` returns `200`, the JSON directly with no redirect, and a `Content-Type: application/json` response before testing links on a signed device build. GitHub Pages commonly serves extensionless files as `application/octet-stream`; if that remains true for this domain, configure the proxied domain (for example, with a Cloudflare response-header rule or Worker route) to serve this exact path as JSON.
+
+## Local parity and API checks
+
+iOS parity/regression/API testing runs locally only. GitHub macOS workflows and
+the manual fallback have been removed. Run `npm run verify:ios:local` from the
+repository root on a Mac with Xcode and Maestro. It runs regression/API XCTest
+before Maestro on one selected simulator and shared build directory. Use local
+Xcode Test for the full unit suite. See [the parity execution policy](../../mobile-parity/README.md#ios-execution-policy)
+for combining fresh local iOS evidence with web/Android CI results.

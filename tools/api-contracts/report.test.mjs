@@ -26,3 +26,24 @@ test("every required consumer/provider must pass with matching fixture/source ev
   evidence.express.successfulRun = false;
   assert.equal(apiReport(registry, evidence, "current").passed, false);
 });
+test('Linux CI scope retains the missing iOS gap and rejects failed, skipped or stale included evidence', () => {
+  const scope = ['web', 'android', 'express', 'convex'];
+  const evidence = Object.fromEntries(scope.map(target => [target, { fingerprint: 'current', revision: 'head', successfulRun: true, results: Object.fromEntries(registry.interactions.map(item => [item.id, 'Pass'])) }]));
+  const result = () => apiReport(registry, evidence, 'current', 'head', scope);
+  assert.equal(result().scopePassed, true);
+  assert.equal(result().passed, false);
+  assert.ok(result().rows.every(row => row.statuses.ios === 'Not run' && !row.compatible));
+  assert.match(result().markdown, /does not establish full three-consumer compatibility/);
+  for (const status of ['Fail', 'Skipped', 'Not run']) {
+    evidence.android.results['cards.search.empty'] = status;
+    assert.equal(result().scopePassed, false);
+  }
+  evidence.android.results['cards.search.empty'] = 'Pass';
+  evidence.android.revision = 'old';
+  assert.equal(result().scopePassed, false);
+  evidence.android.revision = 'head';
+  evidence.web.fingerprint = 'old';
+  assert.equal(result().scopePassed, false);
+  assert.throws(() => apiReport(registry, evidence, 'current', 'head', []));
+  assert.throws(() => apiReport(registry, evidence, 'current', 'head', ['unknown']));
+});

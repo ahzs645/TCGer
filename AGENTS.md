@@ -58,6 +58,18 @@ and compares approaches used by other projects.
    Distinguish passed checks/builds from executed UI tests. If a suite could not
    run, say so and retain the verification gap.
 
+### Execution location policy
+
+Run iOS regression, API and Maestro tests locally only using
+`npm run verify:ios:local`, or the separate local commands above. Do not add
+GitHub-hosted macOS jobs, manual GitHub iOS fallbacks or self-hosted GitHub iOS
+runners. Web, Android and provider checks run on Linux in GitHub Actions.
+CI explicitly gates web/Android UI and web/Android/provider API evidence; retain
+iOS as unverified in CI reports. Default `--require-pass` reports still require
+all three clients. Never use a scoped CI pass to claim full parity or to promote
+a feature without fresh local iOS evidence. Combine results only from unchanged
+source at the same commit/run identity; do not relabel older execution evidence.
+
 ### Server-backed API changes
 
 Follow [the API contract workflow](mobile-parity/api-contracts/README.md) when

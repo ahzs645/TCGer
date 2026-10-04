@@ -94,6 +94,10 @@ case "${1:-}" in
     run_maestro "$android_device" "com.ahmadjalil.tcger" android
     ;;
   ios)
+    if [[ "${GITHUB_ACTIONS:-false}" == "true" ]]; then
+      echo "iOS tests run locally only; GitHub Actions execution is disabled." >&2
+      exit 1
+    fi
     node tools/mobile-parity/evidence.mjs begin "$results_dir/ios.xml" ios
     require_command maestro
     require_command xcodebuild

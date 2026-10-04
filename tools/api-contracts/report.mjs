@@ -38,8 +38,10 @@ export function parseXCTest(tree, registry) {
   for (const node of tree.testNodes ?? []) visit(node);
   return results;
 }
-export function apiReport(registry, evidence, currentFingerprint, currentRevision) {
+export function apiReport(registry, evidence, currentFingerprint, currentRevision, requiredTargets) {
   const targets = [...Object.keys(registry.consumers), ...Object.keys(registry.providers)];
+  const scope = requiredTargets ?? targets;
+  if (!scope.length || scope.some(target => !targets.includes(target)) || new Set(scope).size !== scope.length) throw new Error('Invalid required API targets');
   const rows = registry.interactions.map(item => {
     const statuses = Object.fromEntries(targets.map(target => {
       if (!Object.hasOwn(registry.consumers, target) && !item.providers.includes(target)) return [target, "—"];
@@ -50,6 +52,7 @@ export function apiReport(registry, evidence, currentFingerprint, currentRevisio
   });
   const lines = ["# API contract coverage", "", "API boundary evidence only. Passing this matrix does not mark a feature's UI parity Verified.", "", "Card search is served by Express in both backend modes; Convex evidence is required for collection, import, scan-save and sealed-opening interactions.", "", "| Interaction | Product feature | Web | iOS | Android | Express | Convex | Compatible |", "|---|---|---|---|---|---|---|---|"];
   for (const row of rows) lines.push(`| ${row.id} | ${row.featureId} | ${targets.map(target => row.statuses[target]).join(" | ")} | ${row.compatible ? "Yes" : "No"} |`);
+  if (requiredTargets) lines.splice(2, 0, `Required execution targets: ${scope.join(', ')}. This subset does not establish full three-consumer compatibility; iOS evidence is collected locally.`, '');
   lines.push("", "## Provider boundaries", "", ...Object.entries(registry.providers).map(([name, binding]) => `- ${name}: ${binding.limitation}`), "", "Missing, skipped, failed, or stale evidence cannot satisfy a contract. Fingerprints bind fixtures and registered source/test files; CI additionally tests one checkout revision.", "");
-  return { rows, markdown: lines.join("\n"), passed: rows.every(row => row.compatible) };
+  return { rows, markdown: lines.join("\n"), passed: rows.every(row => row.compatible), scopePassed: rows.every(row => scope.every(target => ['Pass', '—'].includes(row.statuses[target]))) };
 }

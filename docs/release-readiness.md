@@ -33,6 +33,14 @@ corresponding `tcgerRelease*` properties. Missing release signing fails the buil
 `-PtcgerAllowUnsignedRelease=true` permits an explicit compiler check only; it
 cannot pass signed-artifact readiness.
 
+## iOS testing location
+
+Run `npm run verify:ios:local` on the local Mac for regression/API XCTest and
+Maestro, sequentially on one simulator. GitHub workflows use Linux only; there
+is no automatic or manual GitHub macOS/iOS runner. Source contract checks still
+validate iOS registrations and fixtures. Full parity/API gates still require
+fresh local iOS evidence in addition to web/Android/provider evidence.
+
 ## iOS distribution
 
 `mobile-apps/ios/release/archive.sh` archives and exports a Release IPA with the

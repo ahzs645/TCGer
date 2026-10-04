@@ -11,7 +11,7 @@ The evaluated framework options and the reasons for this hybrid are recorded in
 2. `npm run parity:generate` joins the declarations and creates typed TypeScript, Swift, and Kotlin feature/control IDs, support metadata, and [`REPORT.md`](REPORT.md). Screens attach those IDs through DOM attributes, accessibility identifiers, or Compose test tags.
 3. The same Maestro flow runs against each compiled native app. Platform branches are reserved for real UI differences, while assertions use the shared IDs.
 4. The focused frontend Playwright parity suite is the authoritative web runner. [`web-parity.mjs`](../tools/mobile-parity/web-parity.mjs) converts its JUnit into feature-ID cases; the core parity reporter merges those results with iOS and Android. Visual-regression baselines remain a separate concern, and Maestro web beta is not required.
-5. CI rejects invalid or stale contracts, runs Playwright plus both native smoke suites, and publishes a three-platform report and test artifacts.
+5. GitHub CI runs source checks, Playwright, Android and the web/Android/provider API suites on Linux. iOS XCTest/API/Maestro execution runs locally only. CI retains the three-platform matrix with iOS marked Not run; its required gate covers web and Android and cannot establish full parity.
 
 The report distinguishes each platform declaration from current execution evidence. “Not run” means a declared test exists but no JUnit was supplied; “—” means no test is declared for that platform.
 
@@ -30,7 +30,8 @@ npm run parity:check      # registrations, policy/evidence checks, and generated
 npm run parity:impact -- --base origin/main # affected features and uncovered source paths
 npm run parity:web        # run Playwright and emit raw + feature-ID JUnit
 npm run parity:android    # build, install, and test a running Android device
-npm run parity:ios        # build, install, and test an iPhone 17 Pro simulator
+npm run parity:ios        # local only: build, install, and run iOS Maestro
+npm run verify:ios:local  # local only: regression + API XCTest, then iOS Maestro
 npm run parity:report -- --require-pass # require all core flows and fresh evidence
 ```
 
@@ -124,7 +125,7 @@ Swift exposes `ParityFeatureID.decksBrowse.support`; Kotlin exposes `ParityFeatu
 
 ## Checks during development and review
 
-Frontend development and build commands run the source contract check before starting. The root test command checks it before workspace tests. Three-platform CI checks source registrations and generated files, and now also triggers for backend, shared-package, and relevant publishing-tool changes. Standalone Xcode and Gradle builds compile the generated metadata; run `npm run parity:check` before native review to check its source bindings.
+Frontend development and build commands run the source contract check before starting. The root test command checks it before workspace tests. Web/Android GitHub CI checks source registrations and generated files, and now also triggers for backend, shared-package, and relevant publishing-tool changes. Standalone Xcode and Gradle builds compile the generated metadata; run `npm run parity:check` before native review to check its source bindings.
 
 `npm run parity:impact -- --base <revision>` compares tracked changes and new untracked files against feature sources, tests, and flows. It lists affected features/platforms and highlights application files without direct feature coverage. Shared infrastructure can legitimately appear in that list. This is a review aid: neither annotations nor path matching can automatically discover every conceptual feature or prove that a handler works. Add a product definition when introducing a new capability and keep behavioral assertions in the execution suites.
 
@@ -132,3 +133,23 @@ The registry migration included all 92 existing features. The current inventory
 has 114, including physical storage, deck checkout/refiling, intake, price
 provenance, audit/undo, game packages, links, biometrics and release readiness.
 Tracked records retain reviewed platform limitations; only seven require parity. Five stale web scanner declarations were reconciled with their existing handlers: server embedding, torch, result auto-open, crop correction, and binder-page photo saving. This changes declarations only; it does not infer passing device/server evidence or promote their parity policy.
+
+## iOS execution policy
+
+iOS tests run on the developer's local Mac. Do not add GitHub macOS jobs, a
+manual Mac fallback, or a self-hosted GitHub iOS runner. All three execution
+entrypoints reject `GITHUB_ACTIONS=true`.
+
+`npm run verify:ios:local` selects one available iPhone 17 Pro UUID (or uses
+`MAESTRO_DEVICE_ID`), runs API XCTest plus the lock/link/repository/package
+regressions, and starts Maestro only after successful XCTest. Both use the same
+simulator and build directory. Set `IOS_DERIVED_DATA` and `IOS_SIMULATOR` as
+needed. The full unit suite is still available through local Xcode Test.
+
+GitHub's report uses `parity:report -- --require-platforms web,android`. That
+explicit scope still rejects missing, stale, failed or mixed-run web/Android
+evidence. It leaves iOS unverified. The default `--require-pass` still requires
+all three platforms. For a full local report, run all three unchanged sources
+with one `PARITY_RUN_ID`; to combine CI web/Android with local iOS, check out the
+exact CI commit and set `PARITY_RUN_ID` to its GitHub run ID before local iOS
+execution and reporting. Never relabel old evidence.

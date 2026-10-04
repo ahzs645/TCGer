@@ -3,11 +3,13 @@ import path from "node:path";
 import { spawnSync, execFileSync } from "node:child_process";
 import { root, main as check, loadContracts } from "./contracts.mjs";
 import { fingerprint, parseAPIJUnit, parseXCTest, apiReport } from "./report.mjs";
+import { requiredScope } from "../mobile-parity/verification-scope.mjs";
 
 const registry = loadContracts();
 const resultsDir = path.resolve(process.env.API_CONTRACT_RESULTS_DIR ?? path.join(root, "mobile-parity/results/api"));
 fs.mkdirSync(resultsDir, { recursive: true });
 const command = process.argv[2];
+if (command === 'ios' && process.env.GITHUB_ACTIONS === 'true') throw new Error('iOS API tests run locally only; GitHub Actions execution is disabled.');
 const runFingerprint = fingerprint(registry);
 const revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const file = name => path.join(resultsDir, name);
@@ -17,11 +19,14 @@ const xmlResults = name => fs.existsSync(file(name)) ? parseAPIJUnit(fs.readFile
 
 if (command === "report") {
   const evidence = Object.fromEntries([...Object.keys(registry.consumers), ...Object.keys(registry.providers)].filter(target => fs.existsSync(file(`${target}.json`))).map(target => [target, JSON.parse(fs.readFileSync(file(`${target}.json`), "utf8"))]));
-  const report = apiReport(registry, evidence, runFingerprint, revision);
+  const scoped = process.argv.includes('--require-targets');
+  const scope = requiredScope(process.argv, '--require-targets', [...Object.keys(registry.consumers), ...Object.keys(registry.providers)]);
+  const report = apiReport(registry, evidence, runFingerprint, revision, scoped ? scope : undefined);
   fs.writeFileSync(file("REPORT.md"), report.markdown);
   fs.writeFileSync(file("summary.json"), `${JSON.stringify(report.rows, null, 2)}\n`);
   console.log(report.markdown);
   if (process.argv.includes("--require-pass") && !report.passed) process.exitCode = 1;
+  if (scoped && !report.scopePassed) process.exitCode = 1;
 } else {
   check("check");
   const targets = command === "js" ? ["web", "express"] : [command];

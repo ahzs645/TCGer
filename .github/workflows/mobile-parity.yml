@@ -1,4 +1,4 @@
-name: Three-platform parity
+name: Web and Android verification
 
 on:
   workflow_dispatch:
@@ -225,64 +225,9 @@ jobs:
           path: frontend/test-results
           if-no-files-found: ignore
 
-  ios-smoke:
-    needs: contract
-    runs-on: macos-26
-    timeout-minutes: 45
-    env:
-      MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
-      MAESTRO_CLI_NO_ANALYTICS: "true"
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - name: Select Xcode 26
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
-      - name: Select one simulator for XCTest and Maestro
-        run: |
-          simulator_id=$(xcrun simctl list devices available -j | node tools/mobile-parity/select-ios-simulator.mjs)
-          echo "MAESTRO_DEVICE_ID=$simulator_id" >> "$GITHUB_ENV"
-          echo "API_CONTRACT_IOS_DESTINATION=platform=iOS Simulator,id=$simulator_id" >> "$GITHUB_ENV"
-          echo "IOS_DERIVED_DATA=$RUNNER_TEMP/parity-ios-build" >> "$GITHUB_ENV"
-          echo "API_CONTRACT_IOS_DERIVED_DATA=$RUNNER_TEMP/parity-ios-build" >> "$GITHUB_ENV"
-      - name: Verify iOS lock, link, repository and package regressions
-        run: >-
-          xcodebuild -project mobile-apps/ios/TCGer/TCGer.xcodeproj -scheme TCGer
-          -destination "$API_CONTRACT_IOS_DESTINATION" -derivedDataPath "$IOS_DERIVED_DATA"
-          -only-testing:TCGerTests/DeviceAuthenticationTests -only-testing:TCGerTests/DeepLinkRoutingTests
-          -only-testing:TCGerTests/LocalAPIRepositoryInjectionTests -only-testing:TCGerTests/PackageScannerDownloadTests test
-      - name: Verify iOS API serialization and decoding
-        run: npm run api-contracts:ios
-      - name: Upload iOS API evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: api-contracts-ios
-          path: |
-            mobile-parity/results/api/ios.json
-            mobile-parity/results/api/ios-tests.json
-            mobile-parity/results/api/*.xcresult
-          if-no-files-found: warn
-      - name: Install Maestro
-        run: |
-          curl -Ls https://get.maestro.mobile.dev | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-      - name: Build and run iOS parity flows
-        run: npm run parity:ios
-      - name: Upload iOS results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: parity-ios
-          path: mobile-parity/results/ios*
-          if-no-files-found: warn
-
   report:
     if: always()
-    needs: [android-smoke, ios-smoke, web-smoke, api-contracts-js]
+    needs: [android-smoke, web-smoke, api-contracts-js]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -299,10 +244,10 @@ jobs:
           pattern: parity-*
           path: mobile-parity/results
           merge-multiple: true
-      - name: Build combined report
+      - name: Require web and Android UI evidence (iOS runs locally)
         run: |
           parity_exit=0
-          npm run parity:report -- --require-pass || parity_exit=$?
+          npm run parity:report -- --require-platforms web,android || parity_exit=$?
           cat mobile-parity/results/REPORT.md >> "$GITHUB_STEP_SUMMARY"
           exit "$parity_exit"
       - name: Download API contract evidence
@@ -313,11 +258,11 @@ jobs:
           pattern: api-contracts-*
           path: mobile-parity/results/api
           merge-multiple: true
-      - name: Require complete API compatibility coverage
+      - name: Require web, Android and provider API evidence (iOS runs locally)
         if: always()
         run: |
           api_contract_exit=0
-          npm --silent run api-contracts:report -- --require-pass > mobile-parity/results/api-summary.md || api_contract_exit=$?
+          npm --silent run api-contracts:report -- --require-targets web,android,express,convex > mobile-parity/results/api-summary.md || api_contract_exit=$?
           cat mobile-parity/results/api-summary.md >> "$GITHUB_STEP_SUMMARY"
           exit "$api_contract_exit"
       - uses: actions/upload-artifact@v7

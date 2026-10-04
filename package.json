@@ -72,7 +72,8 @@
     "api-contracts:test": "npm run api-contracts:check && npm run api-contracts:js && npm run api-contracts:convex",
     "release:check": "node tools/release/readiness.mjs",
     "release:test": "node --test tools/release/*.test.mjs",
-    "release:apk": "node tools/release/apk-signing.mjs --build"
+    "release:apk": "node tools/release/apk-signing.mjs --build",
+    "verify:ios:local": "bash mobile-parity/verify-ios-local.sh"
   },
   "engines": {
     "node": ">=18.17.0",

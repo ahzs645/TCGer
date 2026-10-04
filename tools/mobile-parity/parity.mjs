@@ -8,6 +8,7 @@ import { execFileSync } from "node:child_process";
 import { collectSourceRegistrations, compileSourceContract } from "./source-contract.mjs";
 import { featureImpact, renderFeatureImpact } from "./feature-impact.mjs";
 import { sourceIdentity, validateEvidence } from "./evidence.mjs";
+import { requiredScope } from "./verification-scope.mjs";
 import { loadContracts, apiContractImpact, main as checkAPIContracts } from "../api-contracts/contracts.mjs";
 
 const toolDir = path.dirname(fileURLToPath(import.meta.url));
@@ -378,15 +379,17 @@ function main() {
     }
     console.log(`Parity contract valid: ${manifest.features.length} features, ${manifest.controls.length} controls across ${manifest.platforms.length} platforms.`);
   } else if (command === "report") {
-    const report = renderReport(manifest, {
+    const scope = requiredScope(process.argv, "--require-platforms", manifest.platforms);
+    const scoped = process.argv.includes("--require-platforms");
+    const report = (scoped ? `> Required execution scope: ${scope.join(", ")}. iOS runs locally; this CI subset does not establish three-platform parity.\n\n` : "") + renderReport(manifest, {
       results: Object.fromEntries(manifest.platforms.map((platform) => [platform, argumentValue(`--${platform}-results`)])),
     });
     const output = argumentValue("--output") ?? reportPath;
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(output, report);
-    if (process.argv.includes("--require-pass")) {
+    if (process.argv.includes("--require-pass") || scoped) {
       const identity = sourceIdentity();
-      for (const platform of manifest.platforms) {
+      for (const platform of process.argv.includes("--require-pass") ? manifest.platforms : scope) {
         const file = argumentValue(`--${platform}-results`);
         const issue = validateEvidence(file, platform, identity);
         const cases = issue ? new Map() : parseJUnit(file);

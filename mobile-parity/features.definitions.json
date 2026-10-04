@@ -3633,7 +3633,7 @@
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
           "mobile-apps/ios/TCGer/TCGer.xcodeproj/project.pbxproj",
-          ".github/workflows/ios.yml",
+          "mobile-parity/verify-ios-local.sh",
           "mobile-apps/ios/release/ExportOptions.plist",
           "mobile-apps/ios/release/archive.sh",
           "tools/release/readiness.mjs",
@@ -3646,6 +3646,11 @@
             "runner": "node-test",
             "id": "release.readiness",
             "path": "tools/release/readiness.test.mjs"
+          },
+          {
+            "runner": "node-test",
+            "id": "release.readiness",
+            "path": "tools/mobile-parity/local-ios-policy.test.mjs"
           }
         ]
       },
