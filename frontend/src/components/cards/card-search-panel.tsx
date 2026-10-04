@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"cards.searchMarketPrices","platform":"web","status":"partial","limitation":"Search previews support manual authenticated server quote comparison and downloaded package price snapshots; automatic visible-result free-provider refresh matching iOS remains outstanding."}
 // @tcger-feature {"id":"cards.filteredSearch","platform":"web","status":"implemented"}
 
 "use client";

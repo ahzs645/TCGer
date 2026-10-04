@@ -6,6 +6,7 @@ export const ParityFeatureIDs = {
   collectionsArtworkBadges: "collections.artworkBadges",
   collectionsCreate: "collections.create",
   cardsSearch: "cards.search",
+  cardsSearchMarketPrices: "cards.searchMarketPrices",
   wishlistsBrowse: "wishlists.browse",
   wishlistsCreate: "wishlists.create",
   settingsBrowse: "settings.browse",
@@ -134,6 +135,7 @@ export const parityFeatureSupport: Readonly<Record<ParityFeatureID, ParityFeatur
   [ParityFeatureIDs.collectionsArtworkBadges]: {"status":"partial","limitation":"Collection rows display quantity and per-card prices; no artwork grid with overlaid badges.","modes":null,"requirements":[],"source":"frontend/src/components/collections/sandbox/collection-view.tsx"},
   [ParityFeatureIDs.collectionsCreate]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/collections/sandbox/collection-view.tsx"},
   [ParityFeatureIDs.cardsSearch]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/cards/page.tsx"},
+  [ParityFeatureIDs.cardsSearchMarketPrices]: {"status":"partial","limitation":"Search previews support manual authenticated server quote comparison and downloaded package price snapshots; automatic visible-result free-provider refresh matching iOS remains outstanding.","modes":null,"requirements":[],"source":"frontend/src/components/cards/card-search-panel.tsx"},
   [ParityFeatureIDs.wishlistsBrowse]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/wishlists/page.tsx"},
   [ParityFeatureIDs.wishlistsCreate]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/wishlists/wishlist-content.tsx"},
   [ParityFeatureIDs.settingsBrowse]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/account/account-settings-dialog.tsx"},
@@ -454,6 +456,7 @@ export const ParityControlIDs = {
   optionCollectionsLayout: "option.collections.layout",
   actionCollectionsNewBinder: "action.collections.newBinder",
   optionSettingsShowPricing: "option.settings.showPricing",
+  optionCardsSearchScope: "option.cards.searchScope",
 } as const;
 
 export type ParityControlID = (typeof ParityControlIDs)[keyof typeof ParityControlIDs];

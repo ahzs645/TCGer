@@ -4,16 +4,16 @@ Generated from [product definitions](features.definitions.json) and platform sou
 
 - Platforms: Web, iOS, Android.
 - 7 features are parity-required.
-- 108 features are explicitly tracked.
+- 109 features are explicitly tracked.
 - A declaration is backed by source paths in the manifest. “Verified” additionally requires passing current JUnit evidence on every declared platform; a declared test that was not supplied is “Not run.”
 
 ## Declaration summary
 
 | Platform | Implemented | Partial | Planned | Unavailable | Not applicable | Waived |
 |---|---|---|---|---|---|---|
-| Web | 90 | 13 | 10 | 0 | 2 | 0 |
-| iOS | 109 | 5 | 1 | 0 | 0 | 0 |
-| Android | 93 | 11 | 10 | 0 | 1 | 0 |
+| Web | 90 | 14 | 10 | 0 | 2 | 0 |
+| iOS | 110 | 5 | 1 | 0 | 0 | 0 |
+| Android | 93 | 11 | 11 | 0 | 1 | 0 |
 
 ## Feature matrix
 
@@ -24,6 +24,7 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | collections.artworkBadges | Artwork quantity and per-card price badges | track | Partial | — | Implemented | Not run | Partial | — | Tracked gap |
 | collections.create | Create a binder | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | cards.search | Search cards | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
+| cards.searchMarketPrices | Market price estimates in card search | track | Partial | — | Implemented | Not run | Planned | — | Tracked gap |
 | wishlists.browse | Browse wishlists | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | wishlists.create | Create a wishlist | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
 | settings.browse | Settings | parity | Implemented | Not run | Implemented | Not run | Implemented | Not run | Declared |
@@ -142,8 +143,11 @@ These declarations live beside platform implementations. Unspecified modes are u
 | ID | Platform | Support | Modes | Requirements | Limitation or fallback | Registration |
 |---|---|---|---|---|---|---|
 | collections.artworkBadges | Web | Partial | Not specified | — | Collection rows display quantity and per-card prices; no artwork grid with overlaid badges. | [Source](../frontend/src/components/collections/sandbox/collection-view.tsx#L1) |
-| collections.artworkBadges | iOS | Implemented | local, server, demo | — | Displays stored per-card estimates; market refresh remains in Prices. Mixed finishes/conditions share the collection printing's stored estimate. | [Source](../mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift#L1) |
+| collections.artworkBadges | iOS | Implemented | local, server, demo | — | Collection badges display stored per-card estimates; search has separate market-reference refresh. Mixed finishes/conditions share the collection printing's stored estimate. | [Source](../mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift#L1) |
 | collections.artworkBadges | Android | Partial | Not specified | — | Binder grid/list shows quantity and per-card prices below artwork, without overlaid badges. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt#L1) |
+| cards.searchMarketPrices | Web | Partial | Not specified | — | Search previews support manual authenticated server quote comparison and downloaded package price snapshots; automatic visible-result free-provider refresh matching iOS remains outstanding. | [Source](../frontend/src/components/cards/card-search-panel.tsx#L1) |
+| cards.searchMarketPrices | iOS | Implemented | local, demo | internet-for-market-refresh | Phone-only Magic/Pokémon results load cached USD market references for visible cards. Other games, offline mode and unavailable quotes keep stored estimates. Search quotes do not rewrite owned copies; native/server/web search pricing is not equivalent. | [Source](../mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift#L1) |
+| cards.searchMarketPrices | Android | Planned | Not specified | — | Search has no equivalent visible-result free-provider price refresh or quote provenance; the server search DTO does not consume returned prices. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt#L1) |
 | decks.browse | Web | Implemented | demo, server | — | — | [Source](../frontend/app/decks/page.tsx#L1) |
 | decks.browse | iOS | Implemented | server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/DecksView.swift#L1) |
 | decks.browse | Android | Implemented | server | — | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/DeckScreens.kt#L1) |

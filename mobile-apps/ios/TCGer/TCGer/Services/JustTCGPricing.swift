@@ -124,8 +124,8 @@ enum JustTCGIdentifierMappingStore {
     }
 }
 
-extension CollectionCard {
-    var justTCGIdentifiers: JustTCGIdentifiers {
+extension JustTCGIdentifiers {
+    static func forCard(tcg: String, externalId: String, attributes: [String: JSONValue]?, worldChampionshipProductId: String? = nil) -> JustTCGIdentifiers {
         func string(_ keys: [String]) -> String? {
             let normalizedKeys = Set(keys.map { $0.lowercased().replacingOccurrences(of: "_", with: "") })
             for (key, value) in attributes ?? [:] {
@@ -144,15 +144,29 @@ extension CollectionCard {
             cardId: string(["justtcgCardId", "justtcgUuid"]),
             variantId: string(["justtcgVariantId"]),
             tcgplayerId: string(["tcgplayerId", "tcgplayerProductId"])
-                ?? pokemonPrint?.worldChampionship?.sourceProductId,
+                ?? worldChampionshipProductId,
             mtgjsonId: string(["mtgjsonId", "mtgjsonUuid"]),
             scryfallId: string(["scryfallId"]),
             tcgplayerSkuId: string(["tcgplayerSkuId"])
         )
         return JustTCGIdentifiers.inferred(
             tcg: tcg,
-            externalId: externalId ?? cardId
+            externalId: externalId
         ).merging(explicit)
+    }
+}
+
+extension CollectionCard {
+    var justTCGIdentifiers: JustTCGIdentifiers {
+        .forCard(tcg: tcg, externalId: externalId ?? cardId, attributes: attributes,
+                 worldChampionshipProductId: pokemonPrint?.worldChampionship?.sourceProductId)
+    }
+}
+
+extension Card {
+    var justTCGIdentifiers: JustTCGIdentifiers {
+        .forCard(tcg: tcg, externalId: id, attributes: attributes,
+                 worldChampionshipProductId: pokemonPrint?.worldChampionship?.sourceProductId)
     }
 }
 

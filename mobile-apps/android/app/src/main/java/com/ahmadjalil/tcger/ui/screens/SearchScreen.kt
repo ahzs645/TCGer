@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"cards.searchMarketPrices","platform":"android","status":"planned","limitation":"Search has no equivalent visible-result free-provider price refresh or quote provenance; the server search DTO does not consume returned prices."}
 // @tcger-feature {"id":"cards.search","platform":"android","status":"implemented"}
 
 package com.ahmadjalil.tcger.ui.screens

@@ -11,6 +11,8 @@ struct CardSearchResultsList: View {
     let enabledGames: [TCGGame]
     let showPricing: Bool
     let showCardNumbers: Bool
+    var includeUninstalledGames = false
+    var pricingAPI: APIService? = nil
     var showsGameSectionHeader = true
     var primaryActionTitle: String = "Add Card"
     var accessibilityHint = "Opens the add card form"
@@ -20,20 +22,8 @@ struct CardSearchResultsList: View {
 
     // Group cards by TCG
     private var groupedCards: [(String, [Card])] {
-        if selectedGame != .all {
-            return [(selectedGame.rawValue, cards)]
-        }
-
-        // Filter cards to only include enabled games
-        let enabledGameRawValues = Set(enabledGames.map { $0.rawValue })
-        let filteredCards = cards.filter { card in
-            enabledGameRawValues.contains(card.tcg)
-        }
-
-        let groups = Dictionary(grouping: filteredCards, by: { $0.tcg })
-        return groups.sorted {
-            gameSectionIsOrderedBefore($0.key, $1.key, enabledGames: enabledGames)
-        }
+        CardSearchResultGrouping.groups(cards: cards, selectedGame: selectedGame,
+                                        enabledGames: enabledGames, includeUninstalled: includeUninstalledGames)
     }
 
     private var shouldShowGameSectionHeader: Bool {
@@ -69,11 +59,12 @@ struct CardSearchResultsList: View {
                 Button {
                     onCardTap(card)
                 } label: {
-                    CardSearchResultCell(
-                        card: card,
-                        showPricing: showPricing,
-                        showCardNumbers: showCardNumbers
-                    )
+                    if let pricingAPI {
+                        MarketPricedSearchResultCell(card: card, showPricing: showPricing,
+                                                   showCardNumbers: showCardNumbers, api: pricingAPI)
+                    } else {
+                        CardSearchResultCell(card: card, showPricing: showPricing, showCardNumbers: showCardNumbers)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint(accessibilityHint)
@@ -136,6 +127,13 @@ struct CardSearchResultCell: View {
     let showPricing: Bool
     let showCardNumbers: Bool
     var quantity: Int? = nil
+    var marketEstimate: CardSearchMarketEstimate? = nil
+    var showsEstimateSource = false
+
+    private var displayedPrice: Double? { marketEstimate?.price ?? card.price }
+    private var estimateLabel: String {
+        marketEstimate?.label ?? (CardPriceBadgeValue(price: card.price).text == "—" ? "Price unavailable" : "Stored estimate")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -171,8 +169,15 @@ struct CardSearchResultCell: View {
             }
             .cornerRadius(8)
             .overlay(alignment: .topLeading) {
-                CardArtworkBadges(quantity: quantity, price: card.price, showPricing: showPricing)
+                CardArtworkBadges(quantity: quantity, price: displayedPrice, showPricing: showPricing)
                     .padding(4)
+            }
+
+            if showPricing && showsEstimateSource {
+                Text(estimateLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
 
             // Card Info
@@ -367,7 +372,8 @@ struct CardSearchResultCell: View {
         }
         if let quantity { parts.append("\(quantity) \(quantity == 1 ? "copy" : "copies")") }
         if showPricing {
-            parts.append(CardPriceBadgeValue(price: card.price).accessibilityLabel)
+            parts.append(CardPriceBadgeValue(price: displayedPrice).accessibilityLabel)
+            if showsEstimateSource { parts.append(estimateLabel) }
         }
 
         return parts.joined(separator: ", ")

@@ -778,7 +778,10 @@ final class LocalStore {
                         imageUrlSmall: cc.imageUrlSmall,
                         price: cc.price,
                         collectorNumber: cc.collectorNumber,
-                        releasedAt: nil
+                        releasedAt: nil,
+                        language: cc.languageCode,
+                        pokemonPrint: cc.pokemonPrint,
+                        attributes: cc.attributes
                     )
                 )
             }
@@ -841,11 +844,9 @@ final class LocalStore {
     }
 
     private func gameMatches(_ cardTCG: String, requested game: TCGGame) -> Bool {
-        guard let cardGame = TCGGame(rawValue: cardTCG),
-              CatalogStore.shared.isEnabled(cardGame) else {
-            return false
-        }
-        return game == .all || cardGame == game
+        // Download/preferences select full catalog packs in CatalogStore.
+        // Owned and opt-in sample records remain searchable without that pack.
+        game == .all || cardTCG.caseInsensitiveCompare(game.rawValue) == .orderedSame
     }
 
     private func cardMatchesSearch(_ card: Card, query: String) -> Bool {

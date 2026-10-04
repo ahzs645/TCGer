@@ -28,11 +28,13 @@ final class APIService {
     }
 
     private let session: URLSession
+    let tcgcsvPrices: TCGCSVPriceClient
     let collectionCache: CacheManager
     private let injectedLocalStore: LocalStore?
     var localStore: LocalStore { injectedLocalStore ?? .shared }
 
-    init(session: URLSession = .shared, collectionCache: CacheManager = .shared, localStore: LocalStore? = nil) {
+    init(session: URLSession = .shared, collectionCache: CacheManager = .shared, localStore: LocalStore? = nil, tcgcsvPrices: TCGCSVPriceClient = .shared) {
+        self.tcgcsvPrices = tcgcsvPrices
         self.injectedLocalStore = localStore
         self.session = session
         self.collectionCache = collectionCache

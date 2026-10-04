@@ -176,7 +176,7 @@
           "path": "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift",
           "line": 1
         },
-        "limitation": "Displays stored per-card estimates; market refresh remains in Prices. Mixed finishes/conditions share the collection printing's stored estimate.",
+        "limitation": "Collection badges display stored per-card estimates; search has separate market-reference refresh. Mixed finishes/conditions share the collection printing's stored estimate.",
         "modes": [
           "local",
           "server",
@@ -324,13 +324,22 @@
           "backend/src/api/middleware/auth.ts",
           "mobile-parity/api-contracts/interactions.json",
           "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift",
-          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/MarketPricedSearchResultCell.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardSearchResults.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
         ],
         "tests": [
           {
             "runner": "xctest",
             "id": "cards.search",
             "path": "mobile-apps/ios/TCGer/TCGerTests/CachedImageLoaderTests.swift"
+          },
+          {
+            "runner": "xctest",
+            "id": "cards.search",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CardSearchMarketPriceTests.swift"
           }
         ],
         "status": "implemented",
@@ -352,8 +361,75 @@
         "status": "implemented",
         "implementation": {
           "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt",
-          "line": 1
+          "line": 2
         }
+      }
+    },
+    {
+      "id": "cards.searchMarketPrices",
+      "title": "Market price estimates in card search",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/components/cards/card-search-panel.tsx",
+          "frontend/src/components/cards/card-preview.tsx",
+          "frontend/src/components/game-features/package-capabilities.tsx",
+          "frontend/src/lib/api/pricing.ts"
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "frontend/src/components/cards/card-search-panel.tsx",
+          "line": 1
+        },
+        "limitation": "Search previews support manual authenticated server quote comparison and downloaded package price snapshots; automatic visible-result free-provider refresh matching iOS remains outstanding."
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/MarketPricedSearchResultCell.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Portfolio.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/JustTCGPricing.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardSearchResults.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "cards.searchMarketPrices",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CardSearchMarketPriceTests.swift"
+          },
+          {
+            "runner": "maestro",
+            "id": "cards.searchMarketPrices",
+            "path": "mobile-parity/maestro/ios/search-market-prices.yaml"
+          }
+        ],
+        "status": "implemented",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift",
+          "line": 1
+        },
+        "limitation": "Phone-only Magic/Pokémon results load cached USD market references for visible cards. Other games, offline mode and unavailable quotes keep stored estimates. Search quotes do not rewrite owned copies; native/server/web search pricing is not equivalent.",
+        "modes": [
+          "local",
+          "demo"
+        ],
+        "requires": [
+          "internet-for-market-refresh"
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt"
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt",
+          "line": 1
+        },
+        "limitation": "Search has no equivalent visible-result free-provider price refresh or quote provenance; the server search DTO does not consume returned prices."
       }
     },
     {
@@ -3913,7 +3989,7 @@
         "status": "implemented",
         "implementation": {
           "path": "frontend/src/components/cards/card-search-panel.tsx",
-          "line": 1
+          "line": 2
         }
       },
       "ios": {
@@ -5766,6 +5842,7 @@
     "action.keyboard.dismiss",
     "option.collections.layout",
     "action.collections.newBinder",
-    "option.settings.showPricing"
+    "option.settings.showPricing",
+    "option.cards.searchScope"
   ]
 }

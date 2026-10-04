@@ -169,6 +169,14 @@ present persistence warnings, and keep the logout tombstone if deletion fails.
 Health refresh must permit same-server retries, preserve known restrictions on
 failure and reject responses for superseded sources.
 
+Search market quotes are transient references, separate from owned-copy values
+and acquisition costs. Preserve provider identifiers when projecting local cards.
+Use exact printing/product identifiers and retain language matching; never attach
+a fuzzy name match's price. The card badge currency formatter expects USD, so do
+not label another currency as dollars without conversion. Fetch only rendered
+search results while pricing is enabled and online, retain stored estimates when
+quotes fail, and reject replaced/cancelled card, source or session requests.
+
 Copy PATCH changes the addressed physical copy and preserves its siblings;
 the established DELETE card endpoint removes the whole printing group. Scan-save
 contracts verify persistence requests, not recognition or UI review. Sealed opening

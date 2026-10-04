@@ -17,6 +17,7 @@ object ParityFeatureIDs {
     const val COLLECTIONS_ARTWORK_BADGES = "collections.artworkBadges"
     const val COLLECTIONS_CREATE = "collections.create"
     const val CARDS_SEARCH = "cards.search"
+    const val CARDS_SEARCH_MARKET_PRICES = "cards.searchMarketPrices"
     const val WISHLISTS_BROWSE = "wishlists.browse"
     const val WISHLISTS_CREATE = "wishlists.create"
     const val SETTINGS_BROWSE = "settings.browse"
@@ -230,6 +231,7 @@ object ParityFeatureIDs {
         COLLECTIONS_ARTWORK_BADGES to ParityFeatureSupport(ParitySupportStatus.PARTIAL, "Binder grid/list shows quantity and per-card prices below artwork, without overlaid badges.", null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BinderDetailScreen.kt"),
         COLLECTIONS_CREATE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionsScreen.kt"),
         CARDS_SEARCH to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt"),
+        CARDS_SEARCH_MARKET_PRICES to ParityFeatureSupport(ParitySupportStatus.PLANNED, "Search has no equivalent visible-result free-provider price refresh or quote provenance; the server search DTO does not consume returned prices.", null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt"),
         WISHLISTS_BROWSE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt"),
         WISHLISTS_CREATE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/WishlistsScreen.kt"),
         SETTINGS_BROWSE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SettingsScreen.kt"),
@@ -458,4 +460,5 @@ object ParityControlIDs {
     const val OPTION_COLLECTIONS_LAYOUT = "option.collections.layout"
     const val ACTION_COLLECTIONS_NEW_BINDER = "action.collections.newBinder"
     const val OPTION_SETTINGS_SHOW_PRICING = "option.settings.showPricing"
+    const val OPTION_CARDS_SEARCH_SCOPE = "option.cards.searchScope"
 }

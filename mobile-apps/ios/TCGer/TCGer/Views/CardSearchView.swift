@@ -2,6 +2,7 @@
 // @tcger-feature {"id":"cards.filteredSearch","platform":"ios","status":"implemented"}
 
 import SwiftUI
+import CryptoKit
 
 private enum CardSearchScope: String, CaseIterable, Identifiable {
     case catalog = "All Cards"
@@ -51,6 +52,11 @@ struct CardSearchView: View {
     var onCardAdded: (() -> Void)?
 
     private let apiService = APIService()
+
+    private var sessionIdentity: String {
+        let source = environmentStore.serverConfiguration.baseURL + "\u{0}" + (environmentStore.authToken ?? "")
+        return SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 
     init(
         initialSearchText: String = "",
@@ -122,6 +128,7 @@ struct CardSearchView: View {
                         results: filteredOwnedSearchResults,
                         showPricing: environmentStore.showPricing,
                         showCardNumbers: environmentStore.showCardNumbers,
+                        api: apiService,
                         onOpenBinder: { result in
                             selectedOwnedResult = result
                         },
@@ -136,6 +143,8 @@ struct CardSearchView: View {
                         enabledGames: environmentStore.enabledGames,
                         showPricing: environmentStore.showPricing,
                         showCardNumbers: environmentStore.showCardNumbers,
+                        includeUninstalledGames: environmentStore.serverConfiguration.isOnDevice,
+                        pricingAPI: apiService,
                         onCardTap: { card in
                             addSheetCard = card
                         },
@@ -276,6 +285,15 @@ struct CardSearchView: View {
                 latestSearch.cancel()
                 isSearching = false
             }
+            .onChange(of: sessionIdentity) {
+                latestSearch.cancel()
+                isSearching = false
+                hasSearched = false
+                searchResults = []
+                ownedSearchResults = []
+                loadedCollections = nil
+                errorMessage = nil
+            }
             .onChange(of: initialSearchText) { _, nextQuery in
                 guard nextQuery != searchText else { return }
                 searchText = nextQuery
@@ -291,7 +309,7 @@ struct CardSearchView: View {
                 }
                 validateSelectedGame()
             }
-            .task {
+            .task(id: sessionIdentity) {
                 await loadCollectionAvailability()
                 if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                    !hasSearched {
@@ -313,6 +331,7 @@ struct CardSearchView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .accessibilityIdentifier(ParityControlID.optionCardsSearchScope)
                 .padding(.horizontal)
                 .padding(.vertical, 8)
             }
@@ -405,6 +424,12 @@ struct CardSearchView: View {
     }
 
     private func validateSelectedGame() {
+        if environmentStore.serverConfiguration.isOnDevice {
+            if selectedGame == .all { return }
+            if loadedCollections?.contains(where: { collection in
+                collection.cards.contains { $0.tcg == selectedGame.rawValue }
+            }) == true { return }
+        }
         let resolvedGame = environmentStore.resolvedGameSelection(selectedGame)
         if resolvedGame != selectedGame {
             selectedGame = resolvedGame
@@ -426,13 +451,17 @@ struct CardSearchView: View {
     @MainActor
     private func loadCollectionAvailability() async {
         guard loadedCollections == nil else { return }
+        let source = sessionIdentity
+        let config = environmentStore.serverConfiguration
+        let token = environmentStore.authToken
 
         do {
             let collections = try await apiService.getCollections(
-                config: environmentStore.serverConfiguration,
-                token: environmentStore.authToken,
+                config: config,
+                token: token,
                 useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
+            guard source == sessionIdentity, !Task.isCancelled else { return }
             loadedCollections = collections
             if !hasOwnedCards, searchScope == .collection {
                 searchScope = .catalog
@@ -553,6 +582,7 @@ struct CardSearchView: View {
         let packageId = selectedPackageId
         let filters = searchFilters
         let config = environmentStore.serverConfiguration
+        let source = sessionIdentity
         let useCache = environmentStore.offlineModeEnabled
         let cachedCollections = loadedCollections
         isSearching = true
@@ -601,6 +631,7 @@ struct CardSearchView: View {
             }
             return output
         } completion: { result in
+            guard source == sessionIdentity else { return }
             isSearching = false
             switch result {
             case .success(let output):
@@ -707,6 +738,7 @@ private struct OwnedCardSearchResultsList: View {
     let results: [OwnedCardSearchResult]
     let showPricing: Bool
     let showCardNumbers: Bool
+    let api: APIService
     let onOpenBinder: (OwnedCardSearchResult) -> Void
     let onShowDetails: (OwnedCardSearchResult) -> Void
 
@@ -720,11 +752,9 @@ private struct OwnedCardSearchResultsList: View {
                         onOpenBinder(result)
                     } label: {
                         VStack(alignment: .leading, spacing: 8) {
-                            CardSearchResultCell(
-                                card: result.previewCard,
-                                showPricing: showPricing,
-                                showCardNumbers: showCardNumbers,
-                                quantity: result.card.quantity
+                            MarketPricedSearchResultCell(
+                                card: result.previewCard, showPricing: showPricing,
+                                showCardNumbers: showCardNumbers, quantity: result.card.quantity, api: api
                             )
 
                             HStack(spacing: 6) {

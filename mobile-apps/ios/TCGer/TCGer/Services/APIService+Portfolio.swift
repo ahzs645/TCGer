@@ -5,11 +5,12 @@ private actor ScryfallPricingThrottle {
     private var nextRequestAt = Date.distantPast
 
     func wait() async throws {
-        let delay = nextRequestAt.timeIntervalSinceNow
+        let scheduled = max(Date(), nextRequestAt)
+        nextRequestAt = scheduled.addingTimeInterval(0.12)
+        let delay = scheduled.timeIntervalSinceNow
         if delay > 0 {
             try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
-        nextRequestAt = Date().addingTimeInterval(0.12)
     }
 }
 
@@ -163,7 +164,7 @@ extension APIService {
     func getCachedPokemonPrices(items: [TrackedPriceItem]) async -> [TrackedPriceResult] {
         var results: [TrackedPriceResult] = []
         for item in items where item.tcg.lowercased() == "pokemon" && PricingSource.selected(for: item.tcg) == .automatic {
-            if let quote = await TCGCSVPriceClient.shared.cached(item.tcgcsvLookup) {
+            if let quote = await tcgcsvPrices.cached(item.tcgcsvLookup) {
                 results.append(item.tcgcsvResult(quote))
             }
         }
@@ -242,7 +243,7 @@ extension APIService {
                 ? selectedSource
                 : .automatic
             if item.tcg.lowercased() == "pokemon", source == .automatic {
-                let quote = await TCGCSVPriceClient.shared.quote(item.tcgcsvLookup)
+                let quote = await tcgcsvPrices.quote(item.tcgcsvLookup)
                 results.append(item.tcgcsvResult(quote))
                 continue
             }
@@ -344,8 +345,9 @@ extension APIService {
     }
 
     private func fetchOnDeviceScryfallPrice(_ item: TrackedPriceItem) async throws -> CardPriceQuote? {
+        let scryfallID = item.identifiers?.scryfallId ?? item.externalId
         guard item.tcg.lowercased() == "magic",
-              let url = URL(string: "https://api.scryfall.com/cards/\(item.externalId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? item.externalId)") else {
+              let url = URL(string: "https://api.scryfall.com/cards/\(scryfallID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? scryfallID)") else {
             return nil
         }
         try await ScryfallPricingThrottle.shared.wait()
@@ -387,7 +389,7 @@ extension APIService {
         finishCode: String?
     ) -> Double? {
         func price(_ value: String?) -> Double? {
-            guard let value, let parsed = Double(value), parsed > 0, parsed.isFinite else { return nil }
+            guard let value, let parsed = Double(value), parsed >= 0, parsed.isFinite else { return nil }
             return parsed
         }
         let regularPrice = price(regular)

@@ -58,3 +58,32 @@ release approval. Current local UI/API reports must pass against committed,
 unchanged source; report links above point to ignored execution artifacts.
 
 Follow [AGENTS.md](../AGENTS.md), [the parity workflow](../mobile-parity/README.md) and [the API contract workflow](../mobile-parity/api-contracts/README.md). Update implementation, declarations, definitions and tests together; preserve deliberate differences and keep UI/API evidence separate.
+
+## iOS in-app search and free pricing follow-up (2026-10-04)
+
+The earlier native core search smoke case only opened the screen. It did not
+prove a typed search or an in-app market lookup. The follow-up fixed two download
+filters that hid/excluded owned and opt-in sample records, retained their exact
+provider IDs in local search projections, and added market references for rendered
+phone-only Magic/Pokémon search cells. Scryfall requests use the printing ID;
+Pokémon uses exact English TCGCSV product/set matching and its daily durable cache.
+Captions identify the provider and cached/stored estimate. Missing, failed or
+non-USD quotes retain stored values. Offline mode and Show Pricing gate requests.
+Quotes remain presentation state and do not rewrite owned values or intake costs.
+
+`cards.searchMarketPrices` is a separate tracked capability. Web and Android have
+explicit implementation gaps; native server search retains returned values and
+has no additional client market refresh. Other games have no general free fallback.
+A complete catalog still requires a game download; owned and loaded demo cards do
+not. This work does not claim live API search across the entire card catalog.
+
+Local validation: 75 focused XCTest cases passed with no skips or failures,
+including 42 existing server API interactions, Scryfall/TCGCSV transport fixtures,
+cache/relaunch, missing/foreign-currency quotes, source/session cancellation,
+search metadata and grouping. The additional iOS-only live Maestro flow typed
+“Lightning Bolt” and “Pikachu”, asserted Scryfall and TCGCSV estimates in both
+search scopes, and verified that disabling pricing hides badges and provenance.
+It uses real provider responses with demo identities/card-back artwork; it is
+separate from the shared core smoke suite and requires network availability.
+No GitHub macOS/iOS runner is configured. Web/Android behavior is unchanged apart
+from tracking metadata; these local results do not establish three-platform parity.

@@ -1,4 +1,4 @@
-// @tcger-feature {"id":"collections.artworkBadges","platform":"ios","status":"implemented","limitation":"Displays stored per-card estimates; market refresh remains in Prices. Mixed finishes/conditions share the collection printing's stored estimate.","modes":["local","server","demo"]}
+// @tcger-feature {"id":"collections.artworkBadges","platform":"ios","status":"implemented","limitation":"Collection badges display stored per-card estimates; search has separate market-reference refresh. Mixed finishes/conditions share the collection printing's stored estimate.","modes":["local","server","demo"]}
 import SwiftUI
 
 /// An absent quote is different from a real zero-dollar quote.
@@ -17,7 +17,7 @@ struct CardPriceBadgeValue {
 }
 
 /// Quantity and unit price sit together above the artwork, as in a card album.
-/// These are collection estimates, never a multiplication by the copy count.
+/// Unit estimates are never multiplied by the copy count.
 struct CardArtworkBadges: View {
     var quantity: Int? = nil
     let price: Double?

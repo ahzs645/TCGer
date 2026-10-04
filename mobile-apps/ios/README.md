@@ -173,8 +173,14 @@ with edit/move/sell available from the context menu. Owned search uses the same
 badges; catalog search shows the price badge without implying ownership.
 
 Settings → Show Pricing hides all price badges. New installations enable pricing.
-These badges do not fetch quotes or replace stored collection prices. The Prices
-workspace owns market refresh and source/finish/condition selection. With the
+Collection badges use stored prices. Search refreshes visible Magic and Pokémon
+results with compatible USD market references while online and Show Pricing is
+enabled. The caption distinguishes the provider/cached quote from a stored
+estimate. A failed lookup retains the stored estimate; unsupported games and
+offline mode remain usable. Quotes do not rewrite owned-copy values or costs.
+Full catalog search requires a downloaded game, while owned and explicitly
+loaded demo cards remain searchable without installing its catalog. The Prices
+workspace retains explicit source/finish/condition selection. With the
 default Best Available source, phone-only mode uses **Scryfall for Magic** and
 **TCGCSV TCGplayer market data for Pokémon**, without a personal API key. A stored
 JustTCG key enables that provider for compatible games; it is optional. Coverage
@@ -191,3 +197,27 @@ and `TCGCSVPriceClientTests`, followed by the iOS-specific Maestro flow:
 maestro --device "$MAESTRO_DEVICE_ID" test -e APP_ID=firstform.TCGer \
   mobile-parity/maestro/ios/collection-price-badges.yaml
 ```
+
+`cards.searchMarketPrices` is tracked separately: equivalent search refresh is
+still pending on web and Android. Native server search retains returned values;
+search does not call the server's tracked-prices endpoint. EUR-only quotes are
+not mislabeled as USD. Provider results are estimates rather than sold prices or
+a valuation for every finish, language, condition or grade. Search fetches only
+cells SwiftUI renders, uses provider caches, and rejects replaced/cancelled
+requests after card, source, session or pricing-preference changes.
+
+The focused `CardSearchMarketPriceTests` exercises the production Scryfall and
+TCGCSV paths with injected transports, cache/relaunch, unavailable/foreign-currency
+quotes, local search metadata and cancellation. The additional local-only flow
+uses real Scryfall and TCGCSV over the network with demo card identities and
+stored demo values; it types Magic and Pokémon queries, verifies refreshed quotes
+in both search scopes, and verifies that Show Pricing hides badges and sources:
+
+```sh
+maestro --device "$MAESTRO_DEVICE_ID" test -e APP_ID=firstform.TCGer \
+  mobile-parity/maestro/ios/search-market-prices.yaml
+```
+
+A network failure fails that live flow; the core three-platform smoke flow still
+verifies only native screen availability and must not be reported as a live-price
+or full-search test. There are no GitHub macOS runners for this verification.

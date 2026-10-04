@@ -264,7 +264,11 @@
           "backend/src/api/middleware/auth.ts",
           "mobile-parity/api-contracts/interactions.json",
           "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift",
-          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CachedAsyncImage.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/MarketPricedSearchResultCell.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardSearchResults.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
         ],
         "registration": "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift",
         "tests": [
@@ -272,6 +276,11 @@
             "runner": "xctest",
             "id": "cards.search",
             "path": "mobile-apps/ios/TCGer/TCGerTests/CachedImageLoaderTests.swift"
+          },
+          {
+            "runner": "xctest",
+            "id": "cards.search",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CardSearchMarketPriceTests.swift"
           }
         ]
       },
@@ -286,6 +295,51 @@
           "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
         ],
         "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt"
+      }
+    },
+    {
+      "id": "cards.searchMarketPrices",
+      "title": "Market price estimates in card search",
+      "policy": "track",
+      "web": {
+        "registration": "frontend/src/components/cards/card-search-panel.tsx",
+        "sources": [
+          "frontend/src/components/cards/card-search-panel.tsx",
+          "frontend/src/components/cards/card-preview.tsx",
+          "frontend/src/components/game-features/package-capabilities.tsx",
+          "frontend/src/lib/api/pricing.ts"
+        ]
+      },
+      "ios": {
+        "registration": "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/MarketPricedSearchResultCell.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Portfolio.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/JustTCGPricing.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardSearchResults.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "cards.searchMarketPrices",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/CardSearchMarketPriceTests.swift"
+          },
+          {
+            "runner": "maestro",
+            "id": "cards.searchMarketPrices",
+            "path": "mobile-parity/maestro/ios/search-market-prices.yaml"
+          }
+        ]
+      },
+      "android": {
+        "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SearchScreen.kt"
+        ]
       }
     },
     {
@@ -3878,6 +3932,7 @@
     "action.keyboard.dismiss",
     "option.collections.layout",
     "action.collections.newBinder",
-    "option.settings.showPricing"
+    "option.settings.showPricing",
+    "option.cards.searchScope"
   ]
 }

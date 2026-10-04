@@ -1,0 +1,109 @@
+appId: ${APP_ID}
+name: "[cards.searchMarketPrices] iOS typed search with live free market prices"
+tags: [ios, pricing, live-network]
+properties:
+  featureId: "cards.searchMarketPrices"
+---
+- launchApp:
+    clearState: true
+    arguments:
+      tcgerParityTest: "true"
+- tapOn:
+    id: "nav.settings"
+- scrollUntilVisible:
+    element:
+      id: "option.settings.showPricing"
+- runFlow:
+    when:
+      visible:
+        id: "option.settings.showPricing"
+        checked: false
+    commands:
+      - tapOn:
+          id: "option.settings.showPricing"
+          point: "90%,50%"
+- assertVisible:
+    id: "option.settings.showPricing"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "nav.home"
+    direction: UP
+- tapOn:
+    id: "nav.home"
+- tapOn:
+    id: "action.search"
+- tapOn:
+    text: "Cards, sets, or codes"
+    retryTapIfNoChange: true
+- inputText: "Lightning Bolt"
+- assertVisible: "Lightning Bolt"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: ".*Lightning Bolt.*per card.*Scryfall.*estimate.*"
+    timeout: 60000
+- takeScreenshot: search-live-scryfall-prices
+- tapOn:
+    id: "option.cards.searchScope"
+    point: "75%,50%"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: ".*Lightning Bolt.*cop(y|ies).*per card.*Scryfall.*estimate.*"
+    timeout: 60000
+- assertVisible: ".*Favorites Binder.*"
+- takeScreenshot: owned-search-live-scryfall-prices
+- tapOn:
+    text: "Cards, sets, or codes"
+    retryTapIfNoChange: true
+- eraseText
+- inputText: "Pikachu"
+- assertVisible: "Pikachu"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: ".*Pikachu.*per card.*TCGCSV.*estimate.*"
+    timeout: 60000
+- takeScreenshot: owned-search-live-tcgcsv-prices
+- tapOn:
+    id: "option.cards.searchScope"
+    point: "25%,50%"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: ".*Pikachu.*per card.*TCGCSV.*estimate.*"
+    timeout: 60000
+- takeScreenshot: search-live-tcgcsv-prices
+- scrollUntilVisible:
+    element:
+      text: "Done"
+    direction: UP
+- tapOn: "Done"
+- tapOn:
+    id: "nav.settings"
+- scrollUntilVisible:
+    element:
+      id: "option.settings.showPricing"
+- tapOn:
+    id: "option.settings.showPricing"
+    point: "90%,50%"
+- assertVisible:
+    id: "option.settings.showPricing"
+    checked: false
+- scrollUntilVisible:
+    element:
+      id: "nav.home"
+    direction: UP
+- tapOn:
+    id: "nav.home"
+- tapOn:
+    id: "action.search"
+- tapOn:
+    text: "Cards, sets, or codes"
+    retryTapIfNoChange: true
+- inputText: "Pikachu"
+- assertVisible: "Pikachu"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: ".*Pikachu.*Celebrations.*"
+    timeout: 20000
+- assertNotVisible: ".*per card.*"
+- assertNotVisible: ".*TCGCSV.*estimate.*"
+- takeScreenshot: search-prices-hidden

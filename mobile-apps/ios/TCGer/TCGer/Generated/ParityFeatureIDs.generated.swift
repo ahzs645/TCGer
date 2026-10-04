@@ -20,6 +20,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     case collectionsArtworkBadges = "collections.artworkBadges"
     case collectionsCreate = "collections.create"
     case cardsSearch = "cards.search"
+    case cardsSearchMarketPrices = "cards.searchMarketPrices"
     case wishlistsBrowse = "wishlists.browse"
     case wishlistsCreate = "wishlists.create"
     case settingsBrowse = "settings.browse"
@@ -137,6 +138,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .collectionsArtworkBadges,
         .collectionsCreate,
         .cardsSearch,
+        .cardsSearchMarketPrices,
         .wishlistsBrowse,
         .wishlistsCreate,
         .settingsBrowse,
@@ -246,9 +248,10 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     static let supportByID: [ParityFeatureID: ParityFeatureSupport] = [
         .homeDashboard: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/DashboardView.swift"),
         .collectionsBrowse: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/CollectionsView.swift"),
-        .collectionsArtworkBadges: ParityFeatureSupport(status: .implemented, limitation: "Displays stored per-card estimates; market refresh remains in Prices. Mixed finishes/conditions share the collection printing's stored estimate.", modes: ["local", "server", "demo"], requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift"),
+        .collectionsArtworkBadges: ParityFeatureSupport(status: .implemented, limitation: "Collection badges display stored per-card estimates; search has separate market-reference refresh. Mixed finishes/conditions share the collection printing's stored estimate.", modes: ["local", "server", "demo"], requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/Components/CardArtworkBadges.swift"),
         .collectionsCreate: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/Components/CreateBinderSheet.swift"),
         .cardsSearch: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/CardSearchView.swift"),
+        .cardsSearchMarketPrices: ParityFeatureSupport(status: .implemented, limitation: "Phone-only Magic/Pokémon results load cached USD market references for visible cards. Other games, offline mode and unavailable quotes keep stored estimates. Search quotes do not rewrite owned copies; native/server/web search pricing is not equivalent.", modes: ["local", "demo"], requirements: ["internet-for-market-refresh"], source: "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift"),
         .wishlistsBrowse: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"),
         .wishlistsCreate: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"),
         .settingsBrowse: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"),
@@ -478,4 +481,5 @@ enum ParityControlID {
     static let optionCollectionsLayout = "option.collections.layout"
     static let actionCollectionsNewBinder = "action.collections.newBinder"
     static let optionSettingsShowPricing = "option.settings.showPricing"
+    static let optionCardsSearchScope = "option.cards.searchScope"
 }
