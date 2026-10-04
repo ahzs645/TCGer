@@ -1,4 +1,4 @@
-// @tcger-feature {"id":"navigation.appLinks","platform":"web","status":"partial","limitation":"Canonical native search/binder/wishlist URLs redirect to web screens and preserve selection; static demo aliases, hosted associations and signed-device cold starts remain unverified."}
+// @tcger-feature {"id":"navigation.appLinks","platform":"web","status":"partial","limitation":"Normal web aliases preserve targets. GitHub Pages publishes associations and a browser 404 fallback through demo entry; it uses sample/browser data and cannot access native private records. Hosted association headers and signed-device cold/warm links require verification."}
 import type { Metadata, Viewport } from "next";
 import { Inter, Lexend } from "next/font/google";
 import Script from "next/script";

@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { setDemoMode } from "@/lib/demo-mode";
 import { demoLogin } from "@/lib/api/demo-adapter";
 import { useAuthStore } from "@/stores/auth";
+import { demoReturnTarget } from "@/lib/app-links.mjs";
 
 export default function DemoLoginPage() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function DemoLoginPage() {
       setDemoMode(true);
       const { user, token } = demoLogin();
       useAuthStore.getState().setAuth(user, token);
-      router.push("/demo/dashboard");
+      router.push(demoReturnTarget(new URLSearchParams(window.location.search).get("next")));
     }, 800);
   };
 

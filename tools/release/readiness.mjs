@@ -45,7 +45,7 @@ export async function hostedChecks(baseURL, env, fetcher = fetch) {
       const response = await fetcher(new URL(pathname, origin), { redirect: 'manual', signal: AbortSignal.timeout(15000) });
       const data = response.ok ? await response.json() : null;
       const configured = pathname.includes('assetlinks') ? expected.android.length > 0 : expected.ios.applinks.details.length > 0;
-      checks.push({ id: pathname, status: configured && response.status === 200 && response.headers.get('content-type')?.includes('application/json') && JSON.stringify(data) === JSON.stringify(identity) ? 'passed' : 'pending', detail: `HTTP ${response.status}; must serve the configured public identities without a redirect.` });
+      checks.push({ id: pathname, status: configured && response.status === 200 && response.headers.get('content-type')?.includes('application/json') && JSON.stringify(data) === JSON.stringify(identity) ? 'passed' : 'pending', detail: `HTTP ${response.status}; Content-Type ${response.headers.get('content-type') ?? 'missing'}; must serve the configured public identities as application/json without a redirect.` });
     } catch (error) { checks.push({ id: pathname, status: 'failed', detail: error.message }); }
   }
   for (const pathname of ['/manifest.webmanifest', '/sw.js']) {

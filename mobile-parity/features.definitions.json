@@ -3494,7 +3494,12 @@
           "frontend/src/lib/release-identities.json",
           "mobile-parity/fixtures/app-links-v1.json",
           "frontend/app/demo/cards/page.tsx",
-          "frontend/app/demo/wishlists/page.tsx"
+          "frontend/app/demo/wishlists/page.tsx",
+          "frontend/app/demo/page.tsx",
+          "frontend/src/components/collections/sandbox/collection-view.tsx",
+          "tools/release/pages-app-links.mjs",
+          "marketing-site/public/404.html",
+          ".github/workflows/pages.yml"
         ],
         "tests": [
           {
@@ -3511,6 +3516,11 @@
             "runner": "playwright",
             "id": "navigation.appLinks",
             "path": "frontend/tests/parity/app-links.spec.ts"
+          },
+          {
+            "runner": "node",
+            "id": "navigation.appLinks",
+            "path": "tools/release/pages-app-links.test.mjs"
           }
         ]
       },
@@ -3606,7 +3616,9 @@
           "tools/release/readiness.mjs",
           "mobile-parity/fixtures/release-device-evidence.example.json",
           "docs/release-readiness.md",
-          "frontend/src/lib/release-identities.json"
+          "frontend/src/lib/release-identities.json",
+          "tools/release/pages-app-links.mjs",
+          ".github/workflows/pages.yml"
         ],
         "tests": [
           {

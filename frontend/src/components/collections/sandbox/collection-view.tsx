@@ -474,9 +474,10 @@ export function CollectionView() {
     () => binders.find((binder) => binder.id === binderFilter) ?? null,
     [binders, binderFilter],
   );
+  const showAllBinders = binderFilter === "all" && searchParams.get("binder") !== "all";
   const workingCards = useMemo(() => {
     const binderCards =
-      binderFilter === "all" ? flattenedCards : (activeBinder?.cards ?? []);
+      showAllBinders ? flattenedCards : (activeBinder?.cards ?? []);
     const folder = smartFolders.find(
       (candidate) => candidate.id === activeSmartFolderId,
     );
@@ -484,7 +485,7 @@ export function CollectionView() {
       ? binderCards.filter((card) => matchesSmartFolder(card, folder))
       : binderCards;
   }, [
-    binderFilter,
+    showAllBinders,
     flattenedCards,
     activeBinder,
     smartFolders,
@@ -1511,6 +1512,11 @@ export function CollectionView() {
 
   return (
     <div className="space-y-6" data-oid="bclo5-9">
+      {hasFetched && !showAllBinders && !activeBinder && (
+        <div role="alert" className="rounded-lg border p-3 text-sm">
+          This binder is unavailable for the current account.
+        </div>
+      )}
       {error && (
         <div
           className="flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"

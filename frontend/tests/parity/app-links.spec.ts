@@ -21,10 +21,17 @@ test("[navigation.appLinks] canonical native URLs preserve web destinations and 
 });
 
 test("[navigation.appLinks] a search link executes its supplied query", async ({ page }) => {
-  await enterDemo(page);
-  await page.goto("/demo/cards?q=Pikachu");
+  await page.goto("/demo/?next=%2Fdemo%2Fcards%3Fq%3DPikachu");
+  await page.getByRole("button", { name: "Enter Demo" }).click();
+  await expect(page).toHaveURL(/\/demo\/cards\?q=Pikachu$/);
   await expect(page.getByLabel("Keyword", { exact: true })).toHaveValue("Pikachu");
   await expect(page.getByText("Pikachu", { exact: true }).first()).toBeVisible();
+});
+
+test("[navigation.appLinks] demo entry rejects an external return destination", async ({ page }) => {
+  await page.goto("/demo/?next=https%3A%2F%2Fevil.example");
+  await page.getByRole("button", { name: "Enter Demo" }).click();
+  await expect(page).toHaveURL(/\/demo\/dashboard$/);
 });
 
 test("[navigation.appLinks] a wishlist link selects its record and rejects a missing target", async ({ page }) => {
@@ -34,6 +41,10 @@ test("[navigation.appLinks] a wishlist link selects its record and rejects a mis
   await page.getByLabel("Import portable backup").setInputFiles(path.resolve("../mobile-parity/fixtures/portable-backup-v2.json"));
   await page.getByRole("button", { name: "Import reviewed backup" }).click();
   await expect(page.getByText("Import saved. A recovery point is available. Reload to refresh all open views.")).toBeVisible();
+  await page.goto("/demo/collections?binder=missing-target");
+  await expect(page.getByText("This binder is unavailable for the current account.")).toBeVisible();
+  await page.goto("/demo/collections?binder=all");
+  await expect(page.getByText("This binder is unavailable for the current account.")).toBeVisible();
   await page.goto("/demo/wishlists?wishlist=fixture-wishlist");
   await expect(page.getByRole("heading", { name: "Every Pikachu", exact: true }).first()).toBeVisible();
   await page.goto("/demo/wishlists?wishlist=missing-target");

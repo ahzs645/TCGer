@@ -1,4 +1,4 @@
-// @tcger-feature {"id":"release.readiness","platform":"web","status":"partial","limitation":"Production build and hosted smoke tooling are configured; production deployment, signed app associations and physical PWA install/update checks remain unverified."}
+// @tcger-feature {"id":"release.readiness","platform":"web","status":"partial","limitation":"Normal production app build and readiness tooling exist. The canonical host currently serves GitHub Pages marketing/static demo with service-worker registration disabled; production PWA install/offline/update and hosted association headers remain unverified."}
 "use client";
 
 import { useEffect } from "react";

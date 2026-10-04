@@ -178,3 +178,11 @@ committed source, signed artifact checks, hosted associations and current,
 artifact-bound physical-device evidence. `--allow-pending` produces an audit;
 it does not establish release readiness. Simulator and contract passes do not
 prove biometric hardware, camera, browser installation or hosted app links.
+
+The canonical host currently deploys the marketing site and static demo through
+`.github/workflows/pages.yml`. Generate Pages associations with
+`tools/release/pages-app-links.mjs` from tracked public identities and retain
+`include-hidden-files: true` for `.well-known`. Static browser fallbacks preserve
+targets through demo entry; they do not prove production HTTP redirects, native
+private-data access, OS association, or PWA offline/install/update readiness.
+Check deployed headers and retain hosting limitations in feature declarations.

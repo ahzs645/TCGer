@@ -56,8 +56,38 @@ Android domain verification or iOS Universal Links can work.
 Canonical `/search?q=...`, `/binder/:id` and `/wishlist/:id` links redirect to web
 screens while preserving queries and target IDs. Search links run the query;
 wishlist links select only the addressed record. Missing/inaccessible wishlists
-produce an explicit unavailable state. Static demo exports do not provide these
-server redirects. Local routing tests do not prove OS domain association.
+produce an explicit unavailable state. Local routing tests do not prove OS domain association.
+
+### Current canonical host: GitHub Pages
+
+`tcger.ahmadjalil.com` currently serves the marketing site plus `/demo`, built by
+`.github/workflows/pages.yml`. It is not the normal Next.js application server.
+`tools/release/pages-app-links.mjs` writes both association files from the same
+tracked identities after copying the static demo. The Pages upload explicitly
+includes hidden files: upload-pages-artifact v5 otherwise excludes `.well-known`
+([action implementation](https://github.com/actions/upload-pages-artifact/blob/v5/action.yml)).
+
+Pages serves its custom 404 HTML for native link paths. The browser fallback
+routes supported paths into `/demo/?next=...`; Enter Demo preserves the search or
+target ID. Return destinations are restricted to known demo screens. Missing
+binders/wishlists show an unavailable state rather than unrelated private data.
+The demo uses sample/browser-local records; a native account's local records are
+not made available by opening its URL in the browser. A fallback response can
+remain HTTP 404 even when its browser navigation succeeds; it is not a server
+307 redirect and does not satisfy the production redirect gate.
+
+Verify deployed association HTTP headers as well as bytes. GitHub Pages does not
+allow custom MIME types per file or repository
+([GitHub documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site#mime-types-on-github-pages)).
+An extensionless Apple association may require an HTTPS proxy/server on this
+same host that can return `application/json`; a checked-in file cannot set that
+header. Retain the pending association gate until verified. No additional domain
+is required to make that change, but hosting/DNS credentials would be needed.
+
+The static demo disables service-worker registration. Its manifest alone does
+not prove an installable/offline production web application. The full release
+checker intentionally continues to report missing production PWA/redirect
+requirements on this hosting setup. Do not weaken those gates to claim readiness.
 
 ## Readiness evidence
 

@@ -22,3 +22,24 @@ export function appLinkFallback(raw) {
     return null;
   } catch { return null; }
 }
+
+// Pages hosts a sample-data demo, so retain the destination through its entry screen.
+export function demoAppLinkFallback(raw) {
+  const destination = appLinkFallback(raw);
+  return destination ? `/demo/?next=${encodeURIComponent(`/demo${destination}`)}` : null;
+}
+
+export function demoReturnTarget(raw) {
+  const fallback = '/demo/dashboard';
+  if (typeof raw !== 'string' || !raw.startsWith('/demo/') || raw.includes('\\')) return fallback;
+  try {
+    const url = new URL(raw, 'https://tcger.ahmadjalil.com');
+    const routes = { cards: 'q', collections: 'binder', wishlists: 'wishlist', scan: null, packs: null };
+    const route = url.pathname.slice('/demo/'.length).replace(/\/$/, '');
+    if (url.origin !== 'https://tcger.ahmadjalil.com' || !Object.hasOwn(routes, route)) return fallback;
+    const parameter = routes[route];
+    const value = parameter ? url.searchParams.get(parameter)?.trim() : null;
+    if (value && parameter !== 'q' && !/^[A-Za-z0-9_.:-]+$/.test(value)) return fallback;
+    return `/demo/${route}` + (value ? `?${parameter}=${encodeURIComponent(value)}` : '');
+  } catch { return fallback; }
+}

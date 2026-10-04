@@ -9,6 +9,7 @@ on:
       - "docs/**"
       - "frontend/**"
       - "packages/**"
+      - "tools/release/**"
       - "package.json"
       - "package-lock.json"
       - ".gitmodules"
@@ -49,6 +50,8 @@ jobs:
         uses: actions/configure-pages@v6
 
       - name: Install dependencies
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
         run: |
           npm ci
           npm ci --prefix marketing-site
@@ -134,6 +137,9 @@ jobs:
 
       - name: Verify demo runtime files
         run: |
+          node tools/release/pages-app-links.mjs
+          test -f marketing-site/dist/.well-known/assetlinks.json
+          test -f marketing-site/dist/.nojekyll
           test -f marketing-site/dist/.well-known/apple-app-site-association
           test -f marketing-site/dist/privacy/index.html
           test -f marketing-site/dist/support/index.html
@@ -156,6 +162,8 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: marketing-site/dist
+          # v5 excludes dot directories by default, including .well-known.
+          include-hidden-files: true
 
   deploy:
     runs-on: ubuntu-latest
