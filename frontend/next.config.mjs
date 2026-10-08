@@ -58,6 +58,7 @@ const nextConfig = {
         images: { unoptimized: true }
       }
     : {
+        output: 'standalone',
         images: {
           remotePatterns: [
             {

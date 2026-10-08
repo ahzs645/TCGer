@@ -156,7 +156,8 @@ export function DashboardContent() {
         error: state.error,
       })),
     );
-  const { token, isAuthenticated } = useAuthStore();
+  const token = useAuthStore((state) => state.token);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const {
     wishlists,
     fetchWishlists,

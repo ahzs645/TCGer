@@ -215,7 +215,7 @@ services:
       dockerfile: docker/frontend.Dockerfile
       target: dev
     container_name: tcg-frontend
-    command: sh -c "cd /app && npm install && cd /app/frontend && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    command: sh -c "cd /app && npm run --workspace=packages/api-types build && cd /app/frontend && npm run dev -- --hostname 0.0.0.0 --port 3000"
     environment:
       NODE_ENV: development
       NEXT_DIST_DIR: ${NEXT_DIST_DIR:-.next-docker}
@@ -240,7 +240,7 @@ services:
       - tcg-net
 
   gateway:
-    image: nginx:1.25-alpine
+    image: nginx:1.30-alpine
     container_name: tcg-gateway
     depends_on:
       backend:

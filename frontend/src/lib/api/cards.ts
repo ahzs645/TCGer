@@ -1,4 +1,5 @@
-import type { Card, TcgCode, TcgSet } from "@tcg/api-types";
+import type { Card, TcgCode, TcgSet, SearchCardsResponse } from "@tcg/api-types";
+import { completeSearchCards } from "./search-completeness";
 
 import { API_BASE_URL } from "./base-url";
 
@@ -26,11 +27,11 @@ export async function searchCards(
       credentials: "include",
     },
   );
-  const payload = await readJson<SetCardsResponse>(
+  const payload = await readJson<SearchCardsResponse>(
     response,
     "Failed to search cards",
   );
-  return payload.cards;
+  return completeSearchCards(payload);
 }
 
 /**
@@ -57,11 +58,11 @@ export async function searchAllCards(
       credentials: "include",
     },
   );
-  const payload = await readJson<SetCardsResponse>(
+  const payload = await readJson<SearchCardsResponse>(
     response,
     "Failed to search cards",
   );
-  return payload.cards;
+  return completeSearchCards(payload);
 }
 
 export async function searchCardsByArtist(

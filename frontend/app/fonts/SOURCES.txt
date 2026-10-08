@@ -1,0 +1,11 @@
+Inter and Lexend are bundled so production builds do not download Google Fonts.
+Both retain their SIL Open Font License; see the accompanying OFL files.
+
+Sources retrieved on October 8, 2026:
+https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf
+https://raw.githubusercontent.com/google/fonts/main/ofl/lexend/Lexend%5Bwght%5D.ttf
+
+Inter 4.001 is fixed at optical size 14, matching the previous Google Fonts
+weight-only face. Both fonts retain the variable weight range 100–900 and
+their full character coverage. They were compressed to WOFF2 with FontTools.
+The committed font files pin the build inputs; no font generator is needed.

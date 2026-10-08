@@ -14,10 +14,10 @@ vi.mock("../../modules/collections/binder-pages.service", () => ({}));
 vi.mock("../../modules/pricing/collection-price-enrichment", () => ({ enrichCollectionCardPrice: vi.fn(async input => input) }));
 vi.mock("../../modules/sealed/sealed.service", () => ({ createSealedOpening: vi.fn() }));
 vi.mock("../../utils/upload", () => ({ uploadImages: { single: () => (_req: unknown, _res: unknown, next: () => void) => next(), array: () => (_req: unknown, _res: unknown, next: () => void) => next() } }));
-vi.mock("../../modules/cards/cards.service", () => ({ searchAllCards: vi.fn() }));
+vi.mock("../../modules/cards/cards.service", () => ({ searchAllCardsWithStatus: vi.fn() }));
 vi.mock("../../modules/adapters/adapter-registry", () => ({ adapterRegistry: {} }));
 import { getUserBinders, createBinder, updateBinder, deleteBinder, addCardToBinder, updateCardInBinder, removeCardFromBinder } from "../../modules/collections/collections.service";
-import { searchAllCards } from "../../modules/cards/cards.service";
+import { searchAllCardsWithStatus } from "../../modules/cards/cards.service";
 import { createSealedOpening } from "../../modules/sealed/sealed.service";
 import { sealedRouter } from "./sealed.router";
 import { collectionsRouter } from "./collections.router";
@@ -41,7 +41,10 @@ for (const interaction of contracts.interactions as any[]) {
       id: "generated-binder", ...input, cards: [],
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     }) as never);
-    vi.mocked(searchAllCards).mockResolvedValue((interaction.state === "search-results" ? interaction.response.body.cards : []) as never);
+    vi.mocked(searchAllCardsWithStatus).mockImplementation(async () => {
+      if (interaction.state === "search-unavailable") throw Object.assign(new Error(interaction.response.body.message), { status: 503, code: "CARD_SEARCH_UNAVAILABLE", details: interaction.response.body.details });
+      return { cards: interaction.response.body.cards ?? [], failedProviders: interaction.response.body.failedProviders ?? [] } as never;
+    });
 
     vi.mocked(updateBinder).mockImplementation(async (_user, id, input) => {
       if (interaction.state === "foreign") throw new Error("Binder not found");
@@ -104,7 +107,7 @@ for (const interaction of contracts.interactions as any[]) {
     if (interaction.response.status === 401 || interaction.response.status === 400) {
       expect(getUserBinders).not.toHaveBeenCalled();
       expect(createBinder).not.toHaveBeenCalled();
-      expect(searchAllCards).not.toHaveBeenCalled();
+      expect(searchAllCardsWithStatus).not.toHaveBeenCalled();
       expect(addCardToBinder).not.toHaveBeenCalled();
       expect(updateCardInBinder).not.toHaveBeenCalled();
       expect(removeCardFromBinder).not.toHaveBeenCalled();
@@ -126,7 +129,7 @@ for (const interaction of contracts.interactions as any[]) {
     } else if (interaction.operation === "openSealed") {
       expect(createSealedOpening).toHaveBeenCalledWith("contract-user", "contract-inventory", interaction.request.body);
     } else if (interaction.operation === "searchCards") {
-      expect(searchAllCards).toHaveBeenCalledWith({ ...interaction.request.query, limit: 1000 });
+      expect(searchAllCardsWithStatus).toHaveBeenCalledWith({ ...interaction.request.query, limit: 1000 });
     }
   });
 }

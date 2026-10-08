@@ -1,6 +1,6 @@
 // @tcger-feature {"id":"navigation.appLinks","platform":"web","status":"partial","limitation":"Normal web aliases preserve targets. GitHub Pages publishes associations and a browser 404 fallback through demo entry; it uses sample/browser data and cannot access native private records. Hosted association headers and signed-device cold/warm links require verification."}
 import type { Metadata, Viewport } from "next";
-import { Inter, Lexend } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 
@@ -12,8 +12,18 @@ import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
 import { getToken } from "@/lib/auth-server";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const lexend = Lexend({ subsets: ["latin"], variable: "--font-heading" });
+const inter = localFont({
+  src: "./fonts/inter-variable.woff2",
+  weight: "100 900",
+  display: "swap",
+  variable: "--font-sans",
+});
+const lexend = localFont({
+  src: "./fonts/lexend-variable.woff2",
+  weight: "100 900",
+  display: "swap",
+  variable: "--font-heading",
+});
 
 export const viewport: Viewport = {
   width: "device-width",

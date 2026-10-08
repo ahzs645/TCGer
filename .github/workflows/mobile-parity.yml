@@ -90,6 +90,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Use workspace-compatible npm
+        run: npm install --global npm@11.19.0 --no-audit --no-fund
       - name: Install workspace dependencies
         env:
           # These suites never execute native ONNX inference; avoid the optional CUDA download.
@@ -199,6 +201,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Use workspace-compatible npm
+        run: npm install --global npm@11.19.0 --no-audit --no-fund
       - name: Install workspace dependencies
         env:
           # These suites never execute native ONNX inference; avoid the optional CUDA download.

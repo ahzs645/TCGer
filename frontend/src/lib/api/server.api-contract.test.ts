@@ -35,10 +35,11 @@ for (const interaction of contracts.interactions as any[]) {
       case "removeCopy": invoke = () => removeCardFromCollection(token, "contract-binder", "contract-copy"); break;
       case "openSealed": invoke = () => createSealedOpening(token, "contract-inventory", interaction.request.body); break;
       case "importBackup": invoke = () => importServerBackup(token, interaction.request.body); break;
-      case "searchCards": invoke = () => searchAllCards(token, { query: interaction.request.query!.query, tcg: "pokemon", unique: "prints", limit: 1000 }); break;
+      case "searchCards": invoke = () => searchAllCards(token, { query: interaction.request.query!.query, tcg: interaction.request.query!.tcg, unique: "prints", limit: 1000 }); break;
       default: throw new Error(`Uncovered web operation: ${interaction.operation}`);
     }
-    if (interaction.response.status >= 400) await expect(invoke()).rejects.toThrow();
+    const incompleteSearch = interaction.operation === "searchCards" && !!interaction.response.body.failedProviders?.length;
+    if (interaction.response.status >= 400 || incompleteSearch) await expect(invoke()).rejects.toThrow();
     else {
       const result = await invoke();
       if (!["deleteBinder", "addCopy", "removeCopy"].includes(interaction.operation)) assertResponse(result, interaction.operation === "searchCards" ? interaction.response.body.cards : interaction.response.body);
@@ -46,8 +47,8 @@ for (const interaction of contracts.interactions as any[]) {
     expect(requests).toBe(1);
     // The separate scanner/search helper must obey the same exhaustive search contract.
     if (interaction.operation === "searchCards") {
-      const call = searchCardsApi({ token, query: interaction.request.query!.query, tcg: "pokemon" });
-      if (interaction.response.status >= 400) await expect(call).rejects.toThrow();
+      const call = searchCardsApi({ token, query: interaction.request.query!.query, tcg: interaction.request.query!.tcg });
+      if (interaction.response.status >= 400 || incompleteSearch) await expect(call).rejects.toThrow();
       else expect(await call).toEqual(interaction.response.body.cards);
       expect(requests).toBe(2);
     }

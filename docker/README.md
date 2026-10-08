@@ -42,7 +42,7 @@ npm run docker:dev:full
 This additionally starts:
 - `frontend` running Next.js dev server in a container
 - `gateway` (nginx) exposing the stack on `http://localhost:${APP_PORT:-3003}` and proxying `/api` traffic to the backend
-- `gateway` also proxies `/api/auth` to the Next.js app, which forwards auth traffic to Convex
+- `gateway` sends `/api/auth` through Express's auth proxy, which forwards auth traffic to Convex; host development uses the Next.js auth proxy.
 
 ## Legacy Prisma Mode
 
@@ -104,6 +104,21 @@ The resulting artifacts are stored in the named volume `tcger_card_scan_data`:
 
 Production uses Convex's official self-hosted backend image. Unlike the development stack, it does not run `convex dev`, and ports 3210/3211 are exposed only to `tcg-net` rather than published on the host.
 
+`CONVEX_BACKEND_IMAGE` now accepts the full image reference and defaults to a
+pinned digest. If an existing env file sets `CONVEX_BACKEND_TAG`, migrate that
+custom tag to a full `CONVEX_BACKEND_IMAGE` reference before deploying.
+
+Application and cache images use Node 24 LTS. Node 20 reached end of support on
+April 30, 2026; use Node 24 for local development too (Node 22.12 or newer remains supported).
+
+Set the public site, API and Convex URLs before building production images.
+Next.js embeds `NEXT_PUBLIC_*` values in the browser bundle during `next build`;
+changing container runtime variables alone will not change those URLs. Compose
+passes them as build arguments as well as runtime variables. Rebuild the frontend
+when changing a public URL. `BACKEND_API_ORIGIN` is also passed at build time for
+the generated health rewrite. Public Convex URLs must point to browser-reachable
+HTTPS endpoints; container-internal names are only for server-side variables.
+
 ### First boot
 
 ```bash
@@ -127,7 +142,7 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env.docker \
 docker compose -f docker/docker-compose.prod.yml --env-file .env.docker up --build -d
 ```
 
-Uses compiled TypeScript/Next.js output with no development volumes. Add `--profile bulk` for cache services in production.
+Uses compiled TypeScript and Next.js standalone output with no development volumes. The frontend image runs as the non-root Node user and contains traced server dependencies plus public/static assets. It does not ship the development toolchain or native TensorFlow. Add `--profile bulk` for cache services in production.
 
 Run the `convex-deploy` command again after changing Convex functions or any deployment environment value. It sets the environment before deploying, which is required because non-local TCGer deployments fail closed when either application secret is absent. `BETTER_AUTH_SECRET` and `TCGER_BRIDGE_SECRET` are passed to the deploy runner; they are not process environment variables on the official backend container. The CLI stores them as Convex deployment environment variables. The bridge secret is also passed to Express so both sides authenticate internal compatibility-route traffic with the same value.
 
@@ -142,7 +157,7 @@ The optional official dashboard was deliberately not added: it needs a separate 
 | `INSTANCE_NAME` | Stable self-hosted deployment name. | `.env.docker` → official backend `INSTANCE_NAME`; defaults to `tcger-production`. |
 | `INSTANCE_SECRET` | 64-character hex root secret used to sign admin keys and sessions. | Required in `.env.docker` → official backend `INSTANCE_SECRET`; generate with `openssl rand -hex 32`. |
 | `CONVEX_SELF_HOSTED_ADMIN_KEY` | CLI administrator credential printed by `generate_admin_key.sh`. | Added to `.env.docker` after first boot → `convex-deploy` only. |
-| `CONVEX_BACKEND_TAG` | Official backend image tag. | `.env.docker`/Compose image selector; `latest` follows the official example, but an immutable qualified tag or digest is safer for upgrades. |
+| `CONVEX_BACKEND_IMAGE` | Official backend image reference. | Defaults to the verified immutable digest in Compose and `.env.docker.example`; review and test a new digest before upgrading. |
 | `CONVEX_CLOUD_ORIGIN` | Browser-reachable Convex client/API origin for port 3210. | Official backend process env; defaults to the internal service URL. |
 | `CONVEX_SITE_ORIGIN` | Browser-reachable HTTP Actions origin for port 3211. | Official backend process env; defaults to the internal service URL. |
 | `CONVEX_SELF_HOSTED_URL` | CLI target for deployment operations. | Fixed to `http://convex-backend:3210` inside `convex-deploy`. |

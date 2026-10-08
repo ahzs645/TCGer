@@ -19,7 +19,7 @@ export function errorHandler(err: HttpError, req: Request, res: Response, _next:
   }
 
   const status = err.status ?? 500;
-  const isSafeConfigurationError = err.code === 'APITCG_NOT_CONFIGURED';
+  const isSafeConfigurationError = err.code === 'APITCG_NOT_CONFIGURED' || err.code === 'CARD_SEARCH_UNAVAILABLE';
   const message =
     status >= 500 && !isSafeConfigurationError
       ? 'Internal server error'

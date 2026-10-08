@@ -72,7 +72,8 @@ export function CardSearchPanel() {
     })),
   );
   const enabledGames = useModuleStore((state) => state.enabledGames);
-  const { token, isAuthenticated } = useAuthStore();
+  const token = useAuthStore((state) => state.token);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { fetchCollections, hasFetched } = useCollectionsStore(
     useShallow((state) => ({
       fetchCollections: state.fetchCollections,
@@ -123,7 +124,7 @@ export function CardSearchPanel() {
       ? null
       : getGameDefinition(selectedGame as TcgCode);
   const sourceCards = useMemo(
-    () => (selectedPackageId ? packageCards : (discoveredCards ?? data ?? [])),
+    () => (selectedPackageId ? packageCards : (discoveredCards ?? data?.cards ?? [])),
     [data, discoveredCards, packageCards, selectedPackageId],
   );
   const facetCards = sourceCards.map(
@@ -660,6 +661,11 @@ export function CardSearchPanel() {
           </div>
         </CardHeader>
         <CardContent className="p-0" data-oid="bopkrlg">
+          {!selectedPackageId && discoveredCards === null && !isFetching && !isError && !!data?.failedProviders?.length && (
+            <p role="alert" className="m-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm sm:m-6">
+              Showing partial results. {data.failedProviders.map(gameLabel).join(", ")} search is unavailable. Try again or select a single game.
+            </p>
+          )}
           <ScrollArea
             className={
               hasResults ? "h-auto lg:h-[calc(100vh-17rem)]" : "h-auto"
@@ -720,7 +726,7 @@ export function CardSearchPanel() {
                                 tcg);
                         })()}
                       </h3>
-                      <div className="flex flex-wrap gap-4" data-oid="0mf81m4">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-4" data-oid="0mf81m4">
                         {tcgCards.map((card) => (
                           <CardPreview
                             key={`${card.tcg}:${card.id}`}

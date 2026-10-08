@@ -66,7 +66,8 @@
           "convex-backend/convex/http.ts",
           "convex-backend/convex/bridge.ts",
           "mobile-parity/api-contracts/interactions.json",
-          "frontend/src/lib/api/server.api-contract.test.ts"
+          "frontend/src/lib/api/server.api-contract.test.ts",
+          "frontend/src/lib/hooks/use-collection.ts"
         ],
         "tests": [
           {
@@ -301,13 +302,26 @@
           "backend/src/api/routes/cards.router.ts",
           "backend/src/api/middleware/auth.ts",
           "mobile-parity/api-contracts/interactions.json",
-          "frontend/src/lib/api/server.api-contract.test.ts"
+          "frontend/src/lib/api/server.api-contract.test.ts",
+          "packages/api-types/src/cards.ts",
+          "backend/src/modules/cards/cards.service.ts",
+          "backend/src/modules/adapters/magic-adapter.ts",
+          "backend/src/api/middleware/error-handler.ts",
+          "frontend/src/lib/hooks/use-card-search.ts",
+          "frontend/src/lib/api/search-completeness.ts",
+          "frontend/app/demo/cards/page.tsx",
+          "frontend/src/components/cards/card-preview.tsx"
         ],
         "tests": [
           {
             "runner": "playwright",
             "id": "cards.search",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
+          },
+          {
+            "runner": "playwright",
+            "id": "cards.search",
+            "path": "frontend/tests/parity/reliability.spec.ts"
           }
         ],
         "status": "implemented",
@@ -328,7 +342,12 @@
           "mobile-apps/ios/TCGer/TCGer/Services/CardSearchMarketPrice.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/Components/MarketPricedSearchResultCell.swift",
           "mobile-apps/ios/TCGer/TCGer/Views/Components/CardSearchResults.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "packages/api-types/src/cards.ts",
+          "backend/src/modules/cards/cards.service.ts",
+          "backend/src/modules/adapters/magic-adapter.ts",
+          "backend/src/api/middleware/error-handler.ts",
+          "mobile-apps/ios/TCGer/TCGer/Models/TCGModels.swift"
         ],
         "tests": [
           {
@@ -356,7 +375,13 @@
           "backend/src/api/routes/cards.router.ts",
           "backend/src/api/middleware/auth.ts",
           "mobile-parity/api-contracts/interactions.json",
-          "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
+          "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt",
+          "packages/api-types/src/cards.ts",
+          "backend/src/modules/cards/cards.service.ts",
+          "backend/src/modules/adapters/magic-adapter.ts",
+          "backend/src/api/middleware/error-handler.ts",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
         ],
         "status": "implemented",
         "implementation": {
@@ -545,13 +570,22 @@
       "web": {
         "sources": [
           "frontend/src/components/account/account-settings-dialog.tsx",
-          "frontend/src/components/navigation/user-menu.tsx"
+          "frontend/src/components/navigation/user-menu.tsx",
+          "frontend/src/components/ui/dialog.tsx",
+          "frontend/src/stores/auth.ts",
+          "frontend/src/stores/preferences.ts",
+          "frontend/src/stores/auth.test.ts"
         ],
         "tests": [
           {
             "runner": "playwright",
             "id": "settings.browse",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
+          },
+          {
+            "runner": "playwright",
+            "id": "settings.browse",
+            "path": "frontend/tests/parity/reliability.spec.ts"
           }
         ],
         "status": "implemented",

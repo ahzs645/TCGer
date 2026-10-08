@@ -24,6 +24,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
   );
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
     const media = window.matchMedia("(min-width: 768px)");
     const sync = () => setShowDevtools(media.matches);
     sync();

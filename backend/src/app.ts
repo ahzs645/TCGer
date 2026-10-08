@@ -9,12 +9,14 @@ import { errorHandler } from './api/middleware/error-handler';
 import { notFoundHandler } from './api/middleware/not-found';
 import { registerRoutes } from './api/routes';
 import { getUploadsRootDir } from './utils/upload';
+import { httpLogOptions } from './utils/http-log-options';
 
 export async function createApp() {
   const app = express();
 
   app.use(
     pinoHttp({
+      ...httpLogOptions,
       autoLogging: env.NODE_ENV !== 'test'
     })
   );

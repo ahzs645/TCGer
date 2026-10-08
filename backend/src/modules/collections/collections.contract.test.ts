@@ -131,10 +131,15 @@ describe('rich collection contracts', () => {
     });
   });
 
-  it('rejects unsupported games and blank identity keys', () => {
+  it('accepts installed game identifiers and rejects blank games and identity keys', () => {
+    expect(cardDataPayloadSchema.parse({
+      name: 'Custom card',
+      tcg: 'community-game',
+      externalId: 'card-1'
+    }).tcg).toBe('community-game');
     expect(() => cardDataPayloadSchema.parse({
       name: 'Pikachu',
-      tcg: 'other',
+      tcg: '',
       externalId: 'card-1'
     })).toThrow();
     expect(() => addWishlistCardSchema.parse({

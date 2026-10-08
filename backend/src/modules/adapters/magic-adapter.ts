@@ -37,7 +37,10 @@ async function rateLimitedFetch(input: string, init?: RequestInit): Promise<Resp
   rateLimitChain = waitPromise.catch(() => {});
   await waitPromise;
 
-  return fetch(input, init);
+  const headers = new Headers(init?.headers);
+  headers.set('User-Agent', 'TCGer/0.1 (https://tcger.ahmadjalil.com)');
+  headers.set('Accept', 'application/json');
+  return fetch(input, { ...init, headers });
 }
 
 interface ScryfallSearchResponse {
@@ -102,8 +105,9 @@ export class MagicAdapter implements TcgAdapter {
 
     try {
       const response = await rateLimitedFetch(url.toString());
+      if (response.status === 404) return [];
       if (!response.ok) {
-        throw new Error(`Scryfall search failed: ${response.status}`);
+        throw Object.assign(new Error('Magic card search is temporarily unavailable. Try again.'), { status: 503, code: 'CARD_SEARCH_UNAVAILABLE' });
       }
       const payload = (await response.json()) as ScryfallSearchResponse;
       if (!payload?.data?.length) {
@@ -112,7 +116,7 @@ export class MagicAdapter implements TcgAdapter {
       return payload.data.slice(0, 20).map((card) => this.mapCard(card));
     } catch (error) {
       console.error('MagicAdapter.searchCards error', error);
-      return [];
+      throw Object.assign(new Error('Magic card search is temporarily unavailable. Try again.'), { status: 503, code: 'CARD_SEARCH_UNAVAILABLE' });
     }
   }
 
@@ -149,6 +153,7 @@ export class MagicAdapter implements TcgAdapter {
       }
     } catch (error) {
       console.error('MagicAdapter.fetchCardsByName error', error);
+      throw Object.assign(new Error('Magic card search is temporarily unavailable. Try again.'), { status: 503, code: 'CARD_SEARCH_UNAVAILABLE' });
     }
 
     return collected.slice(0, options.limit).map((card) => this.mapCard(card));

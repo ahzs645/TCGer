@@ -39,13 +39,23 @@ export const useModuleStore = create<ModuleState>((set) => ({
       },
     })),
   setGameEnabled: (game, enabled) =>
-    set((state) => ({
-      enabledGames: { ...state.enabledGames, [game]: enabled },
-    })),
+    set((state) =>
+      state.enabledGames[game] === enabled
+        ? state
+        : {
+            enabledGames: { ...state.enabledGames, [game]: enabled },
+          },
+    ),
   showCardNumbers: true,
-  setShowCardNumbers: (show) => set({ showCardNumbers: show }),
+  setShowCardNumbers: (show) =>
+    set((state) =>
+      state.showCardNumbers === show ? state : { showCardNumbers: show },
+    ),
   showPricing: true,
-  setShowPricing: (show) => set({ showPricing: show }),
+  setShowPricing: (show) =>
+    set((state) =>
+      state.showPricing === show ? state : { showPricing: show },
+    ),
   priceSource: "automatic",
   hydratePriceSource: () => {
     if (typeof window === "undefined") return;

@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { encode as encodeCbor } from 'cborg';
-import { Miniflare } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { generateKeyPair, exportJWK, SignJWT, calculateJwkThumbprint, jwtVerify } from 'jose';
 import { buildImport } from '../scripts/import-snapshot.mjs';
 import { issueGuestToken } from '../src/guest-auth.mjs';
@@ -44,7 +44,7 @@ async function runtime(vars = {}, rates = {}, outboundService = () => { throw ne
           });
         }
       }` : bundle;
-  const mf = new Miniflare({ modules: true, script: source, compatibilityDate: '2026-08-01', compatibilityFlags: ['nodejs_compat'],
+  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: source, compatibilityDate: '2026-08-01', compatibilityFlags: ['nodejs_compat'],
     outboundService,
     d1Databases: ['DB'], durableObjects: { QUOTAS: { className: 'PricingQuota', useSQLite: true },
       DEVICES: { className: enrolledKey ? 'TestGuestDevice' : 'GuestDevice', useSQLite: true } },
@@ -54,7 +54,7 @@ async function runtime(vars = {}, rates = {}, outboundService = () => { throw ne
     },
     bindings: { PRICING_ENABLED: 'true', ACCOUNT_ACCESS_ENABLED: 'true', AUTH_ISSUER: issuer, AUTH_AUDIENCE: 'convex', AUTH_JWKS: JSON.stringify(jwks),
       USER_DAILY_CARDS: '2000', GLOBAL_DAILY_CARDS: '100000', GLOBAL_DAILY_REQUESTS: '10000', ...vars },
-  });
+  }));
   runtimes.push(mf);
   const db = await mf.getD1Database('DB');
   const schema = await readFile(new URL('../migrations/0001_prices.sql', import.meta.url), 'utf8');

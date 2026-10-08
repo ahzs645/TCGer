@@ -54,31 +54,47 @@ function withProviderTimeout<T>(game: string, operation: string, promise: Promis
 }
 
 export async function searchCards(input: CardSearchInput) {
+  return (await searchCardsWithStatus(input)).cards;
+}
+
+export async function searchCardsWithStatus(input: CardSearchInput) {
   const { query, tcg } = searchSchema.parse(input);
 
   if (tcg && tcg !== 'all') {
     const adapter = adapterRegistry.get(tcg);
-    return searchAdapterWithFallback(adapter, query);
+    return { cards: await searchAdapterWithFallback(adapter, query), failedProviders: [] as string[] };
   }
 
   const adapters = adapterRegistry.list();
-  const results = await Promise.allSettled(
-    adapters.map((adapter) =>
-      withProviderTimeout(adapter.game, 'search', searchAdapterWithFallback(adapter, query))
-    )
-  );
-  return results.flatMap((result, index) => {
-    if (result.status === 'fulfilled') return result.value;
-    logger.warn(
-      {
-        provider: adapters[index]?.game,
-        error:
-          result.reason instanceof Error ? result.reason.message : 'Unknown provider search failure'
-      },
-      'Card provider search failed; returning partial results'
-    );
-    return [];
+  return searchProviders(adapters, 'search', (adapter) => searchAdapterWithFallback(adapter, query));
+}
+
+async function searchProviders(
+  adapters: TcgAdapter[],
+  operation: string,
+  search: (adapter: TcgAdapter) => Promise<CardDTO[]>
+) {
+  const results = await Promise.allSettled(adapters.map((adapter) =>
+    withProviderTimeout(adapter.game, operation, search(adapter))
+  ));
+  const cards: CardDTO[] = [];
+  const failedProviders: string[] = [];
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') cards.push(...result.value);
+    else {
+      const provider = adapters[index]!.game;
+      failedProviders.push(provider);
+      logger.warn({ provider, error: result.reason instanceof Error ? result.reason.message : 'Provider search failed' }, 'Card search is incomplete');
+    }
   });
+  if (failedProviders.length && !cards.length) {
+    throw Object.assign(new Error('Card search is incomplete because some games are unavailable. Try again or select a single game.'), {
+      status: 503,
+      code: 'CARD_SEARCH_UNAVAILABLE',
+      details: { failedProviders }
+    });
+  }
+  return { cards, failedProviders };
 }
 
 export async function discoverCards(
@@ -172,6 +188,10 @@ async function punctuationInsensitiveFallback(
  * `limit * adapters` cards.
  */
 export async function searchAllCards(input: ExhaustiveSearchQueryInput): Promise<CardDTO[]> {
+  return (await searchAllCardsWithStatus(input)).cards;
+}
+
+export async function searchAllCardsWithStatus(input: ExhaustiveSearchQueryInput) {
   const { query, tcg, unique, limit } = exhaustiveSearchQuerySchema.parse(input);
   const options: CardNameSearchOptions = {
     includeAllPrintings: unique === 'prints',
@@ -180,33 +200,11 @@ export async function searchAllCards(input: ExhaustiveSearchQueryInput): Promise
 
   if (tcg && tcg !== 'all') {
     const adapter = adapterRegistry.get(tcg);
-    return runExhaustiveSearch(adapter, query, options);
+    return { cards: await runExhaustiveSearch(adapter, query, options), failedProviders: [] as string[] };
   }
 
   const adapters = adapterRegistry.list();
-  const results = await Promise.allSettled(
-    adapters.map((adapter) =>
-      withProviderTimeout(
-        adapter.game,
-        'exhaustive search',
-        runExhaustiveSearch(adapter, query, options)
-      )
-    )
-  );
-  return results.flatMap((result, index) => {
-    if (result.status === 'fulfilled') return result.value;
-    logger.warn(
-      {
-        provider: adapters[index]?.game,
-        error:
-          result.reason instanceof Error
-            ? result.reason.message
-            : 'Unknown provider exhaustive search failure'
-      },
-      'Card provider exhaustive search failed; returning partial results'
-    );
-    return [];
-  });
+  return searchProviders(adapters, 'exhaustive search', (adapter) => runExhaustiveSearch(adapter, query, options));
 }
 
 export async function searchCardsByArtist(input: ArtistSearchQueryInput): Promise<CardDTO[]> {

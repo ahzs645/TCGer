@@ -40,6 +40,8 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Use workspace-compatible npm
+        run: npm install --global npm@11.19.0 --no-audit --no-fund
       - run: npm ci
 
       - name: Prepare package signing key

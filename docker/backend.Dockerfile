@@ -1,4 +1,5 @@
-FROM node:20-bookworm-slim AS base
+# syntax=docker/dockerfile:1
+FROM node:24-bookworm-slim AS base
 WORKDIR /app
 
 # Install OpenSSL for Prisma
@@ -10,9 +11,17 @@ RUN apt-get update \
 COPY package*.json ./
 COPY packages/api-types/package*.json ./packages/api-types/
 COPY backend/package*.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY convex-backend/package.json ./convex-backend/
+COPY cloudflare/pricing/package.json ./cloudflare/pricing/
+COPY packages/pack-core/package.json ./packages/pack-core/
 
-# Install workspace dependencies
-RUN npm install
+# Install the locked server dependencies without unrelated root tooling.
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    export GLOBAL_AGENT_HTTP_PROXY="$HTTP_PROXY" GLOBAL_AGENT_HTTPS_PROXY="$HTTPS_PROXY"; \
+    npm install --global npm@11.19.0 --no-audit --no-fund \
+    && ONNXRUNTIME_NODE_INSTALL=skip npm ci --workspace=@tcg/backend --workspace=@tcg/api-types --include-workspace-root=false --no-audit --no-fund
 
 # Copy workspace sources
 COPY packages/api-types ./packages/api-types
@@ -33,10 +42,13 @@ ARG IMAGE_TAG=""
 # Build shared types first, then backend
 RUN npm run --workspace=packages/api-types build
 WORKDIR /app/backend
-RUN npx prisma generate && npx tsc -p tsconfig.build.json --skipLibCheck && test -f dist/server.js
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    export GLOBAL_AGENT_HTTP_PROXY="$HTTP_PROXY" GLOBAL_AGENT_HTTPS_PROXY="$HTTPS_PROXY"; \
+    npx prisma generate && npx tsc -p tsconfig.build.json --skipLibCheck && test -f dist/server.js
 
 # --- Production target ---
-FROM node:20-bookworm-slim AS production
+FROM node:24-bookworm-slim AS production
 ARG GIT_SHA=""
 ARG IMAGE_TAG=""
 WORKDIR /app

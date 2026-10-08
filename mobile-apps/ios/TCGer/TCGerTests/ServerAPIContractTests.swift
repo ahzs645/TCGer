@@ -12,6 +12,8 @@ final class ServerAPIContractTests: XCTestCase {
     func testCardsSearchResults() async throws { try await verify("cards.search.results") }
     func testCardsSearchEmpty() async throws { try await verify("cards.search.empty") }
     func testCardsSearchUnauthorized() async throws { try await verify("cards.search.unauthorized") }
+    func testCardsSearchUnavailable() async throws { try await verify("cards.search.unavailable") }
+    func testCardsSearchPartial() async throws { try await verify("cards.search.partial") }
 
     func testCollectionsUpdateSuccess() async throws { try await verify("collections.update.success") }
     func testCollectionsUpdateInvalid() async throws { try await verify("collections.update.invalid") }
@@ -159,9 +161,10 @@ final class ServerAPIContractTests: XCTestCase {
                 XCTAssertEqual(result.recoveryAvailable, fields["recoveryAvailable"] as? Bool)
             case "searchCards":
                 let query = try XCTUnwrap(request["query"] as? [String: String])
-                let cards = try await service.searchAllCards(config: config, token: token, query: try XCTUnwrap(query["query"]), game: .pokemon, limit: 1000)
+                let cards = try await service.searchAllCards(config: config, token: token, query: try XCTUnwrap(query["query"]), game: query["tcg"].flatMap { TCGGame(rawValue: $0) } ?? .all, limit: 1000)
                 XCTAssertLessThan(status, 400, id)
                 let response = try XCTUnwrap(expected["body"] as? [String: Any])
+                XCTAssertTrue((response["failedProviders"] as? [String] ?? []).isEmpty, "Incomplete search must fail: \(id)")
                 let fields = try XCTUnwrap(response["cards"] as? [[String: Any]])
                 XCTAssertEqual(cards.count, fields.count, id)
                 for (card, data) in zip(cards, fields) {
@@ -175,8 +178,13 @@ final class ServerAPIContractTests: XCTestCase {
         } catch APIService.APIError.unauthorized {
             XCTAssertEqual(status, 401, id)
         } catch APIService.APIError.serverError(let actualStatus, _) {
-            XCTAssertGreaterThanOrEqual(status, 400, id)
-            XCTAssertEqual(actualStatus, status, id)
+            let response = expected["body"] as? [String: Any]
+            if let failedProviders = response?["failedProviders"] as? [String], !failedProviders.isEmpty {
+                XCTAssertEqual(actualStatus, 503, id)
+            } else {
+                XCTAssertGreaterThanOrEqual(status, 400, id)
+                XCTAssertEqual(actualStatus, status, id)
+            }
         }
         XCTAssertEqual(requestCount, 1, "Must execute the remote operation: \(id)")
     }

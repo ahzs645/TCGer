@@ -6,7 +6,11 @@ import type { ServerFeatures } from "@tcg/api-types";
 
 import { API_BASE_URL } from "./base-url";
 
-import { createServerFeatureCache, type FeatureAvailability } from "./health-features";
+import {
+  createServerFeatureCache,
+  type FeatureAvailability,
+  type ServerStatus,
+} from "./health-features";
 export type { FeatureAvailability } from "./health-features";
 
 const failOpenFeatures: FeatureAvailability = {};
@@ -14,10 +18,14 @@ const serverFeatureCache = createServerFeatureCache(async () => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      signal: controller.signal,
+    });
     if (!response.ok) throw new Error("Failed to load server features");
     return await response.json();
-  } finally { clearTimeout(timeout); }
+  } finally {
+    clearTimeout(timeout);
+  }
 });
 
 export function useServerFeatures(): FeatureAvailability {
@@ -33,7 +41,7 @@ export function useServerFeatures(): FeatureAvailability {
   return features;
 }
 
-export type ServerStatus = "checking" | "online" | "offline";
+export type { ServerStatus } from "./health-features";
 
 const OFFLINE_RECHECK_MS = 20_000;
 
@@ -54,27 +62,9 @@ export function useServerStatus(): {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
-    fetch(`${API_BASE_URL}/health`, { signal: controller.signal })
-      .then((response) => {
-        if (!cancelled) {
-          setStatus(response.ok ? "online" : "offline");
-          if (response.ok) void serverFeatureCache.refresh();
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setStatus("offline");
-      })
-      .finally(() => clearTimeout(timeout));
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      controller.abort();
-    };
+    const unsubscribe = serverFeatureCache.subscribeStatus(setStatus);
+    void serverFeatureCache.check();
+    return unsubscribe;
   }, [attempt]);
 
   // Keep retrying quietly while down so the banner clears itself on recovery.

@@ -599,6 +599,14 @@ nonisolated struct Card: Identifiable, Codable, Hashable, Sendable {
 struct CardSearchResponse: Codable, Sendable {
     let cards: [Card]
     let total: Int
+    var failedProviders: [String]? = nil
+
+    func completeCards() throws -> [Card] {
+        if let failedProviders, !failedProviders.isEmpty {
+            throw APIService.APIError.serverError(status: 503, message: "Card search is incomplete (\(failedProviders.joined(separator: ", "))). Try again or select a single game.")
+        }
+        return cards
+    }
 }
 
 struct CardDiscoveryResponse: Codable, Sendable {

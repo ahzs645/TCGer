@@ -34,6 +34,8 @@ jobs:
             echo '::error::Configure CLOUDFLARE_ACCOUNT_ID and bucket-scoped PRICING_CLOUDFLARE_API_TOKEN secrets.'
             exit 1
           fi
+      - name: Use workspace-compatible npm
+        run: npm install --global npm@11.19.0 --no-audit --no-fund
       - run: npm ci --ignore-scripts
       - uses: actions/cache/restore@v6.1.0
         with:

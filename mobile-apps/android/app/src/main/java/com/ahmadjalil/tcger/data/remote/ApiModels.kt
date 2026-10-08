@@ -38,7 +38,16 @@ data class CardDto(
 )
 
 @Serializable
-data class CardSearchResponse(val cards: List<CardDto> = emptyList(), val total: Int = 0)
+data class CardSearchResponse(
+    val cards: List<CardDto> = emptyList(),
+    val total: Int = 0,
+    val failedProviders: List<String> = emptyList(),
+) {
+    fun completeCards(): List<CardDto> {
+        check(failedProviders.isEmpty()) { "Card search is incomplete (${failedProviders.joinToString()}). Try again or select a single game." }
+        return cards
+    }
+}
 
 @Serializable
 data class CardDiscoveryResponse(

@@ -329,7 +329,7 @@ class DefaultTCGerRepository(
                 .map(OwnedCardEntity::toCatalogCard)
                 .toList()
         },
-        remote = { api, auth -> api.searchCards(auth, query.trim(), tcg).cards.map(CardDto::toDomain) },
+        remote = { api, auth -> api.searchCards(auth, query.trim(), tcg).completeCards().map(CardDto::toDomain) },
     )
 
     override suspend fun cardPrints(card: CatalogCard): List<CatalogCard> = withSource(

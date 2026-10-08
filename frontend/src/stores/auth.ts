@@ -149,13 +149,27 @@ export const useAuthStore = create<AuthState>()(
       ...getSingleUserAuthState(),
       setAuth: (user, token) => {
         const normalizedUser = withDisplayDefaults(user);
+        const current = get();
+        const sameUser =
+          normalizedUser !== null &&
+          current.user !== null &&
+          (Object.keys(normalizedUser) as (keyof AuthUser)[]).every(
+            (key) => normalizedUser[key] === current.user![key],
+          );
 
-        set({
-          user: normalizedUser,
-          token: token ?? null,
-          isAuthenticated: true,
-          setupRequired: false,
-        });
+        if (
+          !sameUser ||
+          current.token !== (token ?? null) ||
+          !current.isAuthenticated ||
+          current.setupRequired !== false
+        ) {
+          set({
+            user: normalizedUser,
+            token: token ?? null,
+            isAuthenticated: true,
+            setupRequired: false,
+          });
+        }
 
         syncDisplayPreferences(normalizedUser ?? undefined);
       },

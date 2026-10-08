@@ -130,9 +130,14 @@ class ServerAPIContractTest(private val interactionId: String) {
                 }
                 "searchCards" -> {
                     val query = request.getValue("query").jsonObject
-                    val result = api.searchCards(auth, query.getValue("query").jsonPrimitive.content, query.getValue("tcg").jsonPrimitive.content)
+                    val result = api.searchCards(auth, query.getValue("query").jsonPrimitive.content, query["tcg"]?.jsonPrimitive?.content)
                     assertTrue("Expected HTTP failure", status < 400)
                     assertEquals(payload.jsonObject.getValue("total").jsonPrimitive.int, result.total)
+                    val failedProviders = payload.jsonObject["failedProviders"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
+                    assertEquals(failedProviders, result.failedProviders)
+                    if (failedProviders.isNotEmpty()) {
+                        assertTrue(runCatching { result.completeCards() }.exceptionOrNull()?.message?.contains("incomplete") == true)
+                    } else assertEquals(result.cards, result.completeCards())
                     val cards = payload.jsonObject.getValue("cards").jsonArray
                     assertEquals(cards.size, result.cards.size)
                     result.cards.zip(cards).forEach { (card, fields) ->

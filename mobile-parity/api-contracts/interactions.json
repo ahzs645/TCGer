@@ -9,7 +9,8 @@
         "frontend/src/lib/api-client.ts",
         "frontend/src/lib/api/backups.ts",
         "frontend/src/lib/api/sealed.ts",
-        "frontend/src/components/scan/scanner-workbench.tsx"
+        "frontend/src/components/scan/scanner-workbench.tsx",
+        "frontend/src/lib/api/search-completeness.ts"
       ],
       "test": "frontend/src/lib/api/server.api-contract.test.ts"
     },
@@ -18,14 +19,17 @@
         "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
         "mobile-apps/ios/TCGer/TCGer/Services/APIService+Cards.swift",
         "mobile-apps/ios/TCGer/TCGer/Services/CacheManager.swift",
-        "mobile-apps/ios/TCGer/TCGer/Services/APIService+Sealed.swift"
+        "mobile-apps/ios/TCGer/TCGer/Services/APIService+Sealed.swift",
+        "mobile-apps/ios/TCGer/TCGer/Models/TCGModels.swift"
       ],
       "test": "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift"
     },
     "android": {
       "source": [
         "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
-        "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/RemoteServiceFactory.kt"
+        "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/RemoteServiceFactory.kt",
+        "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt",
+        "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
       ],
       "test": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
     }
@@ -38,7 +42,9 @@
         "backend/src/api/middleware/auth.ts",
         "backend/src/api/routes/backups.router.ts",
         "backend/src/api/routes/convex-http.proxy.ts",
-        "backend/src/api/routes/sealed.router.ts"
+        "backend/src/api/routes/sealed.router.ts",
+        "backend/src/modules/cards/cards.service.ts",
+        "backend/src/modules/adapters/magic-adapter.ts"
       ],
       "test": "backend/src/api/routes/server.api-contract.test.ts",
       "limitation": "Domain services and auth-session lookup are stubbed; this verifies real routing, validation, middleware and HTTP envelopes, not Prisma persistence or live identity."
@@ -334,6 +340,87 @@
         "matchers": {}
       },
       "iosTest": "testCardsSearchResults"
+    },
+    {
+      "id": "cards.search.partial",
+      "featureId": "cards.search",
+      "operation": "searchCards",
+      "state": "partial-search",
+      "providers": [
+        "express"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/cards/search/all",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "query": {
+          "query": "Pikachu & friends",
+          "unique": "prints",
+          "limit": "1000"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "cards": [
+            {
+              "id": "pokemon:sv1-025",
+              "externalId": "sv1-025",
+              "name": "Pikachu",
+              "tcg": "pokemon",
+              "setCode": "SV1",
+              "collectorNumber": "025",
+              "rarity": "Common",
+              "imageUrl": "https://example.test/card.png",
+              "price": 1.25
+            }
+          ],
+          "total": 1,
+          "failedProviders": [
+            "magic"
+          ]
+        },
+        "matchers": {}
+      },
+      "iosTest": "testCardsSearchPartial"
+    },
+    {
+      "id": "cards.search.unavailable",
+      "featureId": "cards.search",
+      "operation": "searchCards",
+      "state": "search-unavailable",
+      "providers": [
+        "express"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/cards/search/all",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "query": {
+          "query": "Pikachu & friends",
+          "tcg": "pokemon",
+          "unique": "prints",
+          "limit": "1000"
+        }
+      },
+      "response": {
+        "status": 503,
+        "body": {
+          "error": "CARD_SEARCH_UNAVAILABLE",
+          "message": "Card search is incomplete because some games are unavailable. Try again or select a single game.",
+          "details": {
+            "failedProviders": [
+              "pokemon"
+            ]
+          }
+        },
+        "matchers": {}
+      },
+      "iosTest": "testCardsSearchUnavailable"
     },
     {
       "id": "cards.search.empty",

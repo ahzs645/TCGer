@@ -211,7 +211,9 @@ export type Card = z.infer<typeof cardSchema>;
 
 export const searchCardsResponseSchema = z.object({
   cards: z.array(cardSchema),
-  total: z.number()
+  total: z.number(),
+  /** Present when upstream failures leave the result incomplete. */
+  failedProviders: z.array(z.string()).optional()
 });
 export type SearchCardsResponse = z.infer<typeof searchCardsResponseSchema>;
 

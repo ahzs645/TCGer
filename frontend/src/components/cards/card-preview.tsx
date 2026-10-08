@@ -67,7 +67,8 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [optimisticQuantity, setOptimisticQuantity] = useState<number | null>(
     null,
   );
-  const { token, isAuthenticated } = useAuthStore();
+  const token = useAuthStore((state) => state.token);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const {
     collections,
     addCardToBinder,

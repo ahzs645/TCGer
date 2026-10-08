@@ -14,7 +14,7 @@ services:
       - tcg-net
 
   convex-backend:
-    image: ghcr.io/get-convex/convex-backend:${CONVEX_BACKEND_TAG:-latest}
+    image: ${CONVEX_BACKEND_IMAGE:-ghcr.io/get-convex/convex-backend@sha256:d715e9ec088784407ca4ba2d3db592702cd328d02c76cdca3852c0018f2a76b4}
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
@@ -215,6 +215,11 @@ services:
       dockerfile: docker/frontend.Dockerfile
       target: production
       args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api}
+        NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:-http://localhost:3210}
+        NEXT_PUBLIC_CONVEX_SITE_URL: ${NEXT_PUBLIC_CONVEX_SITE_URL:-http://localhost:3211}
+        BACKEND_API_ORIGIN: ${BACKEND_API_ORIGIN:-http://backend:3000}
         NEXT_PUBLIC_CATALOG_BASE_URL: ${NEXT_PUBLIC_CATALOG_BASE_URL:-https://assets.tcger.ahmadjalil.com/catalogs}
         NEXT_PUBLIC_SCAN_INDEX_BASE_URL: ${NEXT_PUBLIC_SCAN_INDEX_BASE_URL:-https://assets.tcger.ahmadjalil.com/scan-index}
     environment:
@@ -235,7 +240,7 @@ services:
       - tcg-net
 
   gateway:
-    image: nginx:1.25-alpine
+    image: nginx:1.30-alpine
     depends_on:
       backend:
         condition: service_started

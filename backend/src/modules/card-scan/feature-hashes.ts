@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { type Color, type FitEnum } from 'sharp';
 
 import type { CardHashRecord } from './hash-store';
 import { computeRGBHash, type RGBHash } from './phash';
@@ -73,8 +73,8 @@ export async function extractNormalizedCardRegionBuffer(
   spec: Pick<RegionSpec, 'left' | 'top' | 'width' | 'height'>,
   options?: {
     resizeTo?: number | null;
-    fit?: keyof sharp.FitEnum;
-    background?: sharp.Color;
+    fit?: keyof FitEnum;
+    background?: Color;
   }
 ): Promise<Buffer | null> {
   const cardRect = resolveCardRect(HASH_CANVAS_SIZE);

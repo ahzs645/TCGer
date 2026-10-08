@@ -1,5 +1,5 @@
 import type { NextFunction, Response } from 'express';
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 
 import type { AuthRequest } from './auth';
 
@@ -149,7 +149,7 @@ export async function validateCardScanImage(
   imageBuffer: Buffer,
   maxPixels = positiveInteger(process.env.CARD_SCAN_MAX_PIXELS, DEFAULT_MAX_SCAN_PIXELS),
 ): Promise<void> {
-  let metadata: sharp.Metadata;
+  let metadata: Metadata;
   try {
     metadata = await sharp(imageBuffer, { limitInputPixels: maxPixels }).metadata();
   } catch {

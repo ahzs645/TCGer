@@ -1,0 +1,53 @@
+TCGer web performance and stack follow-up — October 8, 2026
+
+Current result
+The local checkout now runs Next.js 16.4.0. The production frontend Docker image builds and runs successfully as user 1000. All 42 desktop/mobile Chromium workflows passed against that container, including the phone layout and search-failure regressions. The audit findings addressed below are implemented locally; checks were performed locally before committing, and production hosting was not deployed or inspected during this review.
+
+Interface and repeated work fixed
+- Ten unchanged authentication synchronizations previously published 10 auth-store and 160 module/preference-store updates. The same probe now publishes zero. Actual preference changes, session rotation and logout retain regression coverage.
+- Initial authenticated dashboard load fell from four /health requests to one shared request. The updated-stack probe recorded no idle requests and no main text/child DOM changes over three seconds. This measures the dashboard, rather than every component in the app.
+- Card Explorer, result cards and the dashboard subscribe to the auth fields they need. Individual-binder browsing skips unused all-binder aggregation. Demo Card Explorer reuses the live page UI. Query developer controls are restricted to development.
+- Phone settings and Card Explorer result actions fit the 320-pixel viewport. Provider failures are distinguished from empty searches, and partial results retain an explicit warning. Scryfall requests identify the app and preserve upstream failures. Request logging redacts credentials.
+
+Stack and deployment changes
+- Next.js and eslint-config-next are pinned to the 16.4 release line, with 16.4.0 installed. Better Auth is 1.6.33 across the workspaces; the Convex adapter is 0.12.5 and the SDK is 1.46.0.
+- Vitest 4.1.11 and convex-test 0.0.60 replace the vulnerable test-runner/worker chain. Convex test module discovery uses explicit file patterns compatible with the new runner. Jest is 30.5.2 with ts-jest 29.4.14. Wrangler is 4.148.0; its Miniflare 5 test harness uses the official options converter. Its deployed pricing bundle passes all 15 checks.
+- Transformers.js is 4.3.1, native/browser ONNX Runtime is 1.30.0, Sharp is 0.35.5, and Prisma/client remain on compatible 6.19.3. Scanner code uses Sharp’s current exported types. The existing offline TensorFlow tools remain available through root development dependencies, with tar 7.5.22, adm-zip 0.6.1 and node-pre-gyp 2.0.3 overrides. The native TensorFlow package is excluded from the production frontend image. Backend declares the pure TensorFlow types used by its offline scripts explicitly.
+- Express 4.22.3, compression 1.8.2 and Multer 2.4.0 retain the earlier fixes. Compatible transitives were refreshed. Unused ts-node-dev was removed.
+- Application/cache recipes use Node 24 LTS; root/frontend/backend require Node 22.12 or newer. Existing Node 22 CI remains supported. Gateway images use nginx 1.30.
+- Docker uses npm ci with the canonical workspace lock and complete workspace manifests. Installation excludes unrelated root tooling and automatic audit calls; security auditing was performed separately. The Convex deployer now declares, copies and builds its shared API dependency, which the deck functions require.
+- Next production output uses standalone tracing. Production installation/build/assembly runs in one step with a cache of npm downloads. The final image contains traced runtime files and public assets, runs without root privileges, and measured 548,993,833 bytes (about 549 MB). The build was qualified with BuildKit’s bundled Dockerfile frontend because fetching the optional Dockerfile syntax image intermittently returned HTTP 503.
+- Inter 4.001 and Lexend 1.007 are bundled locally as licensed variable WOFF2 fonts. Inter’s optical size matches the previous Google face. This removes the Google Fonts download that broke container compilation. Font licenses and provenance are included with the assets.
+- Production Compose supplies public URLs at build time as well as runtime. NEXT_PUBLIC values require an image rebuild when changed. Nested build caches and all dotenv files are excluded from Docker context; example env files remain available.
+- Self-hosted Convex is pinned to immutable digest sha256:d715e9ec088784407ca4ba2d3db592702cd328d02c76cdca3852c0018f2a76b4. An isolated container passed fresh deployment, logical export/replace-all restore, stable-ID comparison and restart persistence. This used disposable data, not a production database.
+
+Security audit result
+Before this follow-up: 77 affected package entries, including 3 critical; production omission audit: 27, including 3 critical.
+Prior stack update: 35 full affected entries and 7 production entries. These represented five underlying advisory IDs.
+Current advisory follow-up: 11 full affected entries — 0 critical, 7 high, 4 moderate, 0 low.
+Current npm audit --omit=dev: 3 affected entries — 0 critical, 0 high, 3 moderate, 0 low.
+The targeted replacements are deepmerge-ts 8.0.2 for Prisma config, postcss-selector-parser 7.1.6 for Tailwind/PostCSS Nested, esbuild 0.28.2 for affected versions, and js-yaml 4.3.2 replacing NYC’s legacy YAML chain. npm 11.19.0 is pinned in local instructions, CI and application Docker recipes because older npm ignores workspace overrides and rejects the patched lockfile.
+The remaining 11 entries trace to two unpatched advisories: braces in development/build/lint tooling and sprintf-js through TensorFlow’s legacy argparse dependency. No application path exposing their vulnerable functions was identified; actual tensor execution did not load argparse or sprintf. This lowers observed exposure without erasing the dependency finding. The rebuilt frontend image contains no braces, argparse or sprintf-js directories or dotenv files in its traced server filesystem. It runs as UID 1000 and measures 548,993,833 bytes.
+The updated image passes all 42 desktop/mobile Chromium checks; health, authenticated existing session and Android association JSON return 200. All 604 unit checks, 94 JavaScript API/health checks and 39 Convex API checks pass. Frontend/backend/Convex builds, Prisma config/schema/client generation, NYC YAML loading/extends, pack-core checks and scanner runtime smoke checks pass. Frozen scoped npm ci and the full-install dry run pass with npm 11.19.0.
+A clean audit is not claimed. Detailed paths, advisory IDs and follow-up options are recorded in TCGer-Dependency-Advisory-Review.docx and the repository’s docs/dependency-security-review-2026-10-08.md.
+
+Verification
+- Production Docker image: successful build/start, runtime UID 1000, Next 16.4.0, native TensorFlow absent.
+- Desktop/mobile Chromium: 42 checks passed against the final production container. Another 42 passed against development, and eight earlier layout/search checks passed against standalone production output.
+- Container HTTP: demo, health rewrite, authenticated session and Android association JSON all returned 200.
+- nginx 1.30 configuration validated; the gateway served the container’s demo and authenticated API with 200 responses. Upstreams were adapted to local host ports; full production Compose networking was not tested.
+- Frontend: 184 unit checks passed. Backend: 270 checks across 51 suites passed. Convex: 135 checks across 25 files passed, including the final shared-dependency manifest.
+- JavaScript API/health-cache: 94 checks passed; real Convex HTTP API: 39 passed. Feature validation reports 116 features, 115 controls and 44 API interactions.
+- Frontend/backend/Convex TypeScript builds passed. Changed frontend files linted with zero errors; existing React hook/purity warnings remain. Layout/local-font lint passed without warnings.
+- Scanner runtime smoke checks executed real native ONNX CPU and Chromium WASM identity inference, Sharp crop/resize, native TensorFlow tensor math with the scripts’ existing Node compatibility shim, and patched tar extraction. These do not establish model recognition accuracy or camera/GPU behavior.
+- Final static demo export passed on Next 16.4.0 in an isolated source snapshot with the local fonts and patched dependencies, qualifying the export used by the Pages workflow. The local-font layout also passed the production container build and all 42 browser workflows.
+- A clean scoped workspace npm ci passed. Registry/proxy instability and the sandbox’s vfs storage limit required retries and removal of audit-generated caches. The disposable image from the failed Android emulator attempts was removed to make room; Android build tools remain.
+- Both standard production Compose and its optional deployment/legacy/cache profiles parsed with placeholder secrets.
+
+Outstanding verification
+No production deployment, public HTTPS endpoint checks, or real-host backup/restore was performed. Only the frontend production image was fully built and exercised; backend and Convex deployer recipes have source/build/contract validation, but their complete container builds and full Compose startup remain to be qualified. Existing Android’s 44 API interactions passed in the previous review; native Android UI remains unverified after the emulator failed to boot without hardware acceleration. iOS execution requires a Mac and remains unavailable. Physical camera, biometric and hosted app-link evidence are still required by the repository release policy.
+
+Documents
+The original mobile/desktop interface Word report contains the captured screens from the earlier review:
+/workspace/tcger-audit/interface/TCGer-Mobile-and-Desktop-Interface-Review.docx
+The companion stack update Word document records this follow-up.

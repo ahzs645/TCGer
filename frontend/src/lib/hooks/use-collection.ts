@@ -23,7 +23,7 @@ export function useCollectionData({
   const collections = useCollectionsStore((state) => state.collections);
   const isAllCollections = collectionId === ALL_COLLECTION_ID;
   const aggregateCollection = useMemo<CollectionEntity | undefined>(() => {
-    if (!collections.length) {
+    if (!isAllCollections || !collections.length) {
       return undefined;
     }
 
@@ -58,7 +58,7 @@ export function useCollectionData({
       createdAt: new Date(earliestCreated).toISOString(),
       updatedAt: new Date(latestUpdated).toISOString(),
     };
-  }, [collections]);
+  }, [collections, isAllCollections]);
 
   const collection = useMemo(() => {
     if (isAllCollections) {

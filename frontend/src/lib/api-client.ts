@@ -1,5 +1,6 @@
 import { installedCardPrints } from "@/lib/game-packages/game-package-client";
 import { API_BASE_URL } from "@/lib/api/base-url";
+import { completeSearchCards } from "@/lib/api/search-completeness";
 import type {
   Card,
   CardPrintsResponse,
@@ -22,6 +23,14 @@ export async function searchCardsApi(params: {
   tcg?: TcgCode | "all";
   token?: string | null;
 }): Promise<Card[]> {
+  return completeSearchCards(await searchCardsResultApi(params));
+}
+
+export async function searchCardsResultApi(params: {
+  query: string;
+  tcg?: TcgCode | "all";
+  token?: string | null;
+}): Promise<SearchCardsResponse> {
   const { query, tcg, token } = params;
   const usp = new URLSearchParams({ query });
   if (tcg && tcg !== "all") {
@@ -36,7 +45,7 @@ export async function searchCardsApi(params: {
   });
 
   const data = await handleResponse<SearchCardsResponse>(res);
-  return data.cards ?? [];
+  return data;
 }
 
 export async function discoverCardsApi(params: {

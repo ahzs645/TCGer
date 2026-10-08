@@ -279,6 +279,12 @@ paths:
                       $ref: "#/components/schemas/Card"
                   total:
                     type: integer
+                  failedProviders:
+                    type: array
+                    description: Games whose upstream lookup failed; results are incomplete when nonempty.
+                    items: { type: string }
+        "503":
+          description: Search is unavailable or incomplete; retry or select a single game.
         "400":
           $ref: "#/components/responses/ValidationError"
 
@@ -338,6 +344,12 @@ paths:
                       $ref: "#/components/schemas/Card"
                   total:
                     type: integer
+                  failedProviders:
+                    type: array
+                    description: Games whose upstream lookup failed; results are incomplete when nonempty.
+                    items: { type: string }
+        "503":
+          description: Search is unavailable or incomplete; retry or select a single game.
         "400":
           $ref: "#/components/responses/ValidationError"
 

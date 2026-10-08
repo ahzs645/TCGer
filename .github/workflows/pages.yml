@@ -49,6 +49,9 @@ jobs:
         id: pages
         uses: actions/configure-pages@v6
 
+      - name: Use workspace-compatible npm
+        run: npm install --global npm@11.19.0 --no-audit --no-fund
+
       - name: Install dependencies
         env:
           ONNXRUNTIME_NODE_INSTALL: skip

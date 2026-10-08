@@ -439,7 +439,7 @@ export function AccountSettingsDialog({
 
               <section className="space-y-4" data-oid="q24fta7">
                 <div
-                  className="flex items-start justify-between rounded-lg border bg-muted/40 p-4"
+                  className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-4 sm:flex-row sm:items-start sm:justify-between"
                   data-oid="tj1e7-0"
                 >
                   <div data-oid="boxwtbv">
@@ -458,7 +458,7 @@ export function AccountSettingsDialog({
                     </p>
                   </div>
                   <div
-                    className="text-right text-sm text-muted-foreground"
+                    className="min-w-0 break-words text-sm text-muted-foreground sm:text-right"
                     data-oid="2gzn_9r"
                   >
                     <p
@@ -516,7 +516,7 @@ export function AccountSettingsDialog({
 
               <section className="space-y-4" data-oid="-gg3d2v">
                 <div
-                  className="flex items-center justify-between"
+                  className="flex min-w-0 items-center justify-between gap-3"
                   data-oid="qv_q2p0"
                 >
                   <div data-oid="_ac96b6">
@@ -547,15 +547,15 @@ export function AccountSettingsDialog({
                     return (
                       <div
                         key={game}
-                        className="flex items-center justify-between rounded-lg border bg-background p-3"
+                        className="flex min-w-0 items-center justify-between gap-3 rounded-lg border bg-background p-3"
                         data-oid="b-4_i5t"
                       >
                         <div
-                          className="flex items-center gap-3"
+                          className="flex min-w-0 items-center gap-3"
                           data-oid="4imfp9c"
                         >
                           <span
-                            className="flex h-9 w-9 items-center justify-center rounded-md bg-muted"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted"
                             data-oid="0qhu8yu"
                           >
                             {icon ? (
@@ -569,7 +569,7 @@ export function AccountSettingsDialog({
                               />
                             ) : null}
                           </span>
-                          <div data-oid="eva596k">
+                          <div className="min-w-0" data-oid="eva596k">
                             <p
                               className="text-sm font-medium"
                               data-oid="8g2aev:"

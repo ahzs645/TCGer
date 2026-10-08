@@ -73,9 +73,10 @@ export function BackupPanel({ token }: { token: string | null }) {
         >
           Export JSON backup
         </Button>
-        <label className="text-sm">
+        <label className="min-w-0 max-w-full text-sm">
           Import backup
           <input
+            className="block w-full min-w-0 max-w-full"
             type="file"
             accept="application/json,.json"
             disabled={busy}

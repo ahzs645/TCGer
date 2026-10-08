@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { internal } from "./_generated/api";
-import { createTestConvex } from "./test.setup";
+import { createTestConvex, TEST_BRIDGE_SECRET } from "./test.setup";
 
 async function seedUsers() {
   const t = createTestConvex();
@@ -27,6 +27,22 @@ async function seedUsers() {
 }
 
 describe("catalog correction overlays", () => {
+  test("HTTP listing accepts an omitted or empty game filter and retains explicit filtering", async () => {
+    const t = await seedUsers();
+    await t.mutation(internal.catalogCorrections.create, {
+      subject: "catalog-admin", tcg: "pokemon", targetType: "printing", targetKey: "pokemon:test",
+      patch: { name: "Corrected Pikachu" }, reason: "Correct printing name",
+    });
+    const headers = { authorization: "Bearer catalog-session", "x-tcger-bridge-key": TEST_BRIDGE_SECRET, "x-tcger-user-id": "catalog-viewer" };
+    for (const query of ["", "?tcg=", "?tcg=pokemon"]) {
+      const response = await t.fetch(`/catalog-corrections${query}`, { headers });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject([{ tcg: "pokemon", patch: { name: "Corrected Pikachu" } }]);
+    }
+    const response = await t.fetch('/catalog-corrections?tcg=magic', { headers });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([]);
+  });
   test("keeps provider identity immutable and resolves the newest revision", async () => {
     const t = await seedUsers();
     const first = await t.mutation(internal.catalogCorrections.create, {

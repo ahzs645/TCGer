@@ -80,7 +80,7 @@ extension APIService {
             if response.statusCode == 401 {
                 throw APIError.unauthorized
             }
-            throw APIError.serverError(status: response.statusCode)
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
         }
 
         let decoder = JSONDecoder.tcgCardDecoder
@@ -89,7 +89,7 @@ extension APIService {
         }
 
         return CardSearchResponse(
-            cards: searchResponse.cards,
+            cards: try searchResponse.completeCards(),
             total: searchResponse.total
         )
     }
@@ -141,7 +141,7 @@ extension APIService {
             throw APIError.decodingError
         }
 
-        return searchResponse.cards
+        return try searchResponse.completeCards()
     }
 
     /// Exact illustrator lookup used by curated collection guides such as the

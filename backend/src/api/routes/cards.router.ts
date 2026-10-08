@@ -11,9 +11,9 @@ import {
 import { adapterRegistry } from '../../modules/adapters/adapter-registry';
 import {
   getCardPrints,
-  searchCards,
+  searchCardsWithStatus,
   discoverCards,
-  searchAllCards,
+  searchAllCardsWithStatus,
   searchCardsByArtist,
   searchCardsByCollectionTag,
   getSetsWithStatus,
@@ -37,8 +37,8 @@ cardsRouter.get(
   '/search',
   asyncHandler(async (req, res) => {
     const { query, tcg } = searchQuerySchema.parse(req.query);
-    const cards = await searchCards({ query, tcg });
-    res.json({ cards, total: cards.length });
+    const result = await searchCardsWithStatus({ query, tcg });
+    res.json({ ...result, total: result.cards.length });
   })
 );
 
@@ -47,8 +47,8 @@ cardsRouter.get(
   '/search/all',
   asyncHandler(async (req, res) => {
     const params = exhaustiveSearchQuerySchema.parse(req.query);
-    const cards = await searchAllCards(params);
-    res.json({ cards, total: cards.length });
+    const result = await searchAllCardsWithStatus(params);
+    res.json({ ...result, total: result.cards.length });
   })
 );
 

@@ -79,7 +79,7 @@ export function registerCatalogCorrectionRoutes(http: HttpRouter) {
         return json(
           await ctx.runQuery(internal.catalogCorrections.listEffective, {
             subject: identity.subject,
-            tcg: tcgParam as TcgCode | undefined
+            tcg: tcgParam || undefined
           })
         );
       } catch (error) {

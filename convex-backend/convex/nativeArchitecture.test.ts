@@ -1099,10 +1099,18 @@ describe("convex native architecture", () => {
     });
     expect(duplicateFocusResponse.status).toBe(400);
 
+    const customDefaultResponse = await t.fetch("/users/me/preferences", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ defaultGame: "custom-game" })
+    });
+    expect(customDefaultResponse.status).toBe(200);
+    expect(await customDefaultResponse.json()).toMatchObject({ defaultGame: "custom-game" });
+
     const invalidDefaultResponse = await t.fetch("/users/me/preferences", {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ defaultGame: "unsupported-game" })
+      body: JSON.stringify({ defaultGame: "" })
     });
     expect(invalidDefaultResponse.status).toBe(400);
 

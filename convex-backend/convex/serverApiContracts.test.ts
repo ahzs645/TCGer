@@ -32,7 +32,7 @@ describe("shared REST interactions against real Convex HTTP actions", () => {
       if (["copies", "foreign-copy"].includes(interaction.state)) {
         const owner = interaction.state === "foreign-copy" ? "other-user" : "contract-user";
         const seedBinder = owner === "other-user" ? (await (await t.fetch("/collections", {headers: headers(owner)})).json()).find((b: any) => b.name === "Private other binder").id : targetID;
-        const seed = structuredClone(contracts.interactions.find(item => item.id === "collections.copyAdd.success")!.request.body);
+        const seed = structuredClone(contracts.interactions.find(item => item.id === "collections.copyAdd.success")!.request.body!);
         seed.quantity = 2;
         Object.assign(seed, {"acquiredAt": "2026-10-03T12:00:00.000Z", "gradingCompany": "PSA", "gradingScore": "9", "certNumber": "CERT-123", "storageLocation": "Box A"});
         const created = await t.fetch(`/collections/${seedBinder}/cards`, {method: "POST", headers: headers(owner), body: JSON.stringify(seed)});

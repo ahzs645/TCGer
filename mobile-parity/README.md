@@ -22,7 +22,7 @@ engines, model variants, pack modes, or developer diagnostics.
 
 ## Commands
 
-Requirements: Node 18+, Playwright browsers, JDK 17, Android SDK/ADB, Xcode for iOS, and the [Maestro CLI](https://docs.maestro.dev/getting-started/installing-maestro) for native smoke tests.
+Requirements: Node 24 LTS recommended (Node 22 supported), Playwright browsers, JDK 17, Android SDK/ADB, Xcode for iOS, and the [Maestro CLI](https://docs.maestro.dev/getting-started/installing-maestro) for native smoke tests.
 
 ```sh
 npm run parity:generate   # after changing source registrations or product definitions

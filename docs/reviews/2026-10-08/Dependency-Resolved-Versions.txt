@@ -1,0 +1,33 @@
+tcg-collection-manager@0.1.0 /workspace/TCGer
+├─┬ @tcg/backend@0.1.0 -> ./backend
+│ ├─┬ eslint@8.57.1
+│ │ ├─┬ @eslint/eslintrc@2.1.4
+│ │ │ └── js-yaml@4.3.2 deduped
+│ │ └── js-yaml@4.3.2
+│ ├─┬ prisma@6.19.3
+│ │ └─┬ @prisma/config@6.19.3
+│ │   └── deepmerge-ts@8.0.2
+│ ├─┬ ts-jest@29.4.14
+│ │ └─┬ @jest/transform@30.5.2
+│ │   └─┬ babel-plugin-istanbul@8.0.0
+│ │     └─┬ @istanbuljs/load-nyc-config@1.1.0
+│ │       └── js-yaml@4.3.2 deduped
+│ └─┬ tsx@4.23.15
+│   └── esbuild@0.28.2 deduped
+├─┬ @tcg/convex-backend@0.1.0 -> ./convex-backend
+│ ├─┬ convex@1.46.0
+│ │ └── esbuild@0.27.0
+│ └─┬ vitest@4.1.11
+│   └─┬ vite@8.3.4
+│     └── esbuild@0.28.2 deduped
+├─┬ @tcg/frontend@0.1.0 -> ./frontend
+│ ├─┬ @eslint/eslintrc@3.3.7
+│ │ └── js-yaml@4.3.2 deduped
+│ └─┬ tailwindcss@3.4.19
+│   ├─┬ postcss-nested@6.2.0
+│   │ └── postcss-selector-parser@7.1.6 deduped
+│   └── postcss-selector-parser@7.1.6
+├─┬ @tcg/pack-core@0.1.0 -> ./packages/pack-core
+│ └── esbuild@0.28.2
+└─┬ wrangler@4.148.0
+  └── esbuild@0.28.2 deduped

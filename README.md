@@ -14,7 +14,7 @@ TCGer is a multi-game trading card collection manager with a Node/Express API, a
 
 ## Repo layout
 - `backend/` - Express + Prisma API service.
-- `frontend/` - Next.js 15 web app (app router).
+- `frontend/` - Next.js 16.4 web app (app router).
 - `services/` - Optional cache services (scryfall-bulk, ygo-cache, tcgdex-cache, pokemon-cache).
 - `docker/` - Compose files, nginx gateway, cache backup scripts.
 - `mobile-apps/` - iOS SwiftUI and Android Jetpack Compose clients.
@@ -68,11 +68,15 @@ Notes:
 - The first run should go to `/setup` to create the initial admin account.
 
 ## Local development (without Docker)
-Prereqs: Node 18+. The default Convex development path does not require Postgres.
+Prereqs: Node 24 LTS recommended (Node 22.12 or newer supported), and npm 11.19.0 or newer. The default Convex development path does not require Postgres. npm 11.19.0 is the verified installer; older npm versions can ignore workspace overrides and reject the patched lockfile.
 
 ```bash
-npm install
+npm install --global npm@11.19.0
+npm ci
 ```
+
+See the [dependency security review](docs/dependency-security-review-2026-10-08.md)
+for the override rationale, verification and remaining upstream advisories.
 
 Start the local Convex backend first and leave it running:
 ```bash

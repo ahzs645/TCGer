@@ -14,10 +14,33 @@ jest.mock('../../config/env', () => ({
 
 import type { TcgAdapter } from '../adapters/types';
 import { adapterRegistry } from '../adapters/adapter-registry';
-import { searchAllCards, searchCards, searchCardsByArtist } from './cards.service';
+import { searchAllCards, searchCards, searchCardsByArtist, searchAllCardsWithStatus, searchCardsWithStatus } from './cards.service';
 
 describe('cross-game card search', () => {
   afterEach(() => jest.restoreAllMocks());
+
+  test.each(['preview', 'exhaustive'])('%s exposes partial providers and rejects a false empty result', async (mode) => {
+    const working = { game: 'pokemon', searchCards: jest.fn().mockResolvedValue([{ id: 'pikachu', tcg: 'pokemon', name: 'Pikachu' }]), fetchCardsByName: jest.fn().mockResolvedValue([{ id: 'pikachu', tcg: 'pokemon', name: 'Pikachu' }]) } as unknown as TcgAdapter;
+    const broken = { game: 'magic', searchCards: jest.fn().mockRejectedValue(new Error('unavailable')), fetchCardsByName: jest.fn().mockRejectedValue(new Error('unavailable')) } as unknown as TcgAdapter;
+    const adapters = jest.spyOn(adapterRegistry, 'list').mockReturnValue([working, broken]);
+    const search = () => mode === 'preview' ? searchCardsWithStatus({ query: 'Pikachu' }) : searchAllCardsWithStatus({ query: 'Pikachu', unique: 'prints', limit: 100 });
+    await expect(search()).resolves.toMatchObject({ cards: [{ id: 'pikachu' }], failedProviders: ['magic'] });
+    adapters.mockReturnValue([broken]);
+    await expect(search()).rejects.toMatchObject({ status: 503, code: 'CARD_SEARCH_UNAVAILABLE', details: { failedProviders: ['magic'] } });
+    adapters.mockReturnValue([{ game: 'pokemon', searchCards: jest.fn().mockResolvedValue([]), fetchCardsByName: jest.fn().mockResolvedValue([]) } as unknown as TcgAdapter]);
+    await expect(search()).resolves.toEqual({ cards: [], failedProviders: [] });
+  });
+
+  test('timeouts produce an unavailable response without provider internals', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.spyOn(adapterRegistry, 'list').mockReturnValue([{ game: 'pokemon', fetchCardsByName: () => new Promise(() => {}) } as unknown as TcgAdapter]);
+      const pending = searchAllCardsWithStatus({ query: 'Pikachu', unique: 'prints', limit: 100 });
+      const assertion = expect(pending).rejects.toMatchObject({ status: 503, details: { failedProviders: ['pokemon'] } });
+      await jest.advanceTimersByTimeAsync(9000);
+      await assertion;
+    } finally { jest.useRealTimers(); }
+  });
 
   test('returns successful provider results when another adapter fails', async () => {
     const successAdapter = {
