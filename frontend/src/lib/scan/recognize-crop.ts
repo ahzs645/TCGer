@@ -1,9 +1,9 @@
+import { matchEmbeddingShardsInWorker } from "@/lib/scan/embedding-search-client";
 import {
   ensureEmbeddingModel,
   computeEmbeddingFromCanvas,
   ensureCardFaceGate,
   scoreCardFaceGate,
-  matchEmbeddingShardsTopK,
   type EmbeddingIndex,
 } from "./embedding-matcher";
 import type { BrowserVideoScanCandidate } from "./scan-types";
@@ -30,10 +30,10 @@ export async function recognizeCrop(
       );
     if (gate && scoreCardFaceGate(gate, embedding) < gate.threshold) continue;
     candidates.push(
-      ...matchEmbeddingShardsTopK(embedding, [index], {
+      ...(await matchEmbeddingShardsInWorker(embedding, [index], {
         topK: 5,
         proposalLabel: "reviewed-crop",
-      }),
+      })),
     );
   }
   return candidates.sort((a, b) => b.confidence - a.confidence).slice(0, 5);

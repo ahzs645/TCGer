@@ -262,7 +262,11 @@ export function ScannerWorkbench() {
     [sourceUrl],
   );
   useEffect(
-    () => () => stream.current?.getTracks().forEach((track) => track.stop()),
+    () => () => {
+      cameraGeneration.current++;
+      stream.current?.getTracks().forEach((track) => track.stop());
+      stream.current = null;
+    },
     [],
   );
   useEffect(() => {
@@ -354,6 +358,7 @@ export function ScannerWorkbench() {
     setTorch(false);
   }
   async function startCamera() {
+    const generation = ++cameraGeneration.current;
     const next = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "environment",
@@ -362,6 +367,10 @@ export function ScannerWorkbench() {
       },
       audio: false,
     });
+    if (generation !== cameraGeneration.current) {
+      next.getTracks().forEach((track) => track.stop());
+      return;
+    }
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = next;
     const capabilities = next
@@ -369,23 +378,37 @@ export function ScannerWorkbench() {
       ?.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
     setTorchSupported(Boolean(capabilities?.torch));
     setCamera(true);
+    // Warm-up is useful, but must not keep camera controls busy. An early
+    // capture awaits the same cached model/index loaders through matches().
     if (warmStart && engine === "local") {
-      setStatus("Preloading scanner models…");
-      const indexes = await ensureEmbeddingIndexes(filter);
-      const { ensureEmbeddingModel } = await import(
-        "@/lib/scan/embedding-matcher"
-      );
-      if (indexes[0])
-        await ensureEmbeddingModel({
-          model: indexes[0].model,
-          dtype: indexes[0].dtype,
-          encoder: indexes[0].encoder,
-          modelUrl: indexes[0].modelUrl,
-        });
-      await ensureYoloModel();
+      setStatus("Camera ready · Preparing scanner…");
+      void (async () => {
+        const indexes = await ensureEmbeddingIndexes(filter);
+        if (generation !== cameraGeneration.current) return;
+        const { ensureEmbeddingModel } =
+          await import("@/lib/scan/embedding-matcher");
+        if (indexes[0])
+          await ensureEmbeddingModel({
+            model: indexes[0].model,
+            dtype: indexes[0].dtype,
+            encoder: indexes[0].encoder,
+            modelUrl: indexes[0].modelUrl,
+          });
+        if (generation !== cameraGeneration.current) return;
+        await ensureYoloModel();
+        if (generation === cameraGeneration.current) setStatus("Camera ready.");
+      })().catch((error) => {
+        if (generation === cameraGeneration.current) {
+          setStatus(
+            `Camera ready · Scanner preparation failed: ${errorText(error)}`,
+          );
+        }
+      });
+    } else {
       setStatus("Camera ready.");
     }
   }
+
   function frame(): HTMLCanvasElement {
     if (!video.current?.videoWidth)
       throw new Error("Wait for the camera preview before capturing.");

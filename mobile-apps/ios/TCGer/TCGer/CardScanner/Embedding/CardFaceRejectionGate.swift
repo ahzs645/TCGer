@@ -8,7 +8,7 @@ import OSLog
 /// Crops that score below the threshold are packs / card backs / hands / bad
 /// crops; matching them against the index would just return the nearest wrong
 /// card. Runtime cost: one dot product over the embedding.
-struct CardFaceRejectionGate {
+nonisolated struct CardFaceRejectionGate {
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "TCGer",
         category: "CardScanner"

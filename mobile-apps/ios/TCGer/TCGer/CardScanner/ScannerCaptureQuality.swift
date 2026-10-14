@@ -349,7 +349,7 @@ nonisolated struct ScannerCropQuad: Equatable, Sendable {
     }
 }
 
-struct ScannerCropRescueRequest: Identifiable {
+nonisolated struct ScannerCropRescueRequest: Identifiable, Sendable {
     let id = UUID()
     let image: CGImage
     let initialQuad: ScannerCropQuad

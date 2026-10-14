@@ -147,6 +147,7 @@ private enum ScannerDemoFixture {
 struct CardScannerView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isPresented) private var isPresented
     @AppStorage("cardScannerShowTestingTools") private var showTestingTools = false
     @AppStorage(ScannerDevModeStore.enabledDefaultsKey) private var devModeRecordingEnabled = false
@@ -244,6 +245,9 @@ struct CardScannerView: View {
                 }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            viewModel.setApplicationActive(phase == .active)
+        }
         .onAppear {
             viewModel.setAutomaticallyPresentsResults(shouldPresentResults)
             viewModel.updateEnvironment(environmentStore, prepareCamera: cameraEnabled)

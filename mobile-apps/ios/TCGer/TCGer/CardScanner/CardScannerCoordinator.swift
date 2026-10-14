@@ -66,6 +66,37 @@ final class CardScannerCoordinator: @unchecked Sendable {
         await primary.warmUp(for: mode)
     }
 
+    private final class RuntimeResources: NSObject {
+        let modelLoader: FileCardEmbeddingModelLoader
+        let indexStore: AnnoyIndexStore
+        let metadataStore: CardIndexMetadataStore
+
+        init(runtime: ScannerRuntimeAssets, game: TCGGame) {
+            modelLoader = FileCardEmbeddingModelLoader(modelURL: runtime.modelURL)
+            indexStore = AnnoyIndexStore(fileURL: runtime.vectorsURL)
+            // An installed, verified package already declares its game. Avoid
+            // searching its entire metadata file on the UI actor at startup.
+            metadataStore = CardIndexMetadataStore(fileURL: runtime.metadataURL, supportedGames: [game])
+        }
+    }
+
+    @MainActor private static let runtimeCache: NSCache<NSString, RuntimeResources> = {
+        let cache = NSCache<NSString, RuntimeResources>()
+        cache.countLimit = 3
+        return cache
+    }()
+
+    @MainActor private static func reusableRuntime(_ runtime: ScannerRuntimeAssets, game: TCGGame) -> RuntimeResources {
+        // Version and every asset path participate, so an update or reinstall
+        // can never reuse an encoder with another package's index/metadata.
+        let key = "\(game.rawValue)|\(runtime.version)|\(runtime.modelURL.path)|\(runtime.vectorsURL.path)|\(runtime.metadataURL.path)" as NSString
+        if let cached = runtimeCache.object(forKey: key) { return cached }
+        let resources = RuntimeResources(runtime: runtime, game: game)
+        runtimeCache.setObject(resources, forKey: key)
+        return resources
+    }
+
+    @MainActor
     static func makeDefault(
         apiService: APIService = APIService(),
         includeBundledTestFallbacks: Bool = false
@@ -74,17 +105,18 @@ final class CardScannerCoordinator: @unchecked Sendable {
         let downloadableModes = ScannerAssetStore.downloadableGames.map { ($0, ScanMode.game($0)) }
         for (game, mode) in downloadableModes {
             guard let runtime = ScannerAssetStore.shared.runtime(for: game) else { continue }
+            let resources = reusableRuntime(runtime, game: game)
             strategies.append(BoardCardEmbeddingScannerStrategy(
                 variant: .arcface,
                 encoder: CardEmbeddingEncoder(
-                    modelLoader: FileCardEmbeddingModelLoader(modelURL: runtime.modelURL),
+                    modelLoader: resources.modelLoader,
                     queryNormalization: ScannerGameAcceptancePolicy.resolve(
                         game: game,
                         declared: runtime.acceptancePolicy
                     ).queryNormalization
                 ),
-                indexStore: AnnoyIndexStore(fileURL: runtime.vectorsURL),
-                metadataStore: CardIndexMetadataStore(fileURL: runtime.metadataURL),
+                indexStore: resources.indexStore,
+                metadataStore: resources.metadataStore,
                 supportedModes: [mode],
                 acceptancePolicies: runtime.acceptancePolicy.map { [game: $0] } ?? [:]
             ))

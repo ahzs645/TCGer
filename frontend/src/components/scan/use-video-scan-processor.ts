@@ -1,3 +1,4 @@
+import { matchEmbeddingShardsInWorker } from "@/lib/scan/embedding-search-client";
 // @tcger-feature {"id":"scanner.capture.binderPage","platform":"web","status":"partial","limitation":"Grid and detection workbench exists; equivalent automatic page-recognition coverage remains incomplete."}
 
 import { useCallback, useRef } from "react";
@@ -18,7 +19,6 @@ import {
   embeddingIndexesShareModel,
   ensureCardFaceGate,
   ensureEmbeddingModel,
-  matchEmbeddingShardsTopK,
   resolveEmbeddingPrintingCandidates,
   scoreCardFaceGate,
   type CardFaceGate,
@@ -995,7 +995,7 @@ async function rescueWithRectify(
   ) {
     return null;
   }
-  return matchEmbeddingShardsTopK(embedding, embeddingIndexes, {
+  return matchEmbeddingShardsInWorker(embedding, embeddingIndexes, {
     topK: EMBEDDING_SHORTLIST_SIZE,
     tcgFilter: scanFilter,
     proposalLabel: "yolo+embedding+rectified",
@@ -1075,7 +1075,7 @@ async function matchDetectionEmbedding(
         embedAverager && embedAverager.size() >= 2
           ? (embedAverager.mean() ?? embedding)
           : embedding;
-      candidates = matchEmbeddingShardsTopK(query, embeddingIndexes, {
+      candidates = await matchEmbeddingShardsInWorker(query, embeddingIndexes, {
         topK: EMBEDDING_SHORTLIST_SIZE,
         tcgFilter: scanFilter,
         proposalLabel: "yolo+embedding",

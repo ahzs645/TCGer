@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 @preconcurrency import Vision
 
-final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
+nonisolated final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
     private enum Configuration {
         static let maxNeighbors = 10
         /// Candidates below the normal acceptance threshold remain available
@@ -146,13 +146,17 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         await warmUp(for: .pokemon)
     }
 
+    @concurrent
     func warmUp(for mode: ScanMode) async {
-        guard supports(mode) else { return }
+        guard !Task.isCancelled, supports(mode) else { return }
         guard encoder.isAvailable, indexStore.isAvailable else { return }
         guard let blank = Self.makeWarmUpImage() else { return }
         _ = try? cropper.detectRectanglesDetailed(in: blank, intrinsics: nil)
+        guard !Task.isCancelled else { return }
         let embedding = (try? await encoder.embedding(for: blank)) ?? []
+        guard !Task.isCancelled else { return }
         _ = await metadataStore.physicalCardIndices(for: mode.tcgGame, setCode: nil)
+        guard !Task.isCancelled else { return }
         _ = try? await indexStore.nearestNeighbors(
             for: embedding,
             limit: 1,
@@ -176,12 +180,14 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         return context.makeImage()
     }
 
+    @concurrent
     func scan(
         image: CGImage,
         context: CardScannerContext,
         source: ScanInvocationKind,
         apiService: APIService
     ) async throws -> CardScanResult? {
+        try Task.checkCancellation()
         guard supports(context.mode) else {
             throw CardScannerError.ineligibleMode
         }
@@ -199,6 +205,7 @@ final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
 
         var sawRejection = false
         for hypothesis in hypotheses {
+            try Task.checkCancellation()
             let verdict = try await evaluate(hypothesis, context: context, source: source)
             sawRejection = sawRejection || verdict.sawRejection
             if let result = verdict.result { return result }

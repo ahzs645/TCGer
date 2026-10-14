@@ -70,3 +70,21 @@ struct ScannerCameraThrottle {
         return isIdle
     }
 }
+
+/// Visibility generations reject work that finishes after exit or re-entry.
+nonisolated struct ScannerLiveAnalysisLifecycle: Sendable {
+    private(set) var isActive = false
+    private(set) var generation: UInt64 = 0
+
+    mutating func setActive(_ active: Bool) {
+        guard active != isActive else { return }
+        isActive = active
+        generation &+= 1
+    }
+
+    mutating func invalidate() { generation &+= 1 }
+
+    func accepts(_ capturedGeneration: UInt64) -> Bool {
+        isActive && capturedGeneration == generation
+    }
+}

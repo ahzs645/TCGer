@@ -8,6 +8,7 @@ struct RootView: View {
     @State private var isAuthenticating = false
     @State private var isVerifyingServer = false
     @State private var isBootstrapping = false
+    @State private var isCheckingStartupFeatures = false
     @State private var setupRequired: Bool?
     @State private var showingSignup = false
     @State private var errorMessage: String?
@@ -38,8 +39,11 @@ struct RootView: View {
                 serverFeatureStore.reset()
                 return
             }
-            await refreshServerFeatures()
+            isCheckingStartupFeatures = setupRequired == nil
+            defer { isCheckingStartupFeatures = false }
+            async let features: Void = refreshServerFeatures()
             await refreshBootstrapState(force: true)
+            await features
         }
         .task(id: environmentStore.displayCurrencyCode) {
             await environmentStore.refreshExchangeRate()
@@ -111,7 +115,7 @@ struct RootView: View {
         environmentStore.isServerVerified &&
         setupRequired == false &&
         environmentStore.appSettings != nil &&
-        !isBootstrapping &&
+        !isBootstrapping && !isCheckingStartupFeatures &&
         (environmentStore.isAuthenticated || !shouldRequireAuthentication)
     }
 
@@ -139,7 +143,7 @@ struct RootView: View {
             .task(id: environmentStore.serverConfiguration.baseURL) {
                 await verifyServerConnection()
             }
-        } else if setupRequired == nil || environmentStore.appSettings == nil || isBootstrapping {
+        } else if setupRequired == nil || environmentStore.appSettings == nil || isBootstrapping || isCheckingStartupFeatures {
             ProgressView("Loading app configuration…")
                 .progressViewStyle(.circular)
         } else if setupRequired == true {
@@ -347,10 +351,20 @@ struct RootView: View {
         isBootstrapping = true
         defer { isBootstrapping = false }
 
+        let configuration = environmentStore.serverConfiguration
+        let sessionID = environmentStore.widgetSessionID
+        // These independent reads need not add their network latencies. Keep
+        // publication on this actor and reject a replaced server/session.
+        async let setupRequest = apiService.checkSetupRequired(config: configuration)
+        async let settingsRequest = apiService.getSettings(config: configuration)
         do {
-            let setupStatus = try await apiService.checkSetupRequired(config: environmentStore.serverConfiguration)
+            let setupStatus = try await setupRequest
+            guard !Task.isCancelled, sessionID == environmentStore.widgetSessionID,
+                  configuration == environmentStore.serverConfiguration else { return }
             setupRequired = setupStatus.setupRequired
         } catch {
+            guard !Task.isCancelled, sessionID == environmentStore.widgetSessionID,
+                  configuration == environmentStore.serverConfiguration else { return }
             setupRequired = false
             if let apiError = error as? APIService.APIError {
                 print("Failed to check setup status: \(apiError.localizedDescription)")
@@ -360,9 +374,13 @@ struct RootView: View {
         }
 
         do {
-            let settings = try await apiService.getSettings(config: environmentStore.serverConfiguration)
+            let settings = try await settingsRequest
+            guard !Task.isCancelled, sessionID == environmentStore.widgetSessionID,
+                  configuration == environmentStore.serverConfiguration else { return }
             environmentStore.applyAppSettings(settings)
         } catch {
+            guard !Task.isCancelled, sessionID == environmentStore.widgetSessionID,
+                  configuration == environmentStore.serverConfiguration else { return }
             if environmentStore.appSettings == nil {
                 environmentStore.applyAppSettings(defaultAppSettings())
             }

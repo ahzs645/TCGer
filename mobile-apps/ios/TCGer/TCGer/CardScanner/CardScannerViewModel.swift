@@ -139,6 +139,10 @@ final class CardScannerViewModel: ObservableObject {
     private let qualityAnalysisInterval: TimeInterval = 0.45
     private var cameraThrottle = ScannerCameraThrottle()
     private var frameConsumerTask: Task<Void, Never>?
+    private var liveAnalysisLifecycle = ScannerLiveAnalysisLifecycle()
+    private var isPreviewVisible = false
+    private var isApplicationActive = true
+    private var recognitionGeneration = UUID()
     private var previewFrame: CGRect?
     private var guideFrame: CGRect?
     private var liveConsensus = LiveScanConsensus()
@@ -219,7 +223,9 @@ final class CardScannerViewModel: ObservableObject {
                 self.prepareRecognitionInBackgroundIfPossible()
             }
         }
-        startFrameConsumer()
+        cameraController.onPreviewVisibilityChange = { [weak self] visible in
+            self?.setPreviewVisible(visible)
+        }
         if restoresStagedSession {
             restoreStagedSession()
         }
@@ -235,6 +241,7 @@ final class CardScannerViewModel: ObservableObject {
     /// device-level rate change shows up on screen as a freeze or exposure
     /// ramp during the sheet transition itself.
     private func syncCameraOverlayState() {
+        if isOverlayCoveringPreview { liveAnalysisLifecycle.invalidate() }
         cameraController.setIdle(cameraThrottle.noteOverlay(isOverlayCoveringPreview))
     }
 
@@ -266,6 +273,7 @@ final class CardScannerViewModel: ObservableObject {
     /// installed, updated, or removed. Camera/session state stays intact;
     /// only the immutable model/index strategy graph is replaced.
     func reloadScannerAssets() {
+        recognitionGeneration = UUID()
         recognitionPreparationTasks.values.forEach { $0.cancel() }
         recognitionPreparationTasks.removeAll()
         preparedRecognitionKeys.removeAll()
@@ -280,7 +288,8 @@ final class CardScannerViewModel: ObservableObject {
     /// is visible, so recognition can begin preparing without delaying the
     /// transition. Only the selected mode's primary strategy is warmed.
     private func prepareRecognitionInBackgroundIfPossible() {
-        guard hasProducedCameraFrame, ScannerPerfOptions.isWarmStartEnabled else { return }
+        guard liveAnalysisLifecycle.isActive, hasProducedCameraFrame,
+              ScannerPerfOptions.isWarmStartEnabled else { return }
         _ = recognitionPreparationTask(
             for: RecognitionPreparationKey(mode: selectedMode, engine: selectedEngine),
             priority: .utility
@@ -302,6 +311,7 @@ final class CardScannerViewModel: ObservableObject {
         }
 
         let coordinator = self.coordinator
+        let generation = recognitionGeneration
         let task = Task.detached(priority: priority) {
             guard !Task.isCancelled else { return }
             await coordinator.warmUpPrimary(for: key.mode, preferredEngine: key.engine)
@@ -309,7 +319,7 @@ final class CardScannerViewModel: ObservableObject {
         recognitionPreparationTasks[key] = task
         Task { [weak self] in
             await task.value
-            guard let self else { return }
+            guard let self, self.recognitionGeneration == generation, !task.isCancelled else { return }
             self.preparedRecognitionKeys.insert(key)
             self.recognitionPreparationTasks.removeValue(forKey: key)
         }
@@ -323,10 +333,12 @@ final class CardScannerViewModel: ObservableObject {
         guard ScannerPerfOptions.isWarmStartEnabled else { return }
         let key = RecognitionPreparationKey(mode: selectedMode, engine: selectedEngine)
         guard !preparedRecognitionKeys.contains(key) else { return }
+        let generation = recognitionGeneration
         let task = recognitionPreparationTask(for: key, priority: .userInitiated)
         isWaitingForRecognition = true
         defer { isWaitingForRecognition = false }
         await task.value
+        guard recognitionGeneration == generation, !task.isCancelled else { return }
         preparedRecognitionKeys.insert(key)
         recognitionPreparationTasks.removeValue(forKey: key)
     }
@@ -336,10 +348,45 @@ final class CardScannerViewModel: ObservableObject {
     /// into the stream's single buffered slot instead of each allocating a Task
     /// and queueing a main-actor hop — the back-pressure lives in the stream,
     /// not in an unbounded actor mailbox.
+    func setPreviewVisible(_ visible: Bool) {
+        isPreviewVisible = visible
+        updateLiveAnalysisActivity()
+    }
+
+    func setApplicationActive(_ active: Bool) {
+        isApplicationActive = active
+        updateLiveAnalysisActivity()
+    }
+
+    private func updateLiveAnalysisActivity() {
+        let active = isPreviewVisible && isApplicationActive
+        guard liveAnalysisLifecycle.isActive != active else { return }
+        liveAnalysisLifecycle.setActive(active)
+        if active {
+            lastQualityAnalysisDate = .distantPast
+            lastAnalysisDate = .distantPast
+            startFrameConsumer()
+            prepareRecognitionInBackgroundIfPossible()
+        } else {
+            frameConsumerTask?.cancel()
+            cameraController.finishFrameStream()
+            if !isProcessingPhoto {
+                recognitionGeneration = UUID()
+                recognitionPreparationTasks.values.forEach { $0.cancel() }
+                recognitionPreparationTasks.removeAll()
+            }
+        }
+    }
+
     private func startFrameConsumer() {
-        frameConsumerTask?.cancel()
+        let previous = frameConsumerTask
+        previous?.cancel()
         let stream = cameraController.makeFrameStream()
         frameConsumerTask = Task { [weak self] in
+            // A cancelled Vision/Core ML request may still be finishing. Wait
+            // for it so a rapid tab switch cannot create concurrent analyses.
+            await previous?.value
+            guard !Task.isCancelled else { return }
             for await pixelBuffer in stream {
                 guard let self, !Task.isCancelled else { return }
                 await self.consumeLiveFrame(pixelBuffer)
@@ -917,6 +964,7 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     private func rebuildContext() {
+        liveAnalysisLifecycle.invalidate()
         guard let environmentStore else { return }
         context = CardScannerContext(
             mode: selectedMode,
@@ -939,7 +987,7 @@ final class CardScannerViewModel: ObservableObject {
 
     private func handleCapturedPhoto(_ photo: AVCapturePhoto) async {
         defer { isProcessingPhoto = false }
-        guard let cgImage = await Self.decodeCapturedPhoto(photo) else {
+        guard let cgImage = await Self.decodeCapturedPhoto(ScannerCapturedPhoto(photo: photo)) else {
             state = .error("Unable to process captured photo.")
             return
         }
@@ -1090,8 +1138,9 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    private func consumeLiveFrame(_ pixelBuffer: CVPixelBuffer) async {
-        guard !isSimulator else { return }
+    private func consumeLiveFrame(_ frame: ScannerCameraFrame) async {
+        guard !isSimulator, liveAnalysisLifecycle.isActive else { return }
+        let generation = liveAnalysisLifecycle.generation
 
         // A presented result or binder review covers the preview — idle
         // analysis delivery for its duration. The overlay properties' didSet
@@ -1134,14 +1183,15 @@ final class CardScannerViewModel: ObservableObject {
         if schedule.analyzesQualityOnly {
             lastQualityAnalysisDate = now
             if let quality = await Self.analyzeLiveQuality(
-                pixelBuffer,
+                frame,
                 guideGeometry: scannerGuideGeometry
-            ) {
+            ), !Task.isCancelled, liveAnalysisLifecycle.accepts(generation) {
                 latestCaptureQuality = quality
             }
         }
 
-        guard schedule.runsRecognition, let context = liveContext else { return }
+        guard !Task.isCancelled, liveAnalysisLifecycle.accepts(generation),
+              schedule.runsRecognition, let context = liveContext else { return }
 
         isAnalyzingFrame = true
         lastAnalysisDate = now
@@ -1157,13 +1207,13 @@ final class CardScannerViewModel: ObservableObject {
         // Awaited, not detached-and-forgotten: the consumer loop stays
         // suspended here, which is what lets the camera stream shed frames.
         let analysis = await Self.analyzeLiveFrame(
-            pixelBuffer,
+            frame,
             context: scanContext,
             guideGeometry: scannerGuideGeometry,
             coordinator: coordinator,
             recordsDevMode: diagnostics != nil
         )
-        guard let analysis else { return }
+        guard let analysis, !Task.isCancelled, liveAnalysisLifecycle.accepts(generation) else { return }
         latestCaptureQuality = analysis.captureQuality
         guard captureMode == .card else { return }
 
@@ -1195,7 +1245,9 @@ final class CardScannerViewModel: ObservableObject {
         }
     }
 
-    private struct LiveFrameAnalysis {
+    // The result is an immutable value snapshot (including immutable CGImage
+    // storage). It is published only after the visibility generation check.
+    nonisolated private struct LiveFrameAnalysis: @unchecked Sendable {
         let result: Result<CardScanResult, CardScannerError>
         let captureQuality: ScannerCaptureQualityReport
         /// Whether anything card-shaped was in the frame — a no-match on an
@@ -1203,19 +1255,20 @@ final class CardScannerViewModel: ObservableObject {
         let cardPresent: Bool
     }
 
-    /// Decode + crop + scan off the main actor (nonisolated async runs on the
-    /// global executor). Returns nil when the pixel buffer can't be decoded.
+    /// Explicitly leave the caller's actor under Approachable Concurrency.
+    /// The retained pixel buffer is read only; the serial consumer owns its lifetime.
+    @concurrent
     nonisolated private static func analyzeLiveFrame(
-        _ pixelBuffer: CVPixelBuffer,
+        _ frame: ScannerCameraFrame,
         context: CardScannerContext,
         guideGeometry: ScannerGuideGeometry?,
         coordinator: CardScannerCoordinator,
         recordsDevMode: Bool
     ) async -> LiveFrameAnalysis? {
-        guard let cgImage = makeCGImage(from: pixelBuffer) else { return nil }
-        let framedImage = guideGeometry.flatMap {
+        guard !Task.isCancelled, let cgImage = makeCGImage(from: frame.pixelBuffer) else { return nil }
+        let framedImage = Self.liveAnalysisImage(guideGeometry.flatMap {
             ScannerGuideCropper().crop(cgImage, using: $0)
-        } ?? cgImage
+        } ?? cgImage)
         let captureQuality = ScannerCaptureQualityAnalyzer.analyze(image: framedImage)
         let scanStarted = Date()
         let result = await coordinator.scan(image: framedImage, context: context, source: .livePreview)
@@ -1252,12 +1305,13 @@ final class CardScannerViewModel: ObservableObject {
         )
     }
 
+    @concurrent
     nonisolated private static func analyzeLiveQuality(
-        _ pixelBuffer: CVPixelBuffer,
+        _ frame: ScannerCameraFrame,
         guideGeometry: ScannerGuideGeometry?
     ) async -> ScannerCaptureQualityReport? {
-        guard let image = makeCGImage(from: pixelBuffer) else { return nil }
-        let framed = guideGeometry.flatMap { ScannerGuideCropper().crop(image, using: $0) } ?? image
+        guard !Task.isCancelled, let image = makeCGImage(from: frame.pixelBuffer) else { return nil }
+        let framed = Self.liveAnalysisImage(guideGeometry.flatMap { ScannerGuideCropper().crop(image, using: $0) } ?? image)
         return ScannerCaptureQualityAnalyzer.analyze(image: framed)
     }
 
@@ -1288,12 +1342,13 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     /// The HEIF container encode plus full decode + 2048 px downsample of a
-    /// sensor still is 100–500 ms of CPU. `nonisolated async` runs it on the
-    /// global executor so the shutter press never freezes the preview — a
+    /// sensor still is 100–500 ms of CPU. `@concurrent` runs it on the
+    /// concurrent executor so the shutter press never freezes the preview — a
     /// nonisolated *synchronous* method would still execute on the caller's
     /// main actor.
-    private nonisolated static func decodeCapturedPhoto(_ photo: AVCapturePhoto) async -> CGImage? {
-        guard let data = photo.fileDataRepresentation() else { return nil }
+    @concurrent
+    private nonisolated static func decodeCapturedPhoto(_ capture: ScannerCapturedPhoto) async -> CGImage? {
+        guard let data = capture.photo.fileDataRepresentation() else { return nil }
         return makeCGImage(from: data)
     }
 
@@ -1398,6 +1453,21 @@ final class CardScannerViewModel: ObservableObject {
         liveConfirmationRequired = 2
     }
 
+    nonisolated private static func liveAnalysisImage(_ image: CGImage) -> CGImage {
+        let scale = min(1, 1_280 / CGFloat(max(image.width, image.height)))
+        guard scale < 1,
+              let context = CGContext(
+                data: nil, width: max(1, Int(CGFloat(image.width) * scale)),
+                height: max(1, Int(CGFloat(image.height) * scale)),
+                bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+              ) else { return image }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: context.width, height: context.height))
+        return context.makeImage() ?? image
+    }
+
     nonisolated private static func makeCGImage(from data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [
@@ -1408,6 +1478,7 @@ final class CardScannerViewModel: ObservableObject {
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
+    @concurrent
     nonisolated private static func captureQuality(
         image: CGImage,
         intrinsics: ScannerCameraIntrinsics?
@@ -1415,6 +1486,7 @@ final class CardScannerViewModel: ObservableObject {
         ScannerCaptureQualityAnalyzer.analyze(image: image, intrinsics: intrinsics)
     }
 
+    @concurrent
     nonisolated private static func makeCropRescueRequest(
         image: CGImage,
         sourceResultID: CardScanResult.ID?

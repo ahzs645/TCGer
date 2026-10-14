@@ -1329,13 +1329,18 @@
         "sources": [
           "frontend/app/scan/page.tsx",
           "frontend/src/components/scan/card-scan-panel.tsx",
-          "frontend/src/components/scan/video-scan-lab.tsx"
+          "frontend/src/components/scan/video-scan-lab.tsx",
+          "frontend/src/components/scan/scanner-workbench.tsx",
+          "frontend/src/lib/scan/recognize-crop.ts"
         ],
         "registration": "frontend/app/scan/page.tsx"
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerCamera.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerCoordinator.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerCaptureQuality.swift"
         ],
         "registration": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
       },
@@ -1435,16 +1440,33 @@
       "ios": {
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/CardScanner/LiveScanConsensus.swift",
-          "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerViewModel.swift"
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerViewModel.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerCameraThrottle.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerCamera.swift"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/CardScanner/LiveScanConsensus.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/CardScanner/LiveScanConsensus.swift",
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "scanner.capture.automatic",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/ScannerLifecycleTests.swift"
+          }
+        ]
       },
       "android": {
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerPreviewAnalysisThrottle.kt"
         ],
-        "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt"
+        "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSession.kt",
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "scanner.capture.automatic",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/scanner/ScannerPreviewAnalysisThrottleTest.kt"
+          }
+        ]
       }
     },
     {
@@ -1672,13 +1694,36 @@
       "web": {
         "sources": [
           "frontend/src/lib/scan/embedding-matcher.ts",
-          "frontend/public/scan-index/README.md"
+          "frontend/public/scan-index/README.md",
+          "frontend/src/lib/scan/embedding-search.ts",
+          "frontend/src/lib/scan/embedding-search-client.ts",
+          "frontend/src/lib/scan/embedding-search-protocol.ts",
+          "frontend/src/lib/scan/embedding-search.worker.ts"
         ],
-        "registration": "frontend/src/lib/scan/embedding-matcher.ts"
+        "registration": "frontend/src/lib/scan/embedding-matcher.ts",
+        "tests": [
+          {
+            "runner": "node",
+            "id": "scanner.model.arcface",
+            "path": "frontend/src/lib/scan/embedding-search-client.test.ts"
+          },
+          {
+            "runner": "node",
+            "id": "scanner.model.arcface",
+            "path": "frontend/src/lib/scan/embedding-matcher.test.ts"
+          }
+        ]
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift"
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/BoardCardEmbeddingScannerStrategy.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/CardEmbeddingEncoder.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/CardFaceRejectionGate.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/QueryColorNormalization.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/CollectorNumberOCR.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ANN/ANNIndex.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ANN/CardIndexMetadataStore.swift"
         ],
         "registration": "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift"
       },

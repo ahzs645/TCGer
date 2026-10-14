@@ -18,6 +18,9 @@ import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.os.SystemClock
+import android.util.Size
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
@@ -25,7 +28,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
@@ -97,6 +104,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Observer
@@ -136,6 +145,7 @@ import com.ahmadjalil.tcger.data.scanner.ScannerTriggerMode
 import com.ahmadjalil.tcger.data.scanner.ScannerRecognitionEngine
 import com.ahmadjalil.tcger.data.scanner.ScannerSessionEntry
 import com.ahmadjalil.tcger.data.scanner.ScannerSessionStore
+import com.ahmadjalil.tcger.data.scanner.ScannerPreviewAnalysisThrottle
 import com.ahmadjalil.tcger.data.scanner.AutoScanConsensus
 import com.ahmadjalil.tcger.data.scanner.AutoScanConsensusUpdate
 import com.ahmadjalil.tcger.data.scanner.AutomaticCaptureRearmGate
@@ -165,6 +175,10 @@ import com.ahmadjalil.tcger.generated.ParityFeatureIDs
 import com.ahmadjalil.tcger.ui.AppUiState
 import com.ahmadjalil.tcger.ui.AppViewModel
 import java.io.File
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -2138,16 +2152,63 @@ private fun CameraPreview(
             } else {
                 ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
             }
-            setEnabledUseCases(CameraController.IMAGE_CAPTURE)
+            imageAnalysisBackpressureStrategy = ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+            // Leave the sensor buffers in YUV; convert only sampled frames on
+            // the analysis executor. Still capture keeps its original quality.
+            imageAnalysisResolutionSelector = ResolutionSelector.Builder()
+                .setResolutionStrategy(ResolutionStrategy(Size(1280, 960), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                .build()
+            setEnabledUseCases(CameraController.IMAGE_CAPTURE or CameraController.IMAGE_ANALYSIS)
         }
     }
+    val analysisSettings = remember(controller) { AtomicReference<ScannerPreviewAnalysisSettings>() }
     var cameraError by remember { mutableStateOf<String?>(null) }
     var captureInFlight by remember { mutableStateOf(false) }
     var torchAvailable by remember { mutableStateOf(false) }
     var torchEnabled by remember { mutableStateOf(false) }
+    analysisSettings.set(ScannerPreviewAnalysisSettings(automaticCapture, automaticIntervalMillis, isProcessing || captureInFlight, onCaptured))
 
     DisposableEffect(lifecycleOwner, controller) {
         val torchObserver = Observer<Int> { torchEnabled = it == TorchState.ON }
+        val analysisExecutor = Executors.newSingleThreadExecutor()
+        val throttle = ScannerPreviewAnalysisThrottle()
+        val resumed = AtomicBoolean(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+        val lifecycleObserver = LifecycleEventObserver { _, _ ->
+            resumed.set(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+        }
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+        val mainExecutor = ContextCompat.getMainExecutor(context)
+        controller.setImageAnalysisAnalyzer(analysisExecutor) { image ->
+            val settings = analysisSettings.get()
+            val acquired = throttle.tryAcquire(
+                SystemClock.elapsedRealtime(), settings.enabled && resumed.get(),
+                settings.isProcessing, settings.intervalMillis,
+            )
+            if (!acquired) {
+                image.close()
+            } else {
+                try {
+                    val bytes = scannerPreviewJpeg(image)
+                    mainExecutor.execute {
+                        try {
+                            val current = analysisSettings.get()
+                            if (resumed.get() && current.enabled && !current.isProcessing) {
+                                current.onCaptured(bytes, true)
+                            }
+                        } finally {
+                            throttle.release()
+                        }
+                    }
+                } catch (error: Exception) {
+                    throttle.release()
+                    mainExecutor.execute {
+                        if (resumed.get()) cameraError = error.message ?: "Preview analysis failed. Try manual capture."
+                    }
+                } finally {
+                    image.close()
+                }
+            }
+        }
         runCatching { controller.bindToLifecycle(lifecycleOwner) }
             .onSuccess {
                 torchAvailable = runCatching { controller.cameraInfo?.hasFlashUnit() == true }.getOrDefault(false)
@@ -2155,6 +2216,10 @@ private fun CameraPreview(
             }
             .onFailure { cameraError = "Live camera is unavailable. You can still choose a photo." }
         onDispose {
+            resumed.set(false)
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+            controller.clearImageAnalysisAnalyzer()
+            analysisExecutor.shutdown()
             controller.torchState.removeObserver(torchObserver)
             runCatching { controller.enableTorch(false) }
             controller.unbind()
@@ -2201,14 +2266,6 @@ private fun CameraPreview(
             output.delete()
             captureInFlight = false
             cameraError = it.message ?: "The camera could not capture this image."
-        }
-    }
-
-    LaunchedEffect(automaticCapture, automaticIntervalMillis, isProcessing, controller) {
-        if (!automaticCapture) return@LaunchedEffect
-        while (true) {
-            delay(automaticIntervalMillis)
-            if (!isProcessing && !captureInFlight) captureImage(true)
         }
     }
 
@@ -2322,4 +2379,33 @@ private fun scannerCameraSelector(cameraId: String?): CameraSelector {
             }
         }
         .build()
+}
+
+
+private data class ScannerPreviewAnalysisSettings(
+    val enabled: Boolean,
+    val intervalMillis: Long,
+    val isProcessing: Boolean,
+    val onCaptured: (ByteArray, Boolean) -> Unit,
+)
+
+/** Preserve the byte-based recognizer API without still capture or disk I/O. */
+private fun scannerPreviewJpeg(image: ImageProxy): ByteArray {
+    val bitmap = image.toBitmap()
+    var upright: Bitmap? = null
+    try {
+        val rotation = image.imageInfo.rotationDegrees
+        val output = if (rotation == 0) bitmap else {
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, Matrix().apply {
+                postRotate(rotation.toFloat())
+            }, true).also { upright = it }
+        }
+        return ByteArrayOutputStream().use { stream ->
+            check(output.compress(Bitmap.CompressFormat.JPEG, 92, stream)) { "Preview image could not be encoded." }
+            stream.toByteArray()
+        }
+    } finally {
+        upright?.takeIf { it !== bitmap }?.recycle()
+        bitmap.recycle()
+    }
 }

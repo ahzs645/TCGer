@@ -147,12 +147,12 @@ actor CardIndexMetadataStore {
         )
     }
 
-    init(fileURL: URL) {
+    init(fileURL: URL, supportedGames: Set<TCGGame>? = nil) {
         bundle = nil
         self.fileURL = fileURL
         resource = ""
         fileExtension = ""
-        supportedGames = Self.detectSupportedGames(at: fileURL)
+        self.supportedGames = supportedGames ?? Self.detectSupportedGames(at: fileURL)
     }
 
     /// In-memory initializer for unit tests and imported replay manifests.

@@ -1,12 +1,12 @@
 import CoreGraphics
 import Foundation
 
-struct ANNVectorMatch: Hashable {
+nonisolated struct ANNVectorMatch: Hashable, Sendable {
     let index: Int
     let distance: Double
 }
 
-protocol ANNIndexProviding {
+nonisolated protocol ANNIndexProviding: Sendable {
     var isAvailable: Bool { get }
     func nearestNeighbors(
         for vector: [Float],

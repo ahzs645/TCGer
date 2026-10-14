@@ -4,6 +4,19 @@ import CoreMedia
 import QuartzCore
 import SwiftUI
 
+/// Retains a completed capture buffer for read-only analysis. AVFoundation
+/// cannot recycle its storage while this value owns it; consumers never mutate
+/// the pixels and the newest-frame stream permits only one analysis at a time.
+nonisolated struct ScannerCameraFrame: @unchecked Sendable {
+    let pixelBuffer: CVPixelBuffer
+}
+
+/// Published only after didFinishProcessingPhoto. The completed photo is read
+/// exclusively by the decode worker; encoding never touches the UI actor.
+nonisolated struct ScannerCapturedPhoto: @unchecked Sendable {
+    let photo: AVCapturePhoto
+}
+
 struct ScannerCameraOption: Identifiable, Equatable, Sendable {
     let id: String
     let displayName: String
@@ -51,7 +64,7 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     private static let scanningYieldInterval: CFTimeInterval = 1.0 / 15.0
     private static let idleYieldInterval: CFTimeInterval = 0.5
     // Touched only on videoOutputQueue (delegate callbacks) or via its .async.
-    private var frameContinuation: AsyncStream<CVPixelBuffer>.Continuation?
+    private var frameContinuation: AsyncStream<ScannerCameraFrame>.Continuation?
     private var minYieldInterval: CFTimeInterval = CardScannerCameraController.scanningYieldInterval
     private var lastYieldAt: CFTimeInterval = 0
     private var hasDeliveredFirstFrame = false
@@ -61,6 +74,7 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     var onPhotoCaptureError: ((Error) -> Void)?
     var onPreviewFrameChange: ((CGRect) -> Void)?
     var onFirstFrame: (() -> Void)?
+    var onPreviewVisibilityChange: (@MainActor (Bool) -> Void)?
 
     /// Connects the low-latency preview as soon as the session object exists.
     /// Session construction itself stays off the main thread; only the layer
@@ -110,9 +124,9 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     /// pipeline the OLDEST held frame. Newest-1 means: drop stale frames,
     /// always work on a recent one, hold at most one buffer beyond the one in
     /// flight. Making a new stream finishes the previous one.
-    func makeFrameStream() -> AsyncStream<CVPixelBuffer> {
+    func makeFrameStream() -> AsyncStream<ScannerCameraFrame> {
         let (stream, continuation) = AsyncStream.makeStream(
-            of: CVPixelBuffer.self,
+            of: ScannerCameraFrame.self,
             bufferingPolicy: .bufferingNewest(1)
         )
         videoOutputQueue.async { [weak self] in
@@ -122,8 +136,16 @@ final class CardScannerCameraController: NSObject, ObservableObject {
             }
             self.frameContinuation?.finish()
             self.frameContinuation = continuation
+            self.lastYieldAt = 0
         }
         return stream
+    }
+
+    func finishFrameStream() {
+        videoOutputQueue.async { [weak self] in
+            self?.frameContinuation?.finish()
+            self?.frameContinuation = nil
+        }
     }
 
     /// Idle throttles the ANALYSIS STREAM only — the sensor (and therefore
@@ -194,9 +216,14 @@ final class CardScannerCameraController: NSObject, ObservableObject {
         }
 
         videoOutput.alwaysDiscardsLateVideoFrames = true
-        videoOutput.videoSettings = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-        ]
+        // The preview layer is independent of these analysis buffers. Prefer
+        // the sensor's native bi-planar format to avoid a BGRA conversion for
+        // every delivered frame; VTCreateCGImageFromCVPixelBuffer handles both.
+        let formats = videoOutput.availableVideoPixelFormatTypes
+        let format = [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+                      kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
+            .first(where: formats.contains) ?? kCVPixelFormatType_32BGRA
+        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: format]
         videoOutput.setSampleBufferDelegate(self, queue: videoOutputQueue)
         if session.canAddOutput(videoOutput) {
             session.addOutput(videoOutput)
@@ -301,8 +328,11 @@ final class CardScannerCameraController: NSObject, ObservableObject {
     }
 
     func stopRunning() {
-        sessionQueue.async { [weak self] in
-            guard let self, let session = self.session, session.isRunning else { return }
+        // Keep the controller alive through shutdown. Otherwise dismissal can
+        // release the last session/output references on the UI thread before
+        // this queued stop runs.
+        sessionQueue.async { [self] in
+            guard let session = self.session, session.isRunning else { return }
             self.setTorchEnabledOnSessionQueue(false)
             session.stopRunning()
         }
@@ -485,7 +515,7 @@ extension CardScannerCameraController: AVCaptureVideoDataOutputSampleBufferDeleg
             let now = CACurrentMediaTime()
             if minYieldInterval == 0 || now - lastYieldAt >= minYieldInterval {
                 lastYieldAt = now
-                frameContinuation?.yield(pixelBuffer)
+                frameContinuation?.yield(ScannerCameraFrame(pixelBuffer: pixelBuffer))
             }
         }
     }
@@ -544,6 +574,18 @@ final class CameraPreviewController: UIViewController {
         view = previewView
         controller.attachPreviewLayer(previewView.previewLayer)
         previewView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(focusCamera(_:))))
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        controller.onPreviewVisibilityChange?(true)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        // Stop analysis before the transition; leave preview running until
+        // disappearance so the outgoing screen does not freeze mid-animation.
+        controller.onPreviewVisibilityChange?(false)
+        super.viewWillDisappear(animated)
     }
 
     override func viewDidAppear(_ animated: Bool) {

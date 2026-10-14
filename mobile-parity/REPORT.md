@@ -59,7 +59,7 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | scanner.capture.manual | Manually capture one card from the live camera | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.capture.photo | Identify a card from an imported photo | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.capture.bulkPhoto | Bulk-import and identify multiple photos | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| scanner.capture.automatic | Automatic live capture with multi-frame consensus | track | Partial | — | Implemented | — | Implemented | — | Tracked gap |
+| scanner.capture.automatic | Automatic live capture with multi-frame consensus | track | Partial | — | Implemented | Not run | Implemented | Not run | Tracked gap |
 | scanner.capture.binderPage | Detect and identify multiple cards on binder pages | track | Partial | — | Implemented | — | Implemented | Not run | Tracked gap |
 | scanner.mode.pokemon | Pokémon card scanning mode | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.mode.yugioh | Yu-Gi-Oh! card scanning mode | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
@@ -68,7 +68,7 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | scanner.engine.localOnly | Selectable fully on-device recognition engine | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.engine.serverHash | Selectable server perceptual-hash recognition engine | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.engine.serverEmbedding | Selectable server embedding recognition engine | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| scanner.model.arcface | ArcFace model, matching index, thresholds, and rejection policy | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
+| scanner.model.arcface | ArcFace model, matching index, thresholds, and rejection policy | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
 | scanner.model.dinov2 | DINOv2 model, matching index, thresholds, and rejection policy | track | Partial | — | Implemented | — | Implemented | — | Tracked gap |
 | scanner.options.language | Assumed card-language scanner default | track | Implemented | Not run | Implemented | — | Partial | — | Tracked gap |
 | scanner.options.torch | Scanner flashlight control | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
@@ -160,7 +160,7 @@ These declarations live beside platform implementations. Unspecified modes are u
 | scanner.identify | Web | Partial | Not specified | — | Recognition engines and developer scenarios do not yet have equivalent coverage across all runtimes. | [Source](../frontend/app/scan/page.tsx#L1) |
 | scanner.identify | Android | Partial | Not specified | — | Language-aware recognition and granular internal developer diagnostics remain incomplete. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt#L1) |
 | scanner.capture.automatic | Web | Partial | Not specified | — | Consensus capture exists; equivalent camera recognition and acceptance evidence remain incomplete. | [Source](../frontend/src/components/scan/video-scan-lab.tsx#L1) |
-| scanner.capture.binderPage | Web | Partial | Not specified | — | Grid and detection workbench exists; equivalent automatic page-recognition coverage remains incomplete. | [Source](../frontend/src/components/scan/use-video-scan-processor.ts#L1) |
+| scanner.capture.binderPage | Web | Partial | Not specified | — | Grid and detection workbench exists; equivalent automatic page-recognition coverage remains incomplete. | [Source](../frontend/src/components/scan/use-video-scan-processor.ts#L2) |
 | scanner.engine.automatic | Web | Partial | Not specified | — | Automatic cross-engine and cross-game selection is not equivalent across runtimes. | [Source](../frontend/app/scan/page.tsx#L2) |
 | scanner.engine.serverHash | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/scan/card-scan-panel.tsx#L6) |
 | scanner.engine.serverHash | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift#L1) |

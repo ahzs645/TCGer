@@ -8,7 +8,7 @@ import Foundation
 /// (setCode, collectorNumber) from each candidate's id — decides among near
 /// twins. Only "NNN/NNN" pairs are returned; bare digits are too noisy to trust
 /// (a stray number was observed promoting the wrong same-number card).
-struct CollectorNumberOCR {
+nonisolated struct CollectorNumberOCR {
     /// Footer crop region as a fraction of the (top-left origin) card image.
     private let footerTop: CGFloat = 0.88
     private let footerHeight: CGFloat = 0.11

@@ -3,7 +3,7 @@ import CoreML
 import CoreVideo
 import Foundation
 
-protocol CardEmbeddingModelLoading {
+nonisolated protocol CardEmbeddingModelLoading: Sendable {
     var isAvailable: Bool { get }
     func makeModel() async throws -> MLModel
 }
@@ -12,7 +12,7 @@ extension CardEmbeddingModelLoading {
     var isAvailable: Bool { true }
 }
 
-struct CardEmbeddingEncoder {
+nonisolated struct CardEmbeddingEncoder: Sendable {
     enum EncoderError: Error, LocalizedError {
         case modelUnavailable
         case imageConstraintUnavailable
@@ -55,6 +55,7 @@ struct CardEmbeddingEncoder {
         modelLoader.isAvailable
     }
 
+    @concurrent
     func embedding(for image: CGImage) async throws -> [Float] {
         let model = try await modelLoader.makeModel()
         guard let constraint = model.modelDescription.inputDescriptionsByName[inputName]?.imageConstraint else {
@@ -82,6 +83,7 @@ struct CardEmbeddingEncoder {
     /// builds where each request pays a fixed scheduling cost. Results align
     /// with the input order; an image whose output is missing yields an empty
     /// embedding (mirroring how callers treat a failed single embedding).
+    @concurrent
     func embeddings(for images: [CGImage]) async throws -> [[Float]] {
         guard !images.isEmpty else { return [] }
         let model = try await modelLoader.makeModel()
@@ -206,12 +208,12 @@ actor FileCardEmbeddingModelLoader: CardEmbeddingModelLoading {
     }
 }
 
-private enum DINOv2Preprocessing {
+nonisolated private enum DINOv2Preprocessing {
     static let resizedShortestEdge = 256
 }
 
 private extension CGImage {
-    func pixelBuffer(
+    nonisolated func pixelBuffer(
         width: Int,
         height: Int,
         normalization: ScannerGameAcceptancePolicy.QueryNormalization
@@ -231,7 +233,7 @@ private extension CGImage {
         return preprocessed.renderedPixelBuffer(width: width, height: height)
     }
 
-    func centerCroppedAfterResize(shortestEdge: Int, cropWidth: Int, cropHeight: Int) -> CGImage? {
+    nonisolated func centerCroppedAfterResize(shortestEdge: Int, cropWidth: Int, cropHeight: Int) -> CGImage? {
         guard width > 0,
               height > 0,
               shortestEdge > 0,
@@ -258,7 +260,7 @@ private extension CGImage {
         return resized.cropping(to: cropRect)
     }
 
-    func resized(width: Int, height: Int) -> CGImage? {
+    nonisolated func resized(width: Int, height: Int) -> CGImage? {
         guard width > 0, height > 0 else { return nil }
         guard let context = CGContext(
             data: nil,
@@ -276,7 +278,7 @@ private extension CGImage {
         return context.makeImage()
     }
 
-    func renderedPixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
+    nonisolated func renderedPixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
         var pixelBuffer: CVPixelBuffer?
         let attrs: [CFString: Any] = [
             kCVPixelBufferCGImageCompatibilityKey: true,
@@ -313,7 +315,7 @@ private extension CGImage {
 }
 
 private extension MLMultiArray {
-    func toArray() -> [Float] {
+    nonisolated func toArray() -> [Float] {
         (0..<count).map { self[$0].floatValue }
     }
 }

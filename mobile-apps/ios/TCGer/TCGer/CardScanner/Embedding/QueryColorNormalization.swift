@@ -19,7 +19,7 @@ import Foundation
 /// The arithmetic mirrors Pillow exactly (`ImageOps.autocontrast(cutoff=1)`
 /// after a float grey-world gain with truncating conversion) so the offline
 /// evaluator and the device agree pixel for pixel.
-enum QueryColorNormalization {
+nonisolated enum QueryColorNormalization {
     /// Whether a game's declared normalization runs. `SCANNER_QUERY_NORMALIZATION=0`
     /// forces raw queries for every game and `=1` forces the normalization on,
     /// for A/B replays; otherwise the per-game policy decides.
