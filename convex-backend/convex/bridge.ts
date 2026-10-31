@@ -1703,14 +1703,12 @@ export const updateEntry = internalMutation({
 
     if (args.cardOverride) {
       const timestamp = now();
-      await Promise.all(
-        sourceGroup.map((groupEntry) =>
-          ctx.db.patch(groupEntry._id, {
-            cardId: nextCardId,
-            updatedAt: timestamp
-          })
-        )
-      );
+      // A printing correction targets the addressed physical copy only.
+      // Sibling copies may have a different printing and must be preserved.
+      await ctx.db.patch(entry._id, {
+        cardId: nextCardId,
+        updatedAt: timestamp
+      });
       entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
     }
 
