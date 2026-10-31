@@ -1746,7 +1746,9 @@ export const updateEntry = internalMutation({
       : [];
     await ctx.db.patch(entry._id, {
       binderId: targetBinderId,
-      quantity: 1,
+      // A metadata-only PATCH must not collapse a legacy quantity-bearing row.
+      // Quantity reconciliation below handles explicit quantity changes.
+      quantity: args.quantity === undefined ? entry.quantity : 1,
       condition: args.condition === undefined ? entry.condition : args.condition ?? undefined,
       language: args.language === undefined ? entry.language : args.language ?? undefined,
       notes: args.notes === undefined ? entry.notes : args.notes ?? undefined,
