@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useAuthStore } from "@/stores/auth";
 import * as wishlistsApi from "@/lib/api/wishlists";
 import {
   syncWishlistRules,
@@ -67,6 +68,13 @@ export interface WishlistsState {
   ) => Promise<WishlistSyncResult>;
 }
 
+// A previous account's in-flight response must never publish into a new session.
+let sessionGeneration = 0;
+const sessionMatches = (token: string, generation: number, userId: string | null) => {
+  const auth = useAuthStore.getState();
+  return sessionGeneration === generation && auth.token === token && auth.user?.id === userId;
+};
+
 export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
   wishlists: [],
   isLoading: false,
@@ -76,11 +84,16 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
   clearError: () => set({ error: null }),
 
   fetchWishlists: async (token: string) => {
+    const generation = sessionGeneration;
+    const userId = useAuthStore.getState().user?.id ?? null;
+    if (!sessionMatches(token, generation, userId)) return;
     set({ isLoading: true, error: null });
     try {
       const wishlists = await wishlistsApi.getWishlists(token);
+      if (!sessionMatches(token, generation, userId)) return;
       set({ wishlists, isLoading: false, hasFetched: true });
     } catch (error) {
+      if (!sessionMatches(token, generation, userId)) return;
       set({
         error:
           error instanceof Error ? error.message : "Failed to fetch wishlists",
@@ -297,3 +310,11 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     }
   },
 }));
+
+// Reset private state when the authenticated identity or credential changes.
+// The generation also invalidates requests already awaiting network responses.
+useAuthStore.subscribe((state, previous) => {
+  if (state.user?.id === previous.user?.id && state.token === previous.token && state.isAuthenticated === previous.isAuthenticated) return;
+  sessionGeneration += 1;
+  useWishlistsStore.setState({ wishlists: [], isLoading: false, error: null, hasFetched: false });
+});
