@@ -39,6 +39,13 @@ export interface CollectionsState {
   ) => Promise<void>;
 }
 
+// A previous account's in-flight response must never publish into a new session.
+let sessionGeneration = 0;
+const sessionMatches = (token: string, generation: number, userId: string | null) => {
+  const auth = useAuthStore.getState();
+  return sessionGeneration === generation && auth.token === token && auth.user?.id === userId;
+};
+
 export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   collections: [],
   isLoading: false,
@@ -48,14 +55,19 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
   clearError: () => set({ error: null }),
 
   fetchCollections: async (token: string) => {
+    const generation = sessionGeneration;
+    const userId = useAuthStore.getState().user?.id ?? null;
+    if (!sessionMatches(token, generation, userId)) return;
     set({ isLoading: true, error: null });
     try {
       const collections = await collectionsApi.getCollections(
         token,
         useAuthStore.getState().user,
       );
+      if (!sessionMatches(token, generation, userId)) return;
       set({ collections, isLoading: false, hasFetched: true });
     } catch (error) {
+      if (!sessionMatches(token, generation, userId)) return;
       set({
         error:
           error instanceof Error
@@ -229,3 +241,11 @@ export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
     }
   },
 }));
+
+// Reset private state when the authenticated identity or credential changes.
+// The generation also invalidates requests already awaiting network responses.
+useAuthStore.subscribe((state, previous) => {
+  if (state.user?.id === previous.user?.id && state.token === previous.token && state.isAuthenticated === previous.isAuthenticated) return;
+  sessionGeneration += 1;
+  useCollectionsStore.setState({ collections: [], isLoading: false, error: null, hasFetched: false });
+});
