@@ -200,7 +200,8 @@ struct SetBrowserView: View {
             .refreshable {
                 await loadSets(useCache: false)
             }
-            .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { notification in
+                guard CollectionMutationNotice.matches(notification, config: environmentStore.serverConfiguration, token: environmentStore.authToken) else { return }
                 collectionRevision += 1
             }
             .task(id: collectionRevision) {

@@ -21,8 +21,9 @@ COPY tsconfig.base.json ./
 RUN npm run --workspace=packages/api-types build
 
 FROM base AS dev
+COPY tools/dev ./tools/dev
 WORKDIR /app/convex-backend
-CMD ["npm", "run", "dev", "--", "--typecheck", "disable", "--tail-logs", "disable"]
+CMD ["npm", "run", "dev:local"]
 
 FROM base AS deploy
 WORKDIR /app/convex-backend

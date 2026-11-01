@@ -63,6 +63,10 @@ describe("shared REST interactions against real Convex HTTP actions", () => {
         ? { "x-tcger-bridge-key": TEST_BRIDGE_SECRET, "Content-Type": "application/json" }
         : headers("contract-user");
       if (actualPath.includes("contract-binder")) actualPath = actualPath.replace("contract-binder", targetID);
+      if (interaction.operation === "recordSale") {
+        actualBody.collectionId = targetID;
+        actualBody.copyIds = [targetCopy];
+      }
       const response = await t.fetch(actualPath, {
         method: interaction.request.method,
         headers: auth,
@@ -70,7 +74,50 @@ describe("shared REST interactions against real Convex HTTP actions", () => {
       });
       expect(response.status).toBe(interaction.response.status);
       if (response.status !== 204) expect(response.headers.get("content-type")).toContain("application/json");
-      assertResponse(response.status === 204 ? null : await response.json(), interaction.response.body, interaction.response.matchers);
+      const responseBody = response.status === 204 ? null : await response.json();
+      assertResponse(responseBody, interaction.response.body, interaction.response.matchers);
+      if (["commitIntake", "recordSale", "deletePhysicalCopy"].includes(interaction.operation)) {
+        const owner = interaction.state === "foreign" ? "other-user" : "contract-user";
+        const detail = await (await t.fetch(`/collections/${targetID}`, {headers: headers(owner)})).json();
+        const remainingCopies = detail.cards.flatMap((card: any) => card.copies);
+        if (interaction.operation === "deletePhysicalCopy" && interaction.response.status === 204) {
+          expect(remainingCopies).toHaveLength(1);
+          expect(remainingCopies[0]).toMatchObject({id: siblingCopy, condition: "NM", acquisitionPrice: 3.5, storageLocation: "Box A", certNumber: "CERT-123"});
+        }
+        if (interaction.operation === "commitIntake") {
+          expect(remainingCopies).toHaveLength(interaction.response.status === 201 ? 1 : 0);
+          if (interaction.response.status === 201) {
+            expect(remainingCopies[0]).toMatchObject({condition: "LP", language: "EN", notes: "Reviewed real card"});
+            const replay = await t.fetch(actualPath, {method: "POST", headers: auth, body: JSON.stringify(actualBody)});
+            expect(replay.status).toBe(201);
+            const receipt = await replay.json();
+            expect(receipt.entryIds).toEqual([remainingCopies[0].id]);
+            expect(receipt.rows[0].entryIds).toEqual(receipt.entryIds);
+            const after = await (await t.fetch(`/collections/${targetID}`, {headers: headers(owner)})).json();
+            expect(after.cards.flatMap((card: any) => card.copies)).toHaveLength(1);
+          }
+        }
+        if (interaction.operation === "recordSale") {
+          if (interaction.response.status === 201) {
+            expect(responseBody.copyIds).toEqual([targetCopy]);
+            expect(responseBody.removedCopyIds).toEqual(actualBody.removeFromInventory ? [targetCopy] : []);
+            expect(remainingCopies).toHaveLength(1);
+            expect(remainingCopies[0]).toMatchObject({id: siblingCopy, condition: "NM", acquisitionPrice: 3.5});
+            const replay = await t.fetch(actualPath, {method: "POST", headers: auth, body: JSON.stringify(actualBody)});
+            expect(replay.status).toBe(201);
+            expect(await replay.json()).toEqual(responseBody);
+            const transactions = await (await t.fetch("/finance/transactions", {headers: auth})).json();
+            expect(transactions).toHaveLength(1);
+            expect(transactions[0]).toMatchObject({amount: 40, currency: "CAD"});
+          } else {
+            expect(remainingCopies).toHaveLength(interaction.state === "copies" ? 2 : 0);
+          }
+        }
+        if (interaction.state === "foreign-copy") {
+          const foreign = await (await t.fetch("/collections", {headers: headers("other-user")})).json();
+          expect(foreign.flatMap((binder: any) => binder.cards.flatMap((card: any) => card.copies))).toHaveLength(2);
+        }
+      }
       if (["addCopy", "updateCopy", "removeCopy"].includes(interaction.operation)) {
         const persisted = await (await t.fetch(`/collections/${targetID}`, {headers: headers(interaction.state === "foreign" ? "other-user" : "contract-user")})).json();
         const copies = persisted.cards.flatMap((card: any) => card.copies);

@@ -775,9 +775,10 @@ struct CollectionCardCopy: Identifiable, Codable, Hashable, Sendable {
     let language: String?
     let notes: String?
     let price: Double?
-    let acquisitionPrice: Double?
+    var acquisitionPrice: Double?
+    var acquisitionCurrency: String? = nil
     let serialNumber: String?
-    let acquiredAt: String?
+    var acquiredAt: String?
     let isFoil: Bool?
     var finishCode: String? = nil
     var finishLabel: String? = nil
@@ -1252,17 +1253,35 @@ struct RealizedPerformanceCurrency: Codable, Sendable {
     let averageHoldingDays: Int?
 }
 
+struct InventoryCostCurrency: Codable, Sendable {
+    let currency: String
+    let cost: Double
+}
+
 struct RealizedPerformance: Codable, Sendable {
     let byCurrency: [RealizedPerformanceCurrency]
     let inventoryCost: Double
     let inventoryMarketValue: Double
     let inventoryCurrency: String
     let truncated: Bool
+    var inventoryCostsByCurrency: [InventoryCostCurrency]? = nil
 }
 
 struct FinanceSummary: Codable, Sendable {
     let totalSpent: Double
     let totalEarned: Double
     let profitLoss: Double
+    let transactionCount: Int
+}
+
+struct FinanceCurrencySummary: Codable, Sendable {
+    let currency: String
+    let totalSpent: Double
+    let totalEarned: Double
+    let profitLoss: Double
+}
+
+struct FinanceSummaryByCurrency: Codable, Sendable {
+    let byCurrency: [FinanceCurrencySummary]
     let transactionCount: Int
 }

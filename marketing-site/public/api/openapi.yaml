@@ -279,6 +279,12 @@ paths:
                       $ref: "#/components/schemas/Card"
                   total:
                     type: integer
+                  failedProviders:
+                    type: array
+                    description: Games whose upstream lookup failed; results are incomplete when nonempty.
+                    items: { type: string }
+        "503":
+          description: Search is unavailable or incomplete; retry or select a single game.
         "400":
           $ref: "#/components/responses/ValidationError"
 
@@ -338,6 +344,12 @@ paths:
                       $ref: "#/components/schemas/Card"
                   total:
                     type: integer
+                  failedProviders:
+                    type: array
+                    description: Games whose upstream lookup failed; results are incomplete when nonempty.
+                    items: { type: string }
+        "503":
+          description: Search is unavailable or incomplete; retry or select a single game.
         "400":
           $ref: "#/components/responses/ValidationError"
 
@@ -630,7 +642,7 @@ paths:
           $ref: "#/components/responses/NotFound"
     delete:
       tags: [Collections]
-      summary: Remove a card from a binder
+      summary: Remove the entire same-printing group from a binder
       operationId: removeCardFromBinder
       security:
         - bearerAuth: []
@@ -1287,13 +1299,37 @@ paths:
     get:
       tags: [Finance]
       summary: List finance transactions
+      description: Returns up to 100 records, or up to 10 records for the specified collectionEntryId. Supported in full Convex and legacy hybrid mode.
       operationId: listFinanceTransactions
       security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: collectionEntryId
+          in: query
+          description: Filter by the stored physical-copy identity linked to the transaction.
+          schema: { type: string }
       responses:
-        "200": { description: Transaction list }
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TransactionResponse' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Finance]
       summary: Record a finance transaction
+      description: >-
+        Standalone ledger records are supported in both modes. In full Convex,
+        a purchase with collectionEntryId updates the owned copy's acquisition
+        amount, currency and date in the same transaction. Its quantity must
+        match the addressed physical copy. A matching existing purchase is
+        returned instead of duplicated; a different purchase for that copy is
+        rejected with 409 and should be edited with PATCH. Linked operations
+        require health.features.linkedAcquisitions to be explicitly true.
+        Hybrid rejects every collectionEntryId link with 501 before writing.
+        This route alone never removes sold inventory; use /finance/sales for
+        an atomic selected-copy sale and removal.
       operationId: createFinanceTransaction
       security: [{ bearerAuth: [] }, { sessionCookie: [] }]
       requestBody:
@@ -1302,30 +1338,176 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/CreateTransactionInput" }
       responses:
-        "201": { description: Transaction created }
+        "201":
+          description: Transaction created, or matching linked purchase returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionResponse' }
+        "400": { $ref: '#/components/responses/ValidationError' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { description: The physical copy already has a different linked purchase }
+        "501": { $ref: '#/components/responses/LinkedAcquisitionUnavailable' }
 
   /finance/transactions/{transactionId}:
+    parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Finance]
+      summary: Update a finance transaction and its linked acquisition
+      description: >-
+        Omitted fields preserve their values. Explicit null clears the nullable
+        metadata fields. The transaction type cannot be changed. For a linked
+        purchase in full Convex, amount, currency and date update the copy's
+        acquisition fields atomically. Moving or clearing the purchase link
+        clears its previous acquisition mapping and verifies ownership of the
+        new copy. Editing a historical purchase for a removed copy does not
+        recreate inventory. Hybrid returns 501 if the existing or requested
+        transaction has a collectionEntryId link, before any write.
+      operationId: updateFinanceTransaction
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateTransactionInput' }
+      responses:
+        "200":
+          description: Updated transaction
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionResponse' }
+        "400": { $ref: '#/components/responses/ValidationError' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { description: The requested copy already has another linked purchase }
+        "501": { $ref: '#/components/responses/LinkedAcquisitionUnavailable' }
     delete:
       tags: [Finance]
       summary: Delete a finance transaction
+      description: >-
+        In full Convex, deleting a linked purchase also clears the acquisition
+        fields it owns on the physical copy in the same transaction. A removed
+        copy is not recreated. Hybrid rejects deletion of linked records with
+        501. Deleting a sale ledger record does not reverse its inventory change.
       operationId: deleteFinanceTransaction
       security: [{ bearerAuth: [] }, { sessionCookie: [] }]
-      parameters:
-        - name: transactionId
-          in: path
-          required: true
-          schema: { type: string }
       responses:
         "204": { description: Transaction deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "501": { $ref: '#/components/responses/LinkedAcquisitionUnavailable' }
+
+  /finance/acquisition-cost-split:
+    post:
+      tags: [Finance]
+      summary: Allocate a purchase cost across owned copies atomically
+      description: >-
+        Available only in full Convex; clients require explicit
+        health.features.linkedAcquisitions. The operation records purchase
+        transactions and original acquisition costs together, preserving the
+        total in integer cents. Each copy must be owned and appear once, with
+        no existing linked purchase; each allocation must receive at least
+        one cent. Persist a stable operationId and frozen payload before
+        sending. When supplied, an identical retry returns the original receipt
+        and a changed payload returns 409. Omitting operationId retains legacy
+        non-replayable behavior. The receipt's auditId identifies the acquisition
+        allocation for collection-history undo, which reconciles its purchases
+        and copy snapshots together. Legacy hybrid does not mount this route.
+      operationId: splitAcquisitionCost
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcquisitionCostSplitInput' }
+      responses:
+        "201":
+          description: Committed or replayed allocation receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcquisitionCostSplitResult' }
+        "400": { $ref: '#/components/responses/ValidationError' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { description: Owned copy not found, or route unavailable in legacy hybrid mode }
+        "409": { description: Existing purchase, changed operation payload, or legacy state requiring review }
 
   /finance/summary:
     get:
       tags: [Finance]
-      summary: Get spending and earnings summary
+      summary: Get the legacy USD spending and earnings summary
+      description: >-
+        Money fields contain USD purchase/sale amounts only; trade records do
+        not add spending or earnings. No foreign-currency conversion is implied.
+        Use /finance/summary/by-currency for original-currency totals.
+        transactionCount counts records across all currencies, including trades.
+        Full Convex rejects more than 5000 USD transactions with
+        LIMIT_EXCEEDED instead of returning partial money totals; legacy hybrid
+        reads all transaction records.
       operationId: getFinanceSummary
       security: [{ bearerAuth: [] }, { sessionCookie: [] }]
       responses:
-        "200": { description: Finance summary }
+        "200":
+          description: USD-only money totals and total record count
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinanceSummary' }
+        "400": { description: LIMIT_EXCEEDED when the full Convex USD transaction scan exceeds 5000 records }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /finance/summary/by-currency:
+    get:
+      tags: [Finance]
+      summary: Get original-currency spending and earnings totals
+      description: >-
+        Supported in both modes. Purchase and sale amounts are grouped by
+        original currency without conversion; trade records only contribute to
+        the record count. Full Convex rejects more than 5000 transaction records
+        with LIMIT_EXCEEDED instead of silently returning partial totals;
+        legacy hybrid uses all records. This response has no truncation flag.
+      operationId: getFinanceSummaryByCurrency
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        "200":
+          description: Separate totals for each currency
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinanceSummaryByCurrency' }
+        "400": { description: LIMIT_EXCEEDED when the full Convex transaction scan exceeds 5000 records }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /finance/realized-performance:
+    get:
+      tags: [Finance]
+      summary: Get realized sale results and separate inventory references
+      description: >-
+        Full Convex only. Sale results remain grouped by original currency.
+        Inventory cost and market value are independent references: inventoryCost
+        includes explicit USD acquisition costs, while inventoryMarketValue
+        includes all recorded USD market values. These are different populations
+        and must not be subtracted to infer a portfolio profit. Original costs
+        are also grouped in inventoryCostsByCurrency, including UNKNOWN when a
+        legacy acquisition has no currency. periodDays filters sales, not current
+        inventory. Legacy hybrid does not mount this route.
+      operationId: getRealizedPerformance
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - name: periodDays
+          in: query
+          description: Include sales from the last specified number of days; omit for all sales within the response's bounded scan.
+          schema: { type: integer, minimum: 1, maximum: 3650 }
+      responses:
+        "200":
+          description: Sale metrics and current inventory references, with explicit scan truncation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RealizedPerformance' }
+        "400": { $ref: '#/components/responses/ValidationError' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { description: Route unavailable in legacy hybrid mode }
 
   /sealed/products:
     get:
@@ -1860,6 +2042,218 @@ paths:
 # ═══════════════════════════════════════════════════════════════════════
 # Components
 # ═══════════════════════════════════════════════════════════════════════
+  /collections/{binderId}/pages:
+    get:
+      tags: [Collections, Scanner]
+      summary: List saved binder pages and their current revisions
+      description: Returns owned binder pages in page-number order using the configured collections provider. Page images and reviewed positions are separate from physical-copy intake.
+      operationId: listBinderPages
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/binderId' }]
+      responses:
+        '200':
+          description: Saved pages in page-number order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BinderPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /collections/{binderId}/pages/{pageNumber}:
+    put:
+      tags: [Collections, Scanner]
+      summary: Create or replace reviewed binder-page positions
+      description: >-
+        Replaces the complete placements array while preserving an existing
+        image. The path supplies pageNumber; a body pageNumber does not override
+        it. capturedAt defaults to the current server time on each PUT. A new
+        page starts at revision 1 and every successful update advances revision,
+        including identical content. With explicit
+        health.features.binderPageRevisionGuards, clients may send expectedRevision
+        0 to create only, or a positive value that must match the existing page.
+        A stale or mismatched revision returns 409 without overwriting the page.
+        Omission retains legacy overwrite behavior. These revision checks are
+        not operation-ID replay receipts; after an unknown response, read the
+        current page and review its content before retrying a conflicting write.
+      operationId: upsertBinderPage
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/binderId'
+        - $ref: '#/components/parameters/pageNumber'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertBinderPageInput' }
+      responses:
+        '200':
+          description: Created or updated page with its new revision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BinderPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BinderPageRevisionConflict' }
+
+  /collections/{binderId}/pages/{pageNumber}/image:
+    parameters:
+      - $ref: '#/components/parameters/binderId'
+      - $ref: '#/components/parameters/pageNumber'
+    post:
+      tags: [Collections, Scanner]
+      summary: Attach or replace the image of an existing binder page
+      description: >-
+        Requires an existing owned page. Replaces the image and increments page
+        revision while preserving placements and capturedAt. If
+        health.features.binderPageRevisionGuards is explicitly true, send the
+        current positive expectedRevision to reject an intervening page or
+        image change atomically with 409. Omitting the field retains legacy
+        overwrite behavior. Use JPEG, PNG or WebP for portable clients; the
+        Prisma upload handler enforces those types and a 10 MiB file limit,
+        while the Convex route does not apply those application-level checks.
+        Deployment request limits still apply.
+      operationId: replaceBinderPageImage
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, format: binary }
+                expectedRevision:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                  description: Current page revision, serialized as a textual integer in the multipart field. Zero is not valid for image attachment.
+      responses:
+        '201':
+          description: Updated page with the attached image and advanced revision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BinderPage' }
+        '400': { description: Missing image or invalid page/revision input }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BinderPageRevisionConflict' }
+    delete:
+      tags: [Collections, Scanner]
+      summary: Remove a binder-page image and advance its revision
+      description: Clears only the image, preserving the page and placements. Advances revision even when the page has no image. This endpoint does not accept an expectedRevision guard; its revision change invalidates outstanding guarded PUT or image-POST attempts.
+      operationId: removeBinderPageImage
+      security: [{ bearerAuth: [] }, { sessionCookie: [] }]
+      responses:
+        '204': { description: Image cleared and page revision advanced }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Concurrent page change prevented the Prisma transaction from completing; refresh the page before retrying }
+
+  /collections/{binderId}/copies/{copyId}:
+    delete:
+      tags: [Collections]
+      summary: Delete exactly one physical copy
+      description: Preserves same-printing siblings. The older cards DELETE route removes the entire printing group. Percent-encode copy IDs, including legacy ordinal suffixes.
+      operationId: deletePhysicalCopy
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/binderId'
+        - name: copyId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Selected physical copy removed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Copy is committed to a deck or trade, or legacy data needs review }
+
+  /collections/{binderId}/intake:
+    post:
+      tags: [Collections, Scanner, Sealed]
+      summary: Commit reviewed real cards and return a durable receipt
+      description: Requires health.features.atomicIntake. Reusing an operationId with the same frozen payload returns the original receipt, including exact created copy IDs. A changed payload returns 409. A physical-opening request may atomically decrement owned sealed stock. Simulated pulls must not use this endpoint.
+      operationId: commitInventoryIntake
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/binderId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryIntakeRequest' }
+      responses:
+        '201':
+          description: Committed or replayed receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryIntakeReceipt' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Changed operation payload or insufficient sealed stock }
+        '501': { description: Provider does not support atomic intake; nothing changed }
+
+  /finance/sales:
+    post:
+      tags: [Finance]
+      summary: Record selected-copy sale and optional inventory removal atomically
+      description: Requires health.features.atomicSales. Persist the operationId and exact request before sending. Replay returns the same transaction and cannot charge the ledger twice. Every copy must belong to the requesting account and be available.
+      operationId: recordInventorySale
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventorySaleRequest' }
+      responses:
+        '201':
+          description: Committed or replayed sale receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventorySaleReceipt' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Unavailable copy or changed operation payload }
+        '501': { description: Provider does not support atomic sales; nothing changed }
+
+  /collections/normalize-copies:
+    post:
+      tags: [Collections]
+      summary: Preview or migrate the current account's legacy quantity rows
+      description: Export a backup first. Default is dryRun. Each batch is limited by row count and a 500-physical-copy budget. Commit batches until remaining is false. Stable original IDs and copy metadata are retained; ambiguous commitments or an oversized legacy row fail with an actionable conflict instead of discarding data. Dry-run entry IDs are preview addresses; commit returns durable copy IDs.
+      operationId: normalizePhysicalCopies
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dryRun: { type: boolean, default: true }
+                limit: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: Preview or completed batch for the current account
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dryRun, normalizedRows, createdCopies, entryIds, remaining]
+                properties:
+                  dryRun: { type: boolean }
+                  normalizedRows: { type: integer, minimum: 0 }
+                  createdCopies: { type: integer, minimum: 0 }
+                  entryIds: { type: array, items: { type: string } }
+                  remaining: { type: boolean }
+        '400': { description: Invalid migration options }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: Legacy state needs review; batch was not applied }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1897,6 +2291,14 @@ components:
       required: true
       schema:
         type: string
+    pageNumber:
+      name: pageNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 10000
     wishlistId:
       name: wishlistId
       in: path
@@ -1941,12 +2343,121 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    LinkedAcquisitionUnavailable:
+      description: Hybrid cannot commit a linked finance record and physical-copy acquisition together. No records changed. Requires explicit health.features.linkedAcquisitions from a full Convex server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BinderPageRevisionConflict:
+      description: The page changed or the expected revision did not match; no page overwrite occurred. Refresh and review the current page. Prisma uses PAGE_REVISION_CONFLICT and Convex uses CONFLICT in the error field.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
 
   schemas:
+    InventoryIntakeRequest:
+      type: object
+      required: [operationId, source, rows]
+      oneOf:
+        - properties:
+            source: { enum: [scanner] }
+          not:
+            anyOf:
+              - required: [sealedInventoryId]
+              - required: [openedQuantity]
+        - properties:
+            source: { enum: [physical-opening] }
+          anyOf:
+            - not: { required: [openedQuantity] }
+            - required: [sealedInventoryId]
+      properties:
+        operationId: { type: string, minLength: 1, maxLength: 200 }
+        source: { type: string, enum: [scanner, physical-opening] }
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 200
+          description: At most 500 physical copies total; each unique rowId identifies a reviewed row. Serialized/certified copies require quantity one.
+          items:
+            allOf:
+              - $ref: '#/components/schemas/AddCardInput'
+              - type: object
+                required: [rowId]
+                properties:
+                  rowId: { type: string, minLength: 1, maxLength: 200 }
+                  quantity: { type: integer, minimum: 1, maximum: 100 }
+        sealedInventoryId:
+          type: string
+          minLength: 1
+          description: Only valid for physical-opening. Identifies the owned sealed stock to decrement atomically.
+        openedQuantity:
+          type: integer
+          minimum: 1
+          maximum: 500
+          description: Only valid for physical-opening and requires sealedInventoryId. Defaults to one when sealed stock is linked and this field is omitted.
+        openedAt: { type: string, format: date-time }
+        notes: { type: string }
+    InventoryIntakeReceipt:
+      type: object
+      required: [operationId, entryIds, rows]
+      properties:
+        operationId: { type: string }
+        entryIds:
+          type: array
+          description: Exact created physical-copy IDs, in submitted row order. Replays return the original IDs.
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [rowId, entryIds]
+            properties:
+              rowId: { type: string }
+              entryIds: { type: array, items: { type: string } }
+        openingId: { type: string, description: Present when intake also committed a linked physical sealed opening. }
+    InventorySaleRequest:
+      type: object
+      required: [operationId, collectionId, copyIds, amount, currency, removeFromInventory]
+      properties:
+        operationId: { type: string, minLength: 1, maxLength: 200 }
+        collectionId: { type: string, minLength: 1 }
+        copyIds: { type: array, minItems: 1, maxItems: 500, uniqueItems: true, items: { type: string, minLength: 1 } }
+        amount: { type: number, minimum: 0, exclusiveMinimum: true }
+        currency: { type: string, pattern: '^[A-Za-z]{3}$', description: Original sale currency, normalized to uppercase. }
+        removeFromInventory: { type: boolean }
+        platform: { type: string }
+        costBasis: { type: number, minimum: 0 }
+        fees: { type: number, minimum: 0 }
+        shippingCost: { type: number, minimum: 0 }
+        acquiredAt: { type: string, format: date-time }
+        notes: { type: string }
+        date: { type: string, format: date-time }
+    InventorySaleReceipt:
+      type: object
+      required: [operationId, transactionId, copyIds, removedCopyIds, amount, currency]
+      properties:
+        operationId: { type: string }
+        transactionId: { type: string }
+        copyIds:
+          type: array
+          description: Exact durable identities of the selected copies. A legacy ordinal input may resolve to a different durable ID.
+          items: { type: string }
+        removedCopyIds:
+          type: array
+          description: The selected durable IDs when removal was requested; otherwise an empty array.
+          items: { type: string }
+        amount: { type: number }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+
     # ─── Enums & Primitives ──────────────────────────────────────────
     TcgCode:
       type: string
-      enum: [yugioh, magic, pokemon, onepiece, lorcana, dragonball]
+      minLength: 1
+      maxLength: 64
+      pattern: '^[a-z0-9][a-z0-9-]*$'
+      description: Stable game identifier. Built-in providers use yugioh, magic, pokemon, onepiece, lorcana and dragonball; owned records and installed community catalogs also accept validated custom identifiers.
     ScannerTcgCode:
       type: string
       enum: [yugioh, magic, pokemon]
@@ -1981,6 +2492,24 @@ components:
         automations: { type: boolean }
         shipments: { type: boolean }
         public: { type: boolean }
+        atomicSales:
+          type: boolean
+          description: Explicit support for replayable copy-specific inventory and finance sale commits. Missing means unsupported.
+        atomicIntake:
+          type: boolean
+          description: Explicit support for replayable reviewed intake and optional sealed-opening commits. Missing means unsupported.
+        tradeSettlement:
+          type: boolean
+          description: Explicit support for atomic inventory and finance trade settlement, distinct from listing trades.
+        linkedAcquisitions:
+          type: boolean
+          description: Explicit support for atomic linked purchase and owned-copy acquisition changes.
+        binderPageRevisionGuards:
+          type: boolean
+          description: Explicit support for optional expectedRevision checks on binder-page PUT and image POST. Missing means unsupported. Successful page updates and image changes advance revision. Available with either current collections provider.
+        emailDelivery:
+          type: boolean
+          description: False until a real delivery implementation is configured. Logging is not delivery.
 
     # ─── Error ───────────────────────────────────────────────────────
     ErrorResponse:
@@ -2146,16 +2675,287 @@ components:
       required: [type, amount]
       properties:
         type: { type: string, enum: [purchase, sale, trade] }
+        collectionEntryId:
+          type: string
+          description: Full Convex physical-copy link. A purchase synchronizes acquisitionPrice, acquisitionCurrency and acquiredAt with this owned copy atomically. Hybrid rejects nonempty links with 501.
         cardId: { type: string }
         externalId: { type: string }
         tcg: { type: string }
         cardName: { type: string }
         quantity: { type: integer, minimum: 1, default: 1 }
-        amount: { type: number }
-        currency: { type: string, default: USD }
+        amount:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Total transaction amount for all quantity units, in currency.
+        currency:
+          type: string
+          pattern: '^[A-Za-z]{3}$'
+          default: USD
+          description: Original transaction currency, normalized to uppercase. Supply it explicitly when recording an acquisition; the legacy default does not establish the currency of an existing unlabeled cost.
         platform: { type: string }
+        sourceUrl: { type: string, format: uri }
+        costBasis:
+          type: number
+          minimum: 0
+          description: Total original cost in transaction currency. Persisted by full Convex; legacy hybrid standalone finance does not retain this field.
+        fees:
+          type: number
+          minimum: 0
+          description: Fees in transaction currency. Persisted by full Convex; legacy hybrid standalone finance does not retain this field.
+        shippingCost:
+          type: number
+          minimum: 0
+          description: Shipping expense in transaction currency. Persisted by full Convex; legacy hybrid standalone finance does not retain this field.
+        acquiredAt:
+          type: string
+          format: date-time
+          description: Acquisition date used for sale holding-period metrics, retained only by full Convex. A linked purchase sets its copy's acquisition date from the transaction date field.
         notes: { type: string }
         date: { type: string, format: date-time }
+
+    UpdateTransactionInput:
+      type: object
+      description: Omitted fields are unchanged. Null clears nullable metadata. Type, costBasis, fees, shippingCost and acquiredAt are not editable through this PATCH contract.
+      properties:
+        collectionEntryId: { type: string, nullable: true }
+        cardId: { type: string, nullable: true }
+        externalId: { type: string, nullable: true }
+        tcg: { type: string, nullable: true }
+        cardName: { type: string, nullable: true }
+        quantity: { type: integer, minimum: 1 }
+        amount: { type: number, minimum: 0, exclusiveMinimum: true }
+        currency:
+          type: string
+          pattern: '^[A-Za-z]{3}$'
+          description: Original currency, normalized to uppercase.
+        platform: { type: string, nullable: true }
+        sourceUrl: { type: string, format: uri, nullable: true }
+        notes: { type: string, nullable: true }
+        date: { type: string, format: date-time }
+
+    TransactionResponse:
+      type: object
+      required: [id, type, quantity, amount, currency, date]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [purchase, sale, trade] }
+        collectionEntryId: { type: string }
+        cardId: { type: string }
+        externalId: { type: string }
+        cardName: { type: string }
+        tcg: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        amount: { type: number }
+        currency: { type: string }
+        platform: { type: string }
+        sourceUrl: { type: string }
+        costBasis: { type: number, minimum: 0, description: Full Convex only; original total cost in transaction currency. }
+        fees: { type: number, minimum: 0, description: Full Convex only. }
+        shippingCost: { type: number, minimum: 0, description: Full Convex only. }
+        acquiredAt: { type: string, format: date-time, description: Full Convex only. }
+        netProceeds:
+          type: number
+          description: Full Convex sale amount minus fees and shipping. May be negative.
+        realizedProfit:
+          type: number
+          description: Full Convex sale net proceeds minus known cost basis; omitted when cost basis is unknown.
+        holdingDays: { type: integer, minimum: 0, description: Full Convex only; days from acquiredAt to date when acquiredAt exists. }
+        notes: { type: string }
+        date: { type: string, format: date-time }
+
+    AcquisitionCostSplitInput:
+      type: object
+      required: [totalCents, currency, mode, lines]
+      description: >-
+        New clients supply currency and mode explicitly. The HTTP compatibility
+        route defaults missing currency to USD and non-weighted mode values to
+        equal. Each copy may occur once after resolving legacy IDs, and every
+        allocation must receive at least one cent. No currency conversion occurs.
+      oneOf:
+        - properties:
+            mode: { enum: [equal] }
+        - properties:
+            mode: { enum: [weighted] }
+            lines:
+              type: array
+              items:
+                type: object
+                required: [weight]
+      properties:
+        operationId:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Persist with the exact request before sending. Optional for legacy callers; only supplied IDs provide a durable replay receipt. Replay requires the same supplied payload, including currency casing and weights.
+        totalCents:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Total cost in hundredths of currency. Must be at least the number of lines, with at least one cent after weighted allocation to every copy.
+        currency: { type: string, pattern: '^[A-Za-z]{3}$' }
+        mode: { type: string, enum: [equal, weighted] }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [collectionEntryId]
+            properties:
+              collectionEntryId: { type: string }
+              weight:
+                type: number
+                minimum: 0
+                exclusiveMinimum: true
+                description: Required in weighted mode. All weights and their sum must be finite.
+        notes: { type: string }
+
+    AcquisitionCostSplitResult:
+      type: object
+      required: [allocationGroupId, totalCents, currency, auditId, allocations]
+      properties:
+        allocationGroupId: { type: string }
+        totalCents: { type: integer, minimum: 1 }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        auditId: { type: string, description: Acquisition allocation history entry used by collection undo. }
+        allocations:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [collectionEntryId, allocatedCents, acquisitionPrice, transactionId]
+            properties:
+              collectionEntryId: { type: string, description: Exact durable physical-copy identity. }
+              allocatedCents: { type: integer, minimum: 1 }
+              acquisitionPrice: { type: number, minimum: 0, description: Per-copy cost in currency, expressed in major units. }
+              transactionId: { type: string }
+
+    FinanceSummary:
+      type: object
+      required: [totalSpent, totalEarned, profitLoss, transactionCount]
+      properties:
+        totalSpent: { type: number, description: USD purchase amounts only. }
+        totalEarned: { type: number, description: USD sale amounts only. }
+        profitLoss: { type: number, description: USD earned minus spent; cash flow rather than an inventory-aware realized gain. }
+        transactionCount: { type: integer, minimum: 0, description: All transaction types and currencies. }
+
+    FinanceCurrencySummary:
+      type: object
+      required: [currency, totalSpent, totalEarned, profitLoss]
+      properties:
+        currency: { type: string }
+        totalSpent: { type: number }
+        totalEarned: { type: number }
+        profitLoss: { type: number, description: Earned minus spent in this currency; no FX conversion. }
+
+    FinanceSummaryByCurrency:
+      type: object
+      required: [byCurrency, transactionCount]
+      properties:
+        byCurrency:
+          type: array
+          items: { $ref: '#/components/schemas/FinanceCurrencySummary' }
+        transactionCount:
+          type: integer
+          minimum: 0
+          description: All transaction records, including trades. Full Convex rejects accounts above its 5000-record scan limit rather than returning a partial count.
+
+    RealizedSaleMetric:
+      type: object
+      required: [id, currency, quantity, date, revenue, fees, shippingCost, netProceeds]
+      properties:
+        id: { type: string }
+        cardName: { type: string }
+        tcg: { type: string }
+        platform: { type: string }
+        currency: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        date: { type: string, format: date-time }
+        revenue: { type: number }
+        costBasis: { type: number, minimum: 0 }
+        fees: { type: number, minimum: 0 }
+        shippingCost: { type: number, minimum: 0 }
+        netProceeds: { type: number, description: Revenue minus fees and shipping; may be negative. }
+        realizedProfit: { type: number, description: Net proceeds minus known cost basis; absent when cost basis is unknown. }
+        holdingDays: { type: integer, minimum: 0 }
+
+    RealizedPerformanceCurrency:
+      type: object
+      required: [currency, revenue, costBasis, fees, shippingCost, netProceeds, realizedProfit, saleCount, costedSaleCount]
+      properties:
+        currency: { type: string }
+        revenue: { type: number }
+        costBasis: { type: number, minimum: 0 }
+        fees: { type: number, minimum: 0 }
+        shippingCost: { type: number, minimum: 0 }
+        netProceeds: { type: number }
+        realizedProfit: { type: number, description: Sum for sales with known cost basis only. }
+        saleCount: { type: integer, minimum: 0 }
+        costedSaleCount: { type: integer, minimum: 0 }
+        averageHoldingDays: { type: number, minimum: 0 }
+
+    RealizedPerformanceBreakdown:
+      type: object
+      required: [key, currency, revenue, realizedProfit, saleCount]
+      properties:
+        key: { type: string, description: Platform or game label; missing values become Unspecified. }
+        currency: { type: string }
+        revenue: { type: number }
+        realizedProfit: { type: number, description: Sum for sales with known cost basis only. }
+        saleCount: { type: integer, minimum: 0 }
+
+    RealizedPerformance:
+      type: object
+      required: [byCurrency, byPlatform, byGame, recentSales, bestReturns, worstReturns, fastestSales, inventoryCost, inventoryMarketValue, inventoryCurrency, truncated]
+      properties:
+        byCurrency:
+          type: array
+          items: { $ref: '#/components/schemas/RealizedPerformanceCurrency' }
+        byPlatform:
+          type: array
+          items: { $ref: '#/components/schemas/RealizedPerformanceBreakdown' }
+        byGame:
+          type: array
+          items: { $ref: '#/components/schemas/RealizedPerformanceBreakdown' }
+        recentSales:
+          type: array
+          maxItems: 8
+          items: { $ref: '#/components/schemas/RealizedSaleMetric' }
+        bestReturns:
+          type: array
+          maxItems: 5
+          description: Ranked by numeric original-currency profit, with currency retained per sale. Not an FX-normalized comparison across currencies.
+          items: { $ref: '#/components/schemas/RealizedSaleMetric' }
+        worstReturns:
+          type: array
+          maxItems: 5
+          description: Ranked by numeric original-currency profit, with currency retained per sale. Not an FX-normalized comparison across currencies.
+          items: { $ref: '#/components/schemas/RealizedSaleMetric' }
+        fastestSales:
+          type: array
+          maxItems: 5
+          items: { $ref: '#/components/schemas/RealizedSaleMetric' }
+        inventoryCost:
+          type: number
+          description: Sum of explicit USD acquisition costs in the considered inventory; unknown and foreign acquisition currencies are excluded.
+        inventoryMarketValue:
+          type: number
+          description: Sum of recorded USD market values across the considered inventory, independently of acquisition currency or whether a cost exists. Not directly comparable to inventoryCost as a profit calculation.
+        inventoryCurrency: { type: string, enum: [USD] }
+        inventoryCostsByCurrency:
+          type: array
+          description: Present on current servers; optional for older-server compatibility. Separate original acquisition amounts, with UNKNOWN for missing legacy currency. No implicit USD label or conversion.
+          items:
+            type: object
+            required: [currency, cost]
+            properties:
+              currency: { type: string, description: Original currency or UNKNOWN. }
+              cost: { type: number }
+        truncated:
+          type: boolean
+          description: True if the newest-5000-transaction or 5000-inventory-entry bound was exceeded. periodDays filters sales inside that window.
 
     CreateSealedInventoryInput:
       type: object
@@ -2277,13 +3077,45 @@ components:
           type: array
           items:
             type: string
-            enum: [normal, reverse, holo, firstEdition]
+            minLength: 1
+          description: Provider finish codes, including community or newer variants; not restricted to the legacy normal/reverse/holo set.
         category:
           type: string
         regulationMark:
           type: string
         language:
           type: string
+        formatLegality:
+          type: object
+          additionalProperties: { type: boolean }
+        dexEntries:
+          type: array
+          items: { $ref: '#/components/schemas/PokedexEntry' }
+        region: { type: string }
+        worldChampionship:
+          $ref: '#/components/schemas/PokemonWorldChampionshipPrint'
+
+    PokemonWorldChampionshipPrint:
+      type: object
+      required: [year, playerName]
+      properties:
+        year: { type: integer, minimum: 2004 }
+        playerName: { type: string, minLength: 1 }
+        deckName: { type: string }
+        originalCollectorNumber: { type: string }
+        printedSignature: { type: boolean }
+        cardBack: { type: string }
+        borderStyle: { type: string }
+        stamp: { type: string }
+        sourceProductId: { type: string }
+        sourceUrl: { type: string }
+
+    PokedexEntry:
+      type: object
+      required: [number, name]
+      properties:
+        number: { type: integer, minimum: 1 }
+        name: { type: string }
 
     PokemonVariantFlags:
       type: object
@@ -2402,6 +3234,79 @@ components:
         colorHex:
           type: string
 
+    BinderPagePoint:
+      type: object
+      required: [x, y]
+      properties:
+        x: { type: number, minimum: 0, maximum: 1 }
+        y: { type: number, minimum: 0, maximum: 1 }
+
+    BinderPageQuad:
+      type: object
+      description: Four corners in normalized image coordinates, each from zero to one.
+      required: [topLeft, topRight, bottomRight, bottomLeft]
+      properties:
+        topLeft: { $ref: '#/components/schemas/BinderPagePoint' }
+        topRight: { $ref: '#/components/schemas/BinderPagePoint' }
+        bottomRight: { $ref: '#/components/schemas/BinderPagePoint' }
+        bottomLeft: { $ref: '#/components/schemas/BinderPagePoint' }
+
+    BinderPagePlacement:
+      type: object
+      required: [slotIndex, cardId, name, tcg, confidence, status, quad]
+      properties:
+        slotIndex: { type: integer, minimum: 0, maximum: 99 }
+        cardId: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        tcg: { $ref: '#/components/schemas/TcgCode' }
+        setCode: { type: string, minLength: 1 }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        status: { type: string, enum: [matched, uncertain] }
+        quad: { $ref: '#/components/schemas/BinderPageQuad' }
+
+    UpsertBinderPageInput:
+      type: object
+      required: [placements]
+      properties:
+        pageNumber:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          description: Optional compatibility field; the URL pageNumber is authoritative.
+        expectedRevision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+          description: Zero means create only; a positive value must equal the current page revision. Omit for legacy overwrite semantics. Only rely on this guard when the health capability is explicitly true.
+        capturedAt: { type: string, format: date-time }
+        placements:
+          type: array
+          maxItems: 100
+          description: Complete replacement list. An empty list is allowed.
+          items: { $ref: '#/components/schemas/BinderPagePlacement' }
+
+    BinderPage:
+      type: object
+      required: [id, binderId, pageNumber, revision, capturedAt, placements, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        binderId: { type: string }
+        pageNumber: { type: integer, minimum: 1, maximum: 10000 }
+        revision:
+          type: integer
+          minimum: 1
+          description: Starts at one and advances on successful PUT, image replacement or image deletion. Older servers without the revision capability may omit this field.
+        capturedAt: { type: string, format: date-time }
+        imageUrl:
+          type: string
+          description: Relative upload path or absolute storage URL, depending on the collections provider.
+        placements:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/BinderPagePlacement' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
     CollectionTagResponse:
       allOf:
         - $ref: "#/components/schemas/CollectionTag"
@@ -2431,11 +3336,32 @@ components:
           type: number
         acquisitionPrice:
           type: number
+        acquisitionCurrency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Original acquisition currency. Missing legacy currency is unknown and must not be labeled USD.
         serialNumber:
           type: string
         acquiredAt:
           type: string
           format: date-time
+        isFoil: { type: boolean }
+        finishCode: { type: string }
+        finishLabel: { type: string }
+        edition: { type: string }
+        stamp: { type: string }
+        isSealedPromo: { type: boolean }
+        isOversized: { type: boolean }
+        isPeelOff: { type: boolean }
+        isSigned: { type: boolean }
+        isAltered: { type: boolean }
+        gradingCompany: { type: string }
+        gradingScore: { type: string }
+        certNumber: { type: string }
+        storageLocation: { type: string }
+        imageUrls:
+          type: array
+          items: { type: string }
         tags:
           type: array
           items:
@@ -2542,20 +3468,84 @@ components:
       properties:
         name:
           type: string
+        printedName: { type: string }
+        searchAliases:
+          type: array
+          items: { type: string, minLength: 1 }
         tcg:
-          type: string
+          $ref: '#/components/schemas/TcgCode'
         externalId:
           type: string
+          minLength: 1
+        baseExternalId: { type: string, minLength: 1 }
+        printingKey: { type: string, minLength: 1 }
+        artworkId: { type: string, minLength: 1 }
+        printingKind: { type: string, minLength: 1 }
+        sanctionedPlayLegal: { type: boolean }
+        originalPrintingKey: { type: string, minLength: 1 }
         setCode:
           type: string
         setName:
           type: string
         rarity:
           type: string
+        collectorNumber: { type: string }
+        releasedAt: { type: string }
         imageUrl:
           type: string
         imageUrlSmall:
           type: string
+        setSymbolUrl: { type: string }
+        setLogoUrl: { type: string }
+        regulationMark: { type: string }
+        language: { type: string }
+        supertype: { type: string }
+        formatLegality:
+          type: object
+          properties:
+            standard: { type: boolean }
+            expanded: { type: boolean }
+        dexEntries:
+          type: array
+          items: { $ref: '#/components/schemas/PokedexEntry' }
+        region: { type: string }
+        pokemonPrint:
+          $ref: '#/components/schemas/PokemonPrintMetadata'
+        attributes:
+          type: object
+          additionalProperties: true
+        provenance:
+          type: object
+          required: [source]
+          properties:
+            source: { type: string, minLength: 1 }
+            sourceId: { type: string }
+            fetchedAt: { type: string }
+            schemaVersion: { type: string }
+        legalityPeriods:
+          type: array
+          items:
+            type: object
+            required: [format, legal]
+            properties:
+              format: { type: string, minLength: 1 }
+              rotation: { type: string }
+              validFrom: { type: string }
+              validTo: { type: string }
+              legal: { type: boolean }
+        evolution:
+          type: object
+          properties:
+            evolvesFrom: { type: string }
+            evolvesTo:
+              type: array
+              items: { type: string }
+        functionalIdentity:
+          type: object
+          required: [key]
+          properties:
+            key: { type: string, minLength: 1 }
+            normalizedRules: { type: string, nullable: true }
 
     TagPayload:
       type: object
@@ -2571,6 +3561,7 @@ components:
     AddCardInput:
       type: object
       required: [cardId]
+      description: Reviewed printing and physical-copy metadata. cardData supplies the exact game-qualified snapshot when cardId is not an existing server card. No acquisition currency is inferred for an unlabeled acquisitionPrice.
       properties:
         cardId:
           type: string
@@ -2578,22 +3569,45 @@ components:
         quantity:
           type: integer
           minimum: 1
+          maximum: 500
           default: 1
         condition:
           type: string
+          minLength: 1
+          description: Recognized grading condition or alias, matched case-insensitively after trimming (for example Near Mint/NM, Lightly Played/LP, Moderately Played/MP, Heavily Played/HP or Damaged/DMG).
         language:
           type: string
         notes:
           type: string
         price:
           type: number
+          description: Stored market-value reference in USD; independent of original acquisition cost.
         acquisitionPrice:
           type: number
+          minimum: 0
+        acquisitionCurrency:
+          type: string
+          pattern: '^[A-Za-z]{3}$'
+          description: Original acquisition currency, normalized to uppercase when present. Missing means unknown, never an implicit USD value.
         serialNumber:
           type: string
         acquiredAt:
           type: string
           format: date-time
+        isFoil: { type: boolean }
+        finishCode: { type: string, minLength: 1 }
+        finishLabel: { type: string, minLength: 1 }
+        edition: { type: string, minLength: 1 }
+        stamp: { type: string, minLength: 1 }
+        isSealedPromo: { type: boolean }
+        isOversized: { type: boolean }
+        isPeelOff: { type: boolean }
+        isSigned: { type: boolean }
+        isAltered: { type: boolean }
+        gradingCompany: { type: string, minLength: 1 }
+        gradingScore: { type: string, minLength: 1 }
+        certNumber: { type: string, minLength: 1 }
+        storageLocation: { type: string, minLength: 1 }
         tags:
           type: array
           items:
@@ -2607,11 +3621,22 @@ components:
 
     UpdateCardInput:
       type: object
-      description: At least one field must be provided
+      minProperties: 1
+      description: At least one recognized field must be provided. Omitted fields preserve values. Nullable fields may be cleared with null. Acquisition fields of a copy with a linked purchase must be edited through the finance transaction API so inventory and ledger stay consistent.
       properties:
+        acquisitionPrice:
+          type: number
+          minimum: 0
+          nullable: true
+        acquisitionCurrency:
+          type: string
+          nullable: true
+          pattern: '^[A-Za-z]{3}$'
+          description: Original acquisition currency, normalized to uppercase; null clears it to unknown.
         condition:
           type: string
           nullable: true
+          description: Recognized grading condition or alias, matched case-insensitively. Null or the empty string clears the condition.
         language:
           type: string
           nullable: true
@@ -2625,9 +3650,24 @@ components:
           type: string
           format: date-time
           nullable: true
+        isFoil: { type: boolean }
+        finishCode: { type: string, minLength: 1, nullable: true }
+        finishLabel: { type: string, minLength: 1, nullable: true }
+        edition: { type: string, minLength: 1, nullable: true }
+        stamp: { type: string, minLength: 1, nullable: true }
+        isSealedPromo: { type: boolean }
+        isOversized: { type: boolean }
+        isPeelOff: { type: boolean }
+        isSigned: { type: boolean }
+        isAltered: { type: boolean }
+        gradingCompany: { type: string, minLength: 1, nullable: true }
+        gradingScore: { type: string, minLength: 1, nullable: true }
+        certNumber: { type: string, minLength: 1, nullable: true }
+        storageLocation: { type: string, minLength: 1, nullable: true }
         quantity:
           type: integer
           minimum: 1
+          maximum: 500
         tags:
           type: array
           items:
@@ -2639,6 +3679,11 @@ components:
         targetBinderId:
           type: string
           minLength: 1
+        scope:
+          type: string
+          enum: [card, copy]
+          default: copy
+          description: A targetBinderId move affects only this copy by default. Use card explicitly to move the printing group; a printing correction still targets only the addressed copy.
         cardOverride:
           type: object
           required: [cardId]

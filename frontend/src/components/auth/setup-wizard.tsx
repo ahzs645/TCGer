@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { signUp, signIn } from "@/lib/auth-client";
+import { authClient, signUp, signIn } from "@/lib/auth-client";
+import { beginAuthAction } from "@/lib/auth-lifecycle";
 import { toAuthUser } from "@/lib/auth-helpers";
 import { promoteToAdmin } from "@/lib/api/auth";
-import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,10 +22,11 @@ export function SetupWizard() {
   const [loading, setLoading] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false);
 
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const submitting = useRef(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setError("");
     const normalizedUsername = username.trim();
 
@@ -35,12 +36,20 @@ export function SetupWizard() {
     }
 
     setLoading(true);
+    submitting.current = true;
+    const attempt = beginAuthAction("signin");
 
     try {
-      const result = await signIn.username({
-        username: normalizedUsername,
-        password,
+      const result = await attempt.run(async () => {
+        const response = await signIn.username({
+          username: normalizedUsername,
+          password,
+        });
+        attempt.assertCurrent();
+        if (!response.error && response.data) await promoteToAdmin();
+        return response;
       });
+      attempt.assertCurrent();
 
       if (result.error) {
         setError(result.error.message ?? "Login failed");
@@ -48,24 +57,29 @@ export function SetupWizard() {
         return;
       }
 
-      // Promote to admin after login
-      await promoteToAdmin();
-
       if (result.data) {
         const user = toAuthUser(result.data.user as Record<string, unknown>);
         user.isAdmin = true;
-        setAuth(user, result.data.token ?? undefined);
+        attempt.accept(user, result.data.token ?? undefined);
+        authClient.$store.notify("$sessionSignal");
       }
 
       router.push("/collections");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-      setLoading(false);
+      if (attempt.current())
+        setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      submitting.current = false;
+      if (attempt.current()) {
+        attempt.finish();
+        setLoading(false);
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setError("");
     const normalizedUsername = username.trim();
     const normalizedEmail = email.trim().toLowerCase();
@@ -91,15 +105,23 @@ export function SetupWizard() {
     }
 
     setLoading(true);
+    submitting.current = true;
+    const attempt = beginAuthAction("signin");
 
     try {
       // Step 1: Sign up via Better Auth
-      const result = await signUp.email({
-        email: normalizedEmail,
-        password,
-        name: normalizedUsername,
-        username: normalizedUsername,
+      const result = await attempt.run(async () => {
+        const response = await signUp.email({
+          email: normalizedEmail,
+          password,
+          name: normalizedUsername,
+          username: normalizedUsername,
+        });
+        attempt.assertCurrent();
+        if (!response.error && response.data) await promoteToAdmin();
+        return response;
       });
+      attempt.assertCurrent();
 
       if (result.error) {
         setError(result.error.message ?? "Setup failed");
@@ -107,19 +129,23 @@ export function SetupWizard() {
         return;
       }
 
-      // Step 2: Promote the new user to admin
-      await promoteToAdmin();
-
       if (result.data) {
         const user = toAuthUser(result.data.user as Record<string, unknown>);
         user.isAdmin = true;
-        setAuth(user, result.data.token ?? undefined);
+        attempt.accept(user, result.data.token ?? undefined);
+        authClient.$store.notify("$sessionSignal");
       }
 
       router.push("/collections");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Setup failed");
-      setLoading(false);
+      if (attempt.current())
+        setError(err instanceof Error ? err.message : "Setup failed");
+    } finally {
+      submitting.current = false;
+      if (attempt.current()) {
+        attempt.finish();
+        setLoading(false);
+      }
     }
   };
 

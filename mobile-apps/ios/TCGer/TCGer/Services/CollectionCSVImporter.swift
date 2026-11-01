@@ -96,7 +96,7 @@ enum CollectionCSVImporter {
 
     private enum Column: CaseIterable {
         case tcg, externalId, cardName, collectorNumber, setCode, setName, rarity
-        case binderName, quantity, condition, language, notes, price, acquisitionPrice
+        case binderName, quantity, condition, language, notes, price, acquisitionPrice, acquisitionCurrency
         case serialNumber, acquiredAt, isFoil, finishCode, isSigned, isAltered, tags
 
         /// Normalized header spellings this column accepts.
@@ -116,6 +116,7 @@ enum CollectionCSVImporter {
             case .notes: return ["notes", "note", "comment", "comments"]
             case .price: return ["price", "value", "marketprice"]
             case .acquisitionPrice: return ["acquisitionprice", "purchaseprice", "paidprice", "paid", "cost"]
+            case .acquisitionCurrency: return ["acquisitioncurrency", "purchasecurrency", "costcurrency"]
             case .serialNumber: return ["serialnumber", "serial"]
             case .acquiredAt: return ["acquiredat", "purchasedate", "acquired", "datepurchased"]
             case .isFoil: return ["isfoil", "foil", "holo", "isholo"]
@@ -213,6 +214,10 @@ enum CollectionCSVImporter {
                 issue(row: rowNumber, field: "acquisition_price", message: "Acquisition price is not a number.")
             )
         }
+        let acquisitionCurrency = value(.acquisitionCurrency)?.uppercased()
+        if let acquisitionCurrency, acquisitionCurrency.range(of: "^[A-Z]{3}$", options: .regularExpression) == nil {
+            rowIssues.append(issue(row: rowNumber, field: "acquisition_currency", message: "Use a three-letter acquisition currency such as CAD or USD."))
+        }
 
         guard rowIssues.isEmpty else { return .failure(rowIssues) }
 
@@ -250,6 +255,7 @@ enum CollectionCSVImporter {
             notes: value(.notes),
             price: price ?? card.price,
             acquisitionPrice: acquisitionPrice,
+            acquisitionCurrency: acquisitionCurrency,
             serialNumber: value(.serialNumber),
             acquiredAt: value(.acquiredAt),
             isFoil: PokemonFinishOption.isFoil(finishCode),
@@ -280,9 +286,16 @@ enum CollectionCSVImporter {
             row.condition?.lowercased() ?? "",
             row.language?.lowercased() ?? "",
             parsed.finishCode?.lowercased() ?? "",
+            row.notes ?? "",
+            row.price.map { String($0) } ?? "",
+            row.acquisitionPrice.map { String($0) } ?? "",
+            row.acquisitionCurrency ?? "",
+            row.serialNumber ?? "",
+            row.acquiredAt ?? "",
+            row.tags.sorted().map { "\($0.utf8.count):\($0)" }.joined(),
             row.isSigned ? "signed" : "",
             row.isAltered ? "altered" : ""
-        ].joined(separator: "|")
+        ].map { "\($0.utf8.count):\($0)" }.joined()
     }
 
     private static func combine(_ existing: ParsedRow, with addition: ParsedRow) -> ParsedRow {
@@ -302,6 +315,7 @@ enum CollectionCSVImporter {
             notes: row.notes ?? addition.row.notes,
             price: row.price ?? addition.row.price,
             acquisitionPrice: row.acquisitionPrice ?? addition.row.acquisitionPrice,
+            acquisitionCurrency: row.acquisitionCurrency ?? addition.row.acquisitionCurrency,
             serialNumber: row.serialNumber ?? addition.row.serialNumber,
             acquiredAt: row.acquiredAt ?? addition.row.acquiredAt,
             isFoil: row.isFoil,

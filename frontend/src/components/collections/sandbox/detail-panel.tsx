@@ -63,6 +63,7 @@ import {
   getPokemonFinishOptions,
   POKEMON_FINISH_CATALOG,
 } from "@/lib/pokemon-variants";
+import { CopyInventoryActions } from "@/components/collections/copy-inventory-actions";
 import { CardAcquisitionEditor } from "@/components/collections/card-acquisition-editor";
 
 const GAME_LABELS: Record<string, string> = {
@@ -1194,6 +1195,12 @@ export function DetailPanel(props: DetailPanelProps) {
           printSelectionDisabled={printSelectionDisabled}
           data-oid="yhtsmuh"
         />
+        <CopyInventoryActions
+          key={selectedCopy?.id}
+          card={card}
+          copy={selectedCopy}
+          binderId={card.binderId ?? draftBinderId}
+        />
         <CardAcquisitionEditor
           card={card}
           copy={selectedCopy}
@@ -1422,6 +1429,12 @@ export function MobileDetailDrawer(props: DetailPanelProps) {
               printSelectionLabel={printSelectionLabel}
               printSelectionDisabled={printSelectionDisabled}
               data-oid="eju_4_-"
+            />
+            <CopyInventoryActions
+              key={selectedCopy?.id}
+              card={card}
+              copy={selectedCopy}
+              binderId={card.binderId ?? draftBinderId}
             />
             <CardAcquisitionEditor
               card={card}

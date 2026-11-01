@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { ServerFeatures } from "@tcg/api-types";
 
 import { API_BASE_URL } from "./base-url";
+import { subscribePrivateSession } from "@/lib/private-session";
 
 import {
   createServerFeatureCache,
@@ -27,6 +28,9 @@ const serverFeatureCache = createServerFeatureCache(async () => {
     clearTimeout(timeout);
   }
 });
+// Demo/server switches and account replacements must not reuse operation
+// capabilities from the previous connection while a new health check is pending.
+subscribePrivateSession(() => serverFeatureCache.reset());
 
 export function useServerFeatures(): FeatureAvailability {
   const [features, setFeatures] =

@@ -40,6 +40,7 @@ const CLEARABLE_FIELDS = [
   "notes",
   "serialNumber",
   "acquiredAt",
+  "acquisitionCurrency",
   "finishCode",
   "finishLabel",
   "edition",
@@ -83,6 +84,7 @@ export type CopyFields = Partial<
     | "notes"
     | "price"
     | "acquisitionPrice"
+    | "acquisitionCurrency"
     | "serialNumber"
     | "acquiredAt"
     | "isFoil"

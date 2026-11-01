@@ -24,6 +24,7 @@ export const portableCopySchema = z
     condition: conditionValueSchema.nullish(),
     price,
     acquisitionPrice: price,
+    acquisitionCurrency: z.string().trim().regex(/^[A-Za-z]{3}$/).transform(value => value.toUpperCase()).nullish(),
     details: z
       .object({
         language: optionalText,
@@ -171,6 +172,7 @@ export function normalizePortableBackup(input: unknown): PortableBackup {
             condition: copy.condition,
             price: copy.price,
             acquisitionPrice: copy.acquisitionPrice,
+            acquisitionCurrency: copy.acquisitionCurrency,
             details: Object.fromEntries(
               Object.entries(copy).filter(([, value]) => value !== null),
             ),

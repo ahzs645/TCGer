@@ -209,6 +209,8 @@ struct AddWishlistRuleSheet: View {
 
     @MainActor
     private func submit() async {
+        guard !isWorking else { return }
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
             return
@@ -216,13 +218,14 @@ struct AddWishlistRuleSheet: View {
 
         isWorking = true
         errorMessage = nil
-        defer { isWorking = false }
+        defer { if environmentStore.matches(session) { isWorking = false } }
 
         let sync = WishlistSyncService(
             apiService: apiService,
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token,
-            enabledGames: environmentStore.enabledGames
+            enabledGames: environmentStore.enabledGames,
+            isCurrent: { environmentStore.matches(session) }
         )
 
         let now = ISO8601DateFormatter().string(from: Date())
@@ -268,13 +271,15 @@ struct AddWishlistRuleSheet: View {
                 to: wishlist,
                 recordSync: false,
                 onProgress: { message in
+                    guard environmentStore.matches(session) else { return }
                     statusMessage = message
                 }
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
 
             if keepUpdated {
                 _ = try await apiService.addWishlistRule(
-                    config: environmentStore.serverConfiguration,
+                    config: session.configuration,
                     token: token,
                     wishlistId: wishlist.id,
                     type: draft.type,
@@ -285,6 +290,7 @@ struct AddWishlistRuleSheet: View {
                     includeAllPrintings: draft.includeAllPrintings,
                     autoSync: true
                 )
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             }
 
             HapticManager.notification(.success)
@@ -293,8 +299,10 @@ struct AddWishlistRuleSheet: View {
                 ? "Already tracking every match."
                 : "Added \(added.count) card\(added.count == 1 ? "" : "s")."
             try? await Task.sleep(for: .seconds(1))
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             dismiss()
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
             statusMessage = nil
         }

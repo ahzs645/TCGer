@@ -13,6 +13,7 @@ import {
   appendCollectionAudit,
   snapshotAuditEntries
 } from "./collectionAudit";
+import { assertAcquisitionMetadataEditable, assertInventoryAvailable, normalizeAcquisitionCurrency, normalizePhysicalCopies } from "./inventoryAvailability";
 import { formatCollectionCopyCount } from "./copyLabels";
 
 type ReaderCtx = QueryCtx | MutationCtx;
@@ -27,6 +28,7 @@ export const addEntryArgs = {
   notes: v.optional(v.string()),
   price: v.optional(v.number()),
   acquisitionPrice: v.optional(v.number()),
+  acquisitionCurrency: v.optional(v.string()),
   serialNumber: v.optional(v.string()),
   acquiredAt: v.optional(v.string()),
   isFoil: v.optional(v.boolean()),
@@ -47,12 +49,13 @@ export const addEntryArgs = {
   newTags: v.optional(v.array(tagInputValidator))
 };
 
-const bulkAddCopyFields = {
+export const bulkAddCopyFields = {
   condition: v.optional(v.string()),
   language: v.optional(v.string()),
   notes: v.optional(v.string()),
   price: v.optional(v.number()),
   acquisitionPrice: v.optional(v.number()),
+  acquisitionCurrency: v.optional(v.string()),
   serialNumber: v.optional(v.string()),
   acquiredAt: v.optional(v.string()),
   isFoil: v.optional(v.boolean()),
@@ -104,6 +107,7 @@ export const updateEntryArgs = {
   notes: v.optional(v.string()),
   price: v.optional(v.number()),
   acquisitionPrice: v.optional(v.number()),
+  acquisitionCurrency: v.optional(v.string()),
   serialNumber: v.optional(v.string()),
   acquiredAt: v.optional(v.string()),
   isFoil: v.optional(v.boolean()),
@@ -348,6 +352,7 @@ export async function hydrateEntry(ctx: ReaderCtx, entry: Doc<"collectionEntries
     notes: entry.notes,
     price: entry.price,
     acquisitionPrice: entry.acquisitionPrice,
+    acquisitionCurrency: entry.acquisitionCurrency,
     serialNumber: entry.serialNumber,
     acquiredAt: entry.acquiredAt,
     isFoil: entry.isFoil,
@@ -423,6 +428,7 @@ export async function addEntryForViewer(
     notes?: string;
     price?: number;
     acquisitionPrice?: number;
+    acquisitionCurrency?: string;
     serialNumber?: string;
     acquiredAt?: string;
     isFoil?: boolean;
@@ -447,10 +453,10 @@ export async function addEntryForViewer(
   const timestamp = now();
   const cardId = await upsertCard(ctx, args.card);
   const quantity = args.quantity ?? 1;
-  if (!Number.isInteger(quantity) || quantity < 1) {
+  if (quantity !== 1) {
     throw new ConvexError({
       code: "BAD_REQUEST",
-      message: "quantity must be a positive integer"
+      message: "A collection entry represents one physical copy; create multiple entries for larger quantities"
     });
   }
 
@@ -466,6 +472,7 @@ export async function addEntryForViewer(
     notes: args.notes,
     price: args.price,
     acquisitionPrice: args.acquisitionPrice,
+    acquisitionCurrency: normalizeAcquisitionCurrency(args.acquisitionCurrency),
     serialNumber: args.serialNumber,
     acquiredAt: args.acquiredAt,
     isFoil: args.isFoil,
@@ -513,6 +520,7 @@ export async function bulkAddForViewer(
       notes?: string;
       price?: number;
       acquisitionPrice?: number;
+    acquisitionCurrency?: string;
       serialNumber?: string;
       acquiredAt?: string;
       isFoil?: boolean;
@@ -543,6 +551,7 @@ export async function bulkAddForViewer(
         notes?: string;
         price?: number;
         acquisitionPrice?: number;
+    acquisitionCurrency?: string;
         serialNumber?: string;
         acquiredAt?: string;
         isFoil?: boolean;
@@ -661,6 +670,7 @@ export async function bulkAddForViewer(
         notes: row.notes,
         price: row.price,
         acquisitionPrice: row.acquisitionPrice,
+        acquisitionCurrency: normalizeAcquisitionCurrency(row.acquisitionCurrency),
         serialNumber: row.serialNumber,
         acquiredAt: row.acquiredAt,
         isFoil: row.isFoil,
@@ -731,6 +741,7 @@ export async function updateEntryForViewer(
     notes?: string;
     price?: number;
     acquisitionPrice?: number;
+    acquisitionCurrency?: string;
     serialNumber?: string;
     acquiredAt?: string;
     isFoil?: boolean;
@@ -751,7 +762,7 @@ export async function updateEntryForViewer(
     newTags?: Array<{ label: string; colorHex: string }>;
   }
 ) {
-  const entry = await ctx.db.get(args.entryId);
+  let entry = await ctx.db.get(args.entryId);
   if (!entry || entry.userId !== userId) {
     throw new ConvexError({
       code: "NOT_FOUND",
@@ -759,10 +770,14 @@ export async function updateEntryForViewer(
     });
   }
 
+  await normalizePhysicalCopies(ctx, entry);
+  entry = (await ctx.db.get(args.entryId))!;
+  await assertAcquisitionMetadataEditable(ctx, entry, args);
+  if (args.binderId || args.quantity !== undefined || args.storageLocation !== undefined) await assertInventoryAvailable(ctx, entry);
   if (args.binderId) {
     await requireBinderForUser(ctx, args.binderId, userId);
   }
-  if (args.quantity !== undefined && (!Number.isInteger(args.quantity) || args.quantity < 1)) {
+  if (args.quantity !== undefined && (!Number.isInteger(args.quantity) || args.quantity < 1 || args.quantity > 500)) {
     throw new ConvexError({
       code: "BAD_REQUEST",
       message: "quantity must be a positive integer"
@@ -771,12 +786,13 @@ export async function updateEntryForViewer(
 
   await ctx.db.patch(entry._id, {
     binderId: args.binderId ?? entry.binderId,
-    quantity: args.quantity ?? entry.quantity,
+    quantity: 1,
     condition: args.condition ?? entry.condition,
     language: args.language ?? entry.language,
     notes: args.notes ?? entry.notes,
     price: args.price ?? entry.price,
     acquisitionPrice: args.acquisitionPrice ?? entry.acquisitionPrice,
+    acquisitionCurrency: normalizeAcquisitionCurrency(args.acquisitionCurrency) ?? entry.acquisitionCurrency,
     serialNumber: args.serialNumber ?? entry.serialNumber,
     acquiredAt: args.acquiredAt ?? entry.acquiredAt,
     isFoil:
@@ -827,6 +843,22 @@ export async function updateEntryForViewer(
       message: "Collection entry disappeared during update"
     });
   }
+  if (args.quantity !== undefined) {
+    const group = await ctx.db.query("collectionEntries").withIndex("by_binder_and_card", q => q.eq("binderId", updated.binderId).eq("cardId", updated.cardId)).take(501);
+    if (group.length > 500 || args.quantity > 500) throw new ConvexError({ code: "BAD_REQUEST", message: "A printing group may contain at most 500 copies in a single operation" });
+    for (const sibling of group) await normalizePhysicalCopies(ctx, sibling);
+    const normalized = await ctx.db.query("collectionEntries").withIndex("by_binder_and_card", q => q.eq("binderId", updated.binderId).eq("cardId", updated.cardId)).take(501);
+    if (args.quantity > normalized.length) {
+      const card = (await ctx.db.get(updated.cardId))!;
+      const assignments = await ctx.db.query("collectionEntryTags").withIndex("by_entry", q => q.eq("entryId", updated._id)).take(101);
+      for (let index = normalized.length; index < args.quantity; index += 1) {
+        const copy = await addEntryForViewer(ctx, userId, { ...updated, card, quantity: 1, tagIds: assignments.map(row => row.tagId) });
+        await ctx.db.patch(copy.id, { imageUrls: updated.imageUrls, imageStorageIds: updated.imageStorageIds });
+      }
+    } else {
+      for (const sibling of normalized.filter(row => row._id !== updated._id).slice(0, normalized.length - args.quantity)) await removeEntryForViewer(ctx, userId, sibling._id);
+    }
+  }
   return await hydrateEntry(ctx, updated);
 }
 
@@ -842,6 +874,10 @@ export async function removeEntryForViewer(
       message: "Collection entry not found"
     });
   }
+  await assertInventoryAvailable(ctx, entry);
+  const placements = await ctx.db.query("storagePlacements").withIndex("by_entry", q => q.eq("collectionEntryId", entryId)).take(501);
+  if (placements.length > 500) throw new ConvexError({ code: "LIMIT_EXCEEDED", message: "Too many placements" });
+  for (const placement of placements) await ctx.db.delete(placement._id);
   const assignments = await ctx.db
     .query("collectionEntryTags")
     .withIndex("by_entry", (q) => q.eq("entryId", entryId))

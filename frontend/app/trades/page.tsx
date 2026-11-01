@@ -51,6 +51,7 @@ import { useAuthStore } from "@/stores/auth";
 import { formatMoney } from "@/lib/format-money";
 import { PageHeader } from "@/components/layout/page-header";
 import { useCollectionsStore } from "@/stores/collections";
+import { useServerFeatures } from "@/lib/api/health";
 
 type StatusKey = "pending" | "accepted" | "declined";
 
@@ -92,6 +93,8 @@ export default function TradesPage() {
 
   const { token, user, isAuthenticated } = useAuthStore();
   const userId = user?.id;
+  const serverFeatures = useServerFeatures();
+  const canSettleTrades = serverFeatures.tradeSettlement === true;
   const queryClient = useQueryClient();
   const fetchCollections = useCollectionsStore((state) => state.fetchCollections);
 
@@ -106,7 +109,10 @@ export default function TradesPage() {
     void queryClient.invalidateQueries({ queryKey: ["trades"] });
 
   const acceptMutation = useMutation({
-    mutationFn: (id: string) => acceptTrade(token!, id),
+    mutationFn: (id: string) => {
+      if (!canSettleTrades) throw new Error("This server does not support atomic trade settlement. The trade has not changed.");
+      return acceptTrade(token!, id);
+    },
     onSuccess: async () => {
       invalidate();
       await Promise.all([
@@ -269,6 +275,7 @@ export default function TradesPage() {
                     key={trade.id}
                     trade={trade}
                     userId={userId}
+                    canSettle={canSettleTrades}
                     onAccept={async () => {
                       const ok = await confirm({
                         title: "Settle this trade now?",
@@ -321,6 +328,7 @@ function TradeRow({
   onDecline,
   onCancel,
   busy,
+  canSettle,
 }: {
   trade: TradeResponse;
   userId?: string;
@@ -328,6 +336,7 @@ function TradeRow({
   onDecline: () => void;
   onCancel: () => void;
   busy: boolean;
+  canSettle: boolean;
 }) {
   const iAmSender = trade.senderId === userId;
   const giveSide = iAmSender ? "sender" : "receiver";
@@ -419,7 +428,7 @@ function TradeRow({
                   <X className="mr-1 h-4 w-4" />
                   Decline
                 </Button>
-                <Button size="sm" onClick={onAccept} disabled={busy}>
+                <Button size="sm" onClick={onAccept} disabled={busy || !canSettle} title={canSettle ? undefined : "This server does not support atomic trade settlement"}>
                   <Check className="mr-1 h-4 w-4" />
                   Accept
                 </Button>

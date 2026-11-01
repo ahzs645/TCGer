@@ -236,6 +236,7 @@ model Collection {
   notes            String?
   price            Decimal?  @db.Decimal(10, 2)
   acquisitionPrice Decimal?  @db.Decimal(10, 2)
+  acquisitionCurrency String?
   isFoil           Boolean   @default(false)
   finishCode       String?
   finishLabel      String?

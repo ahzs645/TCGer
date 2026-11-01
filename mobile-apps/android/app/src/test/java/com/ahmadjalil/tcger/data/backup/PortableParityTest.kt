@@ -1,12 +1,38 @@
 package com.ahmadjalil.tcger.data.backup
 
 import com.ahmadjalil.tcger.domain.*
+import com.ahmadjalil.tcger.data.remote.AddCardRequest
+import com.ahmadjalil.tcger.data.remote.BinderDto
+import com.ahmadjalil.tcger.data.repository.toDomain
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.math.BigDecimal
 import org.junit.Assert.*
 import org.junit.Test
 
 class PortableParityTest {
+    @Test fun `acquisition currency survives remote local portable and CSV mappings without guessing unknowns`() {
+        val remote = Json { ignoreUnknownKeys = true }.decodeFromString<BinderDto>("""{
+          "id":"binder","name":"Currencies","cards":[{"id":"group","name":"Card","tcg":"pokemon","cardId":"printing",
+          "copies":[{"id":"cad","acquisitionPrice":40.0,"acquisitionCurrency":"CAD"},{"id":"unknown","acquisitionPrice":40.0}]}]
+        }""").toDomain()
+        assertEquals("CAD", remote.cards.first().acquisitionCurrency)
+        assertNull(remote.cards.last().acquisitionCurrency)
+        assertEquals("CAD", remote.cards.first().edit().acquisitionCurrency)
+        val backup = CollectionBackupJson.create(listOf(remote), emptyList(), emptyList(), exportedAt = "2026-10-31T00:00:00Z")
+        val restored = CollectionBackupJson.decode(CollectionBackupJson.encode(backup))
+        val entities = restored.importPlan(emptyList()).binders.single().cards
+        assertEquals("CAD", entities.first().acquisitionCurrency)
+        assertNull(entities.last().acquisitionCurrency)
+        val csv = parseCollectionCsv(CollectionBackupJson.collectionCsv(listOf(remote)))
+        assertEquals("CAD", csv.binders.single().cards.first().acquisitionCurrency)
+        assertNull(csv.binders.single().cards.last().acquisitionCurrency)
+        assertEquals(40.0, csv.binders.single().cards.last().acquisitionPrice!!, 0.0)
+        val payload = AddCardRequest(cardId = "printing", acquisitionPrice = 40.0, acquisitionCurrency = "CAD").payload()
+        assertEquals("CAD", payload["acquisitionCurrency"]?.jsonPrimitive?.content)
+    }
+
     private fun fixture(): String {
         val root = generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }.first { File(it, "mobile-parity/fixtures/portable-backup-v2.json").exists() }
         return File(root, "mobile-parity/fixtures/portable-backup-v2.json").readText()

@@ -2,6 +2,7 @@
 
 "use client";
 
+import { privateStorageKey } from "@/lib/private-storage";
 import { useMemo, useState } from "react";
 import { FolderSearch, Pencil, Plus, Trash2 } from "lucide-react";
 
@@ -28,12 +29,7 @@ import { useDemoStore } from "@/stores/demo-store";
 import { SMART_FOLDER_STORAGE_KEY_PREFIX } from "@/lib/storage/keys";
 
 export type SmartFolderRuleType =
-  | "tcg"
-  | "rarity"
-  | "condition"
-  | "setCode"
-  | "isFoil"
-  | "tag";
+  "tcg" | "rarity" | "condition" | "setCode" | "isFoil" | "tag";
 
 export interface SmartFolderRule {
   id: string;
@@ -86,13 +82,18 @@ function newId() {
 }
 
 export function smartFolderStorageKey(userId?: string | null) {
-  return `${SMART_FOLDER_STORAGE_KEY_PREFIX}${userId || "local"}`;
+  return privateStorageKey(SMART_FOLDER_STORAGE_KEY_PREFIX, userId || "local");
 }
 
 export function loadSmartFolders(userId?: string | null): SmartFolder[] {
   if (typeof window === "undefined") return [];
   try {
-    if (userId === "demo-user-001" && Array.isArray(useDemoStore.getState().portableSections.smartFolders)) return useDemoStore.getState().portableSections.smartFolders as SmartFolder[];
+    if (
+      userId === "demo-user-001" &&
+      Array.isArray(useDemoStore.getState().portableSections.smartFolders)
+    )
+      return useDemoStore.getState().portableSections
+        .smartFolders as SmartFolder[];
     const raw = localStorage.getItem(smartFolderStorageKey(userId));
     if (raw === null && userId === "demo-user-001") {
       return DEMO_SMART_FOLDERS.map((folder) => ({
@@ -112,25 +113,42 @@ function persistSmartFolders(
   folders: SmartFolder[],
 ) {
   localStorage.setItem(smartFolderStorageKey(userId), JSON.stringify(folders));
-  if (userId === "demo-user-001") useDemoStore.setState(state => ({ portableSections: { ...state.portableSections, smartFolders: folders } }));
+  if (userId === "demo-user-001")
+    useDemoStore.setState((state) => ({
+      portableSections: { ...state.portableSections, smartFolders: folders },
+    }));
 }
 
 export function matchesSmartFolder(card: CollectionCard, folder: SmartFolder) {
   if (!folder.rules.length) return true;
-  const copies = card.copies.length ? card.copies : [{ condition: card.condition, isFoil: false, tags: [] }];
-  return copies.some(copy => {
+  const copies = card.copies.length
+    ? card.copies
+    : [{ condition: card.condition, isFoil: false, tags: [] }];
+  return copies.some((copy) => {
     const matchesRule = (rule: SmartFolderRule) => {
       const value = rule.value.trim().toLowerCase();
       switch (rule.type) {
-        case "tcg": return card.tcg.toLowerCase() === value;
-        case "rarity": return card.rarity?.toLowerCase() === value;
-        case "condition": return copy.condition?.toLowerCase() === value;
-        case "setCode": return card.setCode?.toLowerCase() === value;
-        case "isFoil": return Boolean(copy.isFoil) === (value !== "false");
-        case "tag": return copy.tags?.some(tag => tag.label.trim().toLowerCase() === value) ?? false;
+        case "tcg":
+          return card.tcg.toLowerCase() === value;
+        case "rarity":
+          return card.rarity?.toLowerCase() === value;
+        case "condition":
+          return copy.condition?.toLowerCase() === value;
+        case "setCode":
+          return card.setCode?.toLowerCase() === value;
+        case "isFoil":
+          return Boolean(copy.isFoil) === (value !== "false");
+        case "tag":
+          return (
+            copy.tags?.some(
+              (tag) => tag.label.trim().toLowerCase() === value,
+            ) ?? false
+          );
       }
     };
-    return folder.matchMode === "all" ? folder.rules.every(matchesRule) : folder.rules.some(matchesRule);
+    return folder.matchMode === "all"
+      ? folder.rules.every(matchesRule)
+      : folder.rules.some(matchesRule);
   });
 }
 

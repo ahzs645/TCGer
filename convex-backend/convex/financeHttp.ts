@@ -1,3 +1,4 @@
+import { inventorySaleSchema } from "@tcg/api-types";
 import type { HttpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -35,6 +36,25 @@ function isIsoDateTime(value: unknown): value is string {
 }
 
 export function registerFinanceRoutes(http: HttpRouter) {
+  http.route({
+    path: "/finance/sales", method: "POST",
+    handler: httpAction(async (ctx, request) => {
+      try {
+        const identity = await requireBridgeIdentity(ctx, request);
+        const parsed = inventorySaleSchema.safeParse(await parseJsonBody(request));
+        if (!parsed.success) return errorJson(400, "VALIDATION_ERROR", parsed.error.issues.map(issue => issue.message).join("; "));
+        const { collectionId, copyIds, ...data } = parsed.data;
+        let binderId = collectionId as Id<"binders">;
+        if (collectionId === "__library__") {
+          binderId = await ctx.runQuery(internal.bridge.libraryBinderId, { subject: identity.subject });
+        }
+        return json(await ctx.runMutation(internal.finance.commitSale, {
+          ...data, subject: identity.subject, binderId, copyIds: copyIds as Id<"collectionEntries">[],
+        }), 201);
+      } catch (error) { return handleConvexError(error, "Failed to record sale"); }
+    }),
+  });
+
   http.route({
     path: "/finance/transactions",
     method: "GET",

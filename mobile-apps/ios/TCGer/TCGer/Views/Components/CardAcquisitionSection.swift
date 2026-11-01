@@ -93,9 +93,10 @@ struct CardAcquisitionSection: View {
 
     private var fallbackSummary: String? {
         guard let price = copyDetails?.acquisitionPrice else { return nil }
-        // Legacy copy-level costs did not store a currency; the previous API
-        // contract treated all monetary values as USD.
-        var parts = [price.formatted(.currency(code: "USD"))]
+        let recordedCurrency = copyDetails?.acquisitionCurrency
+        let amount = recordedCurrency.map { price.formatted(.currency(code: $0)) }
+            ?? String(format: "%.2f (currency unknown)", price)
+        var parts = [amount]
         if let acquiredAt = copyDetails?.acquiredAt,
            let date = ISO8601DateFormatter().date(from: acquiredAt) {
             parts.append(date.formatted(date: .abbreviated, time: .omitted))
@@ -111,23 +112,26 @@ struct CardAcquisitionSection: View {
 
     @MainActor
     private func loadTransaction() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else {
             isLoading = false
             return
         }
         isLoading = true
+        defer { if environmentStore.matches(session) { isLoading = false } }
         errorMessage = nil
         do {
-            transaction = try await apiService.getTransactions(
-                config: environmentStore.serverConfiguration,
+            let transactions = try await apiService.getTransactions(
+                config: session.configuration,
                 token: token,
                 collectionEntryId: collectionEntryId
             )
-            .first(where: { $0.type == "purchase" })
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            transaction = transactions.first(where: { $0.type == "purchase" })
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = "Purchase details could not be loaded."
         }
-        isLoading = false
     }
 }
 
@@ -184,8 +188,9 @@ private struct CardAcquisitionEditorSheet: View {
 
         let fallbackCurrency = CurrencyDisplayState.shared.currentCurrencyCode
         let initialAmount = existingTransaction?.amount ?? copyDetails?.acquisitionPrice
+        let initialCurrency = existingTransaction?.currency ?? copyDetails?.acquisitionCurrency ?? (copyDetails?.acquisitionPrice == nil ? fallbackCurrency : "")
         _amountText = State(initialValue: initialAmount.map { String(format: "%.2f", $0) } ?? "")
-        _currency = State(initialValue: existingTransaction?.currency ?? fallbackCurrency)
+        _currency = State(initialValue: initialCurrency)
         _purchaseDate = State(initialValue: Self.purchaseDate(
             transaction: existingTransaction,
             copyDetails: copyDetails
@@ -193,7 +198,7 @@ private struct CardAcquisitionEditorSheet: View {
         _source = State(initialValue: existingTransaction?.platform ?? "")
         _sourceURL = State(initialValue: existingTransaction?.sourceUrl ?? "")
         _notes = State(initialValue: existingTransaction?.notes ?? "")
-        _supportedCurrencies = State(initialValue: Self.initialCurrencies(selected: existingTransaction?.currency ?? fallbackCurrency))
+        _supportedCurrencies = State(initialValue: Self.initialCurrencies(selected: initialCurrency))
     }
 
     private var parsedAmount: Double? {
@@ -242,6 +247,7 @@ private struct CardAcquisitionEditorSheet: View {
                             .keyboardType(.decimalPad)
                             .focused($focusedField, equals: .amount)
                         Picker("Currency", selection: $currency) {
+                            if currency.isEmpty { Text("Choose original currency").tag("") }
                             ForEach(supportedCurrencies) { option in
                                 Text(option.isoCode).tag(option.isoCode)
                             }
@@ -262,7 +268,7 @@ private struct CardAcquisitionEditorSheet: View {
                 } header: {
                     Text("Purchase")
                 } footer: {
-                    Text("Total paid should include any tax, shipping, or marketplace costs you want included in your cost basis.")
+                    Text(currency.isEmpty ? "This stored cost has no currency. Choose the original purchase currency before saving." : "Total paid should include any tax, shipping, or marketplace costs you want included in your cost basis.")
                 }
 
                 Section("Optional Reference") {
@@ -329,6 +335,12 @@ private struct CardAcquisitionEditorSheet: View {
         guard let token = environmentStore.authToken,
               let amount = parsedAmount,
               amount > 0 else { return }
+        guard !isSaving else { return }
+        guard environmentStore.serverConfiguration.isOnDevice || environmentStore.serverFeatures.linkedAcquisitions else {
+            errorMessage = "This server does not support atomic linked purchases. Connect to a fully Convex-backed TCGer server."
+            return
+        }
+        let session = environmentStore.sessionIdentity
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -338,20 +350,10 @@ private struct CardAcquisitionEditorSheet: View {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
-            _ = try await apiService.updateCardInBinder(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                binderId: binderId,
-                collectionCardId: collectionEntryId,
-                acquisitionPrice: amount,
-                acquiredAt: date,
-                includeAcquisitionDetails: true
-            )
-
             let transaction: Transaction
             if let existingTransaction {
                 transaction = try await apiService.updateTransaction(
-                    config: environmentStore.serverConfiguration,
+                    config: session.configuration,
                     token: token,
                     transactionId: existingTransaction.id,
                     collectionEntryId: collectionEntryId,
@@ -369,7 +371,7 @@ private struct CardAcquisitionEditorSheet: View {
                 )
             } else {
                 transaction = try await apiService.createTransaction(
-                    config: environmentStore.serverConfiguration,
+                    config: session.configuration,
                     token: token,
                     type: "purchase",
                     collectionEntryId: collectionEntryId,
@@ -386,11 +388,13 @@ private struct CardAcquisitionEditorSheet: View {
                     date: date
                 )
             }
-            NotificationCenter.default.post(name: .collectionDidChange, object: nil)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            CollectionMutationNotice.post(config: session.configuration, token: token)
             HapticManager.notification(.success)
             onSaved(transaction)
             dismiss()
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -399,29 +403,28 @@ private struct CardAcquisitionEditorSheet: View {
     private func remove() async {
         guard let token = environmentStore.authToken,
               let existingTransaction else { return }
+        guard !isSaving else { return }
+        guard environmentStore.serverConfiguration.isOnDevice || environmentStore.serverFeatures.linkedAcquisitions else {
+            errorMessage = "This server does not support atomic linked purchases. Connect to a fully Convex-backed TCGer server."
+            return
+        }
+        let session = environmentStore.sessionIdentity
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
 
         do {
-            _ = try await apiService.updateCardInBinder(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                binderId: binderId,
-                collectionCardId: collectionEntryId,
-                acquisitionPrice: nil,
-                acquiredAt: nil,
-                includeAcquisitionDetails: true
-            )
             try await apiService.deleteTransaction(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 transactionId: existingTransaction.id
             )
-            NotificationCenter.default.post(name: .collectionDidChange, object: nil)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            CollectionMutationNotice.post(config: session.configuration, token: token)
             onSaved(nil)
             dismiss()
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -431,7 +434,7 @@ private struct CardAcquisitionEditorSheet: View {
         do {
             let currencies = try await CurrencyConverter.shared.supportedCurrencies()
             supportedCurrencies = currencies
-            if !supportedCurrencies.contains(where: { $0.isoCode == currency }) {
+            if !currency.isEmpty, !supportedCurrencies.contains(where: { $0.isoCode == currency }) {
                 supportedCurrencies.append(
                     SupportedCurrency(isoCode: currency, name: currency, symbol: nil)
                 )
@@ -459,7 +462,7 @@ private struct CardAcquisitionEditorSheet: View {
 
     private static func initialCurrencies(selected: String) -> [SupportedCurrency] {
         var currencies = SupportedCurrency.fallback
-        if !currencies.contains(where: { $0.isoCode == selected }) {
+        if !selected.isEmpty, !currencies.contains(where: { $0.isoCode == selected }) {
             currencies.append(SupportedCurrency(isoCode: selected, name: selected, symbol: nil))
         }
         return currencies.sorted { $0.isoCode < $1.isoCode }

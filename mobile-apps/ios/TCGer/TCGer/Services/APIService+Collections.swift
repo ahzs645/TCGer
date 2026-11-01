@@ -74,6 +74,7 @@ extension APIService {
         let notes: String?
         let price: Double?
         let acquisitionPrice: Double?
+        var acquisitionCurrency: String? = nil
         let serialNumber: String?
         let acquiredAt: String?
         let isFoil: Bool
@@ -231,7 +232,7 @@ extension APIService {
         token: String
     ) async throws -> Data {
         if config.isOnDevice {
-            let header = "tcg,external_id,card_name,base_external_id,printing_key,artwork_id,collector_number,set_code,set_name,rarity,binder_name,quantity,condition,language,notes,price,acquisition_price,serial_number,acquired_at,is_foil,finish_code,finish_label,edition,stamp,is_sealed_promo,is_oversized,is_peel_off,is_signed,is_altered,tags\n"
+            let header = "tcg,external_id,card_name,base_external_id,printing_key,artwork_id,collector_number,set_code,set_name,rarity,binder_name,quantity,condition,language,notes,price,acquisition_price,acquisition_currency,serial_number,acquired_at,is_foil,finish_code,finish_label,edition,stamp,is_sealed_promo,is_oversized,is_peel_off,is_signed,is_altered,tags\n"
             return Data(header.utf8)
         }
         let (data, response) = try await makeRequest(
@@ -300,7 +301,7 @@ extension APIService {
         }
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/history/\(auditId)/undo",
+            path: "collections/history/\(Self.pathSegment(auditId))/undo",
             method: "POST",
             token: token,
             body: UndoCollectionMutationRequest(idempotencyKey: idempotencyKey)
@@ -417,7 +418,7 @@ extension APIService {
 
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(id)",
+            path: "collections/\(Self.pathSegment(id))",
             token: token
         )
 
@@ -440,6 +441,7 @@ extension APIService {
         let pageNumber: Int
         let capturedAt: String
         let placements: [BinderPagePlacement]
+        let expectedRevision: Int?
     }
 
     func getBinderPages(
@@ -452,7 +454,7 @@ extension APIService {
         }
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/pages",
+            path: "collections/\(Self.pathSegment(binderId))/pages",
             token: token
         )
         guard response.statusCode == 200 else {
@@ -471,9 +473,13 @@ extension APIService {
         binderId: String,
         pageNumber: Int,
         capturedAt: Date,
-        placements: [BinderPagePlacement]
+        placements: [BinderPagePlacement],
+        expectedRevision: Int? = nil
     ) async throws -> SavedBinderPage {
         if config.isOnDevice {
+            if let expectedRevision {
+                return try localStore.upsertBinderPageIfCurrent(binderId: binderId, pageNumber: pageNumber, capturedAt: capturedAt, placements: placements, expectedRevision: expectedRevision)
+            }
             let page = localStore.upsertBinderPage(
                 binderId: binderId,
                 pageNumber: pageNumber,
@@ -486,11 +492,12 @@ extension APIService {
         let body = UpsertBinderPageRequest(
             pageNumber: pageNumber,
             capturedAt: ISO8601DateFormatter().string(from: capturedAt),
-            placements: placements
+            placements: placements,
+            expectedRevision: expectedRevision
         )
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/pages/\(pageNumber)",
+            path: "collections/\(Self.pathSegment(binderId))/pages/\(pageNumber)",
             method: "PUT",
             token: token,
             body: body
@@ -510,17 +517,19 @@ extension APIService {
         token: String?,
         binderId: String,
         pageNumber: Int,
-        imageData: Data
+        imageData: Data,
+        expectedRevision: Int? = nil
     ) async throws -> SavedBinderPage {
         if config.isOnDevice {
             return try localStore.replaceBinderPageImage(
                 binderId: binderId,
                 pageNumber: pageNumber,
-                imageData: imageData
+                imageData: imageData,
+                expectedRevision: expectedRevision
             )
         }
         guard let token else { throw APIError.unauthorized }
-        guard let url = config.endpoint(path: "collections/\(binderId)/pages/\(pageNumber)/image") else {
+        guard let url = config.endpoint(path: "collections/\(Self.pathSegment(binderId))/pages/\(pageNumber)/image") else {
             throw APIError.invalidURL
         }
         let boundary = UUID().uuidString
@@ -529,6 +538,9 @@ extension APIService {
         request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         var body = Data()
+        if let expectedRevision {
+            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"expectedRevision\"\r\n\r\n\(expectedRevision)\r\n".data(using: .utf8)!)
+        }
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"image\"; filename=\"binder-page-\(pageNumber).jpg\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
@@ -559,7 +571,7 @@ extension APIService {
         }
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/pages/\(pageNumber)/image",
+            path: "collections/\(Self.pathSegment(binderId))/pages/\(pageNumber)/image",
             method: "DELETE",
             token: token
         )
@@ -731,7 +743,7 @@ extension APIService {
         )
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(id)",
+            path: "collections/\(Self.pathSegment(id))",
             method: "PATCH",
             token: token,
             body: body
@@ -764,7 +776,7 @@ extension APIService {
 
         let (_, response) = try await makeRequest(
             config: config,
-            path: "collections/\(id)",
+            path: "collections/\(Self.pathSegment(id))",
             method: "DELETE",
             token: token
         )
@@ -797,7 +809,7 @@ extension APIService {
         guard !config.isOnDevice else { return [] }
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/share-links",
+            path: "collections/\(Self.pathSegment(binderId))/share-links",
             token: token
         )
         guard response.statusCode == 200 else {
@@ -819,7 +831,7 @@ extension APIService {
     ) async throws -> BinderShareLink {
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/share-links",
+            path: "collections/\(Self.pathSegment(binderId))/share-links",
             method: "POST",
             token: token,
             body: CreateBinderShareLinkRequest(label: label, expiresAt: expiresAt)
@@ -842,7 +854,7 @@ extension APIService {
     ) async throws {
         let (data, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/share-links/\(linkId)",
+            path: "collections/\(Self.pathSegment(binderId))/share-links/\(linkId)",
             method: "DELETE",
             token: token
         )
@@ -924,6 +936,7 @@ extension APIService {
         let notes: String?
         let price: Double?
         let acquisitionPrice: Double?
+        var acquisitionCurrency: String? = nil
         let isFoil: Bool?
         let finishCode: String?
         let finishLabel: String?
@@ -1031,6 +1044,7 @@ extension APIService {
         let language: String?
         let notes: String?
         let acquisitionPrice: Double?
+        var acquisitionCurrency: String? = nil
         let acquiredAt: String?
         let isFoil: Bool?
         let variant: CardCopyVariant?
@@ -1048,7 +1062,7 @@ extension APIService {
         let targetBinderId: String?
 
         enum CodingKeys: String, CodingKey {
-            case quantity, condition, language, notes, acquisitionPrice, acquiredAt, isFoil
+            case quantity, condition, language, notes, acquisitionPrice, acquisitionCurrency, acquiredAt, isFoil
             case finishCode, finishLabel, edition, stamp
             case isSealedPromo, isOversized, isPeelOff
             case isSigned, isAltered, gradingCompany, gradingScore, certNumber, storageLocation
@@ -1062,6 +1076,7 @@ extension APIService {
             try container.encodeIfPresent(language, forKey: .language)
             try container.encodeIfPresent(notes, forKey: .notes)
             if includeAcquisitionDetails {
+                try container.encodeIfPresent(acquisitionCurrency, forKey: .acquisitionCurrency)
                 if let acquisitionPrice { try container.encode(acquisitionPrice, forKey: .acquisitionPrice) }
                 else { try container.encodeNil(forKey: .acquisitionPrice) }
                 if let acquiredAt { try container.encode(acquiredAt, forKey: .acquiredAt) }
@@ -1112,6 +1127,7 @@ extension APIService {
         notes: String? = nil,
         price: Double? = nil,
         acquisitionPrice: Double? = nil,
+        acquisitionCurrency: String? = nil,
         isFoil: Bool? = nil,
         variant: CardCopyVariant = .empty,
         isSigned: Bool? = nil,
@@ -1134,7 +1150,9 @@ extension APIService {
                 notes: notes,
                 price: price,
                 acquisitionPrice: acquisitionPrice,
+                acquisitionCurrency: acquisitionCurrency,
                 variant: variant,
+                isFoil: isFoil,
                 isSigned: isSigned,
                 isAltered: isAltered,
                 gradingCompany: gradingCompany,
@@ -1145,7 +1163,7 @@ extension APIService {
                 newTags: newTags,
                 card: card
             )
-            NotificationCenter.default.post(name: .collectionDidChange, object: nil)
+            CollectionMutationNotice.post(config: config, token: token)
             return nil
         }
 
@@ -1195,6 +1213,7 @@ extension APIService {
             notes: notes,
             price: price,
             acquisitionPrice: acquisitionPrice,
+            acquisitionCurrency: acquisitionCurrency,
             isFoil: isFoil ?? variant.isFoil,
             finishCode: variant.finishCode,
             finishLabel: variant.finishLabel,
@@ -1214,7 +1233,7 @@ extension APIService {
             cardData: cardData
         )
 
-        let path = binderId == "__library__" ? "collections/cards" : "collections/\(binderId)/cards"
+        let path = binderId == "__library__" ? "collections/cards" : "collections/\(Self.pathSegment(binderId))/cards"
 
         let (data, response) = try await makeRequest(
             config: config,
@@ -1234,7 +1253,7 @@ extension APIService {
         if let cacheKey = CacheManager.CacheKey.collections(config: config, token: token) {
             try? collectionCache.remove(forKey: cacheKey)
         }
-        NotificationCenter.default.post(name: .collectionDidChange, object: nil)
+        CollectionMutationNotice.post(config: config, token: token)
         return try? JSONDecoder().decode(AddedCollectionCopyResponse.self, from: data).createdCopyID
     }
 
@@ -1248,6 +1267,7 @@ extension APIService {
         language: String? = nil,
         notes: String? = nil,
         acquisitionPrice: Double? = nil,
+        acquisitionCurrency: String? = nil,
         acquiredAt: String? = nil,
         isFoil: Bool? = nil,
         variant: CardCopyVariant? = nil,
@@ -1273,6 +1293,7 @@ extension APIService {
                 language: language,
                 notes: notes,
                 acquisitionPrice: acquisitionPrice,
+                acquisitionCurrency: acquisitionCurrency,
                 acquiredAt: acquiredAt,
                 variant: variant,
                 isSigned: isSigned,
@@ -1341,6 +1362,7 @@ extension APIService {
             language: language,
             notes: notes,
             acquisitionPrice: acquisitionPrice,
+            acquisitionCurrency: acquisitionCurrency,
             acquiredAt: acquiredAt,
             isFoil: isFoil ?? variant?.isFoil,
             variant: variant,
@@ -1358,7 +1380,7 @@ extension APIService {
             targetBinderId: targetBinderId
         )
 
-        guard let url = config.endpoint(path: "collections/\(binderId)/cards/\(collectionCardId)") else {
+        guard let url = config.endpoint(path: "collections/\(Self.pathSegment(binderId))/cards/\(Self.pathSegment(collectionCardId))") else {
             throw APIError.invalidURL
         }
 
@@ -1413,7 +1435,7 @@ extension APIService {
 
         let (_, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/cards/\(collectionCardId)",
+            path: "collections/\(Self.pathSegment(binderId))/cards/\(Self.pathSegment(collectionCardId))",
             method: "DELETE",
             token: token
         )
@@ -1473,7 +1495,7 @@ extension APIService {
             return []
         }
 
-        guard let url = config.endpoint(path: "collections/\(binderId)/cards/\(collectionId)/images") else {
+        guard let url = config.endpoint(path: "collections/\(Self.pathSegment(binderId))/cards/\(collectionId)/images") else {
             throw APIError.invalidURL
         }
 
@@ -1524,7 +1546,7 @@ extension APIService {
 
         let (_, response) = try await makeRequest(
             config: config,
-            path: "collections/\(binderId)/cards/\(collectionId)/images/\(imageIndex)",
+            path: "collections/\(Self.pathSegment(binderId))/cards/\(collectionId)/images/\(imageIndex)",
             method: "DELETE",
             token: token
         )
@@ -1543,7 +1565,7 @@ extension APIService {
 /// Everything a screen collects about the copy being added to a binder.
 /// Bundled so sheet callbacks and the service helper share one shape instead
 /// of every view repeating the endpoint's full argument list.
-nonisolated struct BinderCardAddDetails: Sendable {
+nonisolated struct BinderCardAddDetails: Codable, Sendable {
     var quantity: Int = 1
     var condition: String? = nil
     var language: String? = nil

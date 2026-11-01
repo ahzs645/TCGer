@@ -21,6 +21,11 @@ export async function getUserChannels(userId: string) {
 }
 
 export async function createChannel(userId: string, input: CreateNotificationChannelInput) {
+  if (input.type === 'email') {
+    throw Object.assign(new Error('Email delivery is unavailable. Choose an in-app, Discord, or Telegram notification channel.'), {
+      status: 501, code: 'EMAIL_DELIVERY_UNAVAILABLE',
+    });
+  }
   return prisma.notificationChannel.create({
     data: {
       userId,

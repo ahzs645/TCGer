@@ -18,6 +18,7 @@ export interface CollectionEntryAuditSnapshot {
   notes: string | null;
   price: number | null;
   acquisitionPrice: number | null;
+  acquisitionCurrency?: string | null;
   isFoil: boolean;
   finishCode: string | null;
   finishLabel: string | null;
@@ -37,6 +38,8 @@ export interface CollectionEntryAuditSnapshot {
   certNumber: string | null;
   storageLocation: string | null;
   tagIds: string[];
+  sealedOpeningLinks?: Array<{ id: string; openingId: string; quantity: number; status: string; realizedProceeds: number | null; soldAt: string | null }>;
+  linkedPurchases?: Array<{ id: string; amount: number; currency: string; date: string }>;
 }
 
 interface CollectionAuditState {
@@ -70,7 +73,19 @@ function stateJson(entries: CollectionEntryAuditSnapshot[]): Prisma.InputJsonVal
 }
 
 function comparableState(entries: CollectionEntryAuditSnapshot[]) {
-  return JSON.stringify(stateJson(entries));
+  const canonicalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonicalize);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, child]) => [key, canonicalize(child)]));
+    }
+    return value;
+  };
+  // Pre-currency audit records legitimately omit the new nullable field. Treat
+  // that as unknown currency, while still detecting actual acquisition changes.
+  const normalized = entries.map(entry => ({ ...entry, acquisitionCurrency: entry.acquisitionCurrency ?? null,
+    sealedOpeningLinks: entry.sealedOpeningLinks ?? [], linkedPurchases: entry.linkedPurchases ?? [] }));
+  return JSON.stringify(canonicalize(stateJson(normalized)));
 }
 
 export async function snapshotCollectionEntries(
@@ -89,11 +104,16 @@ export async function snapshotCollectionEntries(
         select: {
           tagId: true
         }
-      }
+      },
+      sealedOpeningLinks: { orderBy: { id: 'asc' } }
     },
     orderBy: {
       id: 'asc'
     }
+  });
+  const purchases = await tx.transaction.findMany({
+    where: { userId, type: 'purchase', collectionEntryId: { in: entryIds } },
+    orderBy: { id: 'asc' },
   });
 
   return entries.map((entry) => ({
@@ -108,6 +128,7 @@ export async function snapshotCollectionEntries(
     price: entry.price === null ? null : Number(entry.price),
     acquisitionPrice:
       entry.acquisitionPrice === null ? null : Number(entry.acquisitionPrice),
+    acquisitionCurrency: entry.acquisitionCurrency ?? null,
     isFoil: entry.isFoil,
     finishCode: entry.finishCode,
     finishLabel: entry.finishLabel,
@@ -126,7 +147,13 @@ export async function snapshotCollectionEntries(
     gradingScore: entry.gradingScore,
     certNumber: entry.certNumber,
     storageLocation: entry.storageLocation,
-    tagIds: entry.tags.map((tag) => tag.tagId).sort()
+    tagIds: entry.tags.map((tag) => tag.tagId).sort(),
+    sealedOpeningLinks: entry.sealedOpeningLinks.map(link => ({ id: link.id, openingId: link.openingId,
+      quantity: link.quantity, status: link.status, realizedProceeds: link.realizedProceeds === null ? null : Number(link.realizedProceeds),
+      soldAt: link.soldAt?.toISOString() ?? null })),
+    linkedPurchases: purchases.filter(purchase => purchase.collectionEntryId === entry.id).map(purchase => ({
+      id: purchase.id, amount: Number(purchase.amount), currency: purchase.currency, date: purchase.date.toISOString(),
+    })),
   }));
 }
 
@@ -227,7 +254,7 @@ export async function getCollectionMutationHistory(
     entries: entries.map((entry) =>
       mapAudit(
         entry,
-        entry.operationKind !== 'undo' && !undone.has(entry.id)
+        !['undo', 'normalization'].includes(entry.operationKind) && !undone.has(entry.id)
       )
     )
   };
@@ -263,6 +290,26 @@ async function validateRestoreReferences(
       'Undo cannot be applied because a referenced card, binder, or tag no longer exists.'
     );
   }
+  for (const entry of entries) {
+    const currentPurchases = await tx.transaction.findMany({
+      where: { userId, type: 'purchase', collectionEntryId: entry.id }, orderBy: { id: 'asc' },
+    });
+    const actual = currentPurchases.map(purchase => ({ id: purchase.id, amount: Number(purchase.amount), currency: purchase.currency, date: purchase.date.toISOString() }));
+    const expectedPurchases = entry.linkedPurchases ?? [];
+    if (actual.length !== expectedPurchases.length || actual.some(purchase => !expectedPurchases.some(expected =>
+      expected.id === purchase.id && expected.amount === purchase.amount && expected.currency === purchase.currency && expected.date === purchase.date))) {
+      throw new CollectionAuditError('CONFLICT', 'Undo cannot restore acquisition details because the linked purchase ledger changed.');
+    }
+    for (const expected of entry.sealedOpeningLinks ?? []) {
+      const link = await tx.sealedOpenedCard.findFirst({ where: { id: expected.id, opening: { userId } } });
+      if (!link || (link.collectionId !== null && link.collectionId !== entry.id) ||
+        link.openingId !== expected.openingId || link.quantity !== expected.quantity || link.status !== expected.status ||
+        (link.realizedProceeds === null ? null : Number(link.realizedProceeds)) !== expected.realizedProceeds ||
+        (link.soldAt?.toISOString() ?? null) !== expected.soldAt) {
+        throw new CollectionAuditError('CONFLICT', 'Undo cannot restore a sealed-opening link that was removed, reassigned, or financially changed.');
+      }
+    }
+  }
 }
 
 async function restoreSnapshots(
@@ -294,6 +341,7 @@ async function restoreSnapshots(
         notes: entry.notes,
         price: entry.price,
         acquisitionPrice: entry.acquisitionPrice,
+        acquisitionCurrency: entry.acquisitionCurrency ?? null,
         isFoil: entry.isFoil,
         finishCode: entry.finishCode,
         finishLabel: entry.finishLabel,
@@ -321,6 +369,12 @@ async function restoreSnapshots(
           tagId
         }))
       });
+    }
+    for (const link of entry.sealedOpeningLinks ?? []) {
+      const restored = await tx.sealedOpenedCard.updateMany({
+        where: { id: link.id, collectionId: null, opening: { userId } }, data: { collectionId: entry.id },
+      });
+      if (restored.count !== 1) throw new CollectionAuditError('CONFLICT', 'The sealed-opening link changed during undo.');
     }
   }
 }
@@ -358,8 +412,8 @@ export async function undoCollectionMutation(
     if (!source) {
       throw new CollectionAuditError('NOT_FOUND', 'Collection history entry not found.');
     }
-    if (source.operationKind === 'undo') {
-      throw new CollectionAuditError('BAD_REQUEST', 'Undo records cannot be undone.');
+    if (['undo', 'normalization'].includes(source.operationKind)) {
+      throw new CollectionAuditError('BAD_REQUEST', 'Undo and physical-copy normalization records cannot be undone.');
     }
     const existingUndo = await tx.collectionMutationAudit.findUnique({
       where: { sourceAuditId: source.id }
@@ -401,5 +455,5 @@ export async function undoCollectionMutation(
     });
 
     return { audit: mapAudit(undo, false) };
-  });
+  }, { isolationLevel: 'Serializable' });
 }

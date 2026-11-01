@@ -313,6 +313,7 @@ struct ProfileView: View {
     // MARK: - API Functions
 
     private func loadProfile() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else {
             errorMessage = "Not authenticated"
             isLoading = false
@@ -323,17 +324,19 @@ struct ProfileView: View {
 
         do {
             let loadedProfile = try await api.getUserProfile(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token
             )
 
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 self.profile = loadedProfile
                 environmentStore.applyUserProfile(loadedProfile)
                 self.isLoading = false
             }
         } catch {
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 errorMessage = error.localizedDescription
                 isLoading = false
             }
@@ -356,6 +359,7 @@ struct ProfileView: View {
     }
 
     private func saveProfile() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken,
               let currentProfile = profile else {
             return
@@ -381,6 +385,7 @@ struct ProfileView: View {
         // If nothing changed, just exit edit mode
         if usernameUpdate == nil && emailUpdate == nil {
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 focusedField = nil
                 isEditingProfile = false
                 isSavingProfile = false
@@ -390,13 +395,14 @@ struct ProfileView: View {
 
         do {
             let updatedProfile = try await api.updateUserProfile(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 username: usernameUpdate,
                 email: emailUpdate
             )
 
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 // Update the profile with new data
                 if let currentProfile = self.profile {
                     self.profile = APIService.UserProfile(
@@ -424,6 +430,7 @@ struct ProfileView: View {
             }
         } catch {
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 profileSaveError = error.localizedDescription
                 isSavingProfile = false
             }
@@ -451,6 +458,7 @@ struct ProfileView: View {
     }
 
     private func changePassword() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else {
             return
         }
@@ -475,13 +483,14 @@ struct ProfileView: View {
 
         do {
             try await api.changePassword(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 currentPassword: currentPassword,
                 newPassword: newPassword
             )
 
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 focusedField = nil
                 passwordSuccess = true
                 isSavingPassword = false
@@ -491,12 +500,14 @@ struct ProfileView: View {
 
                 // Auto-close after 2 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    guard environmentStore.matches(session) else { return }
                     isChangingPassword = false
                     passwordSuccess = false
                 }
             }
         } catch {
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 passwordError = error.localizedDescription
                 isSavingPassword = false
             }

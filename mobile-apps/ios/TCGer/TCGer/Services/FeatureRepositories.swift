@@ -162,6 +162,28 @@ final class CollectionListStore: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let repository: any CollectionRepository
+    private struct Source: Equatable {
+        let config: ServerConfiguration
+        let token: String?
+    }
+    private var source: Source?
+    private var generation = UUID()
+    private var loadID: UUID?
+    private var contentRevision = 0
+
+    private func prepare(config: ServerConfiguration, token: String?) -> UUID {
+        let requested = Source(config: config, token: token)
+        if source != requested {
+            source = requested
+            generation = UUID()
+            loadID = nil
+            collections = []
+            hasLoaded = false
+            errorMessage = nil
+        }
+        return generation
+    }
+
 
     init(repository: any CollectionRepository) {
         self.repository = repository
@@ -172,6 +194,16 @@ final class CollectionListStore: ObservableObject {
         token: String?,
         useCache: Bool
     ) async {
+        let requestedGeneration = prepare(config: config, token: token)
+        let requestedRevision = contentRevision
+        let requestID = UUID()
+        loadID = requestID
+        defer {
+            if generation == requestedGeneration, loadID == requestID {
+                isLoading = false
+                loadID = nil
+            }
+        }
         let shouldShowLoading = collections.isEmpty
         if shouldShowLoading {
             isLoading = true
@@ -179,15 +211,18 @@ final class CollectionListStore: ObservableObject {
         }
 
         do {
-            collections = try await repository.collections(
+            let loaded = try await repository.collections(
                 config: config,
                 token: token,
                 useCache: useCache
             )
+            guard generation == requestedGeneration, contentRevision == requestedRevision, loadID == requestID, !Task.isCancelled else { return }
+            collections = loaded
             hasLoaded = true
             isLoading = false
             errorMessage = nil
         } catch {
+            guard generation == requestedGeneration, contentRevision == requestedRevision, loadID == requestID, !Task.isCancelled else { return }
             if let apiError = error as? APIService.APIError,
                case .unauthorized = apiError {
                 errorMessage = "Sign in is required to view collections."
@@ -204,16 +239,20 @@ final class CollectionListStore: ObservableObject {
         token: String,
         input: CreateCollectionInput
     ) async throws -> Collection {
+        let requestedGeneration = prepare(config: config, token: token)
         do {
             let collection = try await repository.createCollection(
                 config: config,
                 token: token,
                 input: input
             )
+            guard generation == requestedGeneration, !Task.isCancelled else { throw CancellationError() }
+            contentRevision &+= 1
             collections.append(collection)
             errorMessage = nil
             return collection
         } catch {
+            guard generation == requestedGeneration, !(error is CancellationError) else { throw CancellationError() }
             errorMessage = error.localizedDescription
             throw error
         }

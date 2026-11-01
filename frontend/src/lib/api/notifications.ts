@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type { NotificationResponse } from "@tcg/api-types";
 
 import { API_BASE_URL } from "./base-url";
@@ -7,7 +8,7 @@ async function notificationFetch<T>(
   token: string | null,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await sessionFetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {

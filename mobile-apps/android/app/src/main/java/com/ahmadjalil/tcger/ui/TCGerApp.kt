@@ -761,14 +761,10 @@ fun TCGerApp(container: AppContainer, pendingLink: String? = null, onLinkConsume
                         canEdit = state.preferences.dataSourceMode == DataSourceMode.ON_DEVICE || state.preferences.isSignedIn,
                         onSaveCopy = viewModel::saveCopy,
                         onBulk = viewModel::bulkEdit,
-                        onSellCopy = { copy, transaction, remove ->
-                            financeRepository.create(transaction)
-                            if (remove) {
-                                try { viewModel.bulkEdit(listOf(copy), null, null, true) }
-                                catch (error: Exception) {
-                                    android.widget.Toast.makeText(context, "Sale saved. The copy could not be removed; remove it from the binder after checking Finance history.", android.widget.Toast.LENGTH_LONG).show()
-                                }
-                            } else viewModel.refresh()
+                        onSellCopy = { _, _, _ ->
+                            // Re-enable only when the atomic transport is paired with a
+                            // durable operation ID/payload and receipt-based UI recovery.
+                            throw UnsupportedOperationException("Resumable inventory sales are not available on Android yet. Record the sale in the web or iOS app.")
                         },
                         onRemove = viewModel::removeCard,
                         onUpdate = viewModel::updateBinder,

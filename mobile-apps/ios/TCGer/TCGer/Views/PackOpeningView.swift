@@ -103,7 +103,7 @@ struct PackOpeningView: View {
                 )
             case .review(let session):
                 PackOpeningReviewSheet(session: session) {
-                    phase = "Saved to collection"
+                    phase = "Simulation saved"
                 }
             }
         }
@@ -424,7 +424,7 @@ struct PackOpeningView: View {
         case .summary, .final:
             HStack(spacing: 10) {
                 if interfaceState.canSave {
-                    Button("Save Pulls") { send(.savePulls) }
+                    Button("Save Simulation") { send(.savePulls) }
                         .buttonStyle(.glassProminent)
                     Button("Open More") { send(.backToPacks) }
                         .buttonStyle(.glass)

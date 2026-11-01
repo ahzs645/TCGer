@@ -43,6 +43,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import { useModuleStore } from "@/stores/preferences";
 import { useShallow } from "zustand/react/shallow";
+import { UNKNOWN_CURRENCY } from "@/lib/pricing/acquisition-currency";
 
 const DISPLAY_CURRENCY_KEY = "tcger.prices.display-currency";
 
@@ -153,7 +154,10 @@ export function CostReturnsContent() {
     const byKey = new Map<string, RateRequest>();
     for (const lot of lots) {
       const paidDate = lot.purchasedAt?.slice(0, 10);
-      if (lot.paidCurrency.toUpperCase() !== displayCurrency) {
+      if (
+        lot.paidCurrency !== UNKNOWN_CURRENCY &&
+        lot.paidCurrency.toUpperCase() !== displayCurrency
+      ) {
         byKey.set(
           exchangeRateCacheKey(lot.paidCurrency, displayCurrency, paidDate),
           { source: lot.paidCurrency, date: paidDate },
@@ -272,12 +276,17 @@ export function CostReturnsContent() {
           controls in the card editor.
         </div>
 
-        {mounted && isAuthenticated && hasFetched && !transactionsQuery.isLoading ? (
+        {mounted &&
+        isAuthenticated &&
+        hasFetched &&
+        !transactionsQuery.isLoading ? (
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between gap-3 text-base">
                 <span>Cost-basis completeness</span>
-                <span className="tabular-nums">{costCoverage.coveragePercent.toFixed(0)}%</span>
+                <span className="tabular-nums">
+                  {costCoverage.coveragePercent.toFixed(0)}%
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -288,9 +297,19 @@ export function CostReturnsContent() {
                 />
               </div>
               <div className="grid gap-2 text-sm sm:grid-cols-3">
-                <span>{costCoverage.costedCopies} of {costCoverage.totalCopies} copies costed</span>
-                <span>{costCoverage.cardsMissingCosts} card rows need costs</span>
-                <span>{formatMoney(costCoverage.untrackedMarketValue, { currency: "USD" })} value lacks cost basis</span>
+                <span>
+                  {costCoverage.costedCopies} of {costCoverage.totalCopies}{" "}
+                  copies costed
+                </span>
+                <span>
+                  {costCoverage.cardsMissingCosts} card rows need costs
+                </span>
+                <span>
+                  {formatMoney(costCoverage.untrackedMarketValue, {
+                    currency: "USD",
+                  })}{" "}
+                  value lacks cost basis
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -372,9 +391,35 @@ export function CostReturnsContent() {
             {missingCount > 0 ? (
               <p className="text-sm text-muted-foreground" role="status">
                 {missingCount} {missingCount === 1 ? "copy is" : "copies are"}{" "}
-                omitted because a current price or exchange rate is unavailable.
+                omitted because an original currency, current price or exchange
+                rate is unavailable.
               </p>
             ) : null}
+
+            {lots.some((lot) => lot.paidCurrency === UNKNOWN_CURRENCY) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Purchase currency unknown</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <p>
+                    These original amounts are preserved and excluded from
+                    currency totals and returns. Add their purchase currency in
+                    Collections.
+                  </p>
+                  {lots
+                    .filter((lot) => lot.paidCurrency === UNKNOWN_CURRENCY)
+                    .map((lot) => (
+                      <p key={lot.id}>
+                        {lot.cardName}:{" "}
+                        {formatMoney(lot.paidAmount, {
+                          currency: UNKNOWN_CURRENCY,
+                        })}
+                      </p>
+                    ))}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardContent className="p-0">

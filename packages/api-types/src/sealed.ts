@@ -120,6 +120,7 @@ export interface SealedLedgerCard {
   status: 'active' | 'sold';
   liveValue: number;
   realizedProceeds: number;
+  realizedProceedsByCurrency?: Array<{ currency: string; amount: number }>;
   soldAt?: string;
 }
 
@@ -132,6 +133,7 @@ export interface SealedOpeningLedger {
   invested: number;
   liveValue: number;
   realizedProceeds: number;
+  realizedProceedsByCurrency?: Array<{ currency: string; amount: number }>;
   profitLoss: number;
   activeCopies: number;
   soldCopies: number;

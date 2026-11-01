@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import { API_BASE_URL } from "./base-url";
 import type { BinderPage, UpsertBinderPageInput } from "@tcg/api-types";
 
@@ -8,7 +9,7 @@ export async function saveBinderPage(
   photo?: Blob,
 ): Promise<BinderPage> {
   const path = `${API_BASE_URL}/collections/${encodeURIComponent(binderId)}/pages/${input.pageNumber}`;
-  const response = await fetch(path, {
+  const response = await sessionFetch(path, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -24,7 +25,7 @@ export async function saveBinderPage(
   if (photo) {
     const form = new FormData();
     form.append("image", photo, "binder-page.jpg");
-    const upload = await fetch(`${path}/image`, {
+    const upload = await sessionFetch(`${path}/image`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,
@@ -42,7 +43,7 @@ export async function getBinderPages(
   token: string,
   binderId: string,
 ): Promise<BinderPage[]> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/collections/${encodeURIComponent(binderId)}/pages`,
     { headers: { Authorization: `Bearer ${token}` } },
   );

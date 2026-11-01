@@ -41,8 +41,12 @@ import {
   getSupportedCurrencies,
 } from "@/lib/currency/exchange-rates";
 import { formatMoney } from "@/lib/format-money";
+import {
+  originalCurrency,
+  UNKNOWN_CURRENCY,
+} from "@/lib/pricing/acquisition-currency";
+import { useServerFeatures } from "@/lib/api/health";
 import { useAuthStore } from "@/stores/auth";
-import { useCollectionsStore } from "@/stores/collections";
 
 interface CardAcquisitionEditorProps {
   card: CollectionCard;
@@ -79,14 +83,12 @@ export function CardAcquisitionEditor({
   binderId,
   compact = false,
 }: CardAcquisitionEditorProps) {
+  const features = useServerFeatures();
   const token = useAuthStore((state) => state.token);
-  const updateCollectionCard = useCollectionsStore(
-    (state) => state.updateCollectionCard,
-  );
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -118,7 +120,7 @@ export function CardAcquisitionEditor({
         item,
       ]),
     );
-    if (!byCode.has(currency)) {
+    if (currency && currency !== UNKNOWN_CURRENCY && !byCode.has(currency)) {
       byCode.set(currency, { isoCode: currency, name: currency });
     }
     return Array.from(byCode.values()).sort((left, right) =>
@@ -129,7 +131,10 @@ export function CardAcquisitionEditor({
   const openEditor = () => {
     const initialAmount = transaction?.amount ?? copy?.acquisitionPrice;
     setAmount(initialAmount === undefined ? "" : String(initialAmount));
-    setCurrency(transaction?.currency ?? "USD");
+    const original = originalCurrency(
+      transaction?.currency ?? copy?.acquisitionCurrency,
+    );
+    setCurrency(original === UNKNOWN_CURRENCY ? "" : original);
     setPurchaseDate(dateInputValue(transaction?.date ?? copy?.acquiredAt));
     setSource(transaction?.platform ?? "");
     setSourceUrl(transaction?.sourceUrl ?? "");
@@ -145,6 +150,7 @@ export function CardAcquisitionEditor({
   const parsedAmount = Number(amount);
   const sourceUrlIsValid = isValidOptionalHttpUrl(sourceUrl);
   const canSave =
+    features.linkedAcquisitions === true &&
     !!token &&
     !!binderId &&
     Number.isFinite(parsedAmount) &&
@@ -154,7 +160,9 @@ export function CardAcquisitionEditor({
     !isSaving;
   const hasPurchase = !!transaction || copy.acquisitionPrice !== undefined;
   const summaryAmount = transaction?.amount ?? copy.acquisitionPrice;
-  const summaryCurrency = transaction?.currency ?? "USD";
+  const summaryCurrency = originalCurrency(
+    transaction?.currency ?? copy?.acquisitionCurrency,
+  );
   const summaryDate = transaction?.date ?? copy.acquiredAt;
 
   const save = async () => {
@@ -166,10 +174,6 @@ export function CardAcquisitionEditor({
     const normalizedUrl = sourceUrl.trim() || null;
     const normalizedNotes = notes.trim() || null;
     try {
-      await updateCollectionCard(token, binderId, copy.id, {
-        acquisitionPrice: parsedAmount,
-        acquiredAt: date,
-      });
       if (transaction) {
         await updateTransaction(token, transaction.id, {
           collectionEntryId: copy.id,
@@ -221,14 +225,17 @@ export function CardAcquisitionEditor({
   };
 
   const remove = async () => {
-    if (!token || !binderId || !transaction || isSaving) return;
+    if (
+      !token ||
+      !binderId ||
+      !transaction ||
+      isSaving ||
+      features.linkedAcquisitions !== true
+    )
+      return;
     setIsSaving(true);
     setError(null);
     try {
-      await updateCollectionCard(token, binderId, copy.id, {
-        acquisitionPrice: null,
-        acquiredAt: null,
-      });
       await deleteTransaction(token, transaction.id);
       await queryClient.invalidateQueries({
         queryKey: ["finance", "purchase", copy.id],
@@ -321,7 +328,7 @@ export function CardAcquisitionEditor({
                 <Label>Currency</Label>
                 <Select value={currency} onValueChange={setCurrency}>
                   <SelectTrigger aria-label="Purchase currency">
-                    <SelectValue />
+                    <SelectValue placeholder="Choose currency" />
                   </SelectTrigger>
                   <SelectContent>
                     {currencies.map((item) => (
@@ -333,6 +340,14 @@ export function CardAcquisitionEditor({
                 </Select>
               </div>
             </div>
+
+            {summaryAmount !== undefined &&
+              summaryCurrency === UNKNOWN_CURRENCY && (
+                <p className="text-sm text-muted-foreground">
+                  This saved amount has no original currency. Choose the
+                  purchase currency before saving or calculating returns.
+                </p>
+              )}
 
             <div className="space-y-1.5">
               <Label
@@ -427,6 +442,12 @@ export function CardAcquisitionEditor({
               Total paid should include any tax, shipping, or marketplace costs
               you want included in the cost basis.
             </p>
+            {features.linkedAcquisitions !== true && (
+              <p role="status" className="text-sm text-muted-foreground">
+                Saving linked purchase details requires an updated Convex server
+                with atomic acquisition support.
+              </p>
+            )}
             {error ? (
               <p className="text-sm text-destructive" role="alert">
                 {error}

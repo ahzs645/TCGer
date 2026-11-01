@@ -45,4 +45,38 @@ describe('Convex HTTP proxy headers', () => {
     expect(headers.get('authorization')).toBe('Bearer browser-session');
     expect(headers.get('cookie')).toBe('better-auth.session_token=test');
   });
+
+  it('does not manufacture a trusted Origin for requests without one', () => {
+    const previousOrigin = env.APP_ORIGIN;
+    env.APP_ORIGIN = 'https://trusted-web.example';
+    try {
+      const headers = buildAuthProxyHeaders(requestWithHeaders({
+        host: 'api.example', cookie: 'better-auth.session_token=test'
+      }));
+      expect(headers.has('origin')).toBe(false);
+      expect(headers.get('x-forwarded-host')).toBe('trusted-web.example');
+    } finally {
+      env.APP_ORIGIN = previousOrigin;
+    }
+  });
+
+  it.each(['https://configured-api.example', 'https://untrusted.example', 'null'])(
+    'preserves incoming Origin %s for Better Auth to validate, including account aliases',
+    origin => {
+      const previousOrigin = env.APP_ORIGIN;
+      env.APP_ORIGIN = 'https://trusted-web.example';
+      try {
+        for (const [method, originalUrl] of [
+          ['POST', '/auth/sign-in/email'],
+          ['POST', '/users/me/change-password'],
+          ['DELETE', '/users/me']
+        ]) {
+          const request = Object.assign(requestWithHeaders({ origin }), { method, originalUrl });
+          expect(buildAuthProxyHeaders(request).get('origin')).toBe(origin);
+        }
+      } finally {
+        env.APP_ORIGIN = previousOrigin;
+      }
+    }
+  );
 });

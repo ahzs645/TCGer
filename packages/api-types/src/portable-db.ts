@@ -69,6 +69,7 @@ export interface CollectionEntryRow extends PortableRow {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   isFoil?: boolean;

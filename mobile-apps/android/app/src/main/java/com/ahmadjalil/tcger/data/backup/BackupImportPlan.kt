@@ -16,7 +16,8 @@ fun PortableCollectionBackup.importPlan(products: List<SealedProductEntity>): Lo
                 val card = owned.card
                 OwnedCardEntity(if (copyIndex == 0) owned.id ?: stable("copy:$index:$cardIndex:0") else stable("copy:$index:$cardIndex:$copyIndex"),
                     id, card.id, card.name, card.tcg, card.setCode, card.setName, card.rarity, card.collectorNumber, card.imageUrl,
-                    1, owned.condition, owned.price, 0, owned.acquisitionPrice, Json.encodeToString(owned.details))
+                    1, owned.condition, owned.price, 0, owned.acquisitionPrice, Json.encodeToString(owned.details),
+                    if (owned.acquisitionPrice == null) null else owned.acquisitionCurrency)
             } })
     }
     val wishlistGroups = wishlists.mapIndexed { index, wishlist ->

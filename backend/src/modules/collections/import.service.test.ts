@@ -1,6 +1,14 @@
 import { collectionImportTemplate, previewCollectionImport } from './import.service';
 
 describe('collection CSV import', () => {
+  it('retains the original purchase currency and rejects ambiguous currency labels', () => {
+    const valid = previewCollectionImport('tcg,external_id,card_name,acquisition_price,acquisition_currency\npokemon,example,Example,100,cad');
+    expect(valid.valid).toBe(true);
+    expect(valid.rows[0]).toMatchObject({ acquisitionPrice: 100, acquisitionCurrency: 'CAD' });
+    const invalid = previewCollectionImport('tcg,external_id,card_name,acquisition_price,acquisition_currency\npokemon,example,Example,100,dollars');
+    expect(invalid.valid).toBe(false);
+    expect(invalid.issues).toEqual(expect.arrayContaining([expect.objectContaining({ field: 'acquisition_currency' })]));
+  });
   it('accepts the export-style headings and quoted values', () => {
     const preview = previewCollectionImport(
       [

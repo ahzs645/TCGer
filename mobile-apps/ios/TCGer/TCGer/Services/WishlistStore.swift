@@ -24,6 +24,24 @@ final class WishlistStore: ObservableObject {
     private var source: Source?
     private var lastLoadedAt: Date?
     private var activeLoad: Task<[Wishlist], Error>?
+    private var generation = UUID()
+    private var contentRevision = 0
+
+    struct MutationScope {
+        fileprivate let baseURL: String
+        fileprivate let token: String
+        fileprivate let generation: UUID
+    }
+
+    func mutationScope(config: ServerConfiguration, token: String) -> MutationScope {
+        prepare(for: Source(baseURL: config.baseURL, token: token))
+        return MutationScope(baseURL: config.baseURL, token: token, generation: generation)
+    }
+
+    func publish(_ wishlist: Wishlist, for scope: MutationScope) throws {
+        guard source == Source(baseURL: scope.baseURL, token: scope.token), generation == scope.generation, !Task.isCancelled else { throw CancellationError() }
+        insert(wishlist)
+    }
 
     init(
         refreshInterval: TimeInterval = 30,
@@ -74,10 +92,11 @@ final class WishlistStore: ObservableObject {
             try await loader(config, token)
         }
         activeLoad = task
-        await apply(task, for: requestedSource)
+        await apply(task, for: requestedSource, generation: generation, contentRevision: contentRevision)
     }
 
-    func insert(_ wishlist: Wishlist) {
+    private func insert(_ wishlist: Wishlist) {
+        contentRevision &+= 1
         wishlists.removeAll { $0.id == wishlist.id }
         wishlists.insert(wishlist, at: 0)
         hasLoaded = true
@@ -86,7 +105,8 @@ final class WishlistStore: ObservableObject {
         revision &+= 1
     }
 
-    func remove(id: String) {
+    private func remove(id: String) {
+        contentRevision &+= 1
         wishlists.removeAll { $0.id == id }
         hasLoaded = true
         lastLoadedAt = Date()
@@ -103,11 +123,17 @@ final class WishlistStore: ObservableObject {
         guard let repository else {
             throw RepositoryConfigurationError.mutationsUnavailable
         }
+        let requestedSource = Source(baseURL: config.baseURL, token: token)
+        prepare(for: requestedSource)
+        let requestedGeneration = generation
         let wishlist = try await repository.createWishlist(
             config: config,
             token: token,
             input: input
         )
+        guard source == requestedSource, generation == requestedGeneration, !Task.isCancelled else {
+            throw CancellationError()
+        }
         insert(wishlist)
         return wishlist
     }
@@ -120,7 +146,13 @@ final class WishlistStore: ObservableObject {
         guard let repository else {
             throw RepositoryConfigurationError.mutationsUnavailable
         }
+        let requestedSource = Source(baseURL: config.baseURL, token: token)
+        prepare(for: requestedSource)
+        let requestedGeneration = generation
         try await repository.deleteWishlist(config: config, token: token, id: id)
+        guard source == requestedSource, generation == requestedGeneration, !Task.isCancelled else {
+            throw CancellationError()
+        }
         remove(id: id)
     }
 
@@ -135,6 +167,7 @@ final class WishlistStore: ObservableObject {
     }
 
     func reset() {
+        generation = UUID()
         activeLoad?.cancel()
         activeLoad = nil
         source = nil
@@ -147,6 +180,7 @@ final class WishlistStore: ObservableObject {
 
     private func prepare(for requestedSource: Source) {
         guard source != requestedSource else { return }
+        generation = UUID()
         activeLoad?.cancel()
         activeLoad = nil
         source = requestedSource
@@ -159,11 +193,19 @@ final class WishlistStore: ObservableObject {
 
     private func apply(
         _ task: Task<[Wishlist], Error>,
-        for requestedSource: Source
+        for requestedSource: Source,
+        generation requestedGeneration: UUID,
+        contentRevision requestedRevision: Int
     ) async {
+        defer {
+            if source == requestedSource, generation == requestedGeneration {
+                activeLoad = nil
+                isLoading = false
+            }
+        }
         do {
             let loadedWishlists = try await task.value
-            guard source == requestedSource else { return }
+            guard source == requestedSource, generation == requestedGeneration, contentRevision == requestedRevision, !Task.isCancelled else { return }
             wishlists = loadedWishlists
             hasLoaded = true
             lastLoadedAt = Date()
@@ -172,13 +214,10 @@ final class WishlistStore: ObservableObject {
         } catch is CancellationError {
             // Source changes and view lifecycle cancellation are expected.
         } catch {
-            guard source == requestedSource else { return }
+            guard source == requestedSource, generation == requestedGeneration, contentRevision == requestedRevision, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
 
-        guard source == requestedSource else { return }
-        activeLoad = nil
-        isLoading = false
     }
 }
 

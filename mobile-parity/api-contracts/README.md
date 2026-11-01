@@ -1,13 +1,14 @@
 # Shared API contract coverage
 
-[`interactions.json`](interactions.json) defines 42 REST interactions for eight
+[`interactions.json`](interactions.json) defines 54 REST interactions for nine
 product features: `collections.browse`, `collections.create`,
 `collections.manage`, `collections.copies`, `cards.search`,
 `data.portableBackup`, `scanner.results.addToBinder`, and
-`packOpening.save.sealedLedger`.
+`packOpening.save.sealedLedger`, and `inventory.sales`.
 The real three-platform clients exercise lists, metadata, partial updates,
 deletion (including empty HTTP 204 responses), query serialization, imports,
-physical-copy edits and moves, scan-result persistence requests and sealed openings.
+physical-copy edits and moves, explicit single-copy deletion, reviewed atomic
+intake, sales, scan-result persistence requests and sealed openings.
 Failure coverage includes invalid input, missing authentication, foreign binder,
 copy and sealed-inventory ownership, unsupported backup versions and opening
 more sealed units than owned. Scanner image recognition/upload and pricing
@@ -17,10 +18,10 @@ still need their own contracts.
 
 | Target | Executed code | Isolation |
 | --- | --- | --- |
-| Web | Production collection, card, backup and sealed clients | Mock fetch asserts method, path, decoded query, authorization and exact JSON before returning the shared response. |
+| Web | Production collection, card, backup, sealed, intake and sales clients | Mock fetch asserts method, path, decoded query, authorization and exact JSON before returning the shared response. |
 | iOS | Production `APIService` serializers, remote operations and decoders | URLProtocol asserts the request and returns the same fixture. Generated fixture is bundled in the test target only. |
 | Android | Production `RemoteServiceFactory`, Retrofit interface and DTO codec | Injected OkHttp transport asserts the actual serialized request and returns the fixture. Test resources read the original JSON directly. |
-| Express | Real collection/card/backup/sealed routers, authentication middleware, input schemas and error handler | Collection/sealed services and auth session lookup are stubbed; the backup gateway transport is injected. Prisma persistence, upstream catalogs and live identity are not verified here. |
+| Express | Real collection/card/backup/sealed routers, atomic intake/sale proxy routes, authentication middleware, input schemas and error handler | Collection/sealed services and auth session lookup are stubbed; gateway transport checks exact bridge identity and request bodies. Prisma persistence, upstream catalogs and live identity are not verified here. |
 | Convex | Real HTTP actions, mutations, response mapping and user isolation | `convex-test` provides in-memory storage and a test bridge identity. No deployed gateway or live identity service is used. |
 
 Card search is served by Express in both backend modes, so those interactions
@@ -35,17 +36,38 @@ Copy PATCH addresses one physical copy by default. Moving that copy preserves it
 ID and metadata and leaves its sibling in the original binder. Explicit nulls clear
 acquisition and owned-copy details; omitted fields preserve existing values. The
 existing DELETE card route removes the whole printing group, including its copies.
-The contracts deliberately retain that established grouped-delete behavior; they do
-not claim a separate single-copy delete endpoint.
+The contracts retain that grouped-delete behavior and additionally exercise
+`DELETE /collections/:binderId/copies/:copyId`. The new route deletes only its
+addressed copy and preserves sibling identity and metadata. Clients percent-encode
+copy IDs, including legacy ordinal addresses containing `#`.
 
-Scan-save coverage exercises the existing collection-add clients with a reviewed
-card snapshot. It verifies the persistence HTTP boundary, including validation and
-authentication failure, rather than image recognition, review UI, draft checkpoints
-or retry idempotency. An interrupted save can still need product-level retry coverage.
+Legacy scan-save coverage exercises the existing collection-add clients with a
+reviewed card snapshot. New atomic-intake interactions exercise
+`POST /collections/:binderId/intake`, including exact row/operation IDs,
+validation, authentication, foreign ownership, and returned copy receipts. Convex
+provider assertions replay successful intake and sale requests and verify the
+original receipt, one set of copies, and one ledger entry. Dedicated domain and
+client tests add changed-payload conflicts, transaction rollback, durable
+checkpoints and lost-response recovery. These are distinct from image recognition
+and physical camera qualification.
 Sealed-opening coverage includes ownership of linked card copies and inventory,
 quantity validation and excess quantity rejection without decrementing stock.
-It does not claim offline sealed ledger support or an idempotency key for repeated
-opening submissions.
+The standalone sealed-opening endpoint does not claim offline ledger support or
+idempotent replay. The combined atomic-intake endpoint owns replay when actual
+new copies and a sealed opening are committed together. Simulation history does
+not enter physical inventory or decrement sealed stock.
+
+Sale interactions exercise `POST /finance/sales` with explicit physical copies,
+amount and currency, optional costs, removal intent, and a stable operation ID.
+The required receipt includes the selected and removed copy IDs. Legacy hybrid
+advertises the stronger operations as unsupported and rejects them before any
+partial write; proxy success fixtures describe the full Convex provider path.
+
+`backend/src/integration/legacy-provider.acceptance.ts` separately tests a fresh
+real PostgreSQL database after versioned migrations, with real identity
+provisioning and collection persistence. It refuses non-disposable/nonempty user
+databases. Keep this acceptance coverage distinct from Express's mocked route
+contract suite and from a live Better Auth signup test.
 
 Responses allow additive fields while retaining required fields, types, values,
 array lengths and envelopes. Explicit matchers allow generated binder IDs,

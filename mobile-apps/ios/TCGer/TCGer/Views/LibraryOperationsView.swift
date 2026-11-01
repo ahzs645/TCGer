@@ -4,8 +4,8 @@
 // @tcger-feature {"id":"intake.acquisitionCosts","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 // @tcger-feature {"id":"intake.psaCertification","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 // @tcger-feature {"id":"pricing.provenance","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
-// @tcger-feature {"id":"storage.audit","platform":"ios","status":"planned","limitation":"Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent."}
-// @tcger-feature {"id":"collections.historyUndo","platform":"ios","status":"partial","modes":["server"],"requires":["authenticated-server"],"limitation":"Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent."}
+// @tcger-feature {"id":"storage.audit","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
+// @tcger-feature {"id":"collections.historyUndo","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 import SwiftUI
 
 struct LibraryOperationsView: View {
@@ -298,6 +298,11 @@ private struct StorageContainerEditorView: View {
             if let mutationError { Text(mutationError).foregroundStyle(.red) }
             ForEach(container.compartments.sorted { $0.order < $1.order }) { compartment in
                 Section {
+                    NavigationLink {
+                        StorageAuditView(container: container, compartment: compartment)
+                    } label: {
+                        Label("Audit this location", systemImage: "checklist")
+                    }
                     LazyVGrid(
                         columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: max(1, compartment.columns)),
                         spacing: 8

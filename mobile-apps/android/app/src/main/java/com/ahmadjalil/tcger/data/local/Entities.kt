@@ -55,6 +55,7 @@ data class OwnedCardEntity(
     val createdAt: Long,
     val acquisitionPrice: Double? = null,
     @androidx.room.ColumnInfo(defaultValue = "'{}'") val detailsJson: String = "{}",
+    val acquisitionCurrency: String? = null,
 )
 
 @Serializable

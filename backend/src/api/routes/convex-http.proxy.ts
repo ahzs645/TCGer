@@ -59,8 +59,6 @@ export function buildAuthProxyHeaders(req: Request) {
   }
   if (origin) {
     headers.set('Origin', origin);
-  } else if (env.APP_ORIGIN) {
-    headers.set('Origin', env.APP_ORIGIN);
   }
   if (forwardedHost) {
     headers.set('Host', forwardedHost);

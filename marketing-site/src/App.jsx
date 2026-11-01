@@ -41,13 +41,16 @@ const GAMES = [
   { name: "Pokemon", src: "TCGdex + Official API", color: "pkmn" },
   { name: "Magic: The Gathering", src: "Scryfall Adapter", color: "mtg" },
   { name: "Yu-Gi-Oh!", src: "YGOPRODeck API", color: "ygo" },
+  { name: "One Piece", src: "OPTCG API", color: "pkmn" },
+  { name: "Disney Lorcana", src: "Lorcast API", color: "mtg" },
+  { name: "Dragon Ball Super", src: "API TCG · requires server key", color: "ygo" },
 ];
 
 const FEATURES = [
   {
     icon: "search",
     title: "Unified Cross-Game Search",
-    desc: "One search bar, three games. Adapter-based architecture serves results with filters that adapt per TCG.",
+    desc: "Search across six built-in game adapters and installed community games, with filters that adapt to each catalog.",
   },
   {
     icon: "grid",
@@ -78,21 +81,21 @@ const FEATURES = [
 
 const EXTRAS = [
   "API-First \u00b7 OpenAPI 3.0 + Swagger UI",
-  "Self-Hosted \u00b7 Docker Compose + PostgreSQL",
+  "Self-Hosted \u00b7 Docker Compose + Convex",
   "Extensible \u00b7 Adapter pattern for new TCGs",
   "Auth Built-In \u00b7 Better Auth + admin setup",
-  "Mobile Coming \u00b7 iOS SwiftUI + Android Kotlin",
+  "Native Apps \u00b7 iOS source build + Android APK",
 ];
 
 const STEPS = [
   {
     title: "Clone & Deploy",
-    desc: "Pull the repo, start everything with Docker Compose. First-run setup creates your admin account.",
-    code: "git clone github.com/ahzs645/TCGer\ncd TCGer && docker compose up",
+    desc: "Follow the self-hosting guide to configure secrets, start Convex, deploy its functions, and run the web app. Sign up, then complete first-admin setup.",
+    code: "git clone --recurse-submodules https://github.com/ahzs645/TCGer.git\ncd TCGer\ncp .env.docker.example .env.docker\n# Configure secrets and follow docs/backend-modes.md",
   },
   {
     title: "Search & Collect",
-    desc: "Search across Pokemon, Magic, and Yu-Gi-Oh! at once. Add copies with full detail\u2009\u2014\u2009condition, price, language, tags.",
+    desc: "Search your installed games. Add real copies with full detail\u2009\u2014\u2009condition, price, language, tags.",
     code: null,
   },
   {
@@ -104,23 +107,25 @@ const STEPS = [
 
 const STACK = [
   { group: "Backend", items: ["Node.js", "Express", "Convex", "PostgreSQL", "Prisma", "Better Auth"] },
-  { group: "Frontend", items: ["Next.js 15", "React 18", "Tailwind", "Zustand", "React Query"] },
+  { group: "Frontend", items: ["Next.js 16", "React 19", "Tailwind", "Zustand", "React Query"] },
   { group: "Cache Services", items: ["Scryfall", "YGO", "TCGdex", "Docker"] },
   { group: "Shared Layer", items: ["TypeScript", "Zod", "OpenAPI 3.0", "Turborepo"] },
 ];
 
 const OSS = [
   { title: "Fully open source", desc: "Every line on GitHub. Fork it, self-host it, adapt it. No hidden services, no vendor lock-in." },
-  { title: "Own your data", desc: "Self-host Convex and PostgreSQL, with optional cache workers for upstream card APIs. Your collection stays yours." },
+  { title: "Own your data", desc: "Self-host Convex for shared accounts and inventory. Phone-only mode keeps data on the device; portable backups help you move it." },
   { title: "Built to extend", desc: "Adapter pattern for new TCGs. OpenAPI spec and typed interfaces make contributions straightforward." },
 ];
 
 const FAQS = [
-  { q: "Is TCGer free?", a: "Yes. Fully open-source and self-hosted. No paid tiers, no usage limits." },
-  { q: "Which card games?", a: "Pokemon, Magic: The Gathering, and Yu-Gi-Oh!\u2009\u2014\u2009all through a unified adapter layer." },
+  { q: "Is TCGer free?", a: "The application is open source. Hosting and optional upstream pricing or catalog services can have their own costs and limits." },
+  { q: "Which card games?", a: "Pokémon, Magic: The Gathering, Yu-Gi-Oh!, One Piece, Disney Lorcana, and Dragon Ball Super have built-in adapters. Dragon Ball search needs a configured API key. Community game packages can add catalogs and game rules." },
   { q: "Do I need the cache services?", a: "No. They\u2019re optional accelerators. Start with direct APIs and add caching later." },
   { q: "API documentation?", a: "Full OpenAPI 3.0 spec with interactive Swagger UI included." },
-  { q: "Where can I host it?", a: "Anywhere with Docker\u2009\u2014\u2009VPS, home server, Raspberry Pi. Just needs PostgreSQL." },
+  { q: "Where can I host it?", a: "Use a host compatible with the pinned Docker images and persistent Convex storage. Follow the repository deployment guide; PostgreSQL is needed only for legacy hybrid storage." },
+  { q: "Does the browser demo sync with my phone?", a: "The public demo uses sample and browser-local data. Phone-only collections stay on the device. To share account data between web and phone, connect both to the same authenticated server." },
+  { q: "How do I get the native apps?", a: "The repository contains the SwiftUI iOS app and Android app. iOS currently uses a signed source build; Android supports a directly installed signed APK. See release-readiness.md for build and device-verification instructions. This page does not offer an App Store release." },
   { q: "Adding a new TCG?", a: "Implement the adapter interface. The pattern isolates game logic so the rest of the stack works automatically." },
 ];
 
@@ -401,13 +406,14 @@ export default function App() {
             <div className="pill"><span className="pill-dot" />Open-Source Collection Platform</div>
             <h1>Your cards <em>deserve</em> better than spreadsheets.</h1>
             <p className="hero-sub">
-              TCGer is a self-hosted platform for managing Pokemon, Magic:&nbsp;The&nbsp;Gathering,
-              and Yu-Gi-Oh! collections&thinsp;&mdash;&thinsp;unified search, per-copy inventory,
-              binder organization, and optional offline caching.
+              Manage your trading card collection across games with per-copy inventory,
+              binders, scanning, and portable backups. Use the phone app locally or connect
+              web and native apps to your own server.
             </p>
             <div className="hero-btns">
-              <a className="btn btn-warm" href={GH} target="_blank" rel="noreferrer">Get Started</a>
-              <a className="btn btn-ghost" href={DEMO}>Live Demo</a>
+              <a className="btn btn-warm" href={GH} target="_blank" rel="noreferrer">Host a server</a>
+              <a className="btn btn-ghost" href={DEMO}>Try the browser demo</a>
+              <a className="btn btn-ghost" href={`${GH}/blob/main/docs/release-readiness.md`}>Get the native apps</a>
               <a className="btn btn-ghost" href={PRODUCT_DOCS}>Docs</a>
             </div>
           </div>

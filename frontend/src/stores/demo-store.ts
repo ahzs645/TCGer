@@ -146,6 +146,7 @@ interface DemoCopyInput {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   isFoil?: boolean;
@@ -205,8 +206,7 @@ export type DemoAppSettings = AdminAppSettings;
 
 /** Persisted snapshots are private to the demo; API callers receive the
  * standard audit fields only. Keeping both sides makes undo conflict-safe. */
-export interface DemoCollectionAuditRecord
-  extends CollectionMutationAuditEntry {
+export interface DemoCollectionAuditRecord extends CollectionMutationAuditEntry {
   before: CollectionSnapshot;
   after: CollectionSnapshot;
 }
@@ -405,6 +405,7 @@ function makeDemoCopy(input: DemoCopyInput = {}): CollectionCardCopy {
     notes: input.notes,
     price: input.price,
     acquisitionPrice: input.acquisitionPrice,
+    acquisitionCurrency: input.acquisitionCurrency,
     serialNumber: input.serialNumber,
     acquiredAt: input.acquiredAt,
     isFoil: input.isFoil,
@@ -604,6 +605,7 @@ function seedBinders(): DemoBinder[] {
               {
                 condition: "Near Mint",
                 acquisitionPrice: Math.max(1, c.price * 0.62),
+                acquisitionCurrency: "USD",
                 storageLocation: "Toploader box · Row 1",
                 serialNumber: "DEMO-025",
               },
@@ -1601,8 +1603,15 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     await localDb.transaction(["cards"], async () => {
       const enrichedRows = toPortableRows(enrichedBinders).cards;
       for (const row of localDb.snapshot().cards) {
-        const enriched = enrichedRows.find((candidate) => candidate.tcg === row.tcg && candidate.externalId === row.externalId);
-        if (enriched?.cardData) await localDb.patch("cards", row._id, { cardData: enriched.cardData });
+        const enriched = enrichedRows.find(
+          (candidate) =>
+            candidate.tcg === row.tcg &&
+            candidate.externalId === row.externalId,
+        );
+        if (enriched?.cardData)
+          await localDb.patch("cards", row._id, {
+            cardData: enriched.cardData,
+          });
       }
     });
     derivedBinders = enrichedBinders;
@@ -2000,8 +2009,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
       containerType: clearable(data.containerType, binder.containerType),
       imageUrl: clearable(data.imageUrl, binder.imageUrl),
       associatedTcg: clearable(data.associatedTcg, binder.associatedTcg) as
-        | TcgCode
-        | undefined,
+        TcgCode | undefined,
       associatedSetCode: clearable(
         data.associatedSetCode,
         binder.associatedSetCode,
@@ -2048,6 +2056,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
         notes: details?.copy?.notes,
         price: details?.copy?.price ?? card.price,
         acquisitionPrice: details?.copy?.acquisitionPrice,
+        acquisitionCurrency: details?.copy?.acquisitionCurrency,
         serialNumber: details?.copy?.serialNumber,
         acquiredAt: details?.copy?.acquiredAt,
         isFoil: details?.copy?.isFoil,
@@ -2072,8 +2081,10 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   updateCardInBinder: async (binderId, cardOrCopyId, updates) => {
     try {
       const original = await localDb.get("collectionEntries", cardOrCopyId);
-      if (!original || original.binderId !== binderId) throw new Error("Card not found");
-      const shouldUpdateTags = updates.tags !== undefined || updates.newTags !== undefined;
+      if (!original || original.binderId !== binderId)
+        throw new Error("Card not found");
+      const shouldUpdateTags =
+        updates.tags !== undefined || updates.newTags !== undefined;
       const tags = (updates.tags ?? []).map((id) => {
         const tag = get().tags.find((candidate) => candidate.id === id);
         if (!tag) throw new Error("Tag not found");
@@ -2081,8 +2092,16 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
       });
       const newTags: DemoTag[] = [];
       for (const input of updates.newTags ?? []) {
-        const existing = [...get().tags, ...newTags].find((tag) => tag.label.toLowerCase() === input.label.toLowerCase());
-        const tag = existing ?? { id: uid(), label: input.label.trim(), colorHex: (input.colorHex ?? "cccccc").replace(/^#/, ""), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        const existing = [...get().tags, ...newTags].find(
+          (tag) => tag.label.toLowerCase() === input.label.toLowerCase(),
+        );
+        const tag = existing ?? {
+          id: uid(),
+          label: input.label.trim(),
+          colorHex: (input.colorHex ?? "cccccc").replace(/^#/, ""),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
         if (!existing) newTags.push(tag);
         tags.push(tag);
       }
@@ -2090,7 +2109,9 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
         userId: LOCAL_USER_ID,
         entryId: cardOrCopyId,
         updates: updates as UpdateFields,
-        embeddedTags: shouldUpdateTags ? Array.from(new Map(tags.map((tag) => [tag.id, tag])).values()) : undefined,
+        embeddedTags: shouldUpdateTags
+          ? Array.from(new Map(tags.map((tag) => [tag.id, tag])).values())
+          : undefined,
       });
       if (newTags.length) set({ tags: [...get().tags, ...newTags] });
       const binders = publishCollection();
@@ -2162,13 +2183,21 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     });
     // Deduplicated on the id the caller used, which for a seeded card is the
     // local catalog's id and not the printing id enrichment later attaches.
-    if (existing.some((row) => (row.localCardId ?? row.externalId) === card.id))
+    if (
+      existing.some(
+        (row) =>
+          row.tcg === card.tcg &&
+          (row.localCardId ?? row.externalId) === card.id,
+      )
+    )
       return;
 
     const now = Date.now();
     const externalId = cardData?.externalId ?? card.id;
     await localDb.patch("wishlists", wishlistId, {
-      excludedCardKeys: (wishlist.excludedCardKeys ?? []).filter(key => key !== `${card.tcg}:${externalId}`),
+      excludedCardKeys: (wishlist.excludedCardKeys ?? []).filter(
+        (key) => key !== `${card.tcg}:${externalId}`,
+      ),
     });
     await localDb.insert("wishlistCards", {
       wishlistId,
@@ -2221,7 +2250,12 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     const wishlist = await localDb.get("wishlists", wishlistId);
     if (!wishlist) return;
     await localDb.patch("wishlists", wishlistId, {
-      excludedCardKeys: [...new Set([...(wishlist.excludedCardKeys ?? []), `${row.tcg}:${row.externalId}`])],
+      excludedCardKeys: [
+        ...new Set([
+          ...(wishlist.excludedCardKeys ?? []),
+          `${row.tcg}:${row.externalId}`,
+        ]),
+      ],
     });
     await localDb.delete("wishlistCards", cardInstanceId);
     publishWishlists();
@@ -2570,30 +2604,66 @@ export function useDemoRarityBreakdown(): DemoRarityBreakdownEntry[] {
 }
 
 /** A backup must reach IndexedDB before its imported read models become visible. */
-export async function commitDemoBackup(patch: Partial<PersistedDemoState>, saveRecovery = true, expected?: Partial<PersistedDemoState>): Promise<void> {
+export async function commitDemoBackup(
+  patch: Partial<PersistedDemoState>,
+  saveRecovery = true,
+  expected?: Partial<PersistedDemoState>,
+): Promise<void> {
   await whenDemoStoreHydrated();
-  if (!persistence.commitDurably) throw new Error("Durable browser storage is unavailable");
+  if (!persistence.commitDurably)
+    throw new Error("Durable browser storage is unavailable");
   const current = useDemoStore.getState();
-  const before = Object.fromEntries(DEMO_SLICES.map(key => [key, current[key]])) as Partial<PersistedDemoState>;
-  if (expected && DEMO_SLICES.some(key => expected[key] !== before[key])) throw new Error("Local data changed while preparing this import. Retry to include those edits.");
+  const before = Object.fromEntries(
+    DEMO_SLICES.map((key) => [key, current[key]]),
+  ) as Partial<PersistedDemoState>;
+  if (expected && DEMO_SLICES.some((key) => expected[key] !== before[key]))
+    throw new Error(
+      "Local data changed while preparing this import. Retry to include those edits.",
+    );
   await persistence.commitDurably(patch, saveRecovery ? before : undefined);
   const rows = { ...localDb.snapshot() };
-  if (patch.collectionRows) { overlayRows(rows, patch.collectionRows, COLLECTION_TABLES); patch.binders = toDemoBinders(patch.collectionRows); derivedBinders = patch.binders; }
-  if (patch.wishlistRows) { overlayRows(rows, patch.wishlistRows, WISHLIST_TABLES); patch.wishlists = toDemoWishlists(patch.wishlistRows); }
-  if (patch.deckRows) { overlayRows(rows, patch.deckRows, DECK_TABLES); patch.decks = toDemoDecks(patch.deckRows); }
-  if (patch.tradeRows) { overlayRows(rows, patch.tradeRows, TRADE_TABLES); patch.trades = toDemoTrades(patch.tradeRows); }
-  if (patch.sealedRows) { overlayRows(rows, patch.sealedRows, SEALED_TABLES); patch.sealed = toDemoSealed(patch.sealedRows); }
+  if (patch.collectionRows) {
+    overlayRows(rows, patch.collectionRows, COLLECTION_TABLES);
+    patch.binders = toDemoBinders(patch.collectionRows);
+    derivedBinders = patch.binders;
+  }
+  if (patch.wishlistRows) {
+    overlayRows(rows, patch.wishlistRows, WISHLIST_TABLES);
+    patch.wishlists = toDemoWishlists(patch.wishlistRows);
+  }
+  if (patch.deckRows) {
+    overlayRows(rows, patch.deckRows, DECK_TABLES);
+    patch.decks = toDemoDecks(patch.deckRows);
+  }
+  if (patch.tradeRows) {
+    overlayRows(rows, patch.tradeRows, TRADE_TABLES);
+    patch.trades = toDemoTrades(patch.tradeRows);
+  }
+  if (patch.sealedRows) {
+    overlayRows(rows, patch.sealedRows, SEALED_TABLES);
+    patch.sealed = toDemoSealed(patch.sealedRows);
+  }
   localDb.load(rows);
   applyToStore(patch);
-  for (const key of DEMO_SLICES) writeSlice(persistBaseline, key, useDemoStore.getState()[key]);
+  for (const key of DEMO_SLICES)
+    writeSlice(persistBaseline, key, useDemoStore.getState()[key]);
 }
 export async function restoreDemoBackup(): Promise<void> {
   const previous = await persistence.readRecovery?.();
   if (!previous) throw new Error("No recovery point is available");
   await commitDemoBackup(previous);
 }
-export async function demoBackupSnapshot(): Promise<Partial<PersistedDemoState>> {
+export async function demoBackupSnapshot(): Promise<
+  Partial<PersistedDemoState>
+> {
   await whenDemoStoreHydrated();
   const current = useDemoStore.getState();
-  return Object.fromEntries(DEMO_SLICES.map(key => [key, current[key]])) as Partial<PersistedDemoState>;
+  return Object.fromEntries(
+    DEMO_SLICES.map((key) => [key, current[key]]),
+  ) as Partial<PersistedDemoState>;
+}
+
+/** Atomic demo operations require storage that acknowledges durable commits. */
+export function demoSupportsDurableOperations(): boolean {
+  return typeof persistence.commitDurably === "function";
 }

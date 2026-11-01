@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   CollectionValueHistory,
   CollectionValueBreakdown,
@@ -24,7 +25,7 @@ export const ANALYTICS_PERIODS = [
 export type AnalyticsPeriod = (typeof ANALYTICS_PERIODS)[number]["value"];
 
 async function authFetch(url: string, token: string) {
-  const res = await fetch(url, {
+  const res = await sessionFetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {

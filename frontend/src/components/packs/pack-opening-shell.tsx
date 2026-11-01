@@ -161,8 +161,8 @@ export function PackOpeningShell({
   );
   const showsResults = Boolean(
     state &&
-      (state.phase === "summary" || state.phase === "final") &&
-      state.session,
+    (state.phase === "summary" || state.phase === "final") &&
+    state.session,
   );
   const possiblePullsPool = state?.cardPools?.find(
     (pool) => pool.id === possiblePullsPoolID,
@@ -230,7 +230,7 @@ export function PackOpeningShell({
                 {savedOpeningsCount > 0 ? (
                   <DropdownMenuItem onSelect={onOpenHistory}>
                     <History className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Saved openings ({savedOpeningsCount})
+                    Simulation history ({savedOpeningsCount})
                   </DropdownMenuItem>
                 ) : null}
               </DropdownMenuContent>
@@ -891,7 +891,7 @@ function PhaseControls({
     <div className={cn(panelClass, "flex flex-wrap justify-center gap-2")}>
       {state.canSave ? (
         <Button type="button" onClick={() => onCommand({ type: "savePulls" })}>
-          Save Pulls
+          Save simulation
         </Button>
       ) : null}
       <Button

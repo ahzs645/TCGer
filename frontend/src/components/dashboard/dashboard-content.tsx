@@ -46,25 +46,11 @@ import {
 
 import { useShallow } from "zustand/react/shallow";
 import { formatMoney } from "@/lib/format-money";
-type DashboardCard = CollectionCard & {
-  updatedAt?: string;
-  binderName?: string;
-};
-
-interface DashboardStats {
-  totalCopies: number;
-  totalValue: number;
-  byGame: Record<TcgCode, { copies: number; value: number }>;
-  recentActivity: Array<{
-    id: string;
-    name: string;
-    tcg: TcgCode;
-    quantity: number;
-    binderName?: string;
-    binderId?: string;
-    timestamp: string;
-  }>;
-}
+import {
+  buildDashboardStats,
+  type DashboardCard,
+  type DashboardStats,
+} from "@/lib/dashboard-stats";
 
 interface SetCompletionMetric {
   tcg: TcgCode;
@@ -76,64 +62,6 @@ interface SetCompletionMetric {
   printingOwned: number;
   printingTotal: number;
   printingPercent: number;
-}
-
-function buildDashboardStats(
-  cards: DashboardCard[],
-  showPricing: boolean,
-): DashboardStats {
-  const stats: DashboardStats = {
-    totalCopies: 0,
-    totalValue: 0,
-    byGame: {
-      yugioh: { copies: 0, value: 0 },
-      magic: { copies: 0, value: 0 },
-      pokemon: { copies: 0, value: 0 },
-      onepiece: { copies: 0, value: 0 },
-      lorcana: { copies: 0, value: 0 },
-      dragonball: { copies: 0, value: 0 },
-    },
-    recentActivity: [],
-  };
-
-  cards.forEach((card) => {
-    const copies = Math.max(card.quantity ?? 0, 0);
-    const breakdown = stats.byGame[card.tcg];
-    breakdown.copies += copies;
-    stats.totalCopies += copies;
-
-    if (showPricing) {
-      const value = (card.price ?? 0) * copies;
-      breakdown.value += value;
-      stats.totalValue += value;
-    }
-  });
-
-  const sorted = [...cards].sort((a, b) => {
-    const getTime = (value?: string) => (value ? new Date(value).getTime() : 0);
-    return getTime(b.updatedAt) - getTime(a.updatedAt);
-  });
-
-  const seen = new Set<string>();
-  for (const card of sorted) {
-    const key = `${card.binderId ?? "global"}:${card.cardId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    stats.recentActivity.push({
-      id: key,
-      name: card.name,
-      tcg: card.tcg,
-      quantity: Math.max(card.quantity ?? 0, 0),
-      binderName: card.binderName,
-      binderId: card.binderId,
-      timestamp: card.updatedAt ?? new Date().toISOString(),
-    });
-    if (stats.recentActivity.length >= 5) break;
-  }
-
-  stats.totalValue = Number(stats.totalValue.toFixed(2));
-
-  return stats;
 }
 
 export function DashboardContent() {
@@ -176,12 +104,14 @@ export function DashboardContent() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const noGamesEnabled = Object.values(enabledGames).every(
-    (enabled) => !enabled,
-  );
+  const noGamesEnabled =
+    Object.values(enabledGames).every((enabled) => !enabled) &&
+    !collections.some((binder) =>
+      binder.cards.some((card) => !(card.tcg in enabledGames)),
+    );
   const selectedGameDisabled =
     selectedGame !== "all" &&
-    !enabledGames[selectedGame as keyof typeof enabledGames];
+    enabledGames[selectedGame as keyof typeof enabledGames] === false;
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -228,7 +158,8 @@ export function DashboardContent() {
 
   const filteredCards = useMemo(() => {
     return aggregatedCards.filter((card) => {
-      if (!enabledGames[card.tcg as keyof typeof enabledGames]) return false;
+      if (enabledGames[card.tcg as keyof typeof enabledGames] === false)
+        return false;
       if (selectedGame !== "all" && card.tcg !== selectedGame) return false;
       return true;
     });
@@ -699,7 +630,7 @@ function GameBreakdown({
   byGame,
   totalCopies,
 }: {
-  byGame: Record<TcgCode, { copies: number; value: number }>;
+  byGame: Record<string, { copies: number; value: number }>;
   totalCopies: number;
 }) {
   const total = totalCopies || 1;

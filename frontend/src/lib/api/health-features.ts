@@ -17,6 +17,12 @@ const featureKeys: Record<keyof ServerFeatures, true> = {
   shipments: true,
   public: true,
   onlineCodes: true,
+  atomicSales: true,
+  linkedAcquisitions: true,
+  atomicIntake: true,
+  tradeSettlement: true,
+  binderPageRevisionGuards: true,
+  emailDelivery: true,
 };
 
 export function parseServerFeatures(data: unknown): FeatureAvailability {
@@ -75,6 +81,13 @@ export function createServerFeatureCache(load: () => Promise<unknown>) {
   return {
     get,
     refresh,
+    reset() {
+      generation++;
+      snapshot = null;
+      pending = null;
+      for (const listener of listeners) listener({});
+      publishStatus("checking");
+    },
     // Status and feature consumers share one request, including Strict Mode
     // remounts. A new status check still probes a previously healthy server.
     check() {

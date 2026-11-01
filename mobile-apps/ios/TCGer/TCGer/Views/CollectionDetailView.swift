@@ -948,10 +948,8 @@ struct CollectionDetailView: View {
             }
         }
         .sheet(item: $cardToSell) { card in
-            MarkAsSoldSheet(card: card) { sale in
-                Task {
-                    await markCardAsSold(card: card, sale: sale)
-                }
+            MarkAsSoldSheet(card: card, collectionID: collection.id) { request in
+                try await markCardAsSold(request: request)
             }
         }
     }
@@ -1177,16 +1175,20 @@ struct CollectionDetailView: View {
             copyPendingDeletion = nil
         }
 
+        let session = environmentStore.sessionIdentity
         do {
-            try await apiService.deleteCardFromBinder(
-                config: environmentStore.serverConfiguration,
+            try await apiService.deleteCopyFromBinder(
+                config: session.configuration,
                 token: token,
                 binderId: collection.id,
-                collectionCardId: copy.id
+                copyId: copy.id
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            CollectionMutationNotice.post(config: session.configuration, token: token)
             await reloadBinderCards()
             HapticManager.notification(.success)
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -1638,41 +1640,15 @@ struct CollectionDetailView: View {
     }
 
     @MainActor
-    private func markCardAsSold(card: CollectionCard, sale: SaleDetails) async {
-        guard let token = environmentStore.authToken else { return }
-
-        do {
-            _ = try await apiService.createTransaction(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                type: "sale",
-                cardName: card.name,
-                tcg: card.tcg,
-                quantity: card.quantity,
-                amount: sale.amount,
-                platform: sale.platform,
-                costBasis: sale.costBasis,
-                fees: sale.fees,
-                shippingCost: sale.shippingCost,
-                acquiredAt: sale.acquiredAt
-            )
-
-            if sale.removeFromBinder {
-                try await apiService.deleteCardFromBinder(
-                    config: environmentStore.serverConfiguration,
-                    token: token,
-                    binderId: collection.id,
-                    collectionCardId: card.id
-                )
-                cards.removeAll { $0.id == card.id }
-            }
-
-            HapticManager.notification(.success)
-            cardToSell = nil
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+    private func markCardAsSold(request: InventorySaleRequest) async throws {
+        guard let token = environmentStore.authToken else { throw APIService.APIError.unauthorized }
+        let session = environmentStore.sessionIdentity
+        _ = try await apiService.recordInventorySale(config: session.configuration, token: token, request: request)
+        guard environmentStore.matches(session), !Task.isCancelled else { throw CancellationError() }
+        CollectionMutationNotice.post(config: session.configuration, token: token)
+        await reloadBinderCards()
     }
+
 }
 
 private struct ConsolidatedCollectionGroupRow: View {

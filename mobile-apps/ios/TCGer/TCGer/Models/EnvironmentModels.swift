@@ -1,6 +1,12 @@
 import Foundation
 
 struct ServerFeatures: Decodable, Equatable, Sendable {
+    let binderPageRevisionGuards: Bool
+    let linkedAcquisitions: Bool
+    let atomicSales: Bool
+    let atomicIntake: Bool
+    let tradeSettlement: Bool
+    let emailDelivery: Bool
     let decks: Bool
     let finance: Bool
     let sealed: Bool
@@ -18,6 +24,12 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
     static let allEnabled = ServerFeatures()
 
     init(
+        binderPageRevisionGuards: Bool = false,
+        linkedAcquisitions: Bool = false,
+        atomicSales: Bool = false,
+        atomicIntake: Bool = false,
+        tradeSettlement: Bool = false,
+        emailDelivery: Bool = false,
         decks: Bool = true,
         finance: Bool = true,
         sealed: Bool = true,
@@ -32,6 +44,12 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
         shipments: Bool = true,
         publicFeature: Bool = true
     ) {
+        self.binderPageRevisionGuards = binderPageRevisionGuards
+        self.linkedAcquisitions = linkedAcquisitions
+        self.atomicSales = atomicSales
+        self.atomicIntake = atomicIntake
+        self.tradeSettlement = tradeSettlement
+        self.emailDelivery = emailDelivery
         self.decks = decks
         self.finance = finance
         self.sealed = sealed
@@ -48,6 +66,8 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case binderPageRevisionGuards
+        case linkedAcquisitions, atomicSales, atomicIntake, tradeSettlement, emailDelivery
         case decks, finance, sealed, analytics, trades, onlineCodes, prices
         case notifications, alerts, shops, automations, shipments
         case publicFeature = "public"
@@ -55,6 +75,12 @@ struct ServerFeatures: Decodable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        binderPageRevisionGuards = try container.decodeIfPresent(Bool.self, forKey: .binderPageRevisionGuards) ?? false
+        linkedAcquisitions = try container.decodeIfPresent(Bool.self, forKey: .linkedAcquisitions) ?? false
+        atomicSales = try container.decodeIfPresent(Bool.self, forKey: .atomicSales) ?? false
+        atomicIntake = try container.decodeIfPresent(Bool.self, forKey: .atomicIntake) ?? false
+        tradeSettlement = try container.decodeIfPresent(Bool.self, forKey: .tradeSettlement) ?? false
+        emailDelivery = try container.decodeIfPresent(Bool.self, forKey: .emailDelivery) ?? false
         decks = try container.decodeIfPresent(Bool.self, forKey: .decks) ?? true
         finance = try container.decodeIfPresent(Bool.self, forKey: .finance) ?? true
         sealed = try container.decodeIfPresent(Bool.self, forKey: .sealed) ?? true
@@ -123,6 +149,27 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
     var normalizedURL: URL? {
         guard !baseURL.isEmpty else { return nil }
         return URL(string: baseURL)
+    }
+
+    /// Native authentication uses the configured API origin. Server operators
+    /// must trust it explicitly when the public API and website use different
+    /// origins; paths, credentials, queries and fragments never enter a header.
+    var authenticationOrigin: String? {
+        guard var components = URLComponents(string: baseURL),
+              let scheme = components.scheme?.lowercased(),
+              ["https", "http"].contains(scheme),
+              let host = components.host, !host.isEmpty else { return nil }
+        components.scheme = scheme
+        components.host = host.lowercased()
+        components.user = nil
+        components.password = nil
+        components.path = ""
+        components.query = nil
+        components.fragment = nil
+        if (scheme == "https" && components.port == 443) || (scheme == "http" && components.port == 80) {
+            components.port = nil
+        }
+        return components.url?.absoluteString
     }
 
     /// True when the app runs entirely on this phone with no backend server.

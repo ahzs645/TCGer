@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { normalizePortableBackup, type PortableBackup } from "@tcg/api-types";
 import { Button } from "@/components/ui/button";
 import { importServerBackup } from "@/lib/api/backups";
@@ -10,25 +10,37 @@ import {
   importLocalBackup,
 } from "@/lib/storage/portable-backup";
 import { restoreDemoBackup } from "@/stores/demo-store";
+import { sessionFetch } from "@/lib/api/session-fetch";
+import {
+  capturePrivateSession,
+  type PrivateSession,
+} from "@/lib/private-session";
+import { publishInventoryChange } from "@/lib/inventory-events";
 
 export function BackupPanel({ token }: { token: string | null }) {
   const [pending, setPending] = useState<PortableBackup | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const run = async (operation: () => Promise<void>) => {
+  const working = useRef(false);
+  const run = async (operation: (origin: PrivateSession) => Promise<void>) => {
+    if (working.current) return;
+    working.current = true;
+    const origin = capturePrivateSession();
     setBusy(true);
     setMessage("");
     try {
-      await operation();
+      await operation(origin);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      if (origin.current())
+        setMessage(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusy(false);
+      working.current = false;
+      if (origin.current()) setBusy(false);
     }
   };
   const request = async (path: string, options?: RequestInit) => {
     if (!token) throw new Error("Sign in before transferring a hosted backup");
-    const response = await fetch(`${API_BASE_URL}/backups${path}`, {
+    const response = await sessionFetch(`${API_BASE_URL}/backups${path}`, {
       ...options,
       headers: {
         Authorization: `Bearer ${token}`,
@@ -53,10 +65,11 @@ export function BackupPanel({ token }: { token: string | null }) {
         <Button
           disabled={busy}
           onClick={() =>
-            void run(async () => {
+            void run(async (origin) => {
               const backup = isDemoMode()
                 ? await exportLocalBackup()
                 : await request("");
+              origin.assertCurrent();
               const url = URL.createObjectURL(
                 new Blob([JSON.stringify(backup, null, 2)], {
                   type: "application/json",
@@ -85,10 +98,12 @@ export function BackupPanel({ token }: { token: string | null }) {
               const file = event.target.files?.[0];
               event.target.value = "";
               if (file)
-                void run(async () => {
-                  setPending(
-                    normalizePortableBackup(JSON.parse(await file.text())),
+                void run(async (origin) => {
+                  const parsed = normalizePortableBackup(
+                    JSON.parse(await file.text()),
                   );
+                  origin.assertCurrent();
+                  setPending(parsed);
                 });
             }}
           />
@@ -102,11 +117,13 @@ export function BackupPanel({ token }: { token: string | null }) {
                 "Restore the snapshot saved before the last import? This replaces data covered by that recovery point.",
               )
             )
-              void run(async () => {
+              void run(async (origin) => {
                 if (isDemoMode()) await restoreDemoBackup();
                 else await request("/recovery", { method: "POST" });
+                origin.assertCurrent();
+                publishInventoryChange(origin);
                 setMessage(
-                  "Recovery point restored. Reload to refresh all open views.",
+                  "Recovery point restored. Your collection and inventory views have been refreshed.",
                 );
               });
           }}
@@ -129,13 +146,13 @@ export function BackupPanel({ token }: { token: string | null }) {
           <Button
             disabled={busy}
             onClick={() =>
-              void run(async () => {
+              void run(async (origin) => {
                 if (isDemoMode()) await importLocalBackup(pending);
-                else
-                  await importServerBackup(token!, pending);
+                else await importServerBackup(token!, pending);
+                origin.assertCurrent();
                 setPending(null);
                 setMessage(
-                  "Import saved. A recovery point is available. Reload to refresh all open views.",
+                  "Import saved and inventory views refreshed. A recovery point is available.",
                 );
               })
             }

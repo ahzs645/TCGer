@@ -269,6 +269,14 @@ extension APIService {
         return result
     }
 
+    func previewStorageAudit(config: ServerConfiguration, token: String, request: StorageAuditRequest) async throws -> StorageAuditResult {
+        try await libraryOperationsResponse(config: config, path: "storage/audits/preview", method: "POST", token: token, body: request, as: StorageAuditResult.self)
+    }
+
+    func commitStorageAudit(config: ServerConfiguration, token: String, request: StorageAuditRequest) async throws -> StorageAuditResult {
+        try await libraryOperationsResponse(config: config, path: "storage/audits", method: "POST", token: token, body: request, as: StorageAuditResult.self)
+    }
+
     private var libraryOperationsDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .useDefaultKeys

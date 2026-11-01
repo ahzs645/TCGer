@@ -6,6 +6,7 @@ import type {
 } from "@tcg/api-types";
 
 import { trackedPriceLookupKey } from "./collection-price-lots";
+import { originalCurrency, UNKNOWN_CURRENCY } from "./acquisition-currency";
 
 export interface PurchasePerformanceLot {
   id: string;
@@ -35,7 +36,11 @@ export function purchaseCostCoverage(
 ): PurchaseCostCoverage {
   const purchasedEntries = new Set(
     transactions
-      .filter((transaction) => transaction.type === "purchase")
+      .filter(
+        (transaction) =>
+          transaction.type === "purchase" &&
+          originalCurrency(transaction.currency) !== UNKNOWN_CURRENCY,
+      )
       .flatMap((transaction) =>
         transaction.collectionEntryId ? [transaction.collectionEntryId] : [],
       ),
@@ -48,7 +53,10 @@ export function purchaseCostCoverage(
     for (const card of binder.cards) {
       totalCopies += card.quantity;
       const costedInCard = card.copies.filter(
-        (copy) => purchasedEntries.has(copy.id) || copy.acquisitionPrice !== undefined,
+        (copy) =>
+          purchasedEntries.has(copy.id) ||
+          (copy.acquisitionPrice !== undefined &&
+            originalCurrency(copy.acquisitionCurrency) !== UNKNOWN_CURRENCY),
       ).length;
       const covered = Math.min(card.quantity, costedInCard);
       costedCopies += covered;
@@ -169,18 +177,25 @@ export function buildPurchasePerformanceLots(
             item.language,
           ),
         );
+        const hasMarketQuote =
+          market?.price !== undefined &&
+          Number.isFinite(market.price) &&
+          originalCurrency(market.currency) !== UNKNOWN_CURRENCY;
         lots.push({
           id: copy.id,
           cardName: card.name,
           setName: card.setName,
           imageUrl: card.imageUrlSmall ?? card.imageUrl,
           paidAmount: transaction?.amount ?? copy.acquisitionPrice ?? 0,
-          // Legacy acquisition costs predate currency storage and were USD.
-          paidCurrency: transaction?.currency ?? "USD",
+          paidCurrency: originalCurrency(
+            transaction?.currency ?? copy.acquisitionCurrency,
+          ),
           purchasedAt: transaction?.date ?? copy.acquiredAt,
           source: transaction?.platform,
-          currentValue: market?.price ?? copy.price ?? card.price,
-          currentCurrency: market?.currency ?? "USD",
+          currentValue: hasMarketQuote ? market.price : copy.price,
+          currentCurrency: hasMarketQuote
+            ? originalCurrency(market.currency)
+            : "USD",
         });
       }
     }
@@ -200,7 +215,12 @@ export function convertPurchasePerformanceLots(
   rateFor: (source: string, date?: string) => number | undefined,
 ): ConvertedPurchaseLot[] {
   return lots.flatMap((lot) => {
-    if (lot.currentValue === undefined) return [];
+    if (
+      lot.currentValue === undefined ||
+      originalCurrency(lot.paidCurrency) === UNKNOWN_CURRENCY ||
+      originalCurrency(lot.currentCurrency) === UNKNOWN_CURRENCY
+    )
+      return [];
     const paidRate = rateFor(lot.paidCurrency, lot.purchasedAt);
     const currentRate = rateFor(lot.currentCurrency);
     if (paidRate === undefined || currentRate === undefined) return [];

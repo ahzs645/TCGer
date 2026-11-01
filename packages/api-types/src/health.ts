@@ -13,7 +13,15 @@ export const serverFeaturesSchema = z.object({
   shops: z.boolean(),
   automations: z.boolean(),
   shipments: z.boolean(),
-  public: z.boolean()
+  public: z.boolean(),
+  // Missing operation flags mean unsupported on older servers. Clients must
+  // require an explicit true before promising transactional inventory changes.
+  atomicSales: z.boolean().optional(),
+  atomicIntake: z.boolean().optional(),
+  tradeSettlement: z.boolean().optional(),
+  linkedAcquisitions: z.boolean().optional(),
+  binderPageRevisionGuards: z.boolean().optional(),
+  emailDelivery: z.boolean().optional()
 });
 export type ServerFeatures = z.infer<typeof serverFeaturesSchema>;
 

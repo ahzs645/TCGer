@@ -53,8 +53,8 @@ const envSchema = z.object({
   // FX conversion is deliberately disabled unless the rate, source and date are
   // all supplied. Quotes must never silently depend on a timeless default rate.
   PRICE_USD_TO_EUR: optionalPositiveNumberEnv,
-  PRICE_FX_SOURCE: z.string().trim().min(1).optional(),
-  PRICE_FX_AS_OF: z.string().datetime({ offset: true }).optional(),
+  PRICE_FX_SOURCE: optionalSecretEnv,
+  PRICE_FX_AS_OF: z.preprocess((value) => typeof value === 'string' && !value.trim() ? undefined : value, z.string().datetime({ offset: true }).optional()),
   PROVIDER_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
   SCRYFALL_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(120),
   TCGCSV_API_BASE_URL: z.string().url().default('https://tcgcsv.com/tcgplayer'),

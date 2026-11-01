@@ -132,8 +132,8 @@ export function PackOpening() {
         return;
       }
       if (event.type === "saveRequested") {
-        // The local copy keeps the browser-side history working; the review
-        // sheet then offers the collection save, like the iOS sheet does.
+        // Random pulls stay in simulation history. Real openings are recorded
+        // from actual cards reviewed in the scanner.
         setSaveFailed(!persistOpening(event.session));
         setReviewSession(event.session);
       }
@@ -226,7 +226,7 @@ export function PackOpening() {
         assetBase={assetBase}
         embedded
         nativeControls
-        completionActionLabel="Save pulls"
+        completionActionLabel="Save simulation"
         onEvent={handleEvent}
       />
       <PackOpeningShell
@@ -269,10 +269,10 @@ export function PackOpening() {
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="max-h-[85dvh] max-w-xl">
           <DialogHeader>
-            <DialogTitle>Saved pack openings</DialogTitle>
+            <DialogTitle>Simulation history</DialogTitle>
             <DialogDescription>
-              These results are stored only in this browser. Open an entry to
-              review its pulls or download a portable copy.
+              These simulated results are stored only in this browser. Open an
+              entry to review its pulls or download a copy.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[55dvh] space-y-2 overflow-y-auto">

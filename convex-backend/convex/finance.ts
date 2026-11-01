@@ -1,5 +1,11 @@
+import { inventorySaleSchema } from "@tcg/api-types";
+import { saleReceiptValidator, operationReceipt } from "./lib/operationReceipts";
+import { assertInventoryAvailable, normalizePhysicalCopies, resolvePhysicalCopyId } from "./lib/inventoryAvailability";
+import { requireBinderForUser } from "./lib/domain";
+import { removeEntryForViewer } from "./lib/library";
+import { appendCollectionAudit, snapshotAuditEntries } from "./lib/collectionAudit";
 import { ConvexError, v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
@@ -105,6 +111,7 @@ const realizedPerformanceValidator = v.object({
   inventoryCost: v.number(),
   inventoryMarketValue: v.number(),
   inventoryCurrency: v.string(),
+  inventoryCostsByCurrency: v.array(v.object({ currency: v.string(), cost: v.number() })),
   truncated: v.boolean(),
 });
 
@@ -190,7 +197,7 @@ function requireNonnegativeOptional(value: number | undefined, fieldName: string
   }
 }
 
-async function updateSummary(
+export async function updateSummary(
   ctx: MutationCtx,
   userId: Doc<"users">["_id"],
   transaction: Pick<Doc<"transactions">, "type" | "amount">,
@@ -247,6 +254,30 @@ export const listTransactions = internalQuery({
   },
 });
 
+async function linkedPurchaseEntry(ctx: MutationCtx, userId: Doc<"users">["_id"], collectionEntryId: string) {
+  const id = await resolvePhysicalCopyId(ctx, userId, collectionEntryId);
+  const entry = await ctx.db.get(id);
+  if (!entry || entry.userId !== userId) throw new ConvexError({ code: "NOT_FOUND", message: "Linked collection copy not found" });
+  return entry;
+}
+
+async function synchronizePurchase(ctx: MutationCtx, transaction: Doc<"transactions">, clear = false) {
+  if (transaction.type !== "purchase" || !transaction.collectionEntryId) return;
+  const id = ctx.db.normalizeId("collectionEntries", transaction.collectionEntryId);
+  const entry = id ? await ctx.db.get(id) : null;
+  // A sale may have removed the physical copy; editing its historical purchase
+  // still updates the ledger without recreating inventory.
+  if (!entry || entry.userId !== transaction.userId) return;
+  if (clear && entry.acquisitionTransactionId && entry.acquisitionTransactionId !== transaction._id) return;
+  await ctx.db.patch(entry._id, {
+    acquisitionPrice: clear ? undefined : transaction.amount / transaction.quantity,
+    acquisitionCurrency: clear ? undefined : transaction.currency,
+    acquiredAt: clear ? undefined : new Date(transaction.date).toISOString(),
+    acquisitionTransactionId: clear ? undefined : transaction._id,
+    updatedAt: Date.now(),
+  });
+}
+
 export const createTransaction = internalMutation({
   args: {
     subject: v.string(),
@@ -295,11 +326,23 @@ export const createTransaction = internalMutation({
       });
     }
 
+    let collectionEntryId = args.collectionEntryId;
+    if (args.type === "purchase" && collectionEntryId) {
+      const entry = await linkedPurchaseEntry(ctx, viewer._id, collectionEntryId);
+      collectionEntryId = entry._id;
+      if (quantity !== entry.quantity) throw new ConvexError({ code: "BAD_REQUEST", message: "A linked purchase quantity must match the addressed physical copy" });
+      const existing = (await ctx.db.query("transactions").withIndex("by_user_and_collection_entry", q => q.eq("userId", viewer._id).eq("collectionEntryId", collectionEntryId)).take(101)).filter(row => row.type === "purchase");
+      if (existing.length) {
+        const prior = existing[0]!;
+        if (existing.length === 1 && prior.amount === args.amount && prior.currency === currency && prior.quantity === quantity && prior.platform === args.platform && prior.notes === args.notes && prior.sourceUrl === args.sourceUrl && (args.date === undefined || prior.date === parseIsoDate(args.date, "date"))) return toTransactionResponse(prior);
+        throw new ConvexError({ code: "CONFLICT", message: "This copy already has a purchase; update that purchase instead of recording it twice" });
+      }
+    }
     const timestamp = Date.now();
     const transactionId = await ctx.db.insert("transactions", {
       userId: viewer._id,
       type: args.type,
-      collectionEntryId: args.collectionEntryId,
+      collectionEntryId,
       cardId: args.cardId,
       externalId: args.externalId,
       tcg: args.tcg,
@@ -330,6 +373,7 @@ export const createTransaction = internalMutation({
       });
     }
     await updateSummary(ctx, viewer._id, transaction, 1);
+    await synchronizePurchase(ctx, transaction);
     return toTransactionResponse(transaction);
   },
 });
@@ -374,12 +418,22 @@ export const updateTransaction = internalMutation({
       });
     }
 
+    let nextCollectionEntryId = args.collectionEntryId === undefined ? transaction.collectionEntryId : args.collectionEntryId ?? undefined;
+    if (transaction.type === "purchase" && nextCollectionEntryId) {
+      const changingLink = nextCollectionEntryId !== transaction.collectionEntryId;
+      const id = changingLink ? (await linkedPurchaseEntry(ctx, viewer._id, nextCollectionEntryId))._id : ctx.db.normalizeId("collectionEntries", nextCollectionEntryId);
+      const nextEntry = id ? await ctx.db.get(id) : null;
+      if (nextEntry && nextEntry.userId === viewer._id) {
+        if ((args.quantity ?? transaction.quantity) !== nextEntry.quantity) throw new ConvexError({ code: "BAD_REQUEST", message: "A linked purchase quantity must match the physical copy" });
+        const purchases = await ctx.db.query("transactions").withIndex("by_user_and_collection_entry", q => q.eq("userId", viewer._id).eq("collectionEntryId", nextEntry._id)).take(101);
+        if (purchases.some(row => row._id !== transaction._id && row.type === "purchase")) throw new ConvexError({ code: "CONFLICT", message: "This copy already has a linked purchase" });
+        nextCollectionEntryId = nextEntry._id;
+      }
+    }
+    if (transaction.type === "purchase" && nextCollectionEntryId !== transaction.collectionEntryId) await synchronizePurchase(ctx, transaction, true);
     await updateSummary(ctx, viewer._id, transaction, -1);
     await ctx.db.patch(transaction._id, {
-      collectionEntryId:
-        args.collectionEntryId === undefined
-          ? transaction.collectionEntryId
-          : args.collectionEntryId ?? undefined,
+      collectionEntryId: nextCollectionEntryId,
       cardId: args.cardId === undefined ? transaction.cardId : args.cardId ?? undefined,
       externalId:
         args.externalId === undefined ? transaction.externalId : args.externalId ?? undefined,
@@ -392,13 +446,14 @@ export const updateTransaction = internalMutation({
       sourceUrl: args.sourceUrl === undefined ? transaction.sourceUrl : args.sourceUrl ?? undefined,
       notes: args.notes === undefined ? transaction.notes : args.notes ?? undefined,
       date: args.date === undefined ? transaction.date : parseIsoDate(args.date, "date"),
-      updatedAt: Date.now(),
+      updatedAt: Math.max(Date.now(), transaction.updatedAt + 1),
     });
     const updated = await ctx.db.get(transaction._id);
     if (!updated) {
       throw new ConvexError({ code: "INVARIANT", message: "Transaction could not be updated" });
     }
     await updateSummary(ctx, viewer._id, updated, 1);
+    await synchronizePurchase(ctx, updated);
     return toTransactionResponse(updated);
   },
 });
@@ -419,6 +474,7 @@ export const deleteTransaction = internalMutation({
       });
     }
     await updateSummary(ctx, viewer._id, transaction, -1);
+    await synchronizePurchase(ctx, transaction, true);
     await ctx.db.delete(transaction._id);
     return null;
   },
@@ -435,8 +491,11 @@ export const getSummary = internalQuery({
       .query("financeSummaries")
       .withIndex("by_user", (q) => q.eq("userId", viewer._id))
       .unique();
-    const totalSpent = summary?.totalSpent ?? 0;
-    const totalEarned = summary?.totalEarned ?? 0;
+    // Scalar legacy summaries are USD only; keep original currency totals separate.
+    const rows = await ctx.db.query("transactions").withIndex("by_user_and_currency", q => q.eq("userId", viewer._id).eq("currency", "USD")).take(5001);
+    if (rows.length > 5000) throw new ConvexError({ code: "LIMIT_EXCEEDED", message: "USD summary exceeds 5000 transactions; use a paginated report" });
+    const totalSpent = rows.filter(row => row.type === "purchase").reduce((sum, row) => sum + row.amount, 0);
+    const totalEarned = rows.filter(row => row.type === "sale").reduce((sum, row) => sum + row.amount, 0);
     return {
       totalSpent: Math.round(totalSpent * 100) / 100,
       totalEarned: Math.round(totalEarned * 100) / 100,
@@ -457,7 +516,10 @@ export const getSummaryByCurrency = internalQuery({
       .query("transactions")
       .withIndex("by_user_and_date", (q) => q.eq("userId", viewer._id))
       .order("desc")
-      .take(5_000);
+      .take(5_001);
+    if (transactions.length > 5_000) {
+      throw new ConvexError({ code: "LIMIT_EXCEEDED", message: "Currency summary exceeds 5000 transactions; use a paginated report" });
+    }
     const byCurrency = new Map<
       string,
       { totalSpent: number; totalEarned: number }
@@ -587,11 +649,16 @@ export const getRealizedPerformance = internalQuery({
       .take(limit + 1);
     const inventory = entries.slice(0, limit).reduce(
       (total, entry) => ({
-        cost: total.cost + (entry.acquisitionPrice ?? 0) * entry.quantity,
+        cost: total.cost + (entry.acquisitionCurrency === "USD" ? (entry.acquisitionPrice ?? 0) * entry.quantity : 0),
         market: total.market + (entry.price ?? 0) * entry.quantity,
       }),
       { cost: 0, market: 0 },
     );
+    const inventoryCosts = new Map<string, number>();
+    for (const entry of entries.slice(0, limit)) {
+      const currency = entry.acquisitionCurrency ?? "UNKNOWN";
+      inventoryCosts.set(currency, (inventoryCosts.get(currency) ?? 0) + (entry.acquisitionPrice ?? 0) * entry.quantity);
+    }
     const costed = metrics.filter((metric) => metric.realizedProfit !== undefined);
     const withHolding = metrics.filter((metric) => metric.holdingDays !== undefined);
 
@@ -619,7 +686,81 @@ export const getRealizedPerformance = internalQuery({
       inventoryCost: roundMoney(inventory.cost),
       inventoryMarketValue: roundMoney(inventory.market),
       inventoryCurrency: "USD",
+      inventoryCostsByCurrency: [...inventoryCosts].sort(([a], [b]) => a.localeCompare(b)).map(([currency, cost]) => ({ currency, cost: roundMoney(cost) })),
       truncated: rows.length > limit || entries.length > limit,
     };
+  },
+});
+
+export const commitSale = internalMutation({
+  args: {
+    subject: v.string(), operationId: v.string(), binderId: v.id("binders"),
+    copyIds: v.array(v.string()), amount: v.number(), currency: v.string(),
+    removeFromInventory: v.boolean(), platform: v.optional(v.string()), costBasis: v.optional(v.number()),
+    fees: v.optional(v.number()), shippingCost: v.optional(v.number()), acquiredAt: v.optional(v.string()),
+    notes: v.optional(v.string()), date: v.optional(v.string()),
+  },
+  returns: saleReceiptValidator,
+  handler: async (ctx, args) => {
+    const viewer = await requireViewerBySubject(ctx, args.subject);
+    const { subject: _, ...payload } = args;
+    const parsed = inventorySaleSchema.safeParse({ ...payload, collectionId: args.binderId });
+    if (!parsed.success) throw new ConvexError({ code: "BAD_REQUEST", message: parsed.error.issues.map(issue => issue.message).join("; ") });
+    const replay = await operationReceipt(ctx, viewer._id, "sale", args.operationId, payload);
+    if (replay.prior) return replay.prior;
+    await requireBinderForUser(ctx, args.binderId, viewer._id);
+    const entries: Doc<"collectionEntries">[] = [];
+    const copyIds: Id<"collectionEntries">[] = [];
+    for (const rawId of args.copyIds) {
+      const id = await resolvePhysicalCopyId(ctx, viewer._id, rawId);
+      if (copyIds.includes(id)) throw new ConvexError({ code: "BAD_REQUEST", message: "A physical copy may only appear once" });
+      copyIds.push(id);
+      const entry = await ctx.db.get(id);
+      if (!entry || entry.userId !== viewer._id || entry.binderId !== args.binderId) throw new ConvexError({ code: "NOT_FOUND", message: "A selected physical copy is not in this collection" });
+      // Normalize the legacy aggregate, then sell only the explicitly addressed
+      // physical copy. Every generated sibling keeps its metadata and remains owned.
+      await normalizePhysicalCopies(ctx, entry);
+      const copy = (await ctx.db.get(id))!;
+      await assertInventoryAvailable(ctx, copy);
+      entries.push(copy);
+    }
+    const currency = parsed.data.currency;
+    const sameCurrencyCosts = entries.every(entry => entry.acquisitionPrice !== undefined && entry.acquisitionCurrency === currency);
+    const costBasis = args.costBasis ?? (sameCurrencyCosts ? entries.reduce((sum, entry) => sum + entry.acquisitionPrice!, 0) : undefined);
+    const cards = await Promise.all(entries.map(entry => ctx.db.get(entry.cardId)));
+    const sameCard = entries.every(entry => entry.cardId === entries[0]!.cardId);
+    const card = sameCard ? cards[0] : undefined;
+    const timestamp = Date.now();
+    const date = args.date ? parseIsoDate(args.date, "date") : timestamp;
+    const transactionId = await ctx.db.insert("transactions", {
+      userId: viewer._id, type: "sale", collectionEntryId: entries.length === 1 ? entries[0]!._id : undefined,
+      cardId: card?._id, externalId: card?.externalId, tcg: card?.tcg,
+      cardName: card?.name ?? `${entries.length} physical cards`, quantity: entries.length,
+      amount: args.amount, currency, costBasis, fees: args.fees, shippingCost: args.shippingCost,
+      acquiredAt: args.acquiredAt ? parseIsoDate(args.acquiredAt, "acquiredAt") : undefined,
+      platform: args.platform, notes: args.notes, date, createdAt: timestamp, updatedAt: timestamp,
+    });
+    await updateSummary(ctx, viewer._id, { type: "sale", amount: args.amount }, 1);
+    const before = await snapshotAuditEntries(ctx, viewer._id, copyIds);
+    if (args.removeFromInventory) {
+      const totalCents = Math.round(args.amount * 100);
+      for (const [index, entry] of entries.entries()) {
+        const opened = await ctx.db.query("sealedOpenedCards").withIndex("by_collection", q => q.eq("collectionId", entry._id)).take(2);
+        if (opened.length > 1) throw new ConvexError({ code: "CONFLICT", message: "A copy is linked to multiple opening ledgers" });
+        for (const link of opened) await ctx.db.patch(link._id, {
+          status: "sold", realizedProceeds: (Math.floor(totalCents / entries.length) + (index < totalCents % entries.length ? 1 : 0)) / 100, realizedCurrency: currency,
+          soldAt: date, updatedAt: timestamp,
+        });
+        await removeEntryForViewer(ctx, viewer._id, entry._id);
+      }
+    }
+    await appendCollectionAudit(ctx, { userId: viewer._id, actorId: args.subject, operationKind: "sale", binderId: args.binderId,
+      summary: `Recorded ${currency} ${args.amount.toFixed(2)} sale of ${entries.length} physical copies`,
+      before, after: args.removeFromInventory ? [] : before, financialTransactionIds: [transactionId] });
+    const receipt = { operationId: args.operationId, transactionId, copyIds,
+      removedCopyIds: args.removeFromInventory ? copyIds : [], amount: args.amount, currency };
+    await ctx.db.insert("inventoryOperationReceipts", { userId: viewer._id, operationId: args.operationId, kind: "sale",
+      requestFingerprint: replay.fingerprint, receipt, createdAt: timestamp });
+    return receipt;
   },
 });

@@ -10,7 +10,10 @@
         "frontend/src/lib/api/backups.ts",
         "frontend/src/lib/api/sealed.ts",
         "frontend/src/components/scan/scanner-workbench.tsx",
-        "frontend/src/lib/api/search-completeness.ts"
+        "frontend/src/lib/api/search-completeness.ts",
+        "frontend/src/lib/api/inventory-intake.ts",
+        "frontend/src/lib/api/pricing.ts",
+        "frontend/src/lib/api/session-fetch.ts"
       ],
       "test": "frontend/src/lib/api/server.api-contract.test.ts"
     },
@@ -20,7 +23,8 @@
         "mobile-apps/ios/TCGer/TCGer/Services/APIService+Cards.swift",
         "mobile-apps/ios/TCGer/TCGer/Services/CacheManager.swift",
         "mobile-apps/ios/TCGer/TCGer/Services/APIService+Sealed.swift",
-        "mobile-apps/ios/TCGer/TCGer/Models/TCGModels.swift"
+        "mobile-apps/ios/TCGer/TCGer/Models/TCGModels.swift",
+        "mobile-apps/ios/TCGer/TCGer/Services/InventoryOperations.swift"
       ],
       "test": "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift"
     },
@@ -44,7 +48,10 @@
         "backend/src/api/routes/convex-http.proxy.ts",
         "backend/src/api/routes/sealed.router.ts",
         "backend/src/modules/cards/cards.service.ts",
-        "backend/src/modules/adapters/magic-adapter.ts"
+        "backend/src/modules/adapters/magic-adapter.ts",
+        "backend/src/api/routes/collections.convex.router.ts",
+        "backend/src/api/routes/finance.convex.router.ts",
+        "backend/src/api/routes/atomic-operations.guard.ts"
       ],
       "test": "backend/src/api/routes/server.api-contract.test.ts",
       "limitation": "Domain services and auth-session lookup are stubbed; this verifies real routing, validation, middleware and HTTP envelopes, not Prisma persistence or live identity."
@@ -56,7 +63,11 @@
         "convex-backend/convex/backups.ts",
         "convex-backend/convex/backupsHttp.ts",
         "convex-backend/convex/sealed.ts",
-        "convex-backend/convex/sealedHttp.ts"
+        "convex-backend/convex/sealedHttp.ts",
+        "convex-backend/convex/finance.ts",
+        "convex-backend/convex/financeHttp.ts",
+        "convex-backend/convex/lib/operationReceipts.ts",
+        "convex-backend/convex/lib/inventoryAvailability.ts"
       ],
       "test": "convex-backend/convex/serverApiContracts.test.ts",
       "limitation": "Executes real HTTP actions and mutations against convex-test storage using test bridge identity; not a deployed gateway or live identity service."
@@ -1837,6 +1848,423 @@
         }
       },
       "iosTest": "testScannerSaveUnauthorized"
+    },
+    {
+      "id": "collections.physicalCopyDelete.success",
+      "featureId": "collections.copies",
+      "operation": "deletePhysicalCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder/copies/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 204,
+        "body": null
+      },
+      "iosTest": "testCollectionsPhysicalCopyDeleteSuccess"
+    },
+    {
+      "id": "collections.physicalCopyDelete.unauthorized",
+      "featureId": "collections.copies",
+      "operation": "deletePhysicalCopy",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder/copies/contract-copy",
+        "headers": {
+          "Authorization": "Bearer expired-token"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Not authenticated"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsPhysicalCopyDeleteUnauthorized"
+    },
+    {
+      "id": "collections.physicalCopyDelete.foreign",
+      "featureId": "collections.copies",
+      "operation": "deletePhysicalCopy",
+      "state": "foreign-copy",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/contract-binder/copies/contract-copy",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Collection entry not found"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testCollectionsPhysicalCopyDeleteForeign"
+    },
+    {
+      "id": "scanner.atomicIntake.success",
+      "featureId": "scanner.results.addToBinder",
+      "operation": "commitIntake",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/intake",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "operationId": "contract-intake",
+          "source": "scanner",
+          "rows": [
+            {
+              "rowId": "reviewed-one",
+              "cardId": "sv1-1",
+              "cardData": {
+                "tcg": "pokemon",
+                "externalId": "sv1-1",
+                "name": "Bulbasaur"
+              },
+              "quantity": 1,
+              "condition": "LP",
+              "language": "EN",
+              "notes": "Reviewed real card",
+              "isFoil": false,
+              "isSealedPromo": false,
+              "isOversized": false,
+              "isPeelOff": false,
+              "isSigned": false,
+              "isAltered": false,
+              "tags": []
+            }
+          ]
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "operationId": "contract-intake",
+          "entryIds": [
+            "contract-created-copy"
+          ],
+          "rows": [
+            {
+              "rowId": "reviewed-one",
+              "entryIds": [
+                "contract-created-copy"
+              ]
+            }
+          ]
+        },
+        "matchers": {
+          "/entryIds/0": "nonempty-string",
+          "/rows/0/entryIds/0": "nonempty-string"
+        }
+      },
+      "iosTest": "testScannerAtomicIntakeSuccess"
+    },
+    {
+      "id": "scanner.atomicIntake.invalid",
+      "featureId": "scanner.results.addToBinder",
+      "operation": "commitIntake",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/intake",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "operationId": "contract-intake",
+          "source": "scanner",
+          "rows": []
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "VALIDATION_ERROR",
+          "message": "Request rejected"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testScannerAtomicIntakeInvalid"
+    },
+    {
+      "id": "scanner.atomicIntake.unauthorized",
+      "featureId": "scanner.results.addToBinder",
+      "operation": "commitIntake",
+      "state": "binder",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/intake",
+        "headers": {
+          "Authorization": "Bearer expired-token"
+        },
+        "body": {
+          "operationId": "contract-intake",
+          "source": "scanner",
+          "rows": [
+            {
+              "rowId": "reviewed-one",
+              "cardId": "sv1-1",
+              "cardData": {
+                "tcg": "pokemon",
+                "externalId": "sv1-1",
+                "name": "Bulbasaur"
+              },
+              "quantity": 1,
+              "condition": "LP",
+              "language": "EN",
+              "notes": "Reviewed real card",
+              "isFoil": false,
+              "isSealedPromo": false,
+              "isOversized": false,
+              "isPeelOff": false,
+              "isSigned": false,
+              "isAltered": false,
+              "tags": []
+            }
+          ]
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Request rejected"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testScannerAtomicIntakeUnauthorized"
+    },
+    {
+      "id": "scanner.atomicIntake.foreign",
+      "featureId": "scanner.results.addToBinder",
+      "operation": "commitIntake",
+      "state": "foreign",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/collections/contract-binder/intake",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "operationId": "contract-intake",
+          "source": "scanner",
+          "rows": [
+            {
+              "rowId": "reviewed-one",
+              "cardId": "sv1-1",
+              "cardData": {
+                "tcg": "pokemon",
+                "externalId": "sv1-1",
+                "name": "Bulbasaur"
+              },
+              "quantity": 1,
+              "condition": "LP",
+              "language": "EN",
+              "notes": "Reviewed real card",
+              "isFoil": false,
+              "isSealedPromo": false,
+              "isOversized": false,
+              "isPeelOff": false,
+              "isSigned": false,
+              "isAltered": false,
+              "tags": []
+            }
+          ]
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Request rejected"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testScannerAtomicIntakeForeign"
+    },
+    {
+      "id": "inventory.sale.success",
+      "featureId": "inventory.sales",
+      "operation": "recordSale",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/finance/sales",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "operationId": "contract-sale",
+          "collectionId": "contract-binder",
+          "copyIds": [
+            "contract-copy"
+          ],
+          "amount": 40,
+          "currency": "CAD",
+          "removeFromInventory": true,
+          "fees": 1.5,
+          "shippingCost": 2,
+          "notes": "Sold selected copy"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "operationId": "contract-sale",
+          "transactionId": "contract-transaction",
+          "copyIds": [
+            "contract-copy"
+          ],
+          "removedCopyIds": [
+            "contract-copy"
+          ],
+          "amount": 40,
+          "currency": "CAD"
+        },
+        "matchers": {
+          "/transactionId": "nonempty-string",
+          "/copyIds/0": "nonempty-string",
+          "/removedCopyIds/0": "nonempty-string"
+        }
+      },
+      "iosTest": "testInventorySaleSuccess"
+    },
+    {
+      "id": "inventory.sale.unauthorized",
+      "featureId": "inventory.sales",
+      "operation": "recordSale",
+      "state": "copies",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/finance/sales",
+        "headers": {
+          "Authorization": "Bearer expired-token"
+        },
+        "body": {
+          "operationId": "contract-sale",
+          "collectionId": "contract-binder",
+          "copyIds": [
+            "contract-copy"
+          ],
+          "amount": 40,
+          "currency": "CAD",
+          "removeFromInventory": true,
+          "fees": 1.5,
+          "shippingCost": 2,
+          "notes": "Sold selected copy"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "UNAUTHORIZED",
+          "message": "Request rejected"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testInventorySaleUnauthorized"
+    },
+    {
+      "id": "inventory.sale.foreign",
+      "featureId": "inventory.sales",
+      "operation": "recordSale",
+      "state": "foreign-copy",
+      "providers": [
+        "express",
+        "convex"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/finance/sales",
+        "headers": {
+          "Authorization": "Bearer contract-token"
+        },
+        "body": {
+          "operationId": "contract-sale",
+          "collectionId": "contract-binder",
+          "copyIds": [
+            "contract-copy"
+          ],
+          "amount": 40,
+          "currency": "CAD",
+          "removeFromInventory": true,
+          "fees": 1.5,
+          "shippingCost": 2,
+          "notes": "Sold selected copy"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "error": "NOT_FOUND",
+          "message": "Request rejected"
+        },
+        "matchers": {
+          "/message": "nonempty-string"
+        }
+      },
+      "iosTest": "testInventorySaleForeign"
     }
   ]
 }

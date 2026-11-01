@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/api/session-fetch";
 import { installedCardPrints } from "@/lib/game-packages/game-package-client";
 import { API_BASE_URL } from "@/lib/api/base-url";
 import { completeSearchCards } from "@/lib/api/search-completeness";
@@ -38,11 +39,14 @@ export async function searchCardsResultApi(params: {
   }
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE_URL}/cards/search/all?unique=prints&limit=1000&${usp.toString()}`, {
-    headers,
-    credentials: "include",
-    next: { revalidate: 30 },
-  });
+  const res = await sessionFetch(
+    `${API_BASE_URL}/cards/search/all?unique=prints&limit=1000&${usp.toString()}`,
+    {
+      headers,
+      credentials: "include",
+      next: { revalidate: 30 },
+    },
+  );
 
   const data = await handleResponse<SearchCardsResponse>(res);
   return data;
@@ -57,10 +61,13 @@ export async function discoverCardsApi(params: {
   if (params.tcg) usp.set("tcg", params.tcg);
   const headers: Record<string, string> = {};
   if (params.token) headers.Authorization = `Bearer ${params.token}`;
-  const response = await fetch(`${API_BASE_URL}/cards/discover?${usp.toString()}`, {
-    headers,
-    credentials: "include",
-  });
+  const response = await sessionFetch(
+    `${API_BASE_URL}/cards/discover?${usp.toString()}`,
+    {
+      headers,
+      credentials: "include",
+    },
+  );
   return handleResponse<DiscoverCardsResponse>(response);
 }
 
@@ -73,15 +80,30 @@ export async function fetchCardPrintsApi(params: {
   const { tcg, cardId, token } = params;
   if (typeof indexedDB !== "undefined") {
     const prints = await installedCardPrints(tcg, cardId, params.packageId);
-    if (prints) return { mode: "simple", total: prints.length, prints: prints.map(card => ({ ...card, tcg, dexEntries: card.dexEntries?.map(entry => ({ ...entry, name: entry.name ?? `#${entry.number}` })) })) };
+    if (prints)
+      return {
+        mode: "simple",
+        total: prints.length,
+        prints: prints.map((card) => ({
+          ...card,
+          tcg,
+          dexEntries: card.dexEntries?.map((entry) => ({
+            ...entry,
+            name: entry.name ?? `#${entry.number}`,
+          })),
+        })),
+      };
   }
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}/prints`, {
-    headers,
-    credentials: "include",
-    next: { revalidate: 30 },
-  });
+  const res = await sessionFetch(
+    `${API_BASE_URL}/cards/${tcg}/${encodeURIComponent(cardId)}/prints`,
+    {
+      headers,
+      credentials: "include",
+      next: { revalidate: 30 },
+    },
+  );
   return handleResponse<CardPrintsResponse>(res);
 }
 
@@ -93,11 +115,14 @@ export async function fetchCardByIdApi(params: {
   const { tcg, cardId, token } = params;
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE_URL}/cards/${tcg}/${cardId}`, {
-    headers,
-    credentials: "include",
-    next: { revalidate: 30 },
-  });
+  const res = await sessionFetch(
+    `${API_BASE_URL}/cards/${tcg}/${encodeURIComponent(cardId)}`,
+    {
+      headers,
+      credentials: "include",
+      next: { revalidate: 30 },
+    },
+  );
 
   const data = await handleResponse<{ card: Card }>(res);
   return data.card;

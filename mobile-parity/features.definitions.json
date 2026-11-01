@@ -15,13 +15,20 @@
       "web": {
         "sources": [
           "frontend/app/page.tsx",
-          "frontend/src/components/dashboard/dashboard-content.tsx"
+          "frontend/src/components/dashboard/dashboard-content.tsx",
+          "frontend/src/lib/dashboard-stats.ts",
+          "frontend/src/stores/game-filter.ts"
         ],
         "tests": [
           {
             "runner": "playwright",
             "id": "home.dashboard",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
+          },
+          {
+            "runner": "node-test",
+            "id": "home.dashboard",
+            "path": "frontend/src/lib/dashboard-stats.test.ts"
           }
         ],
         "registration": "frontend/app/page.tsx"
@@ -55,13 +62,22 @@
           "convex-backend/convex/bridge.ts",
           "mobile-parity/api-contracts/interactions.json",
           "frontend/src/lib/api/server.api-contract.test.ts",
-          "frontend/src/lib/hooks/use-collection.ts"
+          "frontend/src/lib/hooks/use-collection.ts",
+          "frontend/src/lib/inventory-events.ts",
+          "frontend/src/stores/tags.ts",
+          "frontend/src/stores/game-filter.ts",
+          "frontend/src/stores/demo-store.ts"
         ],
         "tests": [
           {
             "runner": "playwright",
             "id": "collections.browse",
             "path": "frontend/tests/parity/feature-parity.spec.ts"
+          },
+          {
+            "runner": "node-test",
+            "id": "collections.browse",
+            "path": "frontend/src/stores/private-session.test.ts"
           }
         ],
         "registration": "frontend/app/collections/page.tsx"
@@ -254,7 +270,9 @@
           "frontend/src/lib/hooks/use-card-search.ts",
           "frontend/src/lib/api/search-completeness.ts",
           "frontend/app/demo/cards/page.tsx",
-          "frontend/src/components/cards/card-preview.tsx"
+          "frontend/src/components/cards/card-preview.tsx",
+          "frontend/src/lib/api/catalog-corrections.ts",
+          "frontend/src/lib/api/banlists.ts"
         ],
         "tests": [
           {
@@ -375,7 +393,9 @@
       "web": {
         "sources": [
           "frontend/app/wishlists/page.tsx",
-          "frontend/src/components/wishlists/wishlist-content.tsx"
+          "frontend/src/components/wishlists/wishlist-content.tsx",
+          "frontend/src/lib/wishlists/sync.ts",
+          "frontend/src/lib/api/wishlists.ts"
         ],
         "tests": [
           {
@@ -424,7 +444,16 @@
       "ios": {
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Wishlists.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Wishlists.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/WishlistStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/BinderPickerMenu.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/WishlistSyncService.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/AddSetsToWishlistSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/AddToWishlistSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/AddWishlistRuleSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/WishlistPickerSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/SetDetailView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/WishlistDetailView.swift"
         ],
         "registration": "mobile-apps/ios/TCGer/TCGer/Views/WishlistsView.swift"
       },
@@ -460,7 +489,25 @@
           "frontend/src/components/ui/dialog.tsx",
           "frontend/src/stores/auth.ts",
           "frontend/src/stores/preferences.ts",
-          "frontend/src/stores/auth.test.ts"
+          "frontend/src/stores/auth.test.ts",
+          "frontend/src/components/auth/login-dialog.tsx",
+          "frontend/src/components/auth/signup-dialog.tsx",
+          "frontend/src/components/auth/setup-wizard.tsx",
+          "frontend/src/components/account/profile-dialog.tsx",
+          "frontend/src/components/providers/convex-client-provider.tsx",
+          "frontend/src/components/providers/query-provider.tsx",
+          "frontend/src/lib/auth-client.ts",
+          "frontend/src/lib/auth-lifecycle.ts",
+          "frontend/src/lib/api/auth.ts",
+          "frontend/src/lib/private-session.ts",
+          "frontend/src/lib/private-query-client.ts",
+          "frontend/src/lib/private-storage.ts",
+          "frontend/src/lib/api/session-fetch.ts",
+          "frontend/src/lib/api/settings.ts",
+          "frontend/src/lib/api/user-preferences.ts",
+          "frontend/src/lib/api/user.ts",
+          "backend/src/api/routes/convex-http.proxy.ts",
+          "backend/src/api/routes/convex-http.proxy.test.ts"
         ],
         "tests": [
           {
@@ -472,6 +519,11 @@
             "runner": "playwright",
             "id": "settings.browse",
             "path": "frontend/tests/parity/reliability.spec.ts"
+          },
+          {
+            "runner": "node-test",
+            "id": "settings.browse",
+            "path": "frontend/src/lib/auth-lifecycle.test.ts"
           }
         ],
         "registration": "frontend/src/components/account/account-settings-dialog.tsx"
@@ -479,16 +531,42 @@
       "ios": {
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Settings.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Settings.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Models/EnvironmentModels.swift",
+          "mobile-apps/ios/TCGer/TCGer/Models/AppNotifications.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/FeatureRepositories.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/GameInstallationView.swift",
+          "backend/src/api/routes/convex-http.proxy.ts",
+          "backend/src/api/routes/convex-http.proxy.test.ts",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Auth.swift",
+          "mobile-apps/ios/TCGer/TCGerTests/NativeAuthTransportTests.swift"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/SettingsView.swift",
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "settings.browse",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/SessionIsolationTests.swift"
+          },
+          {
+            "runner": "xctest",
+            "id": "settings.browse",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/NativeAuthTransportTests.swift"
+          }
+        ]
       },
       "android": {
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SettingsScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BottomNavigationCustomizationScreen.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/BottomNavigationMoreScreen.kt",
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/preferences/PreferencesStore.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/preferences/PreferencesStore.kt",
+          "backend/src/api/routes/convex-http.proxy.ts",
+          "backend/src/api/routes/convex-http.proxy.test.ts",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/RemoteServiceFactory.kt",
+          "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/NativeAuthOriginTest.kt"
         ],
         "tests": [
           {
@@ -500,6 +578,11 @@
             "runner": "junit",
             "id": "settings.browse",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/domain/GameDisableGuardTest.kt"
+          },
+          {
+            "runner": "gradle",
+            "id": "settings.browse",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/NativeAuthOriginTest.kt"
           }
         ],
         "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/SettingsScreen.kt"
@@ -610,7 +693,8 @@
       "web": {
         "sources": [
           "frontend/app/guides/page.tsx",
-          "frontend/src/components/guides/collection-guides-content.tsx"
+          "frontend/src/components/guides/collection-guides-content.tsx",
+          "frontend/src/lib/api/guides.ts"
         ],
         "registration": "frontend/app/guides/page.tsx"
       },
@@ -1048,19 +1132,21 @@
     },
     {
       "id": "packOpening.save.collection",
-      "title": "Save every revealed pull to a collection",
+      "title": "Record reviewed physical-opening cards in a collection",
       "policy": "track",
       "web": {
         "sources": [
-          "frontend/src/components/packs/pack-opening-review-sheet.tsx"
+          "frontend/src/components/packs/pack-opening-review-sheet.tsx",
+          "frontend/src/components/scan/scanner-workbench.tsx"
         ],
-        "registration": "frontend/src/components/packs/pack-opening-review-sheet.tsx"
+        "registration": "frontend/src/components/scan/scanner-workbench.tsx"
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift"
       },
       "android": {
         "sources": [
@@ -1073,20 +1159,22 @@
     },
     {
       "id": "packOpening.save.sealedLedger",
-      "title": "Link an opening to sealed inventory and decrement stock",
+      "title": "Link reviewed physical-opening cards and decrement sealed stock atomically",
       "policy": "track",
       "web": {
         "sources": [
           "frontend/src/components/packs/pack-opening-review-sheet.tsx",
-          "frontend/src/lib/api/sealed.ts"
+          "frontend/src/lib/api/sealed.ts",
+          "frontend/src/components/scan/scanner-workbench.tsx"
         ],
-        "registration": "frontend/src/components/packs/pack-opening-review-sheet.tsx"
+        "registration": "frontend/src/components/scan/scanner-workbench.tsx"
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift"
       },
       "android": {
         "sources": [
@@ -1855,9 +1943,18 @@
       "web": {
         "sources": [
           "frontend/src/components/scan/scanner-workbench.tsx",
-          "mobile-parity/SCANNER_PACK_MATRIX.md"
+          "mobile-parity/SCANNER_PACK_MATRIX.md",
+          "frontend/src/lib/scan/scanner-pricing.ts",
+          "frontend/src/lib/scan/use-scanner-prices.ts"
         ],
-        "registration": "frontend/src/components/scan/scanner-workbench.tsx"
+        "registration": "frontend/src/components/scan/scanner-workbench.tsx",
+        "tests": [
+          {
+            "runner": "node-test",
+            "id": "scanner.results.priceMode",
+            "path": "frontend/src/lib/scan/scanner-pricing.test.ts"
+          }
+        ]
       },
       "ios": {
         "sources": [
@@ -1944,15 +2041,43 @@
       "web": {
         "sources": [
           "frontend/src/components/scan/card-scan-panel.tsx",
-          "frontend/src/components/scan/shared-scan-session.tsx"
+          "frontend/src/components/scan/shared-scan-session.tsx",
+          "frontend/src/lib/api/inventory-intake.ts",
+          "frontend/src/lib/intake/durable-intake.ts",
+          "frontend/src/components/scan/intake-recovery.tsx",
+          "frontend/src/lib/api/demo-inventory.ts",
+          "frontend/src/lib/api/demo-adapter.ts",
+          "frontend/src/lib/intake/durable-intake.test.ts"
         ],
-        "registration": "frontend/src/components/scan/card-scan-panel.tsx"
+        "registration": "frontend/src/components/scan/card-scan-panel.tsx",
+        "tests": [
+          {
+            "runner": "node-test",
+            "id": "scanner.results.addToBinder",
+            "path": "frontend/src/lib/intake/durable-intake.test.ts"
+          },
+          {
+            "runner": "node-test",
+            "id": "scanner.results.addToBinder",
+            "path": "frontend/src/lib/api/demo-inventory.test.ts"
+          }
+        ]
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/InventoryOperations.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/InventoryRecoveryView.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerStagingStore.swift"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/Views/CardScannerView.swift",
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "scanner.results.addToBinder",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/InventoryOperationTests.swift"
+          }
+        ]
       },
       "android": {
         "sources": [
@@ -2036,9 +2161,26 @@
       "ios": {
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
-          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/BinderPageRecovery.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageConflictReviewView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/InventoryRecoveryView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "mobile-apps/ios/TCGer/TCGerTests/BinderPageRecoveryTests.swift",
+          "backend/src/modules/collections/binder-pages.service.ts",
+          "backend/src/api/routes/collections.router.ts",
+          "convex-backend/convex/binderPageRecovery.test.ts",
+          "packages/api-types/src/collections.ts",
+          "packages/api-types/src/health.ts"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift",
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "scanner.binder.savePagePhotos",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/BinderPageRecoveryTests.swift"
+          }
+        ]
       },
       "android": {
         "sources": [
@@ -2745,7 +2887,8 @@
           "frontend/src/lib/storage/portable-backup.ts",
           "frontend/src/lib/api/backups.ts",
           "packages/api-types/src/portable-backup.ts",
-          "frontend/src/components/account/backup-panel.tsx"
+          "frontend/src/components/account/backup-panel.tsx",
+          "frontend/src/lib/storage/legacy-collection-rows.ts"
         ],
         "tests": [
           {
@@ -2771,7 +2914,8 @@
           "mobile-apps/ios/TCGer/TCGer/Services/LocalStorePhotoRepository.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/LocalStoreBackupCodec.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/CollectionCSVImporter.swift"
         ],
         "tests": [
           {
@@ -2791,7 +2935,11 @@
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/CollectionBackup.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/PortableBackupMerge.kt",
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/BackupImportPlan.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/CollectionCsv.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/backup/PortableBackupNormalization.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/local/TCGerDatabase.kt"
         ],
         "tests": [
           {
@@ -2864,9 +3012,26 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/BinderPageRecovery.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageConflictReviewView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/InventoryRecoveryView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "mobile-apps/ios/TCGer/TCGerTests/BinderPageRecoveryTests.swift",
+          "backend/src/modules/collections/binder-pages.service.ts",
+          "backend/src/api/routes/collections.router.ts",
+          "convex-backend/convex/binderPageRecovery.test.ts",
+          "packages/api-types/src/collections.ts",
+          "packages/api-types/src/health.ts"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift",
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "scanner.binderCorners",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/BinderPageRecoveryTests.swift"
+          }
+        ]
       },
       "android": {
         "sources": [
@@ -2982,7 +3147,9 @@
       "policy": "track",
       "web": {
         "sources": [
-          "frontend/src/components/scan/scanner-workbench.tsx"
+          "frontend/src/components/scan/scanner-workbench.tsx",
+          "frontend/src/lib/api/binder-pages.ts",
+          "frontend/src/lib/intake/durable-intake.ts"
         ],
         "tests": [
           {
@@ -2995,9 +3162,26 @@
       },
       "ios": {
         "sources": [
-          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/BinderPageRecovery.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/BinderPageConflictReviewView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/InventoryRecoveryView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift",
+          "mobile-apps/ios/TCGer/TCGerTests/BinderPageRecoveryTests.swift",
+          "backend/src/modules/collections/binder-pages.service.ts",
+          "backend/src/api/routes/collections.router.ts",
+          "convex-backend/convex/binderPageRecovery.test.ts",
+          "packages/api-types/src/collections.ts",
+          "packages/api-types/src/health.ts"
         ],
-        "registration": "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift"
+        "registration": "mobile-apps/ios/TCGer/TCGer/Views/BinderPageReviewView.swift",
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "scanner.binderReview",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/BinderPageRecoveryTests.swift"
+          }
+        ]
       },
       "android": {
         "sources": [
@@ -3314,13 +3498,25 @@
         "registration": "frontend/src/components/collections/intake-tools.tsx",
         "sources": [
           "frontend/src/components/collections/intake-tools.tsx",
-          "frontend/src/lib/api/collection-operations.ts"
+          "frontend/src/lib/api/collection-operations.ts",
+          "frontend/src/components/collections/card-acquisition-editor.tsx",
+          "frontend/src/lib/pricing/purchase-performance.ts",
+          "frontend/src/components/transactions/transactions-content.tsx",
+          "frontend/src/lib/pricing/acquisition-currency.ts",
+          "frontend/src/components/prices/cost-returns-content.tsx",
+          "frontend/src/lib/format-money.ts",
+          "frontend/src/lib/api/demo-adapter.test.ts"
         ],
         "tests": [
           {
             "runner": "node",
             "id": "intake.acquisitionCosts",
             "path": "frontend/src/lib/collection-operations.test.ts"
+          },
+          {
+            "runner": "node-test",
+            "id": "intake.acquisitionCosts",
+            "path": "frontend/src/lib/pricing/purchase-performance.test.ts"
           }
         ]
       },
@@ -3328,7 +3524,9 @@
         "registration": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/CardAcquisitionSection.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/TransactionsView.swift"
         ]
       },
       "android": {
@@ -3428,7 +3626,16 @@
         "registration": "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
         "sources": [
           "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/APIService+LibraryOperations.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/StorageAuditView.swift",
+          "mobile-apps/ios/TCGer/TCGer/Models/StorageAuditModels.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "storage.audit",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/LibraryOperationsContractTests.swift"
+          }
         ]
       },
       "android": {
@@ -3849,19 +4056,25 @@
     },
     {
       "id": "collections.copies",
-      "title": "Add, edit and move physical copies; remove printing groups",
+      "title": "Add, edit, move and delete physical copies; remove printing groups explicitly",
       "policy": "track",
       "web": {
         "registration": "frontend/src/lib/api/collections.ts",
         "sources": [
           "frontend/src/lib/api/collections.ts",
-          "frontend/src/components/collections/sandbox/detail-panel.tsx"
+          "frontend/src/components/collections/sandbox/detail-panel.tsx",
+          "frontend/src/components/collections/copy-inventory-actions.tsx"
         ],
         "tests": [
           {
             "runner": "api-contract",
             "id": "collections.copies",
             "path": "frontend/src/lib/api/server.api-contract.test.ts"
+          },
+          {
+            "runner": "node-test",
+            "id": "collections.copies",
+            "path": "frontend/src/lib/api/copy-identity.test.ts"
           }
         ]
       },
@@ -3872,7 +4085,8 @@
           "mobile-apps/ios/TCGer/TCGer/Views/CollectionDetailView.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
           "mobile-apps/ios/TCGer/TCGer/Services/LocalSampleCatalog.swift",
-          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift"
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalWishlistProjection.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/InventoryOperations.swift"
         ],
         "tests": [
           {
@@ -3887,7 +4101,8 @@
         "sources": [
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
           "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/CollectionCopyEditor.kt",
-          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt"
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/repository/DefaultTCGerRepository.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/domain/CollectionDetails.kt"
         ],
         "tests": [
           {
@@ -3895,6 +4110,91 @@
             "id": "collections.copies",
             "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
           }
+        ]
+      }
+    },
+    {
+      "id": "inventory.sales",
+      "title": "Record a sale of selected physical copies atomically with replayable receipts",
+      "policy": "track",
+      "web": {
+        "registration": "frontend/src/components/collections/copy-inventory-actions.tsx",
+        "sources": [
+          "frontend/src/components/collections/copy-inventory-actions.tsx",
+          "frontend/src/lib/api/pricing.ts",
+          "frontend/src/lib/sales/durable-sale.ts",
+          "frontend/src/components/transactions/transactions-content.tsx"
+        ],
+        "tests": [
+          {
+            "runner": "api-contract",
+            "id": "inventory.sales",
+            "path": "frontend/src/lib/api/server.api-contract.test.ts"
+          },
+          {
+            "runner": "node-test",
+            "id": "inventory.sales",
+            "path": "frontend/src/lib/sales/durable-sale.test.ts"
+          }
+        ]
+      },
+      "ios": {
+        "registration": "mobile-apps/ios/TCGer/TCGer/Services/InventoryOperations.swift",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/InventoryOperations.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/Components/MarkAsSoldSheet.swift",
+          "mobile-apps/ios/TCGer/TCGer/Services/LocalStore.swift",
+          "mobile-apps/ios/TCGer/TCGer/Views/InventoryRecoveryView.swift",
+          "mobile-apps/ios/TCGer/TCGerTests/InventoryOperationTests.swift"
+        ],
+        "tests": [
+          {
+            "runner": "api-contract",
+            "id": "inventory.sales",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/ServerAPIContractTests.swift"
+          },
+          {
+            "runner": "xctest",
+            "id": "inventory.sales",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/InventoryOperationTests.swift"
+          }
+        ]
+      },
+      "android": {
+        "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/ApiModels.kt"
+        ],
+        "tests": [
+          {
+            "runner": "api-contract",
+            "id": "inventory.sales",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/remote/ServerAPIContractTest.kt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "packOpening.simulationHistory",
+      "title": "Save simulated pack history without changing physical inventory",
+      "policy": "track",
+      "web": {
+        "registration": "frontend/src/components/packs/pack-opening-review-sheet.tsx",
+        "sources": [
+          "frontend/src/components/packs/pack-opening-review-sheet.tsx"
+        ]
+      },
+      "ios": {
+        "registration": "mobile-apps/ios/TCGer/TCGer/Services/PackSimulationStore.swift",
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/Services/PackSimulationStore.swift"
+        ]
+      },
+      "android": {
+        "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt",
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"
         ]
       }
     }

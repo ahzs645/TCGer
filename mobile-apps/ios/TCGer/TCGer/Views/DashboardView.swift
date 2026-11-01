@@ -12,6 +12,7 @@ struct DashboardView: View {
     @State private var errorMessage: String?
     @State private var selectedCollection: Collection?
     @State private var hasLoaded = false
+    @State private var loadID: UUID?
 
     private let apiService = APIService()
     private var recentCollections: [Collection] {
@@ -34,6 +35,14 @@ struct DashboardView: View {
         }
         .task {
             await loadData()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { notification in
+            let session = environmentStore.sessionIdentity
+            guard CollectionMutationNotice.matches(notification, config: session.configuration, token: session.token) else { return }
+            Task {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
+                await loadData(force: true)
+            }
         }
     }
 
@@ -114,24 +123,32 @@ struct DashboardView: View {
     }
 
     @MainActor
-    private func loadData() async {
+    private func loadData(force: Bool = false) async {
         let sessionID = environmentStore.widgetSessionID
-        guard !isLoading else { return }
+        guard !isLoading || force else { return }
+        let requestID = UUID()
+        loadID = requestID
         isLoading = true
+        defer {
+            if sessionID == environmentStore.widgetSessionID, loadID == requestID {
+                isLoading = false
+            }
+        }
         errorMessage = nil
 
         do {
             let loadedCollections = try await apiService.getCollections(
                 config: environmentStore.serverConfiguration,
                 token: environmentStore.authToken,
-                useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
+                useCache: !force && environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
-            guard sessionID == environmentStore.widgetSessionID else { isLoading = false; return }
+            guard sessionID == environmentStore.widgetSessionID, loadID == requestID, !Task.isCancelled else { return }
             collections = loadedCollections
             hasLoaded = true
             environmentStore.updateWidgetData(collections: collections, sessionID: sessionID)
             isLoading = false
         } catch {
+            guard sessionID == environmentStore.widgetSessionID, loadID == requestID, !Task.isCancelled else { return }
             if let apiError = error as? APIService.APIError, case .unauthorized = apiError {
                 errorMessage = "Sign in is required to view dashboard collections."
             } else {

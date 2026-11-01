@@ -31,6 +31,7 @@ const HEADER_ALIASES: Record<string, string> = {
   notes: 'notes',
   price: 'price',
   'acquisition price': 'acquisition_price',
+  'acquisition currency': 'acquisition_currency',
   'serial number': 'serial_number',
   foil: 'is_foil',
   'finish code': 'finish_code',
@@ -55,6 +56,7 @@ const HEADER_ALIASES: Record<string, string> = {
   set_name: 'set_name',
   external_id: 'external_id',
   acquisition_price: 'acquisition_price',
+  acquisition_currency: 'acquisition_currency',
   serial_number: 'serial_number',
   is_foil: 'is_foil',
   finish_code: 'finish_code',
@@ -89,6 +91,7 @@ export const COLLECTION_IMPORT_TEMPLATE_HEADERS = [
   'notes',
   'price',
   'acquisition_price',
+  'acquisition_currency',
   'serial_number',
   'acquired_at',
   'is_foil',
@@ -284,6 +287,10 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
       'acquisition_price',
       issues,
     );
+    const acquisitionCurrency = source.acquisition_currency?.trim().toUpperCase() || undefined;
+    if (acquisitionCurrency && !/^[A-Z]{3}$/.test(acquisitionCurrency)) {
+      issues.push({ row: rowNumber, field: 'acquisition_currency', message: 'must be a three-letter currency code' });
+    }
     const acquiredAt = optionalText(source.acquired_at);
     if (acquiredAt && Number.isNaN(Date.parse(acquiredAt))) {
       issues.push({
@@ -325,6 +332,7 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
       notes: optionalText(source.notes),
       price,
       acquisitionPrice,
+      acquisitionCurrency,
       serialNumber: optionalText(source.serial_number),
       acquiredAt,
       isFoil,
@@ -359,6 +367,7 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
       row.notes ?? '',
       row.price ?? null,
       row.acquisitionPrice ?? null,
+      row.acquisitionCurrency ?? null,
       row.serialNumber ?? '',
       row.acquiredAt ?? '',
       row.isFoil,
@@ -428,6 +437,7 @@ function normalizedImportCsv(rows: ReturnType<typeof parseCollectionImportSource
     notes: row.notes,
     price: row.price,
     acquisition_price: row.acquisitionPrice,
+    acquisition_currency: row.acquisitionCurrency,
     edition: row.edition,
     is_foil: row.isFoil,
     is_signed: row.isSigned,
@@ -691,6 +701,7 @@ export async function commitCollectionImport(
             notes: row.notes,
             price: row.price,
             acquisitionPrice: row.acquisitionPrice,
+            acquisitionCurrency: row.acquisitionCurrency,
             serialNumber: row.serialNumber,
             acquiredAt: row.acquiredAt ? new Date(row.acquiredAt) : undefined,
             isFoil: row.isFoil,

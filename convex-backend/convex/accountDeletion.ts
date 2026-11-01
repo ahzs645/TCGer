@@ -20,6 +20,7 @@ const phaseValidator = v.union(
   v.literal("sealedInventory"),
   v.literal("transactions"),
   v.literal("financeSummaries"),
+  v.literal("operationReceipts"),
   v.literal("trades"),
   v.literal("audits"),
   v.literal("snapshots"),
@@ -43,6 +44,7 @@ type DeletionPhase =
   | "sealedInventory"
   | "transactions"
   | "financeSummaries"
+  | "operationReceipts"
   | "trades"
   | "audits"
   | "snapshots"
@@ -64,7 +66,8 @@ const nextPhase: Record<DeletionPhase, DeletionPhase | null> = {
   sealedOpenings: "sealedInventory",
   sealedInventory: "transactions",
   transactions: "financeSummaries",
-  financeSummaries: "trades",
+  financeSummaries: "operationReceipts",
+  operationReceipts: "trades",
   trades: "audits",
   audits: "snapshots",
   snapshots: "preferences",
@@ -451,6 +454,13 @@ export const deleteBatch = internalMutation({
       } else {
         await advance();
       }
+      return null;
+    }
+
+    if (args.phase === "operationReceipts") {
+      const rows = await ctx.db.query("inventoryOperationReceipts").withIndex("by_user", q => q.eq("userId", args.userId)).take(batchSize);
+      for (const row of rows) await ctx.db.delete(row._id);
+      if (rows.length === batchSize) await schedule(args.phase); else await advance();
       return null;
     }
 

@@ -1,3 +1,4 @@
+import { assertInventoryAvailable } from "./lib/inventoryAvailability";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -202,6 +203,7 @@ export const place = internalMutation({
     if (container.locked || compartment.locked) throw new ConvexError({ code: "CONFLICT", message: "Storage location is locked" });
     if (!Number.isInteger(args.slotIndex) || args.slotIndex < 0 || args.slotIndex >= compartment.capacity) throw new ConvexError({ code: "BAD_REQUEST", message: "slotIndex is outside the compartment capacity" });
     if (!Number.isInteger(args.quantity) || args.quantity < 1) throw new ConvexError({ code: "BAD_REQUEST", message: "quantity must be a positive integer" });
+    await assertInventoryAvailable(ctx, entry, args.quantity);
     const alreadyPlaced = await ctx.db.query("storagePlacements").withIndex("by_user_and_entry", q => q.eq("userId", user._id).eq("collectionEntryId", entry._id)).take(1000);
     if (alreadyPlaced.reduce((sum, row) => sum + row.quantity, 0) + args.quantity > entry.quantity) throw new ConvexError({ code: "CONFLICT", message: "Placement exceeds the owned quantity" });
     const occupants = await ctx.db.query("storagePlacements").withIndex("by_compartment_and_slot", q => q.eq("compartmentId", compartment._id).eq("slotIndex", args.slotIndex)).take(100);
@@ -223,6 +225,8 @@ export const removePlacement = internalMutation({
     const compartment = await ownedCompartment(ctx, placement.compartmentId, user._id);
     const container = await ownedContainer(ctx, placement.containerId, user._id);
     if (container.locked || compartment.locked) throw new ConvexError({ code: "CONFLICT", message: "Storage location is locked" });
+    const entry = await ctx.db.get(placement.collectionEntryId);
+    if (entry) await assertInventoryAvailable(ctx, entry, placement.quantity);
     await ctx.db.delete(placement._id);
     return null;
   },

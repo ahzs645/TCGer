@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import { API_BASE_URL } from "./base-url";
 
 export interface SharedScanSession {
@@ -38,7 +39,7 @@ async function request<T>(
   token: string,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await sessionFetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,

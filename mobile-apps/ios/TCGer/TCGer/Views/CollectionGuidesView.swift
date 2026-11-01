@@ -851,48 +851,58 @@ private struct CollectionGuideDetailView: View {
 
     @MainActor
     private func follow() async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isFollowing, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
+        let scope = wishlistStore.mutationScope(config: session.configuration, token: token)
         isFollowing = true
         statusMessage = "Creating wishlist…"
-        defer { isFollowing = false }
+        defer { if environmentStore.matches(session) { isFollowing = false } }
         do {
             let response = try await apiService.followCollectionGuide(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 slug: guide.slug
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             guide = response.guide
             onGuideChange(guide)
             var followedWishlist = try await apiService.getWishlist(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 id: response.wishlistId
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             if guide.rule.type == .manual {
                 wishlist = followedWishlist
-                wishlistStore.insert(followedWishlist)
+                try wishlistStore.publish(followedWishlist, for: scope)
                 statusMessage = "Added \(followedWishlist.totalCards) curated cards to your wishlist."
                 return
             }
             let syncService = WishlistSyncService(
-                config: environmentStore.serverConfiguration,
+                apiService: apiService,
+                config: session.configuration,
                 token: token,
-                enabledGames: environmentStore.enabledGames
+                enabledGames: environmentStore.enabledGames,
+                isCurrent: { environmentStore.matches(session) }
             )
             let result = await syncService.sync(wishlist: followedWishlist) { progress in
+                guard environmentStore.matches(session) else { return }
                 statusMessage = progress
             }
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             followedWishlist = try await apiService.getWishlist(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 id: response.wishlistId
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             wishlist = followedWishlist
-            wishlistStore.insert(followedWishlist)
+            try wishlistStore.publish(followedWishlist, for: scope)
             statusMessage = result.errors.isEmpty
                 ? "Added \(result.addedCards) cards to your wishlist."
                 : "Added \(result.addedCards) cards; \(result.errors.count) sync issue(s)."
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
             statusMessage = nil
         }
@@ -900,27 +910,29 @@ private struct CollectionGuideDetailView: View {
 
     @MainActor
     private func unfollow() async {
-        guard let token = environmentStore.authToken,
+        guard !isFollowing, let token = environmentStore.authToken,
               let wishlistId = guide.wishlistId else {
             errorMessage = "This guide’s wishlist could not be found. Refresh the guides and try again."
             return
         }
+        let session = environmentStore.sessionIdentity
         isFollowing = true
         statusMessage = "Removing guide wishlist…"
-        defer { isFollowing = false }
+        defer { if environmentStore.matches(session) { isFollowing = false } }
         do {
-            try await apiService.deleteWishlist(
-                config: environmentStore.serverConfiguration,
+            try await wishlistStore.delete(
+                config: session.configuration,
                 token: token,
                 id: wishlistId
             )
-            wishlistStore.remove(id: wishlistId)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             wishlist = nil
             guide = guide.updatingFollowState(followed: false, wishlistId: nil)
             onGuideChange(guide)
             errorMessage = nil
             statusMessage = "Guide unfollowed."
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
             statusMessage = nil
         }

@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 // @tcger-feature {"id":"collections.copies","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 // @tcger-feature {"id":"collections.manage","platform":"web","status":"implemented"}
 import type {
@@ -83,9 +84,12 @@ export async function getCollections(
   token: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<Collection[]> {
-  const response = await fetch(`${getCollectionsBaseUrl()}/collections`, {
-    headers: buildHeaders(token, viewer),
-  });
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections`,
+    {
+      headers: buildHeaders(token, viewer),
+    },
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -100,11 +104,14 @@ export async function createCollection(
   data: CreateCollectionInput,
   viewer?: CollectionsViewerContext | null,
 ): Promise<Collection> {
-  const response = await fetch(`${getCollectionsBaseUrl()}/collections`, {
-    method: "POST",
-    headers: buildHeaders(token, viewer),
-    body: JSON.stringify(data),
-  });
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections`,
+    {
+      method: "POST",
+      headers: buildHeaders(token, viewer),
+      body: JSON.stringify(data),
+    },
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -120,8 +127,8 @@ export async function updateCollection(
   data: UpdateCollectionInput,
   viewer?: CollectionsViewerContext | null,
 ): Promise<Collection> {
-  const response = await fetch(
-    `${getCollectionsBaseUrl()}/collections/${collectionId}`,
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}`,
     {
       method: "PATCH",
       headers: buildHeaders(token, viewer),
@@ -142,8 +149,8 @@ export async function deleteCollection(
   collectionId: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<void> {
-  const response = await fetch(
-    `${getCollectionsBaseUrl()}/collections/${collectionId}`,
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}`,
     {
       method: "DELETE",
       headers: buildHeaders(token, viewer, false),
@@ -161,7 +168,7 @@ export async function getBinderShareLinks(
   collectionId: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<BinderShareLink[]> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/share-links`,
     { headers: buildHeaders(token, viewer, false) },
   );
@@ -178,7 +185,7 @@ export async function createBinderShareLink(
   input: CreateBinderShareLinkInput,
   viewer?: CollectionsViewerContext | null,
 ): Promise<BinderShareLink> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/share-links`,
     {
       method: "POST",
@@ -199,7 +206,7 @@ export async function revokeBinderShareLink(
   linkId: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/share-links/${encodeURIComponent(linkId)}`,
     { method: "DELETE", headers: buildHeaders(token, viewer, false) },
   );
@@ -216,7 +223,7 @@ export async function addCardToCollection(
   viewer?: CollectionsViewerContext | null,
 ): Promise<void> {
   if (collectionId === LIBRARY_COLLECTION_ID) {
-    const response = await fetch(
+    const response = await sessionFetch(
       `${getCollectionsBaseUrl()}/collections/cards`,
       {
         method: "POST",
@@ -233,8 +240,8 @@ export async function addCardToCollection(
     return;
   }
 
-  const response = await fetch(
-    `${getCollectionsBaseUrl()}/collections/${collectionId}/cards`,
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/cards`,
     {
       method: "POST",
       headers: buildHeaders(token, viewer),
@@ -255,8 +262,8 @@ export async function removeCardFromCollection(
   cardId: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<void> {
-  const response = await fetch(
-    `${getCollectionsBaseUrl()}/collections/${collectionId}/cards/${cardId}`,
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(collectionId)}/cards/${encodeURIComponent(cardId)}`,
     {
       method: "DELETE",
       headers: buildHeaders(token, viewer, false),
@@ -277,7 +284,7 @@ export async function getCollectionMutationHistory(
   const params = new URLSearchParams({
     limit: String(Math.min(100, Math.max(1, limit))),
   });
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/history?${params.toString()}`,
     { headers: buildHeaders(token, viewer, false) },
   );
@@ -294,7 +301,7 @@ export async function undoCollectionMutation(
   idempotencyKey: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<UndoCollectionMutationResult> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/history/${encodeURIComponent(auditId)}/undo`,
     {
       method: "POST",
@@ -316,8 +323,8 @@ export async function updateCollectionCard(
   data: UpdateCollectionCardInput,
   viewer?: CollectionsViewerContext | null,
 ): Promise<CollectionCard> {
-  const response = await fetch(
-    `${getCollectionsBaseUrl()}/collections/${binderId}/cards/${cardId}`,
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections/${encodeURIComponent(binderId)}/cards/${encodeURIComponent(cardId)}`,
     {
       method: "PATCH",
       headers: buildHeaders(token, viewer),
@@ -337,9 +344,12 @@ export async function getTags(
   token: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<CollectionTagResponse[]> {
-  const response = await fetch(`${getCollectionsBaseUrl()}/collections/tags`, {
-    headers: buildHeaders(token, viewer),
-  });
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections/tags`,
+    {
+      headers: buildHeaders(token, viewer),
+    },
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -354,11 +364,14 @@ export async function createTag(
   data: CreateTagInput,
   viewer?: CollectionsViewerContext | null,
 ): Promise<CollectionTagResponse> {
-  const response = await fetch(`${getCollectionsBaseUrl()}/collections/tags`, {
-    method: "POST",
-    headers: buildHeaders(token, viewer),
-    body: JSON.stringify(data),
-  });
+  const response = await sessionFetch(
+    `${getCollectionsBaseUrl()}/collections/tags`,
+    {
+      method: "POST",
+      headers: buildHeaders(token, viewer),
+      body: JSON.stringify(data),
+    },
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -374,7 +387,7 @@ async function importRequest<T>(
   input: CollectionImportRequest,
   viewer?: CollectionsViewerContext | null,
 ): Promise<T> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/import/${action}`,
     {
       method: "POST",
@@ -448,7 +461,7 @@ export async function downloadCollectionImportTemplate(
   token: string,
   viewer?: CollectionsViewerContext | null,
 ): Promise<Blob> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/import/template`,
     { headers: buildHeaders(token, viewer, false) },
   );
@@ -464,7 +477,7 @@ export async function downloadCollectionExport(
   format: "csv" | "json" | "manabox" | "moxfield" | "tcgplayer" | "collectr",
   viewer?: CollectionsViewerContext | null,
 ): Promise<Blob> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections/export?format=${format}`,
     { headers: buildHeaders(token, viewer, false) },
   );
@@ -484,7 +497,7 @@ async function bulkRequest<T>(
   viewer?: CollectionsViewerContext | null,
 ): Promise<T> {
   const suffix = action === "preview" ? "/bulk/preview" : "/bulk";
-  const response = await fetch(
+  const response = await sessionFetch(
     `${getCollectionsBaseUrl()}/collections${suffix}`,
     {
       method: "POST",
@@ -513,4 +526,23 @@ export function commitBulkAdd(
   viewer?: CollectionsViewerContext | null,
 ) {
   return bulkRequest<BulkAddResult>(token, "commit", input, viewer);
+}
+
+/** Explicit physical-copy removal; the established /cards route remains grouped. */
+export async function removeCollectionCopy(
+  token: string,
+  collectionId: string,
+  copyId: string,
+): Promise<void> {
+  const response = await sessionFetch(
+    `${API_BASE_URL}/collections/${encodeURIComponent(collectionId)}/copies/${encodeURIComponent(copyId)}`,
+    {
+      method: "DELETE",
+      headers: buildHeaders(token, undefined, false),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message ?? "This copy could not be removed.");
+  }
 }

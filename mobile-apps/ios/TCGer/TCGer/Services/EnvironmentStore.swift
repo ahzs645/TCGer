@@ -89,6 +89,33 @@ final class EnvironmentStore: ObservableObject {
         UUID(uuidString: "8E3347A1-C95F-4BBA-9B30-000000000002")!
     ]
 
+    /// Captured before asynchronous work. The generation rejects A → B → A
+    /// transitions even when the original server and credential are reused.
+    struct SessionIdentity: Equatable {
+        let configuration: ServerConfiguration
+        let token: String?
+        let generation: UUID
+    }
+
+    var sessionIdentity: SessionIdentity {
+        SessionIdentity(configuration: serverConfiguration, token: authToken, generation: widgetSessionID)
+    }
+
+    func matches(_ identity: SessionIdentity) -> Bool {
+        sessionIdentity == identity
+    }
+
+    @discardableResult
+    func completeAuthentication(_ response: AuthResponse, username: String?, for identity: SessionIdentity) -> Bool {
+        guard matches(identity) else { return false }
+        credentials = LoginCredentials(username: username ?? response.user.username ?? "", password: "")
+        isUsingSingleUserMode = false
+        applyAuthUser(response.user)
+        storeToken(response.token)
+        isAuthenticated = true
+        return true
+    }
+
     @Published private(set) var widgetSessionID = UUID()
 
     @Published var serverConfiguration: ServerConfiguration

@@ -402,7 +402,8 @@ struct SetDetailView: View {
             await loadCards()
             await loadOwnershipData(useCache: false)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { notification in
+                guard CollectionMutationNotice.matches(notification, config: environmentStore.serverConfiguration, token: environmentStore.authToken) else { return }
             collectionRevision += 1
         }
         .task(id: collectionRevision) {
@@ -453,30 +454,35 @@ struct SetDetailView: View {
     /// the selected cards to a wishlist.
     @MainActor
     private func addToWishlist(_ wishlist: Wishlist, target: WishlistBulkTarget) async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isBulkAdding, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
         let payload = target == .wholeSet
             ? cards
             : cards.filter { selectedCardIds.contains($0.id) }
         guard !payload.isEmpty else { return }
 
         isBulkAdding = true
+        defer { if environmentStore.matches(session) { isBulkAdding = false } }
         wishlistStatus = "Adding \(payload.count) cards to \(wishlist.name)…"
 
         let service = WishlistSyncService(
             apiService: apiService,
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token,
-            enabledGames: environmentStore.enabledGames
+            enabledGames: environmentStore.enabledGames,
+            isCurrent: { environmentStore.matches(session) }
         )
 
         do {
             try await service.addCards(payload, toWishlist: wishlist.id) { sent, total in
+                guard environmentStore.matches(session) else { return }
                 wishlistStatus = "Adding \(sent) of \(total) cards…"
             }
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
 
             if target == .wholeSet {
                 _ = try await apiService.addWishlistRule(
-                    config: environmentStore.serverConfiguration,
+                    config: session.configuration,
                     token: token,
                     wishlistId: wishlist.id,
                     type: .set,
@@ -486,6 +492,7 @@ struct SetDetailView: View {
                     includeAllPrintings: true,
                     autoSync: true
                 )
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 wishlistStatus = "Tracking \(set.name) in \(wishlist.name)."
             } else {
                 wishlistStatus = "Added \(payload.count) cards to \(wishlist.name)."
@@ -494,10 +501,9 @@ struct SetDetailView: View {
             }
             HapticManager.notification(.success)
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             wishlistStatus = error.localizedDescription
         }
-
-        isBulkAdding = false
     }
 
     private func toggleSelection(_ cardId: String) {

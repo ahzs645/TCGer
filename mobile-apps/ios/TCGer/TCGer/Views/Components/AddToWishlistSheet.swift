@@ -146,68 +146,79 @@ struct AddToWishlistSheet: View {
 
     @MainActor
     private func addToWishlist(_ wishlist: Wishlist) async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isAdding, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
         isAdding = true
+        defer { if environmentStore.matches(session) { isAdding = false } }
 
         do {
             _ = try await apiService.addCardToWishlist(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 wishlistId: wishlist.id,
                 card: card
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             successMessage = "Added to \(wishlist.name)"
-            await refreshWishlistStore(token: token)
+            await refreshWishlistStore(token: token, session: session)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             HapticManager.notification(.success)
             onComplete?()
             try? await Task.sleep(for: .seconds(1))
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             dismiss()
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
-        isAdding = false
     }
 
     @MainActor
     private func createAndAdd() async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isAdding, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         isAdding = true
+        defer { if environmentStore.matches(session) { isAdding = false } }
 
         do {
-            let wishlist = try await apiService.createWishlist(
-                config: environmentStore.serverConfiguration,
+            let wishlist = try await wishlistStore.create(
+                config: session.configuration,
                 token: token,
-                name: name
+                input: CreateWishlistInput(name: name, description: nil, colorHex: nil, matchAnyPrinting: false)
             )
-            wishlistStore.insert(wishlist)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             _ = try await apiService.addCardToWishlist(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 wishlistId: wishlist.id,
                 card: card
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             successMessage = "Added to \(wishlist.name)"
-            await refreshWishlistStore(token: token)
+            await refreshWishlistStore(token: token, session: session)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             onComplete?()
             try? await Task.sleep(for: .seconds(1))
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             dismiss()
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
-        isAdding = false
     }
 
     @MainActor
-    private func refreshWishlistStore(token: String) async {
+    private func refreshWishlistStore(token: String, session: EnvironmentStore.SessionIdentity) async {
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         await wishlistStore.load(
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token,
             force: true
         )
-        if wishlistStore.matches(config: environmentStore.serverConfiguration, token: environmentStore.authToken) {
-            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: environmentStore.widgetSessionID)
+        if environmentStore.matches(session), !Task.isCancelled, wishlistStore.matches(config: session.configuration, token: token) {
+            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: session.generation)
         }
     }
 

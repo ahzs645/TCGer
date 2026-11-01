@@ -9,6 +9,7 @@ nonisolated enum GameInstallationState {
 struct GameInstallationView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @ObservedObject var catalogStore: CatalogStore
+    @EnvironmentObject private var featureDependencies: AppFeatureDependencies
 
     var body: some View {
         NavigationStack {
@@ -26,6 +27,14 @@ struct GameInstallationView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    NavigationLink("My collection") {
+                        CollectionsView(parentProvidesNavigation: true, repository: featureDependencies.collections)
+                    }
+                    .buttonStyle(.bordered)
+                    NavigationLink("Settings, backup & recovery") {
+                        SettingsView(parentProvidesNavigation: true)
+                    }
+                    .buttonStyle(.bordered)
                     NavigationLink("Grading planner") { GradingWorkspaceView() }
                         .buttonStyle(.bordered)
                 }

@@ -53,6 +53,12 @@ final class LocalStore {
     private var nextWishlistRuleId: Int
     private var nextTransactionId: Int
     private var nextOnlineCodeId: Int
+    private var inventoryOperationReceipts: [String: InventoryOperationRecord] = [:]
+
+    private struct InventoryOperationRecord: Codable {
+        let request: Data
+        let receipt: Data
+    }
 
     /// True once the user has explicitly asked for the sample collection.
     /// Phone-only mode is a real, empty collection until they do.
@@ -165,6 +171,7 @@ final class LocalStore {
         /// stores were seeded automatically, so they are treated as loaded.
         var sampleDataLoaded: Bool?
         var portableSections: [String: JSONValue]? = nil
+        var inventoryOperationReceipts: [String: InventoryOperationRecord]? = nil
     }
 
     private struct PortableBackup: Codable {
@@ -195,6 +202,7 @@ final class LocalStore {
     }
 
     private func applyPersistedState(_ state: PersistedState) {
+        inventoryOperationReceipts = state.inventoryOperationReceipts ?? [:]
         portableSections = state.portableSections
         collections = state.collections
         binderPages = state.binderPages ?? []
@@ -256,7 +264,8 @@ final class LocalStore {
             preferences: preferences,
             appSettings: appSettings,
             sampleDataLoaded: sampleDataLoaded,
-            portableSections: portableSections
+            portableSections: portableSections,
+            inventoryOperationReceipts: inventoryOperationReceipts
         )
     }
 
@@ -934,7 +943,7 @@ final class LocalStore {
             [
                 "tcg", "external_id", "card_name", "collector_number", "set_code", "set_name",
                 "rarity", "binder_name", "quantity", "condition", "language", "notes",
-                "price", "acquisition_price", "is_foil", "finish_code", "is_signed",
+                "price", "acquisition_price", "acquisition_currency", "serial_number", "acquired_at", "is_foil", "finish_code", "is_signed",
                 "is_altered", "tags"
             ].joined(separator: ",")
         ]
@@ -959,7 +968,7 @@ final class LocalStore {
                             card.language ?? "",
                             card.notes ?? "",
                             money(card.price),
-                            "", "false", "", "false", "false", ""
+                            "", "", "", "", "false", "", "false", "false", ""
                         ].map(escape).joined(separator: ",")
                     )
                     continue
@@ -972,6 +981,9 @@ final class LocalStore {
                         copy.finishCode ?? "",
                         copy.notes ?? "",
                         money(copy.acquisitionPrice),
+                        copy.acquisitionCurrency ?? "",
+                        copy.serialNumber ?? "",
+                        copy.acquiredAt ?? "",
                         (copy.isSigned ?? false) ? "1" : "0",
                         (copy.isAltered ?? false) ? "1" : "0",
                         copy.tags.map(\.label).sorted().joined(separator: ";")
@@ -996,6 +1008,9 @@ final class LocalStore {
                             sample.notes ?? card.notes ?? "",
                             money(sample.price ?? card.price),
                             money(sample.acquisitionPrice),
+                            sample.acquisitionCurrency ?? "",
+                            sample.serialNumber ?? "",
+                            sample.acquiredAt ?? "",
                             (sample.isFoil ?? false) ? "true" : "false",
                             sample.finishCode ?? "",
                             (sample.isSigned ?? false) ? "true" : "false",
@@ -1074,6 +1089,9 @@ final class LocalStore {
                     notes: item.row.notes,
                     price: item.row.price,
                     acquisitionPrice: item.row.acquisitionPrice,
+                    acquisitionCurrency: item.row.acquisitionCurrency,
+                    serialNumber: item.row.serialNumber,
+                    acquiredAt: item.row.acquiredAt,
                     variant: CardCopyVariant(
                         finishCode: item.finishCode,
                         finishLabel: nil,
@@ -1403,23 +1421,47 @@ final class LocalStore {
         return page
     }
 
+    func upsertBinderPageIfCurrent(
+        binderId: String,
+        pageNumber: Int,
+        capturedAt: Date,
+        placements: [BinderPagePlacement],
+        expectedRevision: Int
+    ) throws -> SavedBinderPage {
+        guard collections.contains(where: { $0.id == binderId }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Binder not found")
+        }
+        let current = binderPages.first { $0.binderId == binderId && $0.pageNumber == pageNumber }
+        guard expectedRevision >= 0,
+              expectedRevision == 0 ? current == nil : current?.revision == expectedRevision else {
+            throw APIService.APIError.serverError(status: 409, message: "The binder page changed. Review the current page before replacing it.")
+        }
+        let page = upsertBinderPage(binderId: binderId, pageNumber: pageNumber, capturedAt: capturedAt, placements: placements)
+        try requireLatestMutationPersisted()
+        return page
+    }
+
     func replaceBinderPageImage(
         binderId: String,
         pageNumber: Int,
-        imageData: Data
+        imageData: Data,
+        expectedRevision: Int? = nil
     ) throws -> SavedBinderPage {
         guard let index = binderPages.firstIndex(where: {
             $0.binderId == binderId && $0.pageNumber == pageNumber
         }) else {
             throw APIService.APIError.serverError(status: 404, message: "Binder page not found")
         }
-        let url = try photoRepository.store(imageData)
         let existing = binderPages[index]
+        if let expectedRevision, expectedRevision <= 0 || existing.revision != expectedRevision {
+            throw APIService.APIError.serverError(status: 409, message: "The binder page image changed. Review the current page before replacing it.")
+        }
+        let url = try photoRepository.store(imageData)
         let page = SavedBinderPage(
             id: existing.id,
             binderId: existing.binderId,
             pageNumber: existing.pageNumber,
-            revision: existing.revision,
+            revision: existing.revision + 1,
             capturedAt: existing.capturedAt,
             imageUrl: url.absoluteString,
             placements: existing.placements,
@@ -1446,7 +1488,7 @@ final class LocalStore {
             id: existing.id,
             binderId: existing.binderId,
             pageNumber: existing.pageNumber,
-            revision: existing.revision,
+            revision: existing.revision + 1,
             capturedAt: existing.capturedAt,
             imageUrl: nil,
             placements: existing.placements,
@@ -1496,7 +1538,11 @@ final class LocalStore {
         notes: String?,
         price: Double?,
         acquisitionPrice: Double?,
+        acquisitionCurrency: String? = nil,
+        serialNumber: String? = nil,
+        acquiredAt: String? = nil,
         variant: CardCopyVariant = .empty,
+        isFoil: Bool? = nil,
         isSigned: Bool?,
         isAltered: Bool?,
         gradingCompany: String? = nil,
@@ -1516,7 +1562,11 @@ final class LocalStore {
             notes: notes,
             price: price,
             acquisitionPrice: acquisitionPrice,
+            acquisitionCurrency: acquisitionCurrency,
+            serialNumber: serialNumber,
+            acquiredAt: acquiredAt,
             variant: variant,
+            isFoil: isFoil,
             isSigned: isSigned,
             isAltered: isAltered,
             gradingCompany: gradingCompany,
@@ -1530,6 +1580,7 @@ final class LocalStore {
         try persistOrThrow()
     }
 
+    @discardableResult
     private func addCardToBinderInMemory(
         binderId: String,
         cardId: String,
@@ -1539,7 +1590,11 @@ final class LocalStore {
         notes: String?,
         price: Double?,
         acquisitionPrice: Double?,
+        acquisitionCurrency: String? = nil,
+        serialNumber: String? = nil,
+        acquiredAt: String? = nil,
         variant: CardCopyVariant = .empty,
+        isFoil: Bool? = nil,
         isSigned: Bool?,
         isAltered: Bool?,
         gradingCompany: String? = nil,
@@ -1549,7 +1604,7 @@ final class LocalStore {
         tagIds: [String]?,
         newTags: [APIService.TagPayload]?,
         card: Card?
-    ) throws {
+    ) throws -> [String] {
         let resolvedBinderId = binderId == Constants.unsortedBinderId ? Constants.unsortedBinderId : binderId
         guard let binderIndex = collections.firstIndex(where: { $0.id == resolvedBinderId }) else {
             throw APIService.APIError.serverError(status: 404, message: "Binder not found")
@@ -1567,6 +1622,7 @@ final class LocalStore {
         // default before landing as unspecified.
         let condition = condition ?? binder.defaultCondition
         var binderCards = binder.cards
+        let createdIDs: [String]
         if let existingIndex = binderCards.firstIndex(where: { $0.cardId == resolvedCard.id && $0.tcg.caseInsensitiveCompare(resolvedCard.tcg) == .orderedSame }) {
             var existing = binderCards[existingIndex]
             let newCopies = makeCopies(
@@ -1576,7 +1632,11 @@ final class LocalStore {
                 notes: notes ?? existing.notes,
                 price: price ?? existing.price,
                 acquisitionPrice: acquisitionPrice,
+                acquisitionCurrency: acquisitionCurrency,
+                serialNumber: serialNumber,
+                acquiredAt: acquiredAt,
                 variant: variant,
+                isFoil: isFoil,
                 isSigned: isSigned,
                 isAltered: isAltered,
                 tags: selectedTags,
@@ -1585,6 +1645,7 @@ final class LocalStore {
                 certNumber: certNumber,
                 storageLocation: storageLocation
             )
+            createdIDs = newCopies.map(\.id)
             let allCopies = existing.copies + newCopies
             existing = replaceCard(existing, copies: allCopies)
             existing.price = price ?? existing.price
@@ -1617,7 +1678,11 @@ final class LocalStore {
                     notes: notes,
                     price: price ?? resolvedCard.price,
                     acquisitionPrice: acquisitionPrice,
+                    acquisitionCurrency: acquisitionCurrency,
+                    serialNumber: serialNumber,
+                    acquiredAt: acquiredAt,
                     variant: variant,
+                    isFoil: isFoil,
                     isSigned: isSigned,
                     isAltered: isAltered,
                     tags: selectedTags,
@@ -1627,12 +1692,14 @@ final class LocalStore {
                     storageLocation: storageLocation
                 )
             )
+            createdIDs = newCard.copies.map(\.id)
             applyCatalogMetadata(resolvedCard, to: &newCard)
             nextCollectionCardId += 1
             binderCards.append(newCard)
         }
 
         collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
+        return createdIDs
     }
 
     func updateCardInBinder(
@@ -1643,6 +1710,7 @@ final class LocalStore {
         language: String?,
         notes: String?,
         acquisitionPrice: Double?,
+        acquisitionCurrency: String? = nil,
         acquiredAt: String?,
         variant: CardCopyVariant?,
         isSigned: Bool?,
@@ -1743,6 +1811,7 @@ final class LocalStore {
                             notes: template.notes,
                             price: template.price,
                             acquisitionPrice: template.acquisitionPrice,
+                            acquisitionCurrency: template.acquisitionCurrency,
                             serialNumber: template.serialNumber,
                             acquiredAt: template.acquiredAt,
                             isFoil: template.isFoil,
@@ -1790,6 +1859,7 @@ final class LocalStore {
                     notes: notes ?? copy.notes,
                     price: copy.price,
                     acquisitionPrice: includeAcquisitionDetails ? acquisitionPrice : copy.acquisitionPrice,
+                    acquisitionCurrency: includeAcquisitionDetails ? (acquisitionPrice == nil ? nil : acquisitionCurrency ?? copy.acquisitionCurrency) : copy.acquisitionCurrency,
                     serialNumber: copy.serialNumber,
                     acquiredAt: includeAcquisitionDetails ? acquiredAt : copy.acquiredAt,
                     isFoil: variant?.isFoil ?? copy.isFoil,
@@ -1812,7 +1882,9 @@ final class LocalStore {
             }
         }
 
-        var updatedCard = replaceCard(sourceCard, copies: updatedCopies)
+        let correctingOneCopy = targetCopyId != nil && newPrint != nil && (newPrint!.id != sourceCard.cardId || newPrint!.tcg != sourceCard.tcg)
+        let correctedCopies = correctingOneCopy ? updatedCopies.filter { $0.id == targetCopyId } : updatedCopies
+        var updatedCard = replaceCard(sourceCard, copies: correctedCopies)
         if let newPrint {
             updatedCard = CollectionCard(
                 id: updatedCard.id,
@@ -1836,7 +1908,19 @@ final class LocalStore {
             applyCatalogMetadata(newPrint, to: &updatedCard)
         }
 
-        sourceCards[sourceCardIndex] = updatedCard
+        if correctingOneCopy {
+            let survivingCopies = sourceCard.copies.filter { $0.id != targetCopyId }
+            if survivingCopies.isEmpty { sourceCards.remove(at: sourceCardIndex) }
+            else {
+                sourceCards[sourceCardIndex] = replaceCard(sourceCard, copies: survivingCopies)
+                updatedCard.id = "local-cc-\(nextCollectionCardId)"
+                nextCollectionCardId += 1
+            }
+            if let destinationIndex = sourceCards.firstIndex(where: { $0.cardId == updatedCard.cardId && $0.tcg == updatedCard.tcg }) {
+                updatedCard = replaceCard(sourceCards[destinationIndex], copies: sourceCards[destinationIndex].copies + correctedCopies)
+                sourceCards[destinationIndex] = updatedCard
+            } else { sourceCards.append(updatedCard) }
+        } else { sourceCards[sourceCardIndex] = updatedCard }
         collections[sourceBinderIndex] = stampUpdatedAt(sourceBinder, cards: sourceCards)
         try persistOrThrow()
         return updatedCard
@@ -1869,6 +1953,132 @@ final class LocalStore {
 
         collections[binderIndex] = stampUpdatedAt(binder, cards: binderCards)
         try persistOrThrow()
+    }
+
+    /// Explicit single-copy deletion never interprets a copy ID as a printing.
+    func deletePhysicalCopy(binderId: String, copyId: String) throws {
+        guard let index = collections.firstIndex(where: { $0.id == binderId }),
+              collections[index].cards.contains(where: { $0.copies.contains(where: { $0.id == copyId }) }) else {
+            throw APIService.APIError.serverError(status: 404, message: "Physical copy not found")
+        }
+        let binder = collections[index]
+        let cards = binder.cards.compactMap { card -> CollectionCard? in
+            guard card.copies.contains(where: { $0.id == copyId }) else { return card }
+            let remaining = card.copies.filter { $0.id != copyId }
+            return remaining.isEmpty ? nil : replaceCard(card, copies: remaining)
+        }
+        collections[index] = stampUpdatedAt(binder, cards: cards)
+        try persistOrThrow()
+    }
+
+    private func operationData<T: Encodable>(_ value: T) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(value)
+    }
+
+    func recordInventorySale(_ request: InventorySaleRequest) throws -> InventorySaleReceipt {
+        let requestData = try operationData(request)
+        if let saved = inventoryOperationReceipts[request.operationId] {
+            guard saved.request == requestData else {
+                throw APIService.APIError.serverError(status: 409, message: "Operation ID already has different sale details")
+            }
+            return try JSONDecoder().decode(InventorySaleReceipt.self, from: saved.receipt)
+        }
+        guard !request.operationId.isEmpty, !request.copyIds.isEmpty,
+              Set(request.copyIds).count == request.copyIds.count,
+              request.amount.isFinite, request.amount >= 0,
+              (request.fees ?? 0).isFinite, (request.fees ?? 0) >= 0,
+              (request.shippingCost ?? 0).isFinite, (request.shippingCost ?? 0) >= 0,
+              request.costBasis == nil || (request.costBasis!.isFinite && request.costBasis! >= 0),
+              request.currency.range(of: "^[A-Z]{3}$", options: .regularExpression) != nil,
+              let binderIndex = collections.firstIndex(where: { $0.id == request.collectionId }) else {
+            throw APIService.APIError.serverError(status: 400, message: "Invalid sale details")
+        }
+        let binder = collections[binderIndex]
+        let wanted = Set(request.copyIds)
+        let copies = binder.cards.flatMap(\.copies).filter { wanted.contains($0.id) }
+        guard copies.count == wanted.count else {
+            throw APIService.APIError.serverError(status: 409, message: "One or more selected copies are no longer in this binder")
+        }
+        let card = binder.cards.first { $0.copies.contains { wanted.contains($0.id) } }
+        let sameCurrencyCosts = copies.allSatisfy { $0.acquisitionPrice != nil && $0.acquisitionCurrency == request.currency }
+        let inferredCost = sameCurrencyCosts ? copies.reduce(0.0) { $0 + ($1.acquisitionPrice ?? 0) } : nil
+        let costBasis = request.costBasis ?? inferredCost
+        let now = Self.isoFormatter.string(from: Date())
+        let net = request.amount - (request.fees ?? 0) - (request.shippingCost ?? 0)
+        let transaction = Transaction(
+            id: "local-txn-\(nextTransactionId)", type: "sale", collectionEntryId: copies.first?.id,
+            cardId: card?.cardId, externalId: card?.externalId, cardName: card?.name, tcg: card?.tcg,
+            quantity: copies.count, amount: request.amount, currency: request.currency,
+            platform: request.platform, costBasis: costBasis, fees: request.fees,
+            shippingCost: request.shippingCost, acquiredAt: request.acquiredAt,
+            netProceeds: net, realizedProfit: costBasis.map { net - $0 }, notes: request.notes,
+            date: request.date ?? now
+        )
+        let receipt = InventorySaleReceipt(
+            operationId: request.operationId, transactionId: transaction.id,
+            copyIds: request.copyIds, removedCopyIds: request.removeFromInventory ? request.copyIds : [],
+            amount: request.amount, currency: request.currency
+        )
+        let receiptData = try operationData(receipt)
+        // All validation/encoding precedes mutation. Receipt, ledger, removal
+        // and ID counter commit in the same atomic file replacement.
+        if request.removeFromInventory {
+            let remainingCards = binder.cards.compactMap { item -> CollectionCard? in
+                guard item.copies.contains(where: { wanted.contains($0.id) }) else { return item }
+                let remaining = item.copies.filter { !wanted.contains($0.id) }
+                return remaining.isEmpty ? nil : replaceCard(item, copies: remaining)
+            }
+            collections[binderIndex] = stampUpdatedAt(binder, cards: remainingCards)
+        }
+        nextTransactionId += 1
+        transactions.insert(transaction, at: 0)
+        inventoryOperationReceipts[request.operationId] = InventoryOperationRecord(request: requestData, receipt: receiptData)
+        try persistOrThrow()
+        return receipt
+    }
+
+    func commitInventoryIntake(_ draft: InventoryIntakeDraft) throws -> InventoryIntakeReceipt {
+        let requestData = try operationData(draft)
+        if let saved = inventoryOperationReceipts[draft.operationId] {
+            guard saved.request == requestData else {
+                throw APIService.APIError.serverError(status: 409, message: "Operation ID already has different intake details")
+            }
+            return try JSONDecoder().decode(InventoryIntakeReceipt.self, from: saved.receipt)
+        }
+        guard !draft.operationId.isEmpty, !draft.rows.isEmpty,
+              ["scanner", "physical-opening"].contains(draft.source),
+              draft.sealedInventoryId == nil,
+              Set(draft.rows.map(\.rowId)).count == draft.rows.count,
+              draft.rows.allSatisfy({ !$0.rowId.isEmpty && $0.details.quantity > 0 && $0.details.quantity <= 1000 }) else {
+            throw APIService.APIError.serverError(status: 400, message: "Invalid intake; a sealed-opening ledger requires a connected server")
+        }
+        let before = persistedState()
+        do {
+            var rows: [InventoryIntakeReceipt.Row] = []
+            for row in draft.rows {
+                let details = row.details
+                let ids = try addCardToBinderInMemory(
+                    binderId: draft.collectionId, cardId: row.card.id, quantity: details.quantity,
+                    condition: details.condition, language: details.language, notes: details.notes,
+                    price: row.card.price, acquisitionPrice: nil, variant: details.variant,
+                    isFoil: details.isFoil || details.variant.isFoil,
+                    isSigned: details.isSigned, isAltered: details.isAltered,
+                    gradingCompany: details.gradingCompany, gradingScore: details.gradingScore,
+                    certNumber: details.certNumber, storageLocation: details.storageLocation,
+                    tagIds: details.tags, newTags: nil, card: row.card
+                )
+                rows.append(InventoryIntakeReceipt.Row(rowId: row.rowId, entryIds: ids))
+            }
+            let receipt = InventoryIntakeReceipt(operationId: draft.operationId, entryIds: rows.flatMap(\.entryIds), rows: rows)
+            inventoryOperationReceipts[draft.operationId] = InventoryOperationRecord(request: requestData, receipt: try operationData(receipt))
+            try persistOrThrow()
+            return receipt
+        } catch {
+            applyPersistedState(before)
+            throw error
+        }
     }
 
     static func cardBack(for tcg: String) -> String? {
@@ -2215,7 +2425,11 @@ final class LocalStore {
         notes: String?,
         price: Double?,
         acquisitionPrice: Double?,
+        acquisitionCurrency: String? = nil,
+        serialNumber: String? = nil,
+        acquiredAt: String? = nil,
         variant: CardCopyVariant = .empty,
+        isFoil: Bool? = nil,
         isSigned: Bool? = nil,
         isAltered: Bool? = nil,
         tags: [CollectionCardTag],
@@ -2237,9 +2451,10 @@ final class LocalStore {
                     notes: notes,
                     price: price,
                     acquisitionPrice: acquisitionPrice,
-                    serialNumber: nil,
-                    acquiredAt: now,
-                    isFoil: variant.isFoil,
+                    acquisitionCurrency: acquisitionPrice == nil ? nil : acquisitionCurrency?.uppercased(),
+                    serialNumber: serialNumber,
+                    acquiredAt: acquiredAt ?? now,
+                    isFoil: isFoil ?? variant.isFoil,
                     finishCode: variant.finishCode,
                     finishLabel: variant.finishLabel,
                     edition: variant.edition,
@@ -3067,9 +3282,18 @@ final class LocalStore {
     }
 
     func getFinanceSummary() -> FinanceSummary {
-        let spent = transactions.filter { $0.type == "purchase" }.reduce(0.0) { $0 + $1.amount }
-        let earned = transactions.filter { $0.type == "sale" }.reduce(0.0) { $0 + $1.amount }
+        let spent = transactions.filter { $0.type == "purchase" && $0.currency == "USD" }.reduce(0.0) { $0 + $1.amount }
+        let earned = transactions.filter { $0.type == "sale" && $0.currency == "USD" }.reduce(0.0) { $0 + $1.amount }
         return FinanceSummary(totalSpent: spent, totalEarned: earned, profitLoss: earned - spent, transactionCount: transactions.count)
+    }
+
+    func getFinanceSummaryByCurrency() -> FinanceSummaryByCurrency {
+        let totals = Dictionary(grouping: transactions, by: { $0.currency.uppercased() }).map { currency, rows in
+            let spent = rows.filter { $0.type == "purchase" }.reduce(0.0) { $0 + $1.amount }
+            let earned = rows.filter { $0.type == "sale" }.reduce(0.0) { $0 + $1.amount }
+            return FinanceCurrencySummary(currency: currency, totalSpent: spent, totalEarned: earned, profitLoss: earned - spent)
+        }.sorted { $0.currency < $1.currency }
+        return FinanceSummaryByCurrency(byCurrency: totals, transactionCount: transactions.count)
     }
 
     func createTransaction(
@@ -3090,7 +3314,23 @@ final class LocalStore {
         acquiredAt: String?,
         notes: String?,
         date: String?
-    ) -> Transaction {
+    ) throws -> Transaction {
+        guard amount.isFinite, amount >= 0, quantity > 0,
+              currency.uppercased().range(of: "^[A-Z]{3}$", options: .regularExpression) != nil else {
+            throw APIService.APIError.serverError(status: 400, message: "Invalid transaction amount or currency")
+        }
+        if type == "purchase", let collectionEntryId {
+            guard quantity == 1 else { throw APIService.APIError.serverError(status: 400, message: "A linked purchase addresses one physical copy") }
+            if let existing = transactions.first(where: { $0.type == "purchase" && $0.collectionEntryId == collectionEntryId }) {
+                guard existing.amount == amount, existing.currency == currency.uppercased(),
+                      existing.quantity == quantity, existing.platform == platform,
+                      existing.sourceUrl == sourceUrl, existing.notes == notes,
+                      date == nil || existing.date == date else {
+                    throw APIService.APIError.serverError(status: 409, message: "This copy already has a purchase. Edit its existing purchase instead.")
+                }
+                return existing
+            }
+        }
         let now = LocalStore.isoFormatter.string(from: Date())
         let netProceeds = type == "sale" ? amount - (fees ?? 0) - (shippingCost ?? 0) : nil
         let txn = Transaction(
@@ -3103,9 +3343,12 @@ final class LocalStore {
             realizedProfit: costBasis.map { (netProceeds ?? amount) - $0 },
             notes: notes, date: date ?? now
         )
+        if type == "purchase", let collectionEntryId {
+            try updateCopyAcquisitionInMemory(copyID: collectionEntryId, amount: amount, currency: currency.uppercased(), date: txn.date, requireCopy: true)
+        }
         nextTransactionId += 1
         transactions.insert(txn, at: 0)
-        persist()
+        try persistOrThrow()
         return txn
     }
 
@@ -3128,6 +3371,15 @@ final class LocalStore {
             throw APIService.APIError.serverError(status: 404, message: "Transaction not found")
         }
         let existing = transactions[index]
+        guard amount.isFinite, amount >= 0, quantity > 0,
+              currency.uppercased().range(of: "^[A-Z]{3}$", options: .regularExpression) != nil else {
+            throw APIService.APIError.serverError(status: 400, message: "Invalid transaction amount or currency")
+        }
+        if existing.type == "purchase", existing.collectionEntryId != nil {
+            guard collectionEntryId == existing.collectionEntryId, quantity == 1 else {
+                throw APIService.APIError.serverError(status: 409, message: "A linked purchase must retain its physical copy")
+            }
+        }
         let updated = Transaction(
             id: existing.id,
             type: existing.type,
@@ -3148,11 +3400,14 @@ final class LocalStore {
             netProceeds: existing.type == "sale"
                 ? amount - (existing.fees ?? 0) - (existing.shippingCost ?? 0)
                 : nil,
-            realizedProfit: existing.realizedProfit,
+            realizedProfit: existing.type == "sale" ? existing.costBasis.map { amount - (existing.fees ?? 0) - (existing.shippingCost ?? 0) - $0 } : existing.realizedProfit,
             holdingDays: existing.holdingDays,
             notes: notes,
             date: date
         )
+        if existing.type == "purchase", let collectionEntryId {
+            try updateCopyAcquisitionInMemory(copyID: collectionEntryId, amount: amount, currency: currency.uppercased(), date: date, requireCopy: false)
+        }
         transactions[index] = updated
         try persistOrThrow()
         return updated
@@ -3160,29 +3415,56 @@ final class LocalStore {
 
     func getRealizedPerformance() -> RealizedPerformance {
         let sales = transactions.filter { $0.type == "sale" }
-        let revenue = sales.reduce(0.0) { $0 + $1.amount }
-        let fees = sales.reduce(0.0) { $0 + ($1.fees ?? 0) }
-        let shipping = sales.reduce(0.0) { $0 + ($1.shippingCost ?? 0) }
-        let costed = sales.filter { $0.costBasis != nil }
-        let costBasis = costed.reduce(0.0) { $0 + ($1.costBasis ?? 0) }
-        let realized = costed.reduce(0.0) { $0 + ($1.realizedProfit ?? 0) }
-        let inventoryCards = collections.flatMap(\.cards).flatMap(\.copies)
+        let byCurrency = Dictionary(grouping: sales, by: \.currency).map { currency, group in
+            let revenue = group.reduce(0.0) { $0 + $1.amount }
+            let fees = group.reduce(0.0) { $0 + ($1.fees ?? 0) }
+            let shipping = group.reduce(0.0) { $0 + ($1.shippingCost ?? 0) }
+            let costed = group.filter { $0.costBasis != nil }
+            return RealizedPerformanceCurrency(
+                currency: currency, revenue: revenue, costBasis: costed.reduce(0.0) { $0 + ($1.costBasis ?? 0) },
+                fees: fees, shippingCost: shipping, netProceeds: revenue - fees - shipping,
+                realizedProfit: costed.reduce(0.0) { $0 + ($1.realizedProfit ?? 0) },
+                saleCount: group.count, costedSaleCount: costed.count, averageHoldingDays: nil
+            )
+        }.sorted { $0.currency < $1.currency }
+        let copies = collections.flatMap(\.cards).flatMap(\.copies).filter { $0.acquisitionPrice != nil }
+        let costs = Dictionary(grouping: copies, by: { $0.acquisitionCurrency ?? "UNKNOWN" }).map { currency, copies in
+            InventoryCostCurrency(currency: currency, cost: copies.reduce(0.0) { $0 + ($1.acquisitionPrice ?? 0) })
+        }.sorted { $0.currency < $1.currency }
         return RealizedPerformance(
-            byCurrency: [RealizedPerformanceCurrency(
-                currency: "USD", revenue: revenue, costBasis: costBasis, fees: fees,
-                shippingCost: shipping, netProceeds: revenue - fees - shipping,
-                realizedProfit: realized, saleCount: sales.count,
-                costedSaleCount: costed.count, averageHoldingDays: nil
-            )],
-            inventoryCost: inventoryCards.reduce(0.0) { $0 + ($1.acquisitionPrice ?? 0) },
+            byCurrency: byCurrency,
+            inventoryCost: costs.first(where: { $0.currency == "USD" })?.cost ?? 0,
             inventoryMarketValue: collections.flatMap(\.cards).reduce(0.0) { $0 + ($1.price ?? 0) * Double($1.quantity) },
-            inventoryCurrency: "USD",
-            truncated: false
+            inventoryCurrency: "USD", truncated: false, inventoryCostsByCurrency: costs
         )
     }
 
-    func deleteTransaction(id: String) {
+    func deleteTransaction(id: String) throws {
+        guard let transaction = transactions.first(where: { $0.id == id }) else { return }
+        if transaction.type == "purchase", let copyID = transaction.collectionEntryId {
+            try updateCopyAcquisitionInMemory(copyID: copyID, amount: nil, currency: nil, date: nil, requireCopy: false)
+        }
         transactions.removeAll { $0.id == id }
-        persist()
+        try persistOrThrow()
+    }
+
+    private func updateCopyAcquisitionInMemory(copyID: String, amount: Double?, currency: String?, date: String?, requireCopy: Bool) throws {
+        for binderIndex in collections.indices {
+            let binder = collections[binderIndex]
+            guard let cardIndex = binder.cards.firstIndex(where: { $0.copies.contains(where: { $0.id == copyID }) }) else { continue }
+            var cards = binder.cards
+            let copies = cards[cardIndex].copies.map { original -> CollectionCardCopy in
+                guard original.id == copyID else { return original }
+                var copy = original
+                copy.acquisitionPrice = amount
+                copy.acquisitionCurrency = currency
+                copy.acquiredAt = date
+                return copy
+            }
+            cards[cardIndex] = replaceCard(cards[cardIndex], copies: copies)
+            collections[binderIndex] = stampUpdatedAt(binder, cards: cards)
+            return
+        }
+        if requireCopy { throw APIService.APIError.serverError(status: 404, message: "Physical copy not found") }
     }
 }

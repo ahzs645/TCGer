@@ -40,6 +40,10 @@ final class APIService {
         self.collectionCache = collectionCache
     }
 
+    static func pathSegment(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")) ?? value
+    }
+
     func makeRequest(
         config: ServerConfiguration,
         path: String,
@@ -55,6 +59,15 @@ final class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        let normalizedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let normalizedMethod = method.uppercased()
+        let requiresAuthOrigin = (normalizedPath.hasPrefix("auth/") && !["GET", "HEAD", "OPTIONS"].contains(normalizedMethod)) ||
+            (normalizedMethod == "POST" && normalizedPath == "users/me/change-password") ||
+            (normalizedMethod == "DELETE" && normalizedPath == "users/me")
+        if requiresAuthOrigin {
+            guard let origin = config.authenticationOrigin else { throw APIError.invalidURL }
+            request.setValue(origin, forHTTPHeaderField: "Origin")
+        }
 
         if let token {
             request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -71,10 +84,15 @@ final class APIService {
     func execute(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         do {
             let (data, response) = try await session.data(for: request)
+            try Task.checkCancellation()
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.serverError(status: -1, message: nil)
             }
             return (data, httpResponse)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
             throw APIError.networkError(error)
         }

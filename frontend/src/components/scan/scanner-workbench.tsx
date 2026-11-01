@@ -1,7 +1,9 @@
+// @tcger-feature {"id":"packOpening.save.collection","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server","atomic-intake"]}
+// @tcger-feature {"id":"packOpening.save.sealedLedger","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server","atomic-intake"]}
 // @tcger-feature {"id":"scanner.engine.serverEmbedding","platform":"web","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 // @tcger-feature {"id":"scanner.options.torch","platform":"web","status":"implemented","requires":["camera-torch"]}
 // @tcger-feature {"id":"scanner.results.autoOpen","platform":"web","status":"implemented"}
-// @tcger-feature {"id":"scanner.results.priceMode","platform":"web","status":"planned","limitation":"Session quotes and currency totals exist; the native price-mode control semantics are not yet equivalent."}
+// @tcger-feature {"id":"scanner.results.priceMode","platform":"web","status":"implemented","modes":["demo","server"],"requires":["pricing-provider"]}
 // @tcger-feature {"id":"scanner.results.cropCorrection","platform":"web","status":"implemented"}
 // @tcger-feature {"id":"scanner.binder.savePagePhotos","platform":"web","status":"implemented"}
 // @tcger-feature {"id":"scanner.debug.developerAccess","platform":"web","status":"implemented"}
@@ -21,6 +23,7 @@
 
 "use client";
 
+import { ScanIntakeRecovery } from "./intake-recovery";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   recordingDatabase,
@@ -34,13 +37,25 @@ import { SCANNER_REVIEW_DB_NAME } from "@/lib/storage/keys";
 import Dexie, { type Table } from "dexie";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth";
+import { getCollections, type Collection } from "@/lib/api/collections";
+import { API_BASE_URL } from "@/lib/api/base-url";
+import { useServerFeatures } from "@/lib/api/health";
 import {
-  getCollections,
-  addCardToCollection,
-  type Collection,
-} from "@/lib/api/collections";
-import { getTrackedCardPrices } from "@/lib/api/pricing";
-import type { BinderPage } from "@tcg/api-types";
+  getSealedInventory,
+  type SealedInventoryResponse,
+} from "@/lib/api/sealed";
+import { capturePrivateSession } from "@/lib/private-session";
+import {
+  loadIntakeDraft,
+  prepareIntakeDraft,
+  submitIntakeDraft,
+  finishIntakeDraft,
+  type IntakeDraft,
+} from "@/lib/intake/durable-intake";
+import { useScannerPrices } from "@/lib/scan/use-scanner-prices";
+import { scannerPriceKey } from "@/lib/scan/scanner-pricing";
+import { POKEMON_FINISH_CATALOG } from "@/lib/pokemon-variants";
+import { getGameDefinitionOrDefault, type BinderPage } from "@tcg/api-types";
 import { saveBinderPage, getBinderPages } from "@/lib/api/binder-pages";
 import { scanCardImageApi, type CardScanMatch } from "@/lib/api/scan";
 import { useVideoScanData } from "./use-video-scan-data";
@@ -61,6 +76,11 @@ interface SessionCard {
   id: string;
   card: CardScanMatch;
   saved?: boolean;
+  entryIds?: string[];
+  operationId?: string;
+  finishCode?: string;
+  condition?: string;
+  language?: string;
   price?: number;
   currency?: string;
 }
@@ -99,7 +119,15 @@ const errorText = (error: unknown) =>
 export function ScannerWorkbench() {
   const token = useAuthStore((s) => s.token);
   const owner = useAuthStore((s) => s.user?.id) ?? "local";
-  const draftKey = `${owner}:review`;
+  const draftKey = `${API_BASE_URL}:${owner}:review`;
+  const features = useServerFeatures();
+  const [pendingIntake, setPendingIntake] = useState<IntakeDraft | null>(null);
+  const [sealedInventory, setSealedInventory] = useState<
+    SealedInventoryResponse[]
+  >([]);
+  const [sealedInventoryId, setSealedInventoryId] = useState("");
+  const [openedQuantity, setOpenedQuantity] = useState(1);
+  const intakeKey = "scanner-review";
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -157,6 +185,33 @@ export function ScannerWorkbench() {
   const [busy, setBusy] = useState(false);
   const [regions, setRegions] = useState<ScanRegion[]>([]);
   const [session, setSession] = useState<SessionCard[]>([]);
+  const priceItem = (item: SessionCard) => ({
+    tcg: item.card.tcg,
+    externalId: item.card.externalId,
+    finishCode: item.finishCode,
+    condition: item.condition,
+    language: item.language,
+  });
+  const pricing = useScannerPrices(session.map(priceItem));
+  const quoteFor = (item: SessionCard) =>
+    pricing.snapshot?.quotes[scannerPriceKey(priceItem(item))];
+  const finishChoices = (item: SessionCard) =>
+    item.card.tcg === "pokemon"
+      ? POKEMON_FINISH_CATALOG
+      : (getGameDefinitionOrDefault(item.card.tcg).printings?.finishes ?? [
+          { code: "nonfoil", label: "Non-Foil" },
+          { code: "foil", label: "Foil" },
+        ]);
+  const updateCopyDetails = (
+    id: string,
+    field: "finishCode" | "condition" | "language",
+    value: string,
+  ) =>
+    setSession((rows) =>
+      rows.map((row) =>
+        row.id === id ? { ...row, [field]: value || undefined } : row,
+      ),
+    );
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [dimensions, setDimensions] = useState({ width: 1, height: 1 });
   const [active, setActive] = useState<string | null>(null);
@@ -272,6 +327,18 @@ export function ScannerWorkbench() {
   useEffect(() => {
     if (camera && video.current) video.current.srcObject = stream.current;
   }, [camera]);
+  useEffect(() => {
+    if (!token) return;
+    try {
+      setPendingIntake(loadIntakeDraft(intakeKey));
+    } catch (e) {
+      setError(errorText(e));
+    }
+    void getSealedInventory(token)
+      .then(setSealedInventory)
+      .catch(() => setSealedInventory([]));
+  }, [token]);
+
   useEffect(() => {
     if (!token) {
       setBinders([]);
@@ -632,44 +699,95 @@ export function ScannerWorkbench() {
       !item.candidates[item.selected]?.requiresPrintingChoice,
   );
   async function saveSession() {
-    if (!token || !binderId) throw new Error("Choose a binder first.");
-    let checkpoint = session;
-    for (const item of session.filter((item) => !item.saved)) {
-      await addCardToCollection(token, binderId, {
-        cardId: item.card.externalId,
-        quantity: 1,
-        cardData: {
-          externalId: item.card.externalId,
-          name: item.card.name,
-          tcg: item.card.tcg,
-          setCode: item.card.setCode ?? undefined,
-          imageUrl: item.card.imageUrl ?? undefined,
-          rarity: item.card.rarity ?? undefined,
+    if (!token) throw new Error("Sign in before saving cards.");
+    if (features.atomicIntake !== true)
+      throw new Error(
+        "This server does not support reliable intake. Connect to an updated Convex server to save or recover this session.",
+      );
+    const origin = capturePrivateSession(token);
+    origin.assertCurrent();
+    let draft = pendingIntake ?? loadIntakeDraft(intakeKey);
+    if (!draft) {
+      if (!binderId) throw new Error("Choose a binder first.");
+      const unsaved = session.filter((item) => !item.saved);
+      if (!unsaved.length) return;
+      draft = prepareIntakeDraft(intakeKey, {
+        collectionId: binderId,
+        request: {
+          operationId: crypto.randomUUID(),
+          source: sealedInventoryId ? "physical-opening" : "scanner",
+          ...(sealedInventoryId
+            ? {
+                sealedInventoryId,
+                openedQuantity,
+                openedAt: new Date().toISOString(),
+              }
+            : {}),
+          rows: unsaved.map((item) => ({
+            rowId: item.id,
+            cardId: item.card.externalId,
+            quantity: 1,
+            finishCode: item.finishCode,
+            finishLabel: finishChoices(item).find(
+              (choice) => choice.code === item.finishCode,
+            )?.label,
+            condition: item.condition,
+            language: item.language,
+            cardData: {
+              externalId: item.card.externalId,
+              name: item.card.name,
+              tcg: item.card.tcg,
+              setCode: item.card.setCode ?? undefined,
+              setName: item.card.setName ?? undefined,
+              imageUrl: item.card.imageUrl ?? undefined,
+              rarity: item.card.rarity ?? undefined,
+            },
+          })),
         },
       });
-      // Checkpoint each successful copy. A retry only sends the remaining copies.
-      checkpoint = checkpoint.map((row) =>
-        row.id === item.id ? { ...row, saved: true } : row,
-      );
-      setSession(checkpoint);
-      const { db, table } = sessionTable();
-      try {
-        await table.put(
-          {
-            regions,
-            session: checkpoint,
-            photo,
-            pageNumber,
-            binderId,
-            ...dimensions,
-          },
-          draftKey,
-        );
-      } finally {
-        db.close();
-      }
     }
-    setStatus("Session added to binder.");
+    setPendingIntake(draft);
+    const receipt = await submitIntakeDraft(token, intakeKey, draft);
+    origin.assertCurrent();
+    const saved = new Map(receipt.rows.map((row) => [row.rowId, row.entryIds]));
+    const checkpoint = session.map((row) =>
+      saved.has(row.id)
+        ? {
+            ...row,
+            saved: true,
+            entryIds: saved.get(row.id),
+            operationId: receipt.operationId,
+          }
+        : row,
+    );
+    const { db, table } = sessionTable();
+    try {
+      await table.put(
+        {
+          regions,
+          session: checkpoint,
+          photo,
+          pageNumber,
+          binderId: draft.collectionId,
+          ...dimensions,
+        },
+        draftKey,
+      );
+    } finally {
+      db.close();
+    }
+    origin.assertCurrent();
+    setSession(checkpoint);
+    setBinderId(draft.collectionId);
+    finishIntakeDraft(intakeKey);
+    setPendingIntake(null);
+    setSealedInventoryId("");
+    setStatus(
+      `${receipt.entryIds.length} physical copies saved${receipt.openingId ? " and sealed stock updated" : ""}.`,
+    );
+    void getSealedInventory(token)
+      .then(setSealedInventory)
+      .catch(() => undefined);
   }
   async function savePage() {
     if (!token || !binderId) throw new Error("Choose a binder first.");
@@ -721,17 +839,19 @@ export function ScannerWorkbench() {
     );
   }
   const totals = scanCurrencyTotals(
-    session.flatMap((item) =>
-      item.price != null && item.currency
-        ? [{ price: item.price, currency: item.currency }]
-        : [],
-    ),
+    session.flatMap((item) => {
+      const quote = quoteFor(item);
+      return quote?.price != null && quote.currency
+        ? [{ price: quote.price, currency: quote.currency }]
+        : [];
+    }),
   );
   return (
     <section
       className="space-y-4 rounded-xl border p-4 [&_select]:rounded [&_select]:border [&_select]:bg-background [&_select]:p-2 [&_input:not([type=checkbox]):not([type=range]):not([type=file])]:rounded [&_input:not([type=checkbox]):not([type=range]):not([type=file])]:border [&_input:not([type=checkbox]):not([type=range]):not([type=file])]:bg-background [&_input:not([type=checkbox]):not([type=range]):not([type=file])]:p-2"
       aria-label="Camera and binder scanner"
     >
+      <ScanIntakeRecovery />
       <h2 className="text-xl font-semibold">
         <button
           onClick={() => {
@@ -1264,11 +1384,36 @@ export function ScannerWorkbench() {
       )}
       <div className="space-y-2 border-t pt-3">
         <h3 className="font-semibold">Session · {session.length} copies</h3>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={pricing.enabled}
+            disabled={!pricing.allowed}
+            onChange={(event) => pricing.setEnabled(event.target.checked)}
+          />
+          Automatic price mode
+        </label>
+        {!pricing.allowed && (
+          <p className="text-sm text-muted-foreground">
+            Connect to a server with pricing to show session quotes.
+          </p>
+        )}
+        {pricing.loading && (
+          <p role="status" className="text-sm">
+            Updating prices for the reviewed printings…
+          </p>
+        )}
+        {pricing.error && (
+          <p role="alert" className="text-sm text-destructive">
+            Session pricing: {pricing.error}
+          </p>
+        )}
         <label>
           Destination binder{" "}
           <select
             aria-label="Scanner destination binder"
-            value={binderId}
+            disabled={busy || Boolean(pendingIntake)}
+            value={pendingIntake?.collectionId ?? binderId}
             onChange={(e) => setBinderId(e.target.value)}
           >
             <option value="">Choose binder</option>
@@ -1279,6 +1424,67 @@ export function ScannerWorkbench() {
             ))}
           </select>
         </label>
+        <fieldset
+          className="space-y-2 rounded-lg border p-3"
+          disabled={busy || Boolean(pendingIntake)}
+        >
+          <legend className="px-1 text-sm font-medium">
+            Physical opening (optional)
+          </legend>
+          <p className="text-xs text-muted-foreground">
+            Review the actual cards in this session before linking sealed
+            inventory. Saving adds these copies and decrements the selected
+            stock together.
+          </p>
+          <label className="block text-sm">
+            Sealed product
+            <select
+              aria-label="Physical opening sealed product"
+              value={sealedInventoryId}
+              onChange={(e) => setSealedInventoryId(e.target.value)}
+            >
+              <option value="">No sealed inventory link</option>
+              {sealedInventory
+                .filter((item) => item.quantity > 0)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.product.name} · {item.quantity} owned
+                  </option>
+                ))}
+            </select>
+          </label>
+          {sealedInventoryId && (
+            <label className="block text-sm">
+              Units opened
+              <input
+                aria-label="Physical units opened"
+                type="number"
+                min={1}
+                max={
+                  sealedInventory.find((item) => item.id === sealedInventoryId)
+                    ?.quantity ?? 1
+                }
+                value={openedQuantity}
+                onChange={(e) =>
+                  setOpenedQuantity(Math.max(1, Number(e.target.value) || 1))
+                }
+              />
+            </label>
+          )}
+        </fieldset>
+        {pendingIntake && (
+          <p role="status" className="text-sm">
+            A saved intake is awaiting confirmation. Retry to recover the same{" "}
+            {pendingIntake.request.rows.length} reviewed rows; the original
+            destination and contents are preserved.
+          </p>
+        )}
+        {features.atomicIntake !== true && (
+          <p className="text-sm text-muted-foreground">
+            Saving reviewed cards requires an updated server with atomic intake.
+            Your review remains available here.
+          </p>
+        )}
         {savedPages.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <label>
@@ -1311,84 +1517,188 @@ export function ScannerWorkbench() {
           </p>
         )}
         <div className="max-h-80 overflow-auto">
-          {session.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between gap-2 border-b py-2"
-            >
-              <button onClick={() => setDetail(item.card)}>
-                {item.card.name} · {item.card.setCode}{" "}
-                {item.saved ? "— saved" : ""}
-              </button>
-              <span>
-                {item.price != null
-                  ? `${item.currency} ${item.price.toFixed(2)}`
-                  : "Price unavailable"}
-              </span>
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() =>
-                  setSession((previous) =>
-                    previous.filter((row) => row.id !== item.id),
-                  )
-                }
+          {session.map((item) => {
+            const quote = quoteFor(item);
+            return (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-2 border-b py-2"
               >
-                Remove
-              </Button>
-            </div>
-          ))}
+                <div className="min-w-0 space-y-1">
+                  <button onClick={() => setDetail(item.card)}>
+                    {item.card.name} · {item.card.setCode}{" "}
+                    {item.saved ? "— saved" : ""}
+                  </button>
+                  <details className="text-xs text-muted-foreground">
+                    <summary>Copy details</summary>
+                    <fieldset
+                      className="mt-2 flex flex-wrap gap-2"
+                      disabled={busy || Boolean(pendingIntake) || item.saved}
+                    >
+                      <label>
+                        Finish
+                        <select
+                          aria-label={`Finish for ${item.card.name}`}
+                          value={item.finishCode ?? ""}
+                          onChange={(event) =>
+                            updateCopyDetails(
+                              item.id,
+                              "finishCode",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          <option value="">Unspecified finish</option>
+                          {finishChoices(item).map((choice) => (
+                            <option key={choice.code} value={choice.code}>
+                              {choice.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Condition
+                        <select
+                          aria-label={`Condition for ${item.card.name}`}
+                          value={item.condition ?? ""}
+                          onChange={(event) =>
+                            updateCopyDetails(
+                              item.id,
+                              "condition",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          <option value="">Unspecified condition</option>
+                          {[
+                            "Near Mint",
+                            "Lightly Played",
+                            "Moderately Played",
+                            "Heavily Played",
+                            "Damaged",
+                          ].map((value) => (
+                            <option key={value}>{value}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Language
+                        <select
+                          aria-label={`Language for ${item.card.name}`}
+                          value={item.language ?? ""}
+                          onChange={(event) =>
+                            updateCopyDetails(
+                              item.id,
+                              "language",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          <option value="">Unspecified language</option>
+                          {[
+                            "English",
+                            "Japanese",
+                            "French",
+                            "German",
+                            "Italian",
+                            "Spanish",
+                            "Portuguese",
+                            "Korean",
+                            "Chinese",
+                          ].map((value) => (
+                            <option key={value}>{value}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </fieldset>
+                  </details>
+                  {pricing.enabled && (
+                    <div
+                      className="text-xs"
+                      data-testid="scanner.session.quote"
+                    >
+                      {quote?.price != null && quote.currency ? (
+                        <>
+                          <span>
+                            {quote.currency} {quote.price.toFixed(2)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {quote.source ?? "Source unspecified"} ·{" "}
+                            {quote.asOf
+                              ? `as of ${new Date(quote.asOf).toLocaleString()}`
+                              : "date unavailable"}
+                            {quote.freshness === "stale"
+                              ? " · stale quote"
+                              : quote.freshness === "unknown"
+                                ? " · freshness unknown"
+                                : ""}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {quote?.message ??
+                            (pricing.loading
+                              ? "Looking up price…"
+                              : "Price unavailable")}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  disabled={busy || Boolean(pendingIntake)}
+                  onClick={() =>
+                    setSession((previous) =>
+                      previous.filter((row) => row.id !== item.id),
+                    )
+                  }
+                >
+                  Remove
+                </Button>
+              </div>
+            );
+          })}
         </div>
-        <p>
-          {Object.entries(totals)
-            .map(([currency, amount]) => `${currency} ${amount.toFixed(2)}`)
-            .join(" · ") || "No session prices yet"}
-        </p>
+        {pricing.enabled && (
+          <p data-testid="scanner.session.priceTotal">
+            Quoted session total:{" "}
+            {Object.entries(totals)
+              .map(([currency, amount]) => `${currency} ${amount.toFixed(2)}`)
+              .join(" · ") || "No prices available"}
+            {session.some((item) =>
+              ["stale", "unknown"].includes(quoteFor(item)?.freshness ?? ""),
+            )
+              ? " · includes quotes with stale or unknown dates"
+              : ""}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button
             disabled={
               busy ||
               !token ||
-              !binderId ||
-              !session.some((item) => !item.saved)
+              (!binderId && !pendingIntake) ||
+              (!pendingIntake && !session.some((item) => !item.saved))
             }
             onClick={() => void run(saveSession)}
           >
-            Add session to binder
+            {pendingIntake
+              ? "Recover saved intake"
+              : "Save reviewed physical cards"}
           </Button>
           <Button
-            disabled={busy || !token || !session.length}
-            onClick={() =>
-              void run(async () => {
-                const result = await getTrackedCardPrices(
-                  token!,
-                  session.map((item) => ({
-                    tcg: item.card.tcg,
-                    externalId: item.card.externalId,
-                  })),
-                );
-                setSession((previous) =>
-                  previous.map((item) => {
-                    const quote = result.prices.find(
-                      (price) => key(price) === key(item.card),
-                    );
-                    return quote
-                      ? {
-                          ...item,
-                          price: quote.price ?? undefined,
-                          currency: quote.currency ?? undefined,
-                        }
-                      : item;
-                  }),
-                );
-              })
+            disabled={
+              busy || !pricing.allowed || pricing.loading || !session.length
             }
+            onClick={pricing.refresh}
           >
             Refresh session prices
           </Button>
           <Button
             variant="outline"
-            disabled={busy}
+            disabled={busy || Boolean(pendingIntake)}
             onClick={() => {
               if (
                 window.confirm(

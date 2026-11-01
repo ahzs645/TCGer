@@ -1,3 +1,4 @@
+import { capturePrivateSession } from "@/lib/private-session";
 import {
   WISHLIST_CARD_BATCH_SIZE,
   type AddWishlistCardInput,
@@ -107,8 +108,10 @@ export async function addCardsInChunks(
   cards: Card[],
   onProgress?: (sent: number, total: number) => void,
 ): Promise<number> {
+  const origin = capturePrivateSession(token);
   let sent = 0;
   for (let index = 0; index < cards.length; index += WISHLIST_CARD_BATCH_SIZE) {
+    origin.assertCurrent();
     const chunk = cards.slice(index, index + WISHLIST_CARD_BATCH_SIZE);
     await addCardsToWishlist(token, wishlistId, {
       cards: chunk.map(toWishlistCardInput),
@@ -151,6 +154,7 @@ export async function syncWishlistRules(
     onProgress?: (message: string) => void;
   },
 ): Promise<WishlistSyncResult> {
+  const origin = capturePrivateSession(token);
   const applicable = options?.autoOnly
     ? rules.filter((rule) => rule.autoSync)
     : rules;
@@ -164,6 +168,7 @@ export async function syncWishlistRules(
   let addedCards = 0;
 
   for (const rule of applicable) {
+    origin.assertCurrent();
     try {
       options?.onProgress?.(
         rule.type === "set"
@@ -171,6 +176,7 @@ export async function syncWishlistRules(
           : `Searching for "${rule.query}"…`,
       );
       const matches = await expandWishlistRule(token, rule);
+      origin.assertCurrent();
       const fresh = matches.filter(
         (card) => !existing.has(`${card.tcg}:${card.id}`),
       );
@@ -191,6 +197,7 @@ export async function syncWishlistRules(
         // A failed bookkeeping write should not fail the sync itself.
       });
     } catch (error) {
+      origin.assertCurrent();
       const message =
         error instanceof Error ? error.message : "Failed to sync rule";
       results.push({ ruleId: rule.id, matched: 0, error: message });

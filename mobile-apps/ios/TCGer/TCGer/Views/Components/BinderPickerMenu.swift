@@ -95,24 +95,27 @@ struct BinderDestinationSection: View {
             return
         }
 
+        let session = environmentStore.sessionIdentity
         isCreatingBinder = true
         defer { isCreatingBinder = false }
 
         do {
             let collection = try await apiService.createCollection(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 name: name,
                 description: description,
                 colorHex: colorHex,
                 defaultCondition: defaultCondition
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             binders.removeAll { $0.id == collection.id }
             binders.append(collection)
             binders = filteredAndSorted(binders)
             selectedBinderId = collection.id
-            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
+            CollectionMutationNotice.post(config: session.configuration, token: token, object: collection)
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }

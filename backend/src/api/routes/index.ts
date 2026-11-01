@@ -30,6 +30,7 @@ import { convexAlertsRouter } from './alerts.convex.router';
 import { convexAutomationsRouter } from './automations.convex.router';
 import { convexBanlistsRouter } from './banlists.convex.router';
 import { convexNotificationsRouter } from './notifications.convex.router';
+import { requireAtomicInventoryProvider } from './atomic-operations.guard';
 
 async function loadCollectionsRouter(): Promise<ExpressRouter> {
   if (env.BACKEND_MODE === 'convex' || env.COLLECTIONS_BACKEND === 'convex') {
@@ -104,6 +105,8 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.use('/settings', settingsRouter);
   app.use('/cards/scan', scanRouter);
   app.use('/cards', cardsRouter);
+  app.post('/collections/:collectionId/intake', requireAtomicInventoryProvider);
+  app.post('/finance/sales', requireAtomicInventoryProvider);
   app.use('/collections', collectionsRouter);
   app.use('/users', usersRouter);
   app.use('/wishlists', wishlistsRouter);

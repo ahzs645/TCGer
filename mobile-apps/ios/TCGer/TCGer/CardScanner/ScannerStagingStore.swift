@@ -148,13 +148,19 @@ actor ScannerStagingStore {
     }
 
     func markAdded(_ ids: Set<UUID>) {
-        var records = loadIfNeeded()
-        var changed = false
-        for index in records.indices where ids.contains(records[index].id) {
-            records[index].addedToCollection = true
-            changed = true
+        try? markAddedDurably(ids)
+    }
+
+    /// Intake recovery must not discard its receipt until the tray checkpoint
+    /// is durable. A failed write leaves both the old manifest and memory intact.
+    func markAddedDurably(_ ids: Set<UUID>) throws {
+        var updated = loadIfNeeded()
+        for index in updated.indices where ids.contains(updated[index].id) {
+            updated[index].addedToCollection = true
         }
-        if changed { persist(records) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(Manifest(scans: updated)).write(to: manifestURL, options: .atomic)
+        records = updated
     }
 
     func remove(id: UUID) {

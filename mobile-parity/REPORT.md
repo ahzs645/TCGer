@@ -4,16 +4,16 @@ Generated from [product definitions](features.definitions.json) and platform sou
 
 - Platforms: Web, iOS, Android.
 - 7 features are parity-required.
-- 109 features are explicitly tracked.
+- 111 features are explicitly tracked.
 - A declaration is backed by source paths in the manifest. “Verified” additionally requires passing current JUnit evidence on every declared platform; a declared test that was not supplied is “Not run.”
 
 ## Declaration summary
 
 | Platform | Implemented | Partial | Planned | Unavailable | Not applicable | Waived |
 |---|---|---|---|---|---|---|
-| Web | 90 | 14 | 10 | 0 | 2 | 0 |
-| iOS | 110 | 5 | 1 | 0 | 0 | 0 |
-| Android | 93 | 11 | 11 | 0 | 1 | 0 |
+| Web | 93 | 14 | 9 | 0 | 2 | 0 |
+| iOS | 114 | 4 | 0 | 0 | 0 | 0 |
+| Android | 93 | 12 | 12 | 0 | 1 | 0 |
 
 ## Feature matrix
 
@@ -47,8 +47,8 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | packOpening.reveal | Card-by-card reveal, flip, slide, and show-all controls | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | packOpening.results.grouped | Grouped multi-pack results and best-pull summary | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | packOpening.results.inspect | Inspect, flip, zoom, share, favorite, and wishlist a pull | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| packOpening.save.collection | Save every revealed pull to a collection | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| packOpening.save.sealedLedger | Link an opening to sealed inventory and decrement stock | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
+| packOpening.save.collection | Record reviewed physical-opening cards in a collection | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
+| packOpening.save.sealedLedger | Link reviewed physical-opening cards and decrement sealed stock atomically | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | packOpening.offline.downloads | Download, retry, remove, and open supported packs offline | track | Implemented | Not run | Implemented | Not run | Implemented | — | Aligned |
 | codes.vault | Online code vault | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
 | prices.browse | Prices | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
@@ -73,13 +73,13 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | scanner.options.language | Assumed card-language scanner default | track | Implemented | Not run | Implemented | — | Partial | — | Tracked gap |
 | scanner.options.torch | Scanner flashlight control | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.results.autoOpen | Automatically open each recognition result | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| scanner.results.priceMode | Per-card market prices and running scan-session total | track | Planned | — | Implemented | — | Implemented | — | Tracked gap |
+| scanner.results.priceMode | Per-card market prices and running scan-session total | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
 | scanner.results.sessionTray | Persistent multi-card scan-session tray | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.results.sessionReview | Select, remove, clear, and bulk-add scan-session results | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
-| scanner.results.addToBinder | Add a recognized card directly to a binder | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
+| scanner.results.addToBinder | Add a recognized card directly to a binder | track | Implemented | Not run | Implemented | Not run | Implemented | — | Aligned |
 | scanner.results.cropCorrection | Adjust card corners and retry recognition | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.sharedWebSession | Sync scanner results into a shared web session | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
-| scanner.binder.savePagePhotos | Save binder-page photos and replace them on retake | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
+| scanner.binder.savePagePhotos | Save binder-page photos and replace them on retake | track | Implemented | — | Implemented | Not run | Implemented | — | Aligned |
 | scanner.debug.serverCapture | Persist server-side scan images, crops, timings, and metadata | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.developerAccess | Hidden developer-tools unlock and scanner-testing toggle | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.debug.testingInputs | Deterministic demo card and binder-page scanner inputs | track | Partial | — | Implemented | — | Implemented | Not run | Tracked gap |
@@ -107,11 +107,11 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | scanner.debug.performance.footerFirstOcr | Footer-first OCR ordering toggle | track | Planned | — | Implemented | — | Planned | — | Tracked gap |
 | data.portableBackup | Portable backup fidelity and recovery | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
 | cards.filteredSearch | Filter cards beyond preview limits | track | Implemented | Not run | Implemented | Not run | Implemented | — | Aligned |
-| scanner.binderCorners | Correct and persist binder page crops | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
+| scanner.binderCorners | Correct and persist binder page crops | track | Implemented | Not run | Implemented | Not run | Implemented | — | Aligned |
 | collections.copyMetadata | Edit and retain physical-copy metadata | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
 | collections.smartFolders | Condition and tag smart folders | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
 | account.management | Profile password signup deletion and preferences | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
-| scanner.binderReview | Save selected cards and reopen saved binder photos | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
+| scanner.binderReview | Save selected cards and reopen saved binder photos | track | Implemented | Not run | Implemented | Not run | Implemented | — | Aligned |
 | pricing.gradingWorkspace | Grading planner: prices, costs, decision, population, history and receipts | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
 | collections.manage | Rename and delete binders | track | Implemented | — | Implemented | Not run | Implemented | — | Aligned |
 | server.capabilities | Server capability flags | track | Implemented | — | Implemented | — | Implemented | Not run | Aligned |
@@ -124,8 +124,8 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | intake.acquisitionCosts | Allocate purchase costs to physical copies in exact cents | track | Implemented | Not run | Implemented | — | Implemented | Not run | Aligned |
 | intake.psaCertification | Look up PSA certifications and confirm the acquired printing | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | pricing.provenance | Read tracked quote source, coverage and provenance | track | Partial | — | Implemented | Not run | Implemented | Not run | Tracked gap |
-| storage.audit | Preview and save read-only physical-location audits | track | Implemented | — | Planned | — | Planned | — | Tracked gap |
-| collections.historyUndo | Browse collection mutation history and undo eligible changes | track | Partial | — | Partial | — | Partial | — | Aligned |
+| storage.audit | Preview and save read-only physical-location audits | track | Implemented | — | Implemented | Not run | Planned | — | Tracked gap |
+| collections.historyUndo | Browse collection mutation history and undo eligible changes | track | Partial | — | Implemented | — | Partial | — | Tracked gap |
 | games.catalogDownloads | Download and verify publisher game catalogs for offline browsing | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
 | games.packageUpdates | Check and install monotonic publisher game-package updates | track | Implemented | — | Implemented | Not run | Implemented | Not run | Aligned |
 | games.capability.scannerDownload | Download the game package scanner runtime separately from its catalog | track | Implemented | — | Partial | Not run | Implemented | — | Tracked gap |
@@ -134,7 +134,9 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | navigation.appLinks | Open scanner, search, binder and wishlist app links | track | Partial | Not run | Partial | Not run | Partial | Not run | Aligned |
 | security.biometricLock | Lock the native app with device authentication | track | Not applicable | — | Partial | Not run | Partial | Not run | Tracked gap |
 | release.readiness | Verify production release configuration and signed distribution | track | Partial | Not run | Partial | Not run | Partial | Not run | Aligned |
-| collections.copies | Add, edit and move physical copies; remove printing groups | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
+| collections.copies | Add, edit, move and delete physical copies; remove printing groups explicitly | track | Implemented | Not run | Implemented | Not run | Implemented | Not run | Aligned |
+| inventory.sales | Record a sale of selected physical copies atomically with replayable receipts | track | Implemented | Not run | Implemented | Not run | Partial | Not run | Tracked gap |
+| packOpening.simulationHistory | Save simulated pack history without changing physical inventory | track | Implemented | — | Implemented | — | Planned | — | Tracked gap |
 
 ## Availability and limitations
 
@@ -151,6 +153,10 @@ These declarations live beside platform implementations. Unspecified modes are u
 | decks.browse | Web | Implemented | demo, server | — | — | [Source](../frontend/app/decks/page.tsx#L1) |
 | decks.browse | iOS | Implemented | server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/DecksView.swift#L1) |
 | decks.browse | Android | Implemented | server | — | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/DeckScreens.kt#L1) |
+| packOpening.save.collection | Web | Implemented | server | authenticated-server, atomic-intake | — | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L1) |
+| packOpening.save.collection | iOS | Implemented | local, server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift#L1) |
+| packOpening.save.sealedLedger | Web | Implemented | server | authenticated-server, atomic-intake | — | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L2) |
+| packOpening.save.sealedLedger | iOS | Implemented | server | authenticated-server, atomic-intake | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift#L2) |
 | trades.browse | Web | Implemented | demo, server | — | — | [Source](../frontend/app/trades/page.tsx#L1) |
 | trades.browse | iOS | Implemented | server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/TradesView.swift#L1) |
 | trades.browse | Android | Implemented | server | — | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/features/social/TradeScreens.kt#L1) |
@@ -165,15 +171,15 @@ These declarations live beside platform implementations. Unspecified modes are u
 | scanner.engine.serverHash | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/scan/card-scan-panel.tsx#L6) |
 | scanner.engine.serverHash | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift#L1) |
 | scanner.engine.serverHash | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L3) |
-| scanner.engine.serverEmbedding | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L1) |
+| scanner.engine.serverEmbedding | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L3) |
 | scanner.engine.serverEmbedding | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift#L2) |
 | scanner.engine.serverEmbedding | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L4) |
 | scanner.model.dinov2 | Web | Partial | Not specified | — | DINOv2 browser paths exist, but production model, gate, and acceptance parity remain incomplete. | [Source](../frontend/src/lib/scan/embedding-matcher.ts#L2) |
 | scanner.options.language | Android | Partial | Not specified | — | Language selection is tracked; recognition does not yet implement equivalent language-aware behavior. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L5) |
-| scanner.options.torch | Web | Implemented | Not specified | camera-torch | — | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L2) |
+| scanner.options.torch | Web | Implemented | Not specified | camera-torch | — | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L4) |
 | scanner.options.torch | iOS | Implemented | Not specified | camera-torch | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift#L2) |
 | scanner.options.torch | Android | Implemented | Not specified | camera-torch | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt#L8) |
-| scanner.results.priceMode | Web | Planned | Not specified | — | Session quotes and currency totals exist; the native price-mode control semantics are not yet equivalent. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L4) |
+| scanner.results.priceMode | Web | Implemented | demo, server | pricing-provider | — | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L6) |
 | scanner.sharedWebSession | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/scan/shared-scan-session.tsx#L5) |
 | scanner.sharedWebSession | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift#L5) |
 | scanner.sharedWebSession | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerSharedSessionClient.kt#L1) |
@@ -193,23 +199,23 @@ These declarations live beside platform implementations. Unspecified modes are u
 | scanner.debug.feedbackLabels | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/scan/card-scan-panel.tsx#L14) |
 | scanner.debug.feedbackLabels | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/CardScanner/CardScannerModels.swift#L6) |
 | scanner.debug.feedbackLabels | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/domain/Models.kt#L1) |
-| scanner.debug.performance.vectorizedAnn | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L9) |
+| scanner.debug.performance.vectorizedAnn | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L11) |
 | scanner.debug.performance.vectorizedAnn | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L7) |
-| scanner.debug.performance.scopeCache | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L10) |
+| scanner.debug.performance.scopeCache | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L12) |
 | scanner.debug.performance.scopeCache | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L8) |
-| scanner.debug.performance.stagedHypotheses | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L11) |
+| scanner.debug.performance.stagedHypotheses | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L13) |
 | scanner.debug.performance.stagedHypotheses | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L9) |
-| scanner.debug.performance.batchedOrientation | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L12) |
+| scanner.debug.performance.batchedOrientation | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L14) |
 | scanner.debug.performance.batchedOrientation | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L10) |
-| scanner.debug.performance.concurrentOrientation | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L13) |
+| scanner.debug.performance.concurrentOrientation | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L15) |
 | scanner.debug.performance.concurrentOrientation | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L11) |
 | scanner.debug.performance.warmStart | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L12) |
-| scanner.debug.performance.fastCapture | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L15) |
-| scanner.debug.performance.fastFooterOcr | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L16) |
+| scanner.debug.performance.fastCapture | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L17) |
+| scanner.debug.performance.fastFooterOcr | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L18) |
 | scanner.debug.performance.fastFooterOcr | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L14) |
-| scanner.debug.performance.leanOcrStrips | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L17) |
+| scanner.debug.performance.leanOcrStrips | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L19) |
 | scanner.debug.performance.leanOcrStrips | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L15) |
-| scanner.debug.performance.footerFirstOcr | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L18) |
+| scanner.debug.performance.footerFirstOcr | Web | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../frontend/src/components/scan/scanner-workbench.tsx#L20) |
 | scanner.debug.performance.footerFirstOcr | Android | Planned | Not specified | — | No equivalent operational A/B control exists in this runtime; platform optimizations are not claimed as control parity. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L16) |
 | server.capabilities | Web | Implemented | server | — | — | [Source](../frontend/src/lib/api/health.ts#L1) |
 | server.capabilities | iOS | Implemented | server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/EnvironmentStore.swift#L2) |
@@ -237,14 +243,14 @@ These declarations live beside platform implementations. Unspecified modes are u
 | intake.psaCertification | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/collections/intake-tools.tsx#L3) |
 | intake.psaCertification | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift#L5) |
 | intake.psaCertification | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt#L7) |
-| pricing.provenance | Web | Partial | server, local | — | Tracked quote APIs retain source/provenance and package snapshots; a dedicated native-style original-quote, FX and match-confidence inspection view is absent. | [Source](../frontend/src/lib/api/pricing.ts#L1) |
+| pricing.provenance | Web | Partial | server, local | — | Tracked quote APIs retain source/provenance and package snapshots; a dedicated native-style original-quote, FX and match-confidence inspection view is absent. | [Source](../frontend/src/lib/api/pricing.ts#L2) |
 | pricing.provenance | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift#L6) |
 | pricing.provenance | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt#L8) |
 | storage.audit | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/components/collections/storage-audit-dialog.tsx#L1) |
-| storage.audit | iOS | Planned | Not specified | — | Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent. | [Source](../mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift#L7) |
+| storage.audit | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift#L7) |
 | storage.audit | Android | Planned | Not specified | — | Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt#L9) |
 | collections.historyUndo | Web | Partial | server, demo | — | Server mutation history and eligible undo are available; the offline demo retains 25 recent changes and only the latest may be undone. | [Source](../frontend/src/components/collections/collection-history-dialog.tsx#L1) |
-| collections.historyUndo | iOS | Partial | server | authenticated-server | Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent. | [Source](../mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift#L8) |
+| collections.historyUndo | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift#L8) |
 | collections.historyUndo | Android | Partial | server | authenticated-server | Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/feature/libraryoperations/LibraryOperationsScreens.kt#L10) |
 | games.catalogDownloads | Web | Implemented | local | network-for-download, publisher-game-package | — | [Source](../frontend/src/lib/game-packages/game-package-client.ts#L1) |
 | games.catalogDownloads | iOS | Implemented | local | network-for-download, publisher-game-package | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift#L1) |
@@ -270,6 +276,12 @@ These declarations live beside platform implementations. Unspecified modes are u
 | release.readiness | Web | Partial | Not specified | — | Normal production app build and readiness tooling exist. The canonical host currently serves GitHub Pages marketing/static demo with service-worker registration disabled; production PWA install/offline/update and hosted association headers remain unverified. | [Source](../frontend/src/components/pwa/service-worker-register.tsx#L1) |
 | release.readiness | iOS | Partial | Not specified | — | Release archive/export settings and artifact/physical-device readiness tooling are configured; no distribution signing identity, exported IPA or physical-device evidence is verified here. | [Source](../mobile-apps/ios/TCGer/TCGer/SettingsView.swift#L1) |
 | release.readiness | Android | Partial | Not specified | — | Direct-install release APK signing and certificate verification are configured; physical-device smoke and deployed domain association are outstanding. Play Store publishing is out of scope. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt#L1) |
-| collections.copies | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/lib/api/collections.ts#L1) |
+| collections.copies | Web | Implemented | server | authenticated-server | — | [Source](../frontend/src/lib/api/collections.ts#L2) |
 | collections.copies | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift#L1) |
-| collections.copies | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt#L1) |
+| collections.copies | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt#L2) |
+| inventory.sales | Web | Implemented | server | authenticated-server, atomic-sales | — | [Source](../frontend/src/components/collections/copy-inventory-actions.tsx#L1) |
+| inventory.sales | iOS | Implemented | local, server | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/InventoryOperations.swift#L1) |
+| inventory.sales | Android | Partial | server | authenticated-server, atomic-sales | Atomic sale transport and receipt decoding exist; the Android inventory sale interface is disabled until durable retry and receipt recovery are wired to this operation. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt#L1) |
+| packOpening.simulationHistory | Web | Implemented | local, demo, server | browser-storage | — | [Source](../frontend/src/components/packs/pack-opening-review-sheet.tsx#L1) |
+| packOpening.simulationHistory | iOS | Implemented | local | — | — | [Source](../mobile-apps/ios/TCGer/TCGer/Services/PackSimulationStore.swift#L1) |
+| packOpening.simulationHistory | Android | Planned | Not specified | — | The simulator exists; a separate durable simulation-only history is not implemented on Android. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt#L1) |

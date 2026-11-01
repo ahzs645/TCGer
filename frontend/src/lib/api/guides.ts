@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   CollectionGuideItemResponse,
   CollectionGuideResponse,
@@ -27,7 +28,7 @@ async function readJson<T>(response: Response, fallback: string): Promise<T> {
 export async function getCollectionGuides(
   token: string,
 ): Promise<CollectionGuideResponse[]> {
-  const response = await fetch(`${API_BASE_URL}/guides`, {
+  const response = await sessionFetch(`${API_BASE_URL}/guides`, {
     headers: headers(token),
     credentials: "include",
   });
@@ -39,7 +40,7 @@ export async function followCollectionGuide(
   slug: string,
   input: FollowCollectionGuideInput = {},
 ): Promise<FollowCollectionGuideResponse> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/guides/${encodeURIComponent(slug)}/follow`,
     {
       method: "POST",
@@ -55,7 +56,7 @@ export async function getCollectionGuideItems(
   token: string,
   slug: string,
 ): Promise<CollectionGuideItemResponse[]> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/guides/${encodeURIComponent(slug)}/items`,
     {
       headers: headers(token),
@@ -82,7 +83,7 @@ export async function searchCollectionGuideCards(
   if (query.rarity) params.set("rarity", query.rarity);
   if (query.limit) params.set("limit", String(query.limit));
   const suffix = params.size ? `?${params.toString()}` : "";
-  const response = await fetch(`${API_BASE_URL}/guides/cards${suffix}`, {
+  const response = await sessionFetch(`${API_BASE_URL}/guides/cards${suffix}`, {
     headers: headers(token),
     credentials: "include",
   });

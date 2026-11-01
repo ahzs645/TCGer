@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   Card,
   CreateStorageCompartmentInput,
@@ -75,7 +76,7 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await sessionFetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: { ...headers(token), ...options.headers },
   });
@@ -88,12 +89,24 @@ export function getStorageContainers(token: string) {
   return request<StorageContainer[]>(token, "/storage/containers");
 }
 
-export function previewStorageAudit(token: string, input: PreviewStorageAuditInput) {
-  return request<StorageAuditPreview>(token, "/storage/audits/preview", { method: "POST", body: JSON.stringify(input) });
+export function previewStorageAudit(
+  token: string,
+  input: PreviewStorageAuditInput,
+) {
+  return request<StorageAuditPreview>(token, "/storage/audits/preview", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
-export function commitStorageAudit(token: string, input: PreviewStorageAuditInput) {
-  return request<StorageAuditResponse>(token, "/storage/audits", { method: "POST", body: JSON.stringify(input) });
+export function commitStorageAudit(
+  token: string,
+  input: PreviewStorageAuditInput,
+) {
+  return request<StorageAuditResponse>(token, "/storage/audits", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function createStorageContainer(
@@ -159,7 +172,7 @@ export async function removeStoragePlacement(
   token: string,
   placementId: string,
 ) {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/storage/placements/${encodeURIComponent(placementId)}`,
     { method: "DELETE", headers: headers(token) },
   );
@@ -194,6 +207,7 @@ export function createRapidEntry(
 export function splitAcquisitionCost(
   token: string,
   input: {
+    operationId?: string;
     totalCents: number;
     currency: string;
     mode: "equal" | "weighted";

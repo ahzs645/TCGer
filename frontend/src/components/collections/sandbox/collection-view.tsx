@@ -2,7 +2,10 @@
 // @tcger-feature {"id":"collections.create","platform":"web","status":"implemented"}
 
 "use client";
-import { cardSupportsPrintSelection, packageCardPresentation } from "@tcg/api-types";
+import {
+  cardSupportsPrintSelection,
+  packageCardPresentation,
+} from "@tcg/api-types";
 
 import { gameLabel } from "@/lib/utils";
 
@@ -98,6 +101,8 @@ import { useCollectionsStore } from "@/stores/collections";
 import { useTagsStore } from "@/stores/tags";
 import { useAuthStore } from "@/stores/auth";
 import { useModuleStore } from "@/stores/preferences";
+import { useGameFilterStore } from "@/stores/game-filter";
+import type { SupportedGame } from "@/lib/utils";
 import { cn, GAME_LABELS } from "@/lib/utils";
 import { getAppRoute } from "@/lib/app-routes";
 import {
@@ -280,7 +285,7 @@ export function CollectionView() {
       clearError: state.clearError,
     })),
   );
-  const { tags, fetchTags, addTag } = useTagsStore();
+  const { tags, fetchTags, addTag, revision: tagsRevision } = useTagsStore();
   const showCardNumbers = useModuleStore((state) => state.showCardNumbers);
   const showPricing = useModuleStore((state) => state.showPricing);
 
@@ -294,16 +299,23 @@ export function CollectionView() {
   const [activeConditions, setActiveConditions] = useState<
     (typeof CONDITION_ORDER)[number][]
   >([]);
-  const [gameFilter, setGameFilter] = useState<TcgCode | "all">("all");
+  const gameFilter = useGameFilterStore((state) => state.selectedGame);
+  const setGlobalGame = useGameFilterStore((state) => state.setGame);
+  const setGameFilter = (game: TcgCode | "all") =>
+    setGlobalGame(game as SupportedGame);
   const [gameFacetSelectionsByGame, setGameFacetSelectionsByGame] = useState<
     Partial<Record<TcgCode, Record<string, GameFilterSelection | undefined>>>
   >({});
   const [catalogCorrections, setCatalogCorrections] = useState<
     CatalogCorrection[]
   >([]);
-  const [identityMode, setIdentityMode] = useState<"collector" | "consolidated">("collector");
-  const [banlistFormat, setBanlistFormat] = useState<YugiohBanlistFormat>("tcg");
-  const [yugiohBanlist, setYugiohBanlist] = useState<YugiohBanlistSnapshot | null>(null);
+  const [identityMode, setIdentityMode] = useState<
+    "collector" | "consolidated"
+  >("collector");
+  const [banlistFormat, setBanlistFormat] =
+    useState<YugiohBanlistFormat>("tcg");
+  const [yugiohBanlist, setYugiohBanlist] =
+    useState<YugiohBanlistSnapshot | null>(null);
   const yugiohBanlistIndex = useMemo(
     () => indexYugiohBanlist(yugiohBanlist),
     [yugiohBanlist],
@@ -378,9 +390,13 @@ export function CollectionView() {
     string | null
   >(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const [managedShareLinks, setManagedShareLinks] = useState<BinderShareLink[]>([]);
+  const [managedShareLinks, setManagedShareLinks] = useState<BinderShareLink[]>(
+    [],
+  );
   const [newShareLinkLabel, setNewShareLinkLabel] = useState("");
-  const [copiedShareLinkId, setCopiedShareLinkId] = useState<string | null>(null);
+  const [copiedShareLinkId, setCopiedShareLinkId] = useState<string | null>(
+    null,
+  );
   const [isEditingBinder, setIsEditingBinder] = useState(false);
   const [editBinderError, setEditBinderError] = useState<string | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -417,16 +433,16 @@ export function CollectionView() {
   }, [userId]);
 
   useEffect(() => {
-    if (token && !hasFetched) {
+    if (token && !hasFetched && !isLoading) {
       fetchCollections(token);
     }
-  }, [token, hasFetched, fetchCollections]);
+  }, [token, hasFetched, isLoading, fetchCollections]);
 
   useEffect(() => {
     if (token) {
       fetchTags(token);
     }
-  }, [token, fetchTags]);
+  }, [token, fetchTags, tagsRevision]);
 
   useEffect(() => {
     if (!token) return;
@@ -475,10 +491,12 @@ export function CollectionView() {
     () => binders.find((binder) => binder.id === binderFilter) ?? null,
     [binders, binderFilter],
   );
-  const showAllBinders = binderFilter === "all" && searchParams.get("binder") !== "all";
+  const showAllBinders =
+    binderFilter === "all" && searchParams.get("binder") !== "all";
   const workingCards = useMemo(() => {
-    const binderCards =
-      showAllBinders ? flattenedCards : (activeBinder?.cards ?? []);
+    const binderCards = showAllBinders
+      ? flattenedCards
+      : (activeBinder?.cards ?? []);
     const folder = smartFolders.find(
       (candidate) => candidate.id === activeSmartFolderId,
     );
@@ -494,7 +512,9 @@ export function CollectionView() {
   ]);
   const availableGames = useMemo(
     () =>
-      Array.from(new Set(workingCards.map((card) => card.tcg))).sort() as TcgCode[],
+      Array.from(
+        new Set(workingCards.map((card) => card.tcg)),
+      ).sort() as TcgCode[],
     [workingCards],
   );
   const activeFacetGame =
@@ -988,9 +1008,16 @@ export function CollectionView() {
     if (draftFinishCode !== originalFinishCode) {
       updates.finishCode = draftFinishCode || null;
       updates.finishLabel = draftFinishCode
-        ? (selectedCard ? getPokemonFinishOptions(selectedCard).find(f => f.code === draftFinishCode)?.label : undefined) ?? formatFinishLabel(draftFinishCode)
+        ? ((selectedCard
+            ? getPokemonFinishOptions(selectedCard).find(
+                (f) => f.code === draftFinishCode,
+              )?.label
+            : undefined) ?? formatFinishLabel(draftFinishCode))
         : null;
-      updates.isFoil = isFoilFinish(draftFinishCode, selectedCard ? getPokemonFinishOptions(selectedCard) : []);
+      updates.isFoil = isFoilFinish(
+        draftFinishCode,
+        selectedCard ? getPokemonFinishOptions(selectedCard) : [],
+      );
     }
     if (draftEdition !== (selectedCopy.edition ?? "")) {
       updates.edition = draftEdition.trim() || null;
@@ -1146,7 +1173,10 @@ export function CollectionView() {
           isSealedPromo: selectedPrintIsSealedPromo,
           isOversized: selectedPrintIsOversized,
           isPeelOff: selectedPrintIsPeelOff,
-          isFoil: isFoilFinish(selectedPrintFinishCode, selectedPrintFinishOptions),
+          isFoil: isFoilFinish(
+            selectedPrintFinishCode,
+            selectedPrintFinishOptions,
+          ),
           ...(selectedPrintCard.id !== selectedCard.cardId
             ? {
                 cardOverride: {
@@ -1453,7 +1483,9 @@ export function CollectionView() {
       setManagedShareLinks((links) => [created, ...links]);
       setNewShareLinkLabel("");
     } catch (error) {
-      setEditBinderError(error instanceof Error ? error.message : "Failed to create share link.");
+      setEditBinderError(
+        error instanceof Error ? error.message : "Failed to create share link.",
+      );
     } finally {
       setIsEditingBinder(false);
     }
@@ -1471,9 +1503,13 @@ export function CollectionView() {
     setIsEditingBinder(true);
     try {
       await revokeBinderShareLink(token, editBinderId, link.id);
-      setManagedShareLinks((links) => links.filter((item) => item.id !== link.id));
+      setManagedShareLinks((links) =>
+        links.filter((item) => item.id !== link.id),
+      );
     } catch (error) {
-      setEditBinderError(error instanceof Error ? error.message : "Failed to revoke share link.");
+      setEditBinderError(
+        error instanceof Error ? error.message : "Failed to revoke share link.",
+      );
     } finally {
       setIsEditingBinder(false);
     }
@@ -1666,9 +1702,14 @@ export function CollectionView() {
               >
                 <Select
                   value={identityMode}
-                  onValueChange={(value) => setIdentityMode(value as "collector" | "consolidated")}
+                  onValueChange={(value) =>
+                    setIdentityMode(value as "collector" | "consolidated")
+                  }
                 >
-                  <SelectTrigger className="w-full sm:w-40" aria-label="Collection identity view">
+                  <SelectTrigger
+                    className="w-full sm:w-40"
+                    aria-label="Collection identity view"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1679,9 +1720,14 @@ export function CollectionView() {
                 {availableGames.includes("yugioh") ? (
                   <Select
                     value={banlistFormat}
-                    onValueChange={(value) => setBanlistFormat(value as YugiohBanlistFormat)}
+                    onValueChange={(value) =>
+                      setBanlistFormat(value as YugiohBanlistFormat)
+                    }
                   >
-                    <SelectTrigger className="w-full sm:w-40" aria-label="Yu-Gi-Oh banlist format">
+                    <SelectTrigger
+                      className="w-full sm:w-40"
+                      aria-label="Yu-Gi-Oh banlist format"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1755,527 +1801,550 @@ export function CollectionView() {
                 selectedCardId={selectedCardId}
                 showPricing={showPricing}
                 banlist={yugiohBanlist}
-                onSelect={(cardId, trigger) => selectCard(cardId, undefined, trigger)}
+                onSelect={(cardId, trigger) =>
+                  selectCard(cardId, undefined, trigger)
+                }
               />
             </CardContent>
           ) : (
             <>
-          {/* Mobile: compact card list */}
-          <CardContent className="p-0 md:hidden" data-oid="4crtseg">
-            <div className="divide-y" data-oid="a2m72_x">
-              {sortedCards.map((card) => {
-                const expanded = expandedRows[card.id];
-                const isSelected = selectedCardId === card.id;
-                const limitEntry = banlistEntryForCollectionCard(card, yugiohBanlistIndex);
-                const binderColor = card.binderColorHex
-                  ? card.binderColorHex.startsWith("#")
-                    ? card.binderColorHex
-                    : `#${card.binderColorHex}`
-                  : undefined;
-                return (
-                  <div key={card.id} data-oid="19un-4y">
-                    <div
-                      className={cn(
-                        "w-full px-4 py-3 text-left transition-colors",
-                        isSelected && "bg-primary/5",
-                      )}
-                      data-oid="3wj3_y1"
-                    >
-                      <div
-                        className="flex items-start gap-3"
-                        data-oid="19yn.eb"
-                      >
-                        <button
-                          type="button"
-                          aria-expanded={Boolean(expanded)}
-                          aria-label={
-                            expanded
-                              ? `Collapse ${card.name}`
-                              : `Expand ${card.name}`
-                          }
-                          className="relative mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleRowExpansion(card.id);
-                          }}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          data-oid="jmv3egp"
-                        >
-                          {expanded ? "−" : "+"}
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={isSelected}
-                          aria-label={`Edit ${card.name}`}
-                          className="min-w-0 flex-1 rounded-sm text-left coarse:min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onClick={(event) =>
-                            selectCard(card.id, undefined, event.currentTarget)
-                          }
-                          data-oid="j38pt51"
-                        >
-                          <div
-                            className="flex items-center gap-2"
-                            data-oid="dtoc5b2"
-                          >
-                            {binderColor && (
-                              <span
-                                className="inline-flex h-2 w-2 rounded-full shrink-0"
-                                style={{ backgroundColor: binderColor }}
-                                data-oid="0x8h1gv"
-                              />
-                            )}
-                            <p
-                              className="text-sm font-medium truncate"
-                              data-oid="aznvj8q"
-                            >
-                              {displayCardName(card)}
-                            </p>
-                            <YugiohLimitBadge entry={limitEntry} compact />
-                            {displayCardName(card) !== card.name && (
-                              <p className="truncate text-[11px] text-muted-foreground">
-                                Canonical: {card.name}
-                              </p>
-                            )}
-                          </div>
-                          <div
-                            className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-xs text-muted-foreground"
-                            data-oid="46.th0u"
-                          >
-                            <span data-oid="eza.4h3">
-                              {card.binderName ?? "Unsorted"}
-                            </span>
-                            <span data-oid="zr1-0z0">·</span>
-                            <span data-oid="mhv2sr4">
-                              {card.rarity ?? "N/A"}
-                            </span>
-                            <span data-oid="yd.-e41">·</span>
-                            <span data-oid="d.p0j5.">
-                              {card.copies?.length ?? card.quantity}{" "}
-                              {(card.copies?.length ?? card.quantity) === 1
-                                ? "copy"
-                                : "copies"}
-                            </span>
-                            {showPricing && card.price !== undefined && (
-                              <>
-                                <span data-oid="23z:efd">·</span>
-                                <span data-oid="4g1892_">
-                                  {formatCurrency(card.price)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                    {expanded && card.copies?.length ? (
-                      <div
-                        className="px-4 pb-3 pl-[3.25rem]"
-                        data-oid="keztso8"
-                      >
+              {/* Mobile: compact card list */}
+              <CardContent className="p-0 md:hidden" data-oid="4crtseg">
+                <div className="divide-y" data-oid="a2m72_x">
+                  {sortedCards.map((card) => {
+                    const expanded = expandedRows[card.id];
+                    const isSelected = selectedCardId === card.id;
+                    const limitEntry = banlistEntryForCollectionCard(
+                      card,
+                      yugiohBanlistIndex,
+                    );
+                    const binderColor = card.binderColorHex
+                      ? card.binderColorHex.startsWith("#")
+                        ? card.binderColorHex
+                        : `#${card.binderColorHex}`
+                      : undefined;
+                    return (
+                      <div key={card.id} data-oid="19un-4y">
                         <div
-                          className="space-y-2 rounded-lg border bg-muted/20 p-3"
-                          data-oid="vqd_pfq"
+                          className={cn(
+                            "w-full px-4 py-3 text-left transition-colors",
+                            isSelected && "bg-primary/5",
+                          )}
+                          data-oid="3wj3_y1"
                         >
-                          <p
-                            className="text-[10px] uppercase text-muted-foreground"
-                            data-oid="89_2-7j"
-                          >
-                            {card.copies.length === 1 ? "Copy" : "Copies"}
-                          </p>
-                          {card.copies.map((copy, index) => (
-                            <button
-                              key={copy.id}
-                              type="button"
-                              aria-pressed={selectedCopyId === copy.id}
-                              aria-label={copyEditAriaLabel({
-                                cardName: card.name,
-                                condition:
-                                  copy.condition ?? "unknown condition",
-                                copyIndex: index,
-                                copyCount: card.copies?.length ?? 0,
-                              })}
-                              className={cn(
-                                "w-full rounded-md border px-3 py-2 text-left text-xs transition coarse:min-h-11",
-                                selectedCopyId === copy.id
-                                  ? "border-primary/70 bg-muted/40"
-                                  : "hover:border-primary/40",
-                              )}
-                              onClick={(event) => {
-                                selectCard(
-                                  card.id,
-                                  copy.id,
-                                  event.currentTarget,
-                                );
-                              }}
-                              data-oid="1nq047e"
-                            >
-                              <span
-                                className="font-semibold"
-                                data-oid=".72vhjv"
-                              >
-                                {copy.condition ?? "Unknown"}
-                              </span>
-                              {copyOrdinalLabel(
-                                index,
-                                card.copies?.length ?? 0,
-                              ) ? (
-                                <span
-                                  className="text-muted-foreground"
-                                  data-oid="bvdmpn:"
-                                >
-                                  {" "}
-                                  {copyOrdinalLabel(
-                                    index,
-                                    card.copies?.length ?? 0,
-                                  )}
-                                </span>
-                              ) : null}
-                              {copy.notes?.trim() ? (
-                                <p
-                                  className="mt-0.5 text-muted-foreground truncate"
-                                  data-oid="75w4x3n"
-                                >
-                                  {copy.notes}
-                                </p>
-                              ) : null}
-                              {getCopyTrackingBadges(copy).length ? (
-                                <span className="mt-1 flex flex-wrap gap-1">
-                                  {getCopyTrackingBadges(copy).map((label) => (
-                                    <Badge
-                                      key={label}
-                                      variant="outline"
-                                      className="text-[10px]"
-                                    >
-                                      {label}
-                                    </Badge>
-                                  ))}
-                                </span>
-                              ) : null}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-              {!sortedCards.length && (
-                <div
-                  className="py-12 text-center text-sm text-muted-foreground"
-                  data-oid="v.bd5l0"
-                >
-                  No cards match these filters.
-                </div>
-              )}
-            </div>
-          </CardContent>
-
-          {/* Desktop: full table */}
-          <CardContent className="p-0 hidden md:block" data-oid="7zne16d">
-            <Table data-oid="ega5d0x">
-              <TableHeader data-oid="_a9ge:9">
-                <TableRow data-oid="uv.u7t7">
-                  <TableHead data-oid="g9ja3yo">Card</TableHead>
-                  <TableHead data-oid="ggq..52">Binder</TableHead>
-                  <TableHead data-oid="lkhd4hl">Rarity</TableHead>
-                  <TableHead data-oid="27v.f6g">Quantity</TableHead>
-                  <TableHead data-oid="-w2i7so">Condition</TableHead>
-                  <TableHead data-oid="mt74kb5">Est. value</TableHead>
-                  <TableHead data-oid="vgw-82v">Tags</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody data-oid="obe9u.h">
-                {sortedCards.map((card) => {
-                  const expanded = expandedRows[card.id];
-                  const limitEntry = banlistEntryForCollectionCard(card, yugiohBanlistIndex);
-                  const aggregatedTags = Array.from(
-                    new Set(
-                      card.copies?.flatMap((copy) =>
-                        copy.tags.map((tag) => tag.id),
-                      ) ?? [],
-                    ),
-                  );
-                  return (
-                    <Fragment key={card.id}>
-                      <TableRow
-                        key={`${card.id}-row`}
-                        className={cn(
-                          "cursor-pointer transition-colors",
-                          selectedCardId === card.id && "bg-primary/5",
-                        )}
-                        onClick={(event) =>
-                          selectCard(
-                            card.id,
-                            undefined,
-                            event.currentTarget.querySelector<HTMLElement>(
-                              "button[aria-pressed]",
-                            ) ?? undefined,
-                          )
-                        }
-                        data-oid="t3bkr-x"
-                      >
-                        <TableCell data-oid="wa7fcu3">
                           <div
-                            className="flex items-center gap-3"
-                            data-oid="sislt0o"
+                            className="flex items-start gap-3"
+                            data-oid="19yn.eb"
                           >
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            <button
+                              type="button"
                               aria-expanded={Boolean(expanded)}
                               aria-label={
                                 expanded
                                   ? `Collapse ${card.name}`
                                   : `Expand ${card.name}`
                               }
-                              className="relative h-8 w-8 rounded-full before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
-                              onClick={(event) => {
-                                event.stopPropagation();
+                              className="relative mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 toggleRowExpansion(card.id);
                               }}
-                              data-oid="rg29468"
+                              onKeyDown={(e) => e.stopPropagation()}
+                              data-oid="jmv3egp"
                             >
                               {expanded ? "−" : "+"}
-                            </Button>
+                            </button>
                             <button
                               type="button"
-                              aria-pressed={selectedCardId === card.id}
-                              className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                              onClick={(event) => {
-                                event.stopPropagation();
+                              aria-pressed={isSelected}
+                              aria-label={`Edit ${card.name}`}
+                              className="min-w-0 flex-1 rounded-sm text-left coarse:min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              onClick={(event) =>
                                 selectCard(
                                   card.id,
                                   undefined,
                                   event.currentTarget,
-                                );
-                              }}
-                              data-oid="iazhh8:"
-                            >
-                              <span
-                                className="block font-medium leading-tight"
-                                data-oid="4hzd59i"
-                              >
-                                {displayCardName(card)}
-                              </span>
-                              <YugiohLimitBadge entry={limitEntry} />
-                              {displayCardName(card) !== card.name && (
-                                <span className="block truncate text-xs text-muted-foreground">
-                                  Canonical: {card.name}
-                                </span>
-                              )}
-                              {showCardNumbers && (
-                                <span
-                                  className="block text-xs text-muted-foreground"
-                                  data-oid="s-paji:"
-                                >
-                                  {card.setName ??
-                                    card.setCode ??
-                                    "Unknown set"}
-                                  {card.setCode ? ` · #${card.setCode}` : ""}
-                                </span>
-                              )}
-                            </button>
-                          </div>
-                        </TableCell>
-                        <TableCell data-oid="s7t42kw">
-                          {card.binderName ?? "Unsorted"}
-                        </TableCell>
-                        <TableCell data-oid="-x0uiz3">
-                          {card.rarity ?? "N/A"}
-                        </TableCell>
-                        <TableCell data-oid=".b_:2gu">
-                          {card.copies?.length ?? card.quantity}
-                        </TableCell>
-                        <TableCell data-oid="hh7_5ok">
-                          {conditionRangeLabel(card.copies ?? []) ?? "Unknown"}
-                        </TableCell>
-                        <TableCell data-oid="v.7rv3y">
-                          {showPricing ? formatCurrency(card.price) : "—"}
-                        </TableCell>
-                        <TableCell data-oid="7uym.8f">
-                          <div
-                            className="flex flex-wrap gap-1"
-                            data-oid="rx9vwyq"
-                          >
-                            {aggregatedTags.length
-                              ? aggregatedTags.slice(0, 3).map((tagId) => {
-                                  const tag = card.copies
-                                    ?.flatMap((copy) => copy.tags)
-                                    .find((t) => t.id === tagId);
-                                  if (!tag) return null;
-                                  return (
-                                    <Badge
-                                      key={tag.id}
-                                      variant="secondary"
-                                      style={{
-                                        backgroundColor: tag.colorHex,
-                                        color: "#0B1121",
-                                      }}
-                                      data-oid="2o7e-nn"
-                                    >
-                                      {tag.label}
-                                    </Badge>
-                                  );
-                                })
-                              : "—"}
-                            {aggregatedTags.length > 3 && (
-                              <Badge variant="outline" data-oid="cl2vqxp">
-                                +{aggregatedTags.length - 3}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {expanded && (
-                        <TableRow
-                          key={`${card.id}-copies`}
-                          className="bg-muted/30"
-                          data-oid="gxoctdj"
-                        >
-                          <TableCell colSpan={7} data-oid="5yo3fc3">
-                            <div
-                              className="space-y-3 rounded-lg border bg-background p-4"
-                              data-oid="jpm7yf1"
+                                )
+                              }
+                              data-oid="j38pt51"
                             >
                               <div
-                                className="text-xs uppercase text-muted-foreground"
-                                data-oid="mcxcbzc"
+                                className="flex items-center gap-2"
+                                data-oid="dtoc5b2"
                               >
-                                {individualCopiesLabel(
-                                  card.copies?.length ?? 0,
+                                {binderColor && (
+                                  <span
+                                    className="inline-flex h-2 w-2 rounded-full shrink-0"
+                                    style={{ backgroundColor: binderColor }}
+                                    data-oid="0x8h1gv"
+                                  />
+                                )}
+                                <p
+                                  className="text-sm font-medium truncate"
+                                  data-oid="aznvj8q"
+                                >
+                                  {displayCardName(card)}
+                                </p>
+                                <YugiohLimitBadge entry={limitEntry} compact />
+                                {displayCardName(card) !== card.name && (
+                                  <p className="truncate text-[11px] text-muted-foreground">
+                                    Canonical: {card.name}
+                                  </p>
                                 )}
                               </div>
-                              {card.copies?.map((copy, index) => {
-                                const handleClick = (trigger: HTMLElement) => {
-                                  selectCard(card.id, copy.id, trigger);
-                                };
-                                const variantBadges = getCopyVariantBadges(
-                                  copy,
-                                ).concat(getCopyTrackingBadges(copy));
-                                return (
-                                  <div
-                                    key={copy.id}
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-pressed={selectedCopyId === copy.id}
-                                    aria-label={copyEditAriaLabel({
-                                      cardName: card.name,
-                                      condition:
-                                        copy.condition ?? "unknown condition",
-                                      copyIndex: index,
-                                      copyCount: card.copies?.length ?? 0,
-                                    })}
-                                    onClick={(event) =>
-                                      handleClick(event.currentTarget)
-                                    }
-                                    onKeyDown={(event) => {
-                                      if (
-                                        event.key === "Enter" ||
-                                        event.key === " "
-                                      ) {
-                                        event.preventDefault();
-                                        handleClick(event.currentTarget);
-                                      }
-                                    }}
-                                    className={cn(
-                                      "flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition hover:border-primary/50 hover:bg-muted/40",
-                                      selectedCopyId === copy.id &&
-                                        "border-primary/70 bg-muted/40",
-                                    )}
-                                    data-oid="-mkg93d"
+                              <div
+                                className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-xs text-muted-foreground"
+                                data-oid="46.th0u"
+                              >
+                                <span data-oid="eza.4h3">
+                                  {card.binderName ?? "Unsorted"}
+                                </span>
+                                <span data-oid="zr1-0z0">·</span>
+                                <span data-oid="mhv2sr4">
+                                  {card.rarity ?? "N/A"}
+                                </span>
+                                <span data-oid="yd.-e41">·</span>
+                                <span data-oid="d.p0j5.">
+                                  {card.copies?.length ?? card.quantity}{" "}
+                                  {(card.copies?.length ?? card.quantity) === 1
+                                    ? "copy"
+                                    : "copies"}
+                                </span>
+                                {showPricing && card.price !== undefined && (
+                                  <>
+                                    <span data-oid="23z:efd">·</span>
+                                    <span data-oid="4g1892_">
+                                      {formatCurrency(card.price)}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                        {expanded && card.copies?.length ? (
+                          <div
+                            className="px-4 pb-3 pl-[3.25rem]"
+                            data-oid="keztso8"
+                          >
+                            <div
+                              className="space-y-2 rounded-lg border bg-muted/20 p-3"
+                              data-oid="vqd_pfq"
+                            >
+                              <p
+                                className="text-[10px] uppercase text-muted-foreground"
+                                data-oid="89_2-7j"
+                              >
+                                {card.copies.length === 1 ? "Copy" : "Copies"}
+                              </p>
+                              {card.copies.map((copy, index) => (
+                                <button
+                                  key={copy.id}
+                                  type="button"
+                                  aria-pressed={selectedCopyId === copy.id}
+                                  aria-label={copyEditAriaLabel({
+                                    cardName: card.name,
+                                    condition:
+                                      copy.condition ?? "unknown condition",
+                                    copyIndex: index,
+                                    copyCount: card.copies?.length ?? 0,
+                                  })}
+                                  className={cn(
+                                    "w-full rounded-md border px-3 py-2 text-left text-xs transition coarse:min-h-11",
+                                    selectedCopyId === copy.id
+                                      ? "border-primary/70 bg-muted/40"
+                                      : "hover:border-primary/40",
+                                  )}
+                                  onClick={(event) => {
+                                    selectCard(
+                                      card.id,
+                                      copy.id,
+                                      event.currentTarget,
+                                    );
+                                  }}
+                                  data-oid="1nq047e"
+                                >
+                                  <span
+                                    className="font-semibold"
+                                    data-oid=".72vhjv"
                                   >
-                                    <div
-                                      className="flex flex-col gap-1"
-                                      data-oid="xzy7:0m"
+                                    {copy.condition ?? "Unknown"}
+                                  </span>
+                                  {copyOrdinalLabel(
+                                    index,
+                                    card.copies?.length ?? 0,
+                                  ) ? (
+                                    <span
+                                      className="text-muted-foreground"
+                                      data-oid="bvdmpn:"
                                     >
-                                      <div
-                                        className="text-xs font-semibold text-foreground"
-                                        data-oid="ms9.8yh"
-                                      >
-                                        {copy.condition ?? "Unknown"}
-                                        {copyOrdinalLabel(
-                                          index,
-                                          card.copies?.length ?? 0,
-                                        ) ? (
-                                          <span
-                                            className="text-muted-foreground"
-                                            data-oid="4fgyn3t"
+                                      {" "}
+                                      {copyOrdinalLabel(
+                                        index,
+                                        card.copies?.length ?? 0,
+                                      )}
+                                    </span>
+                                  ) : null}
+                                  {copy.notes?.trim() ? (
+                                    <p
+                                      className="mt-0.5 text-muted-foreground truncate"
+                                      data-oid="75w4x3n"
+                                    >
+                                      {copy.notes}
+                                    </p>
+                                  ) : null}
+                                  {getCopyTrackingBadges(copy).length ? (
+                                    <span className="mt-1 flex flex-wrap gap-1">
+                                      {getCopyTrackingBadges(copy).map(
+                                        (label) => (
+                                          <Badge
+                                            key={label}
+                                            variant="outline"
+                                            className="text-[10px]"
                                           >
-                                            {" "}
+                                            {label}
+                                          </Badge>
+                                        ),
+                                      )}
+                                    </span>
+                                  ) : null}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                  {!sortedCards.length && (
+                    <div
+                      className="py-12 text-center text-sm text-muted-foreground"
+                      data-oid="v.bd5l0"
+                    >
+                      No cards match these filters.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+
+              {/* Desktop: full table */}
+              <CardContent className="p-0 hidden md:block" data-oid="7zne16d">
+                <Table data-oid="ega5d0x">
+                  <TableHeader data-oid="_a9ge:9">
+                    <TableRow data-oid="uv.u7t7">
+                      <TableHead data-oid="g9ja3yo">Card</TableHead>
+                      <TableHead data-oid="ggq..52">Binder</TableHead>
+                      <TableHead data-oid="lkhd4hl">Rarity</TableHead>
+                      <TableHead data-oid="27v.f6g">Quantity</TableHead>
+                      <TableHead data-oid="-w2i7so">Condition</TableHead>
+                      <TableHead data-oid="mt74kb5">Est. value</TableHead>
+                      <TableHead data-oid="vgw-82v">Tags</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody data-oid="obe9u.h">
+                    {sortedCards.map((card) => {
+                      const expanded = expandedRows[card.id];
+                      const limitEntry = banlistEntryForCollectionCard(
+                        card,
+                        yugiohBanlistIndex,
+                      );
+                      const aggregatedTags = Array.from(
+                        new Set(
+                          card.copies?.flatMap((copy) =>
+                            copy.tags.map((tag) => tag.id),
+                          ) ?? [],
+                        ),
+                      );
+                      return (
+                        <Fragment key={card.id}>
+                          <TableRow
+                            key={`${card.id}-row`}
+                            className={cn(
+                              "cursor-pointer transition-colors",
+                              selectedCardId === card.id && "bg-primary/5",
+                            )}
+                            onClick={(event) =>
+                              selectCard(
+                                card.id,
+                                undefined,
+                                event.currentTarget.querySelector<HTMLElement>(
+                                  "button[aria-pressed]",
+                                ) ?? undefined,
+                              )
+                            }
+                            data-oid="t3bkr-x"
+                          >
+                            <TableCell data-oid="wa7fcu3">
+                              <div
+                                className="flex items-center gap-3"
+                                data-oid="sislt0o"
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-expanded={Boolean(expanded)}
+                                  aria-label={
+                                    expanded
+                                      ? `Collapse ${card.name}`
+                                      : `Expand ${card.name}`
+                                  }
+                                  className="relative h-8 w-8 rounded-full before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleRowExpansion(card.id);
+                                  }}
+                                  data-oid="rg29468"
+                                >
+                                  {expanded ? "−" : "+"}
+                                </Button>
+                                <button
+                                  type="button"
+                                  aria-pressed={selectedCardId === card.id}
+                                  className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    selectCard(
+                                      card.id,
+                                      undefined,
+                                      event.currentTarget,
+                                    );
+                                  }}
+                                  data-oid="iazhh8:"
+                                >
+                                  <span
+                                    className="block font-medium leading-tight"
+                                    data-oid="4hzd59i"
+                                  >
+                                    {displayCardName(card)}
+                                  </span>
+                                  <YugiohLimitBadge entry={limitEntry} />
+                                  {displayCardName(card) !== card.name && (
+                                    <span className="block truncate text-xs text-muted-foreground">
+                                      Canonical: {card.name}
+                                    </span>
+                                  )}
+                                  {showCardNumbers && (
+                                    <span
+                                      className="block text-xs text-muted-foreground"
+                                      data-oid="s-paji:"
+                                    >
+                                      {card.setName ??
+                                        card.setCode ??
+                                        "Unknown set"}
+                                      {card.setCode
+                                        ? ` · #${card.setCode}`
+                                        : ""}
+                                    </span>
+                                  )}
+                                </button>
+                              </div>
+                            </TableCell>
+                            <TableCell data-oid="s7t42kw">
+                              {card.binderName ?? "Unsorted"}
+                            </TableCell>
+                            <TableCell data-oid="-x0uiz3">
+                              {card.rarity ?? "N/A"}
+                            </TableCell>
+                            <TableCell data-oid=".b_:2gu">
+                              {card.copies?.length ?? card.quantity}
+                            </TableCell>
+                            <TableCell data-oid="hh7_5ok">
+                              {conditionRangeLabel(card.copies ?? []) ??
+                                "Unknown"}
+                            </TableCell>
+                            <TableCell data-oid="v.7rv3y">
+                              {showPricing ? formatCurrency(card.price) : "—"}
+                            </TableCell>
+                            <TableCell data-oid="7uym.8f">
+                              <div
+                                className="flex flex-wrap gap-1"
+                                data-oid="rx9vwyq"
+                              >
+                                {aggregatedTags.length
+                                  ? aggregatedTags.slice(0, 3).map((tagId) => {
+                                      const tag = card.copies
+                                        ?.flatMap((copy) => copy.tags)
+                                        .find((t) => t.id === tagId);
+                                      if (!tag) return null;
+                                      return (
+                                        <Badge
+                                          key={tag.id}
+                                          variant="secondary"
+                                          style={{
+                                            backgroundColor: tag.colorHex,
+                                            color: "#0B1121",
+                                          }}
+                                          data-oid="2o7e-nn"
+                                        >
+                                          {tag.label}
+                                        </Badge>
+                                      );
+                                    })
+                                  : "—"}
+                                {aggregatedTags.length > 3 && (
+                                  <Badge variant="outline" data-oid="cl2vqxp">
+                                    +{aggregatedTags.length - 3}
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {expanded && (
+                            <TableRow
+                              key={`${card.id}-copies`}
+                              className="bg-muted/30"
+                              data-oid="gxoctdj"
+                            >
+                              <TableCell colSpan={7} data-oid="5yo3fc3">
+                                <div
+                                  className="space-y-3 rounded-lg border bg-background p-4"
+                                  data-oid="jpm7yf1"
+                                >
+                                  <div
+                                    className="text-xs uppercase text-muted-foreground"
+                                    data-oid="mcxcbzc"
+                                  >
+                                    {individualCopiesLabel(
+                                      card.copies?.length ?? 0,
+                                    )}
+                                  </div>
+                                  {card.copies?.map((copy, index) => {
+                                    const handleClick = (
+                                      trigger: HTMLElement,
+                                    ) => {
+                                      selectCard(card.id, copy.id, trigger);
+                                    };
+                                    const variantBadges = getCopyVariantBadges(
+                                      copy,
+                                    ).concat(getCopyTrackingBadges(copy));
+                                    return (
+                                      <div
+                                        key={copy.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-pressed={
+                                          selectedCopyId === copy.id
+                                        }
+                                        aria-label={copyEditAriaLabel({
+                                          cardName: card.name,
+                                          condition:
+                                            copy.condition ??
+                                            "unknown condition",
+                                          copyIndex: index,
+                                          copyCount: card.copies?.length ?? 0,
+                                        })}
+                                        onClick={(event) =>
+                                          handleClick(event.currentTarget)
+                                        }
+                                        onKeyDown={(event) => {
+                                          if (
+                                            event.key === "Enter" ||
+                                            event.key === " "
+                                          ) {
+                                            event.preventDefault();
+                                            handleClick(event.currentTarget);
+                                          }
+                                        }}
+                                        className={cn(
+                                          "flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition hover:border-primary/50 hover:bg-muted/40",
+                                          selectedCopyId === copy.id &&
+                                            "border-primary/70 bg-muted/40",
+                                        )}
+                                        data-oid="-mkg93d"
+                                      >
+                                        <div
+                                          className="flex flex-col gap-1"
+                                          data-oid="xzy7:0m"
+                                        >
+                                          <div
+                                            className="text-xs font-semibold text-foreground"
+                                            data-oid="ms9.8yh"
+                                          >
+                                            {copy.condition ?? "Unknown"}
                                             {copyOrdinalLabel(
                                               index,
                                               card.copies?.length ?? 0,
-                                            )}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                      <div
-                                        className="text-xs text-muted-foreground"
-                                        data-oid="5xf0gqu"
-                                      >
-                                        {copy.notes?.trim() || "No notes yet"}
-                                      </div>
-                                    </div>
-                                    <div
-                                      className="flex flex-wrap items-center gap-2"
-                                      data-oid="5zdh.bt"
-                                    >
-                                      {variantBadges.map((label) => (
-                                        <Badge
-                                          key={label}
-                                          variant="outline"
-                                          className="text-[10px]"
-                                        >
-                                          {label}
-                                        </Badge>
-                                      ))}
-                                      {copy.tags.length ? (
-                                        copy.tags.map((tag) => (
-                                          <Badge
-                                            key={tag.id}
-                                            variant="secondary"
-                                            style={{
-                                              backgroundColor: tag.colorHex,
-                                              color: "#0B1121",
-                                            }}
-                                            data-oid="7z:6h-o"
+                                            ) ? (
+                                              <span
+                                                className="text-muted-foreground"
+                                                data-oid="4fgyn3t"
+                                              >
+                                                {" "}
+                                                {copyOrdinalLabel(
+                                                  index,
+                                                  card.copies?.length ?? 0,
+                                                )}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                          <div
+                                            className="text-xs text-muted-foreground"
+                                            data-oid="5xf0gqu"
                                           >
-                                            {tag.label}
-                                          </Badge>
-                                        ))
-                                      ) : (
-                                        <Badge
-                                          variant="outline"
-                                          data-oid="hjy1tt5"
+                                            {copy.notes?.trim() ||
+                                              "No notes yet"}
+                                          </div>
+                                        </div>
+                                        <div
+                                          className="flex flex-wrap items-center gap-2"
+                                          data-oid="5zdh.bt"
                                         >
-                                          No tags
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  );
-                })}
-                {!sortedCards.length && (
-                  <TableRow data-oid="0sm1tc-">
-                    <TableCell
-                      colSpan={7}
-                      className="h-32 text-center text-sm text-muted-foreground"
-                      data-oid="ul8xy1i"
-                    >
-                      No cards match these filters.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
+                                          {variantBadges.map((label) => (
+                                            <Badge
+                                              key={label}
+                                              variant="outline"
+                                              className="text-[10px]"
+                                            >
+                                              {label}
+                                            </Badge>
+                                          ))}
+                                          {copy.tags.length ? (
+                                            copy.tags.map((tag) => (
+                                              <Badge
+                                                key={tag.id}
+                                                variant="secondary"
+                                                style={{
+                                                  backgroundColor: tag.colorHex,
+                                                  color: "#0B1121",
+                                                }}
+                                                data-oid="7z:6h-o"
+                                              >
+                                                {tag.label}
+                                              </Badge>
+                                            ))
+                                          ) : (
+                                            <Badge
+                                              variant="outline"
+                                              data-oid="hjy1tt5"
+                                            >
+                                              No tags
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                    {!sortedCards.length && (
+                      <TableRow data-oid="0sm1tc-">
+                        <TableCell
+                          colSpan={7}
+                          className="h-32 text-center text-sm text-muted-foreground"
+                          data-oid="ul8xy1i"
+                        >
+                          No cards match these filters.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
             </>
           )}
         </Card>
@@ -3047,7 +3116,9 @@ export function CollectionView() {
                 <div className="flex flex-wrap gap-2">
                   <Input
                     value={newShareLinkLabel}
-                    onChange={(event) => setNewShareLinkLabel(event.target.value)}
+                    onChange={(event) =>
+                      setNewShareLinkLabel(event.target.value)
+                    }
                     placeholder="Link label, e.g. Trade night"
                     aria-label="New share link label"
                     className="min-w-48 flex-1"
@@ -3065,10 +3136,17 @@ export function CollectionView() {
                   {managedShareLinks.map((link) => {
                     const url = managedShareUrl(link.token);
                     return (
-                      <div key={link.id} className="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 p-2">
+                      <div
+                        key={link.id}
+                        className="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 p-2"
+                      >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">{link.label}</p>
-                          <p className="truncate text-xs text-muted-foreground">{url}</p>
+                          <p className="truncate text-sm font-medium">
+                            {link.label}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {url}
+                          </p>
                         </div>
                         <Button
                           type="button"
@@ -3086,7 +3164,9 @@ export function CollectionView() {
                           size="sm"
                           variant="ghost"
                           className="text-destructive"
-                          onClick={() => void handleRevokeManagedShareLink(link)}
+                          onClick={() =>
+                            void handleRevokeManagedShareLink(link)
+                          }
                         >
                           Revoke
                         </Button>
@@ -3095,7 +3175,8 @@ export function CollectionView() {
                   })}
                   {!managedShareLinks.length ? (
                     <p className="text-xs text-muted-foreground">
-                      Create separate links for friends, events, or listings, then revoke each one independently.
+                      Create separate links for friends, events, or listings,
+                      then revoke each one independently.
                     </p>
                   ) : null}
                 </div>

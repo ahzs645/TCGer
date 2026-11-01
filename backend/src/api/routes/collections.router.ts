@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import {
   createBinderSchema,
   updateBinderSchema,
@@ -26,6 +27,7 @@ import {
   addCardToBinder,
   addCardToLibrary,
   removeCardFromBinder,
+  removeCopyFromBinder,
   updateCardInBinder,
   getUserTags,
   createUserTag,
@@ -60,8 +62,26 @@ import {
   upsertBinderPage
 } from '../../modules/collections/binder-pages.service';
 import { enrichCollectionCardPrice } from '../../modules/pricing/collection-price-enrichment';
+import { normalizeLegacyCopies } from '../../modules/collections/copy-model.service';
 
 export const collectionsRouter = Router();
+
+collectionsRouter.post('/normalize-copies', requireAuth, asyncHandler(async (req, res) => {
+  const input = z.object({ dryRun: z.boolean().default(true), limit: z.number().int().min(1).max(100).default(10) }).parse(req.body ?? {});
+  res.json(await normalizeLegacyCopies((req as AuthRequest).user!.id, input.dryRun, input.limit));
+}));
+
+collectionsRouter.delete('/:binderId/copies/:copyId', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    await removeCopyFromBinder((req as AuthRequest).user!.id, req.params.binderId, req.params.copyId);
+    res.status(204).send();
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Collection entry not found') {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    throw error;
+  }
+}));
 
 // Get all binders for the authenticated user
 collectionsRouter.get(
@@ -142,10 +162,10 @@ collectionsRouter.post(
       return res.status(400).json({ error: 'BAD_REQUEST', message: 'A valid page image is required' });
     }
     const publicPath = getImagePublicPath(file.filename);
+    let result: Awaited<ReturnType<typeof replaceBinderPageImage>>;
     try {
-      const result = await replaceBinderPageImage(userId, req.params.binderId, pageNumber, publicPath);
-      if (result.replacedImageUrl) deleteImageFile(result.replacedImageUrl);
-      res.status(201).json(result.page);
+      const expectedRevision = z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional().parse(req.body.expectedRevision);
+      result = await replaceBinderPageImage(userId, req.params.binderId, pageNumber, publicPath, expectedRevision);
     } catch (error) {
       deleteImageFile(publicPath);
       if (error instanceof Error && ['Binder not found', 'Binder page not found'].includes(error.message)) {
@@ -153,6 +173,9 @@ collectionsRouter.post(
       }
       throw error;
     }
+    // A response failure after commit must leave the attached image intact.
+    if (result.replacedImageUrl) deleteImageFile(result.replacedImageUrl);
+    res.status(201).json(result.page);
   })
 );
 
@@ -524,7 +547,7 @@ collectionsRouter.post(
       let imageUrls: string[] = [];
       for (const file of files) {
         const publicPath = getImagePublicPath(file.filename);
-        imageUrls = await addImageToCollection(userId, collectionId, publicPath);
+        imageUrls = await addImageToCollection(userId, collectionId, publicPath, req.params.binderId);
       }
       res.status(201).json({ imageUrls });
     } catch (error) {
@@ -549,8 +572,8 @@ collectionsRouter.delete(
     const { collectionId, imageIndex } = req.params;
 
     try {
-      const removedUrl = await removeImageFromCollection(userId, collectionId, parseInt(imageIndex, 10));
-      deleteImageFile(removedUrl);
+      const removedUrl = await removeImageFromCollection(userId, collectionId, parseInt(imageIndex, 10), req.params.binderId);
+      if (removedUrl) deleteImageFile(removedUrl);
       res.status(204).send();
     } catch (error) {
       if (error instanceof Error && (error.message === 'Collection entry not found' || error.message === 'Image index out of range')) {

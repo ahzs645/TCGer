@@ -10,6 +10,7 @@ struct WishlistsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @EnvironmentObject private var wishlistStore: WishlistStore
     @State private var showingCreateSheet = false
+    @State private var isCreatingWishlist = false
     @State private var wishlistPresentation: WishlistPresentation?
     @State private var newWishlistName = ""
     @State private var newWishlistDescription = ""
@@ -143,10 +144,18 @@ struct WishlistsView: View {
         .task {
             await loadWishlists()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { notification in
+            let session = environmentStore.sessionIdentity
+            guard CollectionMutationNotice.matches(notification, config: session.configuration, token: session.token) else { return }
+            Task {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
+                await loadWishlists(force: true)
+            }
+        }
         .onChange(of: wishlistStore.revision) {
             if wishlistStore.matches(config: environmentStore.serverConfiguration, token: environmentStore.authToken) {
-            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: environmentStore.widgetSessionID)
-        }
+                environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: environmentStore.widgetSessionID)
+            }
         }
         .sheet(isPresented: $showingCreateSheet) {
             createWishlistSheet
@@ -199,17 +208,19 @@ struct WishlistsView: View {
                         resetCreateForm()
                         showingCreateSheet = false
                     }
+                    .disabled(isCreatingWishlist)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
+                    Button(isCreatingWishlist ? "Creating…" : "Create") {
                         Task { await createWishlist() }
                     }
-                    .disabled(newWishlistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isCreatingWishlist || newWishlistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier(ParityControlID.actionWishlistsConfirmCreate)
                 }
             }
         }
         .accessibilityIdentifier(ParityFeatureID.wishlistsCreate.screenIdentifier)
+        .interactiveDismissDisabled(isCreatingWishlist)
         .presentationDetents([.medium, .large])
     }
 
@@ -219,11 +230,13 @@ struct WishlistsView: View {
             return
         }
 
+        let session = environmentStore.sessionIdentity
         await wishlistStore.load(
             config: environmentStore.serverConfiguration,
             token: token,
             force: force
         )
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         resolvePendingWishlist()
     }
 
@@ -231,7 +244,10 @@ struct WishlistsView: View {
     private func createWishlist() async {
         guard let token = environmentStore.authToken else { return }
         let name = newWishlistName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
+        guard !name.isEmpty, !isCreatingWishlist else { return }
+        let session = environmentStore.sessionIdentity
+        isCreatingWishlist = true
+        defer { isCreatingWishlist = false }
 
         do {
             _ = try await wishlistStore.create(
@@ -244,9 +260,11 @@ struct WishlistsView: View {
                     matchAnyPrinting: newWishlistMatchAnyPrinting
                 )
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             resetCreateForm()
             showingCreateSheet = false
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             actionErrorMessage = error.localizedDescription
         }
     }
@@ -255,6 +273,7 @@ struct WishlistsView: View {
     private func deleteWishlist(_ wishlist: Wishlist) async {
         guard let token = environmentStore.authToken else { return }
 
+        let session = environmentStore.sessionIdentity
         do {
             try await wishlistStore.delete(
                 config: environmentStore.serverConfiguration,
@@ -262,6 +281,7 @@ struct WishlistsView: View {
                 id: wishlist.id
             )
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             actionErrorMessage = error.localizedDescription
         }
     }

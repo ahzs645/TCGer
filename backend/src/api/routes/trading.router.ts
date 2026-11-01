@@ -34,9 +34,7 @@ tradingRouter.get('/:tradeId', asyncHandler(async (req, res) => {
 }));
 
 tradingRouter.patch('/:tradeId/accept', asyncHandler(async (req, res) => {
-  const { id: userId } = (req as AuthRequest).user!;
-  const trade = await tradingService.updateTradeStatus(userId, req.params.tradeId, 'accepted');
-  res.json(trade);
+  res.status(501).json({ error: 'NOT_IMPLEMENTED', message: 'Atomic trade settlement requires the Convex backend. This legacy trade has not been accepted or moved.' });
 }));
 
 tradingRouter.patch('/:tradeId/decline', asyncHandler(async (req, res) => {

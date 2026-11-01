@@ -12,8 +12,8 @@ cp frontend/.env.local.example frontend/.env.local
 # Replace BETTER_AUTH_SECRET and TCGER_BRIDGE_SECRET in .env.docker.
 # Use different random values of at least 32 characters.
 
-# Start backend, Postgres, and cache services in Docker
-npm run docker:dev:legacy:bulk
+# Start the primary supported Convex and Express services
+npm run docker:dev
 
 # In a separate terminal, run the frontend on your host
 npm run dev:frontend
@@ -22,8 +22,22 @@ npm run dev:frontend
 This starts:
 - `convex-backend` serving Convex functions and Better Auth
 - `backend` running `npm run dev` with hot reload (code mounted from your host), exposed on `localhost:3004`
-- `postgres` on `localhost:5432`
-- `scryfall-bulk`, `ygo-cache`, and `tcgdex-cache`
+
+The default uses public catalog provider URLs and does not require Postgres or
+bulk workers. Run `npm ci` from the repository root before starting the host
+frontend. Clone with `--recurse-submodules` so the pack-core dependency is present.
+
+Development runs `npm run dev:local` inside the Convex service. This local-only
+bootstrap applies the declared authentication, bridge, origin, and provider
+settings to the deployment environment before the service becomes healthy.
+It preserves the selected local database and verifies the authenticated bridge.
+The default target is an anonymous local deployment; set
+`TCGER_CONVEX_DEV_TARGET=local` only when reusing an already selected linked local
+deployment. A cloud/production selection or deploy key is rejected without
+rewriting the selection. Restart the service after changing deployment settings.
+Native login supplies the configured API origin. If native clients connect to a
+different host/port from `SITE_URL`, include that client-facing API origin and the
+website origin in `BETTER_AUTH_TRUSTED_ORIGINS`; do not disable origin validation.
 
 The frontend runs natively on your machine with full Next.js hot reload speed at `http://localhost:3003`. It connects to the backend directly at `http://localhost:3004` (no `/api` prefix — that path is only used when you run the nginx gateway in full Docker mode). Collection bridge requests always go through this authenticated Express API; browser code must not call Convex HTTP actions or send `X-TCGER-*` identity headers directly.
 
@@ -48,7 +62,9 @@ This additionally starts:
 
 The default Compose setup is now Convex-first and does not start Postgres unless you opt into the `legacy` profile.
 
-Use this only for still-unmigrated Prisma routes:
+Use this only for still-unmigrated Prisma routes. See the operation-level
+[support matrix](../docs/backend-modes.md); hybrid cannot provide the primary
+backend's atomic sales, intake, linked purchases, or trade settlement.
 
 ```bash
 npm run docker:dev:legacy
@@ -56,7 +72,11 @@ npm run docker:dev:legacy
 
 This adds:
 - `postgres` for legacy Prisma-backed routes
-- hybrid backend startup with `prisma db push`
+- hybrid backend startup with versioned `prisma migrate deploy` migrations
+
+An existing database originally created using `db push` needs its migration
+history baselined and reviewed before upgrade. Back up the database first;
+startup does not silently accept destructive schema changes.
 
 ## Optional Services
 
@@ -72,8 +92,18 @@ npm run docker:dev:full:bulk
 
 - `scryfall-bulk` — Magic card cache. Set `SCRYFALL_API_BASE_URL=http://scryfall-bulk:4010`.
 - `ygo-cache` — Yu-Gi-Oh! dataset mirror. Set `YGO_API_BASE_URL=http://ygo-cache:4020`.
-- `tcgdex-cache` — Pokémon card database (21,632+ cards). Used by default (`POKEMON_API_BASE_URL=http://tcgdex-cache:4040`).
+- `tcgdex-cache` — Pokémon card database. Set `TCGDEX_API_BASE_URL=http://tcgdex-cache:4040` and, if selecting it as the Pokémon adapter source, `POKEMON_API_BASE_URL=http://tcgdex-cache:4040`.
 - `pokemon-cache` — (deprecated) Use tcgdex-cache instead.
+
+Starting the profile alone does not change provider URLs. Keep direct public API
+URLs when the workers are disabled. Provider keys, retry/rate limits, and dated
+FX provenance are forwarded by both Compose files; FX blending requires all of
+`PRICE_USD_TO_EUR`, `PRICE_FX_SOURCE`, and `PRICE_FX_AS_OF`.
+
+The `uploads_data` named volume persists legacy local uploads at `/app/uploads`.
+The gateway serves `/uploads/` through Express and accepts requests up to 64 MB,
+above the application's 48 MB backup limit. Preserve both `uploads_data` and
+the relevant database volumes when moving a deployment.
 
 ## Dedicated Card Hash Builds
 

@@ -32,11 +32,17 @@ describe('getHealthResponse', () => {
         automations: true,
         shipments: false,
         public: true,
+        atomicSales: true,
+        atomicIntake: true,
+        tradeSettlement: true,
+        linkedAcquisitions: true,
+        binderPageRevisionGuards: true,
+        emailDelivery: false,
       },
     });
   });
 
-  test('reports every feature in hybrid mode', () => {
+  test('reports legacy browsing separately from unavailable atomic operations', () => {
     mockedEnv.BACKEND_MODE = 'hybrid';
 
     expect(getHealthResponse()).toEqual({
@@ -57,6 +63,12 @@ describe('getHealthResponse', () => {
         automations: true,
         shipments: true,
         public: true,
+        atomicSales: false,
+        atomicIntake: false,
+        tradeSettlement: false,
+        linkedAcquisitions: false,
+        binderPageRevisionGuards: true,
+        emailDelivery: false,
       },
     });
   });

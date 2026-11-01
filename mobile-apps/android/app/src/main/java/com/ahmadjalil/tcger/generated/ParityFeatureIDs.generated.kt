@@ -128,6 +128,8 @@ object ParityFeatureIDs {
     const val SECURITY_BIOMETRIC_LOCK = "security.biometricLock"
     const val RELEASE_READINESS = "release.readiness"
     const val COLLECTIONS_COPIES = "collections.copies"
+    const val INVENTORY_SALES = "inventory.sales"
+    const val PACK_OPENING_SIMULATION_HISTORY = "packOpening.simulationHistory"
 
     val implemented: Set<String> = setOf(
         HOME_DASHBOARD,
@@ -342,6 +344,8 @@ object ParityFeatureIDs {
         SECURITY_BIOMETRIC_LOCK to ParityFeatureSupport(ParitySupportStatus.PARTIAL, "Biometric or device-credential lock exists; unavailable authenticators remain locked with device-security setup access; physical-device enrollment, lockout and release lifecycle verification remain outstanding.", null, listOf("device-authentication"), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/MainActivity.kt"),
         RELEASE_READINESS to ParityFeatureSupport(ParitySupportStatus.PARTIAL, "Direct-install release APK signing and certificate verification are configured; physical-device smoke and deployed domain association are outstanding. Play Store publishing is out of scope.", null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/TCGerApp.kt"),
         COLLECTIONS_COPIES to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, listOf("server"), listOf("authenticated-server"), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt"),
+        INVENTORY_SALES to ParityFeatureSupport(ParitySupportStatus.PARTIAL, "Atomic sale transport and receipt decoding exist; the Android inventory sale interface is disabled until durable retry and receipt recovery are wired to this operation.", listOf("server"), listOf("authenticated-server", "atomic-sales"), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/remote/TCGerApi.kt"),
+        PACK_OPENING_SIMULATION_HISTORY to ParityFeatureSupport(ParitySupportStatus.PLANNED, "The simulator exists; a separate durable simulation-only history is not implemented on Android.", null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/packopening/PackOpeningScreen.kt"),
     )
 
     fun screen(featureId: String): String = "feature.$featureId"

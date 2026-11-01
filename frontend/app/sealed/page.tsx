@@ -609,7 +609,9 @@ function SealedSetCardsDialog({
   const productQuery = useQuery({
     queryKey: ["sealed-product", product?.id],
     queryFn: () => getSealedProduct(token!, product!.id),
-    enabled: Boolean(product && token && (product.contentCount || product.contents?.length)),
+    enabled: Boolean(
+      product && token && (product.contentCount || product.contents?.length),
+    ),
     staleTime: 5 * 60_000,
   });
   const detailedProduct = productQuery.data ?? product;
@@ -619,7 +621,13 @@ function SealedSetCardsDialog({
     queryKey: ["sealed-set-cards", product?.tcg, setCode],
     queryFn: () =>
       getSetCards(token!, product!.tcg as TcgCode, product!.setCode!),
-    enabled: Boolean(product && token && setCode && knownContents.length === 0 && !productQuery.isLoading),
+    enabled: Boolean(
+      product &&
+      token &&
+      setCode &&
+      knownContents.length === 0 &&
+      !productQuery.isLoading,
+    ),
     staleTime: 5 * 60_000,
   });
 
@@ -643,8 +651,12 @@ function SealedSetCardsDialog({
   }, [cardsQuery.data, search]);
   const filteredContents = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return knownContents.filter((card) =>
-      !query || `${card.name} ${card.rarity ?? ""} ${card.setCode ?? ""}`.toLocaleLowerCase().includes(query),
+    return knownContents.filter(
+      (card) =>
+        !query ||
+        `${card.name} ${card.rarity ?? ""} ${card.setCode ?? ""}`
+          .toLocaleLowerCase()
+          .includes(query),
     );
   }, [knownContents, search]);
 
@@ -653,7 +665,8 @@ function SealedSetCardsDialog({
       <DialogContent className="flex max-h-[92dvh] max-w-5xl flex-col">
         <DialogHeader>
           <DialogTitle>
-            {detailedProduct?.name ?? (setCode ? `Set ${setCode} cards` : "Product contents")}
+            {detailedProduct?.name ??
+              (setCode ? `Set ${setCode} cards` : "Product contents")}
           </DialogTitle>
           <DialogDescription>
             {knownContents.length
@@ -698,7 +711,10 @@ function SealedSetCardsDialog({
           ) : knownContents.length ? (
             <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {filteredContents.map((card, index) => (
-                <div key={`${card.externalId ?? card.name}-${card.setCode ?? index}`} className="min-w-0 rounded-lg border bg-card p-2">
+                <div
+                  key={`${card.externalId ?? card.name}-${card.setCode ?? index}`}
+                  className="min-w-0 rounded-lg border bg-card p-2"
+                >
                   <div className="relative aspect-[5/7] overflow-hidden rounded-md bg-muted">
                     <CardImage
                       src={card.imageUrl}
@@ -710,9 +726,17 @@ function SealedSetCardsDialog({
                       unoptimized
                     />
                   </div>
-                  <p className="mt-2 truncate text-sm font-medium">{card.name}</p>
+                  <p className="mt-2 truncate text-sm font-medium">
+                    {card.name}
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {[card.quantity ? `${card.quantity}×` : undefined, card.setCode, card.rarity].filter(Boolean).join(" · ") || "Included card"}
+                    {[
+                      card.quantity ? `${card.quantity}×` : undefined,
+                      card.setCode,
+                      card.rarity,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "Included card"}
                   </p>
                 </div>
               ))}
@@ -730,13 +754,16 @@ function SealedSetCardsDialog({
           )}
         </ScrollArea>
 
-        {!productQuery.isLoading && !cardsQuery.isLoading && !productQuery.error && !cardsQuery.error && (
-          <p className="text-xs text-muted-foreground">
-            {knownContents.length
-              ? `Showing ${filteredContents.length} of ${knownContents.length} known contents`
-              : `Showing ${cards.length} of ${(cardsQuery.data ?? []).length} eligible cards`}
-          </p>
-        )}
+        {!productQuery.isLoading &&
+          !cardsQuery.isLoading &&
+          !productQuery.error &&
+          !cardsQuery.error && (
+            <p className="text-xs text-muted-foreground">
+              {knownContents.length
+                ? `Showing ${filteredContents.length} of ${knownContents.length} known contents`
+                : `Showing ${cards.length} of ${(cardsQuery.data ?? []).length} eligible cards`}
+            </p>
+          )}
       </DialogContent>
     </Dialog>
   );
@@ -794,9 +821,11 @@ function OpeningCard({
             <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs sm:text-right">
               <span className="text-muted-foreground">Invested</span>
               <span>{currency(entry.invested)}</span>
-              <span className="text-muted-foreground">Live + realized</span>
+              <span className="text-muted-foreground">
+                Live + realized (USD)
+              </span>
               <span>{currency(entry.liveValue + entry.realizedProceeds)}</span>
-              <span className="text-muted-foreground">P/L</span>
+              <span className="text-muted-foreground">P/L (USD)</span>
               <span
                 className={
                   entry.profitLoss >= 0 ? "text-green-500" : "text-red-500"
@@ -805,6 +834,15 @@ function OpeningCard({
                 {entry.profitLoss >= 0 ? "+" : ""}
                 {currency(entry.profitLoss)}
               </span>
+              {(entry.realizedProceedsByCurrency ?? [])
+                .filter((row) => row.currency !== "USD")
+                .map((row) => (
+                  <span className="col-span-2" key={row.currency}>
+                    Additional proceeds:{" "}
+                    {formatMoney(row.amount, { currency: row.currency })} (not
+                    converted)
+                  </span>
+                ))}
             </div>
           )}
         </div>
@@ -836,11 +874,20 @@ function OpeningCard({
                 <div className="flex shrink-0 items-center gap-3">
                   {showPricing && (
                     <span className="text-sm">
-                      {currency(
-                        card.status === "sold"
-                          ? card.realizedProceeds
-                          : card.liveValue,
-                      )}
+                      {card.status === "sold" &&
+                      card.realizedProceedsByCurrency?.length
+                        ? card.realizedProceedsByCurrency
+                            .map((row) =>
+                              formatMoney(row.amount, {
+                                currency: row.currency,
+                              }),
+                            )
+                            .join(" · ")
+                        : currency(
+                            card.status === "sold"
+                              ? card.realizedProceeds
+                              : card.liveValue,
+                          )}
                     </span>
                   )}
                   {card.status === "active" ? (
@@ -1052,7 +1099,9 @@ function AddInventoryDialog({
                           {tcgLabel(product.tcg)} · {product.productType}
                           {product.setCode ? ` · ${product.setCode}` : ""}
                           {product.isCustom ? " · Custom" : ""}
-                          {product.contentCount ? ` · ${product.contentCount} known contents` : ""}
+                          {product.contentCount
+                            ? ` · ${product.contentCount} known contents`
+                            : ""}
                         </span>
                       </span>
                       {product.msrp !== undefined && (

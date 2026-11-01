@@ -83,6 +83,8 @@ import {
   writeScannerOcrEnabled,
 } from "@/lib/scan/scanner-options";
 import { ENABLED_PREFERENCE_KEY, GAME_LABELS } from "@/lib/utils";
+import { capturePrivateSession } from "@/lib/private-session";
+import { privateStorageKey } from "@/lib/private-storage";
 import { useAuthStore } from "@/stores/auth";
 import { useDemoStore } from "@/stores/demo-store";
 import { useModuleStore, type ManageableGame } from "@/stores/preferences";
@@ -199,10 +201,12 @@ export function AccountSettingsDialog({
 
   const loadPreferences = useCallback(async () => {
     if (!token) return;
+    const origin = capturePrivateSession(token);
     setLoadingPreferences(true);
     setPreferencesError(null);
     try {
       const preferences = await getUserPreferences(token);
+      if (!origin.current()) return;
       updateStoredPreferences(preferences);
     } catch (error) {
       setPreferencesError(
@@ -293,6 +297,7 @@ export function AccountSettingsDialog({
   ) => {
     if (!token) return;
 
+    const origin = capturePrivateSession(token);
     const previousValue =
       preference === "showCardNumbers" ? showCardNumbers : showPricing;
     if (previousValue === value) return;
@@ -308,8 +313,10 @@ export function AccountSettingsDialog({
 
     try {
       await updateUserPreferences({ [preference]: value }, token);
+      if (!origin.current()) return;
       updateStoredPreferences({ [preference]: value });
     } catch (error) {
+      if (!origin.current()) return;
       if (preference === "showCardNumbers") {
         setShowCardNumbers(previousValue);
       } else {
@@ -333,6 +340,7 @@ export function AccountSettingsDialog({
       return;
     }
 
+    const origin = capturePrivateSession(token);
     setUpdatingGame(game);
     setSaveError(null);
     toggleGame(game);
@@ -343,9 +351,11 @@ export function AccountSettingsDialog({
 
     try {
       await updateUserPreferences(preferencePayload, token);
+      if (!origin.current()) return;
       updateStoredPreferences(preferencePayload);
       if (newValue && isDemoMode()) requestCatalogPrompt(game);
     } catch (error) {
+      if (!origin.current()) return;
       toggleGame(game);
       setSaveError(
         error instanceof Error
@@ -373,7 +383,10 @@ export function AccountSettingsDialog({
       resetDemo();
       localStorage.removeItem(DEMO_TRANSACTIONS_STORAGE_KEY);
       localStorage.removeItem(
-        `${SMART_FOLDER_STORAGE_KEY_PREFIX}${user?.id ?? "demo-user-001"}`,
+        privateStorageKey(
+          SMART_FOLDER_STORAGE_KEY_PREFIX,
+          user?.id ?? "demo-user-001",
+        ),
       );
       setDemoResetMessage("Demo data restored. Reloading the sample app…");
       window.setTimeout(() => window.location.reload(), 600);

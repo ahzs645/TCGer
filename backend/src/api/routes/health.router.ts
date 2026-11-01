@@ -25,6 +25,12 @@ export function getHealthResponse() {
       automations: true,
       shipments: supportsLegacyFeatures,
       public: true,
+      atomicSales: !supportsLegacyFeatures,
+      atomicIntake: !supportsLegacyFeatures,
+      tradeSettlement: !supportsLegacyFeatures,
+      linkedAcquisitions: !supportsLegacyFeatures,
+      binderPageRevisionGuards: true,
+      emailDelivery: false,
     },
   };
 }

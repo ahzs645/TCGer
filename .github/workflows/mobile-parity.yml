@@ -97,6 +97,10 @@ jobs:
           # These suites never execute native ONNX inference; avoid the optional CUDA download.
           ONNXRUNTIME_NODE_INSTALL: skip
         run: npm ci
+      - name: Build shared API types
+        run: npm --workspace=@tcg/api-types run build
+      - name: Generate Prisma client for route imports
+        run: npx prisma generate --schema backend/prisma/schema.prisma
       - name: Verify web consumers and Express routes
         run: npm run api-contracts:js
       - name: Verify Convex HTTP actions and persistence

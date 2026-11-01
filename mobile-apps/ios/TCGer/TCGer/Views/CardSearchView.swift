@@ -270,7 +270,8 @@ struct CardSearchView: View {
             .onChange(of: environmentStore.enabledOnepiece) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledLorcana) { validateSelectedGame() }
             .onChange(of: environmentStore.enabledDragonball) { validateSelectedGame() }
-            .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { notification in
+                guard CollectionMutationNotice.matches(notification, config: environmentStore.serverConfiguration, token: environmentStore.authToken) else { return }
                 loadedCollections = nil
                 Task { await loadCollectionAvailability() }
             }
@@ -493,28 +494,31 @@ struct CardSearchView: View {
     /// the preview page — and optionally saves it as a rule.
     @MainActor
     private func addAllMatches(to wishlistId: String) async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isAddingAllMatches, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
 
         isAddingAllMatches = true
         bulkWishlistStatus = "Searching every printing…"
-        defer { isAddingAllMatches = false }
+        defer { if environmentStore.matches(session) { isAddingAllMatches = false } }
 
         let service = WishlistSyncService(
             apiService: apiService,
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token,
-            enabledGames: environmentStore.enabledGames
+            enabledGames: environmentStore.enabledGames,
+            isCurrent: { environmentStore.matches(session) }
         )
 
         do {
             let matches = try await apiService.searchAllCards(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 query: query,
                 game: selectedGame
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             let enabledGameRawValues = Set(
                 environmentStore.enabledGames.map { $0.rawValue.lowercased() }
             )
@@ -529,12 +533,14 @@ struct CardSearchView: View {
             }
 
             try await service.addCards(enabledMatches, toWishlist: wishlistId) { sent, total in
+                guard environmentStore.matches(session) else { return }
                 bulkWishlistStatus = "Adding \(sent) of \(total) cards…"
             }
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
 
             if keepWishlistUpdated && !searchFilters.isActive {
                 _ = try await apiService.addWishlistRule(
-                    config: environmentStore.serverConfiguration,
+                    config: session.configuration,
                     token: token,
                     wishlistId: wishlistId,
                     type: .name,
@@ -543,12 +549,14 @@ struct CardSearchView: View {
                     includeAllPrintings: true,
                     autoSync: true
                 )
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             }
 
             bulkWishlistStatus = "Added \(enabledMatches.count) card\(enabledMatches.count == 1 ? "" : "s") for \"\(query)\"."
             HapticManager.notification(.success)
             onCardAdded?()
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             bulkWishlistStatus = error.localizedDescription
         }
     }

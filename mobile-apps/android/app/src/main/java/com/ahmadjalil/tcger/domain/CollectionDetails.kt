@@ -35,6 +35,7 @@ data class CollectionEdit(
     val price: Double? = null,
     val acquisitionPrice: Double? = null,
     val details: CollectionDetails = CollectionDetails(),
+    val acquisitionCurrency: String? = null,
 ) {
     fun validate() {
         val conditions = setOf("GEM MINT", "GM", "MINT", "M", "NEAR MINT", "NM", "EXCELLENT", "EX", "VERY GOOD", "VG", "GOOD", "GD", "G", "LIGHTLY PLAYED", "LIGHT PLAYED", "LP", "MODERATE PLAY", "MODERATELY PLAYED", "MP", "PLAYED", "PL", "HEAVY PLAY", "HEAVILY PLAYED", "HP", "POOR", "PO", "PR", "DAMAGED", "DMG")
@@ -43,8 +44,9 @@ data class CollectionEdit(
         require(details.tags.all { it.label.isNotBlank() && it.colorHex.matches(Regex("[0-9A-Fa-f]{6}")) }) { "Tags need a label and a six-digit color" }
         require(price == null || price.isFinite() && price >= 0) { "Price must be a nonnegative number" }
         require(acquisitionPrice == null || acquisitionPrice.isFinite() && acquisitionPrice >= 0) { "Purchase cost must be a nonnegative number" }
+        require(acquisitionCurrency == null || acquisitionCurrency.matches(Regex("[A-Za-z]{3}"))) { "Use a three-letter acquisition currency such as CAD or USD" }
     }
 }
 
-fun OwnedCard.edit() = CollectionEdit(condition, price, acquisitionPrice, details)
+fun OwnedCard.edit() = CollectionEdit(condition, price, acquisitionPrice, details, acquisitionCurrency)
 fun CatalogCard.identity() = "${tcg.lowercase()}:$id"

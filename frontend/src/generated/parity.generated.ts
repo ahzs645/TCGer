@@ -117,6 +117,8 @@ export const ParityFeatureIDs = {
   securityBiometricLock: "security.biometricLock",
   releaseReadiness: "release.readiness",
   collectionsCopies: "collections.copies",
+  inventorySales: "inventory.sales",
+  packOpeningSimulationHistory: "packOpening.simulationHistory",
 } as const;
 
 export type ParityFeatureID = (typeof ParityFeatureIDs)[keyof typeof ParityFeatureIDs];
@@ -158,8 +160,8 @@ export const parityFeatureSupport: Readonly<Record<ParityFeatureID, ParityFeatur
   [ParityFeatureIDs.packOpeningReveal]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/packs/pack-opening-shell.tsx"},
   [ParityFeatureIDs.packOpeningResultsGrouped]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/packs/pack-opening-shell.tsx"},
   [ParityFeatureIDs.packOpeningResultsInspect]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/packs/pack-card-close-up.tsx"},
-  [ParityFeatureIDs.packOpeningSaveCollection]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/packs/pack-opening-review-sheet.tsx"},
-  [ParityFeatureIDs.packOpeningSaveSealedLedger]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/packs/pack-opening-review-sheet.tsx"},
+  [ParityFeatureIDs.packOpeningSaveCollection]: {"status":"implemented","limitation":null,"modes":["server"],"requirements":["authenticated-server","atomic-intake"],"source":"frontend/src/components/scan/scanner-workbench.tsx"},
+  [ParityFeatureIDs.packOpeningSaveSealedLedger]: {"status":"implemented","limitation":null,"modes":["server"],"requirements":["authenticated-server","atomic-intake"],"source":"frontend/src/components/scan/scanner-workbench.tsx"},
   [ParityFeatureIDs.packOpeningOfflineDownloads]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/packs/pack-opening.tsx"},
   [ParityFeatureIDs.codesVault]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/online-codes/page.tsx"},
   [ParityFeatureIDs.pricesBrowse]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/app/prices/page.tsx"},
@@ -184,7 +186,7 @@ export const parityFeatureSupport: Readonly<Record<ParityFeatureID, ParityFeatur
   [ParityFeatureIDs.scannerOptionsLanguage]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/scan/shared-scan-session.tsx"},
   [ParityFeatureIDs.scannerOptionsTorch]: {"status":"implemented","limitation":null,"modes":null,"requirements":["camera-torch"],"source":"frontend/src/components/scan/scanner-workbench.tsx"},
   [ParityFeatureIDs.scannerResultsAutoOpen]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/scan/scanner-workbench.tsx"},
-  [ParityFeatureIDs.scannerResultsPriceMode]: {"status":"planned","limitation":"Session quotes and currency totals exist; the native price-mode control semantics are not yet equivalent.","modes":null,"requirements":[],"source":"frontend/src/components/scan/scanner-workbench.tsx"},
+  [ParityFeatureIDs.scannerResultsPriceMode]: {"status":"implemented","limitation":null,"modes":["demo","server"],"requirements":["pricing-provider"],"source":"frontend/src/components/scan/scanner-workbench.tsx"},
   [ParityFeatureIDs.scannerResultsSessionTray]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/scan/shared-scan-session.tsx"},
   [ParityFeatureIDs.scannerResultsSessionReview]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/scan/shared-scan-session.tsx"},
   [ParityFeatureIDs.scannerResultsAddToBinder]: {"status":"implemented","limitation":null,"modes":null,"requirements":[],"source":"frontend/src/components/scan/card-scan-panel.tsx"},
@@ -246,6 +248,8 @@ export const parityFeatureSupport: Readonly<Record<ParityFeatureID, ParityFeatur
   [ParityFeatureIDs.securityBiometricLock]: {"status":"not_applicable","limitation":"No native app lock or device-authentication overlay is shipped for the browser; web account authentication is separate.","modes":null,"requirements":[],"source":"frontend/src/components/account/account-settings-dialog.tsx"},
   [ParityFeatureIDs.releaseReadiness]: {"status":"partial","limitation":"Normal production app build and readiness tooling exist. The canonical host currently serves GitHub Pages marketing/static demo with service-worker registration disabled; production PWA install/offline/update and hosted association headers remain unverified.","modes":null,"requirements":[],"source":"frontend/src/components/pwa/service-worker-register.tsx"},
   [ParityFeatureIDs.collectionsCopies]: {"status":"implemented","limitation":null,"modes":["server"],"requirements":["authenticated-server"],"source":"frontend/src/lib/api/collections.ts"},
+  [ParityFeatureIDs.inventorySales]: {"status":"implemented","limitation":null,"modes":["server"],"requirements":["authenticated-server","atomic-sales"],"source":"frontend/src/components/collections/copy-inventory-actions.tsx"},
+  [ParityFeatureIDs.packOpeningSimulationHistory]: {"status":"implemented","limitation":null,"modes":["local","demo","server"],"requirements":["browser-storage"],"source":"frontend/src/components/packs/pack-opening-review-sheet.tsx"},
 };
 
 export const implementedParityFeatureIDs: ReadonlySet<ParityFeatureID> = new Set([
@@ -296,6 +300,7 @@ export const implementedParityFeatureIDs: ReadonlySet<ParityFeatureID> = new Set
   ParityFeatureIDs.scannerOptionsLanguage,
   ParityFeatureIDs.scannerOptionsTorch,
   ParityFeatureIDs.scannerResultsAutoOpen,
+  ParityFeatureIDs.scannerResultsPriceMode,
   ParityFeatureIDs.scannerResultsSessionTray,
   ParityFeatureIDs.scannerResultsSessionReview,
   ParityFeatureIDs.scannerResultsAddToBinder,
@@ -339,6 +344,8 @@ export const implementedParityFeatureIDs: ReadonlySet<ParityFeatureID> = new Set
   ParityFeatureIDs.gamesCapabilityPriceDownload,
   ParityFeatureIDs.gamesCapabilityPackDownload,
   ParityFeatureIDs.collectionsCopies,
+  ParityFeatureIDs.inventorySales,
+  ParityFeatureIDs.packOpeningSimulationHistory,
 ]);
 
 export const parityScreenID = (featureID: ParityFeatureID): string => `feature.${featureID}`;

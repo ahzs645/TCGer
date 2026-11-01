@@ -216,6 +216,7 @@ export type BinderPagePlacement = z.infer<typeof binderPagePlacementSchema>;
 
 export const upsertBinderPageSchema = z.object({
   pageNumber: z.number().int().min(1).max(10000),
+  expectedRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
   capturedAt: z.string().datetime().optional(),
   placements: z.array(binderPagePlacementSchema).max(100),
 });
@@ -239,12 +240,13 @@ export interface BinderPage {
 
 export const addCardSchema = z.object({
   cardId: z.string().min(1, "Card ID is required"),
-  quantity: z.number().int().positive().default(1),
+  quantity: z.number().int().positive().max(500).default(1),
   condition: conditionValueSchema.optional(),
   language: z.string().optional(),
   notes: z.string().optional(),
   price: z.number().optional(),
-  acquisitionPrice: z.number().optional(),
+  acquisitionPrice: z.number().finite().nonnegative().optional(),
+  acquisitionCurrency: z.string().trim().regex(/^[A-Za-z]{3}$/).transform(value => value.toUpperCase()).optional(),
   serialNumber: z.string().optional(),
   acquiredAt: z.string().datetime().optional(),
   isFoil: z.boolean().optional(),
@@ -284,6 +286,7 @@ export const updateCardSchema = z
     notes: z.string().nullable().optional(),
     serialNumber: z.string().nullable().optional(),
     acquisitionPrice: z.number().finite().nonnegative().nullable().optional(),
+    acquisitionCurrency: z.string().trim().regex(/^[A-Za-z]{3}$/).transform(value => value.toUpperCase()).nullable().optional(),
     acquiredAt: z.string().datetime().nullable().optional(),
     isFoil: z.boolean().optional(),
     finishCode: z.string().min(1).nullable().optional(),
@@ -299,7 +302,7 @@ export const updateCardSchema = z
     gradingScore: z.string().trim().min(1).nullable().optional(),
     certNumber: z.string().trim().min(1).nullable().optional(),
     storageLocation: z.string().trim().min(1).nullable().optional(),
-    quantity: z.number().int().min(1).optional(),
+    quantity: z.number().int().min(1).max(500).optional(),
     tags: z.array(z.string()).optional(),
     newTags: z.array(tagPayloadSchema).optional(),
     targetBinderId: z.string().min(1).optional(),
@@ -333,6 +336,11 @@ export const collectionMutationKindSchema = z.enum([
   "bulk",
   "import",
   "trade_settlement",
+  "sale",
+  "physical_opening",
+  "normalization",
+  "rapid_entry",
+  "acquisition_split",
   "undo",
 ]);
 export type CollectionMutationKind = z.infer<
@@ -384,6 +392,7 @@ export const bulkAddCopyFieldsSchema = z.object({
   notes: z.string().trim().min(1).optional(),
   price: z.number().finite().nonnegative().optional(),
   acquisitionPrice: z.number().finite().nonnegative().optional(),
+  acquisitionCurrency: z.string().trim().regex(/^[A-Za-z]{3}$/).transform(value => value.toUpperCase()).optional(),
   serialNumber: z.string().trim().min(1).optional(),
   acquiredAt: z.string().datetime().optional(),
   isFoil: z.boolean().optional(),
@@ -605,6 +614,7 @@ export interface CollectionImportPreviewRow {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   isFoil: boolean;
@@ -685,6 +695,7 @@ export interface CollectionCardCopy {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   isFoil?: boolean;
@@ -744,6 +755,7 @@ export interface CollectionCard {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   binderId?: string;

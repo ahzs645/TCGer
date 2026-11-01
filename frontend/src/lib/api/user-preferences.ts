@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type { UserPreferences } from "@tcg/api-types";
 import { API_BASE_URL } from "./base-url";
 
@@ -6,7 +7,7 @@ export type { UserPreferences } from "@tcg/api-types";
 export async function getUserPreferences(
   token: string,
 ): Promise<UserPreferences> {
-  const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
+  const response = await sessionFetch(`${API_BASE_URL}/users/me/preferences`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -23,7 +24,7 @@ export async function updateUserPreferences(
   data: Partial<UserPreferences>,
   token: string,
 ): Promise<UserPreferences> {
-  const response = await fetch(`${API_BASE_URL}/users/me/preferences`, {
+  const response = await sessionFetch(`${API_BASE_URL}/users/me/preferences`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

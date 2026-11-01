@@ -44,7 +44,7 @@ enum LocalStoreBackupCodec {
                 }
                 return copies.map { copy in
                     var result: [String: Any] = ["id": copy["id"]!, "card": identity, "quantity": 1, "details": copy]
-                    for key in ["condition", "price", "acquisitionPrice"] { result[key] = copy[key] }
+                    for key in ["condition", "price", "acquisitionPrice", "acquisitionCurrency"] { result[key] = copy[key] }
                     return result
                 }
             }
@@ -102,6 +102,12 @@ enum LocalStoreBackupCodec {
                     guard copyIDs.insert(copyID).inserted else { throw LocalDataTransferError.invalidBackup }
                     copy["id"] = copyID
                     for key in ["condition", "price", "acquisitionPrice"] { copy[key] = owned[key] }
+                    if let currency = owned["acquisitionCurrency"] { copy["acquisitionCurrency"] = currency }
+                    if let currency = copy["acquisitionCurrency"], !(currency is NSNull) {
+                        guard let code = currency as? String,
+                              code.range(of: "^[A-Za-z]{3}$", options: .regularExpression) != nil else { throw LocalDataTransferError.invalidBackup }
+                        copy["acquisitionCurrency"] = code.uppercased()
+                    }
                     copy["tags"] = (copy["tags"] as? [[String: Any]] ?? []).map { tag -> [String: Any] in
                         var tagged = tag; let label = tag["label"] as? String ?? "Tag"
                         let id = (tag["id"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "portable-tag-\(label)"

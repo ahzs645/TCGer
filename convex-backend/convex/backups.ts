@@ -185,6 +185,7 @@ export async function snapshot(
             condition: entry.condition,
             price: entry.price,
             acquisitionPrice: entry.acquisitionPrice,
+            acquisitionCurrency: entry.acquisitionCurrency,
             details: pick(entry, [
               "language",
               "notes",
@@ -593,7 +594,7 @@ export const importData = internalMutation({
             binderId,
             cardId,
             quantity: 1,
-            ...pick(owned, ["condition", "price", "acquisitionPrice"]),
+            ...pick(owned, ["condition", "price", "acquisitionPrice", "acquisitionCurrency"]),
             ...pick(owned.details, [
               "language",
               "notes",
