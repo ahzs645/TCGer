@@ -1,6 +1,13 @@
 "use client";
-import { GameCardSymbols, GameRarity, PackagePrice } from "@/components/game-features/package-capabilities";
-import { cardSupportsPrintSelection, packageCardPresentation } from "@tcg/api-types";
+import {
+  GameCardSymbols,
+  GameRarity,
+  PackagePrice,
+} from "@/components/game-features/package-capabilities";
+import {
+  cardSupportsPrintSelection,
+  packageCardPresentation,
+} from "@tcg/api-types";
 
 import { gameLabel } from "@/lib/utils";
 
@@ -28,6 +35,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchCardPrintsApi } from "@/lib/api-client";
+import { LatestRequest } from "@/lib/latest-request";
 import { getCardPrices, type PriceResult } from "@/lib/api/pricing";
 import { useModuleStore } from "@/stores/preferences";
 import { useCollectionsStore } from "@/stores/collections";
@@ -106,6 +114,7 @@ export function CardPreview({ card }: CardPreviewProps) {
   const [isSealedPromo, setIsSealedPromo] = useState(false);
   const [isOversized, setIsOversized] = useState(false);
   const [isPeelOff, setIsPeelOff] = useState(false);
+  const quoteRequest = useRef(new LatestRequest());
   const [priceQuotes, setPriceQuotes] = useState<PriceResult[] | null>(null);
   const [isLoadingPriceQuotes, setIsLoadingPriceQuotes] = useState(false);
   const [priceQuoteError, setPriceQuoteError] = useState<string | null>(null);
@@ -114,12 +123,16 @@ export function CardPreview({ card }: CardPreviewProps) {
   );
   const activeCard = supportsPrintSelection ? selectedPrintCard : card;
   useEffect(() => {
+    quoteRequest.current.cancel();
     setPriceQuotes(null);
     setPriceQuoteError(null);
-  }, [activeCard.id, selectedFinishCode]);
+    setIsLoadingPriceQuotes(false);
+    return () => quoteRequest.current.cancel();
+  }, [activeCard.tcg, activeCard.id, selectedFinishCode, token]);
   const cardBackImage = getCardBackImage(activeCard.tcg);
   const existingEntry = selectedBinder?.cards.find(
-    (binderCard: CollectionCard) => binderCard.cardId === activeCard.id,
+    (binderCard: CollectionCard) =>
+      binderCard.cardId === activeCard.id && binderCard.tcg === activeCard.tcg,
   );
   const serverQuantity = existingEntry?.quantity ?? 0;
   const quantity = optimisticQuantity ?? serverQuantity;
@@ -263,7 +276,12 @@ export function CardPreview({ card }: CardPreviewProps) {
     setIsLoadingPrints(true);
     setPrintError(null);
 
-    fetchCardPrintsApi({ tcg: card.tcg, cardId: card.id, packageId: packageCardPresentation(card)?.packageId, token })
+    fetchCardPrintsApi({
+      tcg: card.tcg,
+      cardId: card.id,
+      packageId: packageCardPresentation(card)?.packageId,
+      token,
+    })
       .then((data) => {
         if (cancelled) return;
         setPrintData(data);
@@ -309,26 +327,31 @@ export function CardPreview({ card }: CardPreviewProps) {
   const handleComparePrices = async () => {
     if (!token) return;
     if (priceQuotes) {
+      quoteRequest.current.cancel();
       setPriceQuotes(null);
       return;
     }
     setIsLoadingPriceQuotes(true);
     setPriceQuoteError(null);
-    try {
-      const quotes = await getCardPrices(
-        token,
-        activeCard.tcg,
-        activeCard.id,
-        selectedFinishCode || undefined,
-        "automatic",
-        true,
-      );
-      setPriceQuotes(quotes.sort((left, right) => left.price - right.price));
-    } catch (error) {
-      setPriceQuoteError(error instanceof Error ? error.message : "Price comparison failed.");
-    } finally {
-      setIsLoadingPriceQuotes(false);
-    }
+    await quoteRequest.current.run(
+      () =>
+        getCardPrices(
+          token,
+          activeCard.tcg,
+          activeCard.id,
+          selectedFinishCode || undefined,
+          "automatic",
+          true,
+        ),
+      (result) => {
+        if (result.error) setPriceQuoteError(result.error.message);
+        else
+          setPriceQuotes(
+            result.value.sort((left, right) => left.price - right.price),
+          );
+        setIsLoadingPriceQuotes(false);
+      },
+    );
   };
 
   const handleOpenPrintDialog = () => {
@@ -923,7 +946,10 @@ export function CardPreview({ card }: CardPreviewProps) {
             </span>
           </p>
           <GameCardSymbols card={activeCard} />
-          <PackagePrice card={activeCard} finishCode={selectedFinishCode || undefined} />
+          <PackagePrice
+            card={activeCard}
+            finishCode={selectedFinishCode || undefined}
+          />
           {activeCard.rarity && (
             <div className="flex justify-center" data-oid="kxwhbmo">
               <Badge
@@ -1013,18 +1039,36 @@ export function CardPreview({ card }: CardPreviewProps) {
                 onClick={() => void handleComparePrices()}
                 disabled={isLoadingPriceQuotes}
               >
-                {isLoadingPriceQuotes ? "Checking markets…" : priceQuotes ? "Hide market quotes" : "Compare market quotes"}
+                {isLoadingPriceQuotes
+                  ? "Checking markets…"
+                  : priceQuotes
+                    ? "Hide market quotes"
+                    : "Compare market quotes"}
               </Button>
               {priceQuotes?.map((quote) => (
-                <div key={`${quote.source}:${quote.currency}`} className="flex items-center justify-between gap-2">
-                  <span className="truncate text-muted-foreground">{quote.source}</span>
+                <div
+                  key={`${quote.source}:${quote.currency}`}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="truncate text-muted-foreground">
+                    {quote.source}
+                  </span>
                   <span className="font-medium tabular-nums">
-                    {new Intl.NumberFormat(undefined, { style: "currency", currency: quote.currency }).format(quote.price)}
+                    {new Intl.NumberFormat(undefined, {
+                      style: "currency",
+                      currency: quote.currency,
+                    }).format(quote.price)}
                   </span>
                 </div>
               ))}
-              {priceQuotes?.length === 0 ? <p className="text-muted-foreground">No provider quotes available.</p> : null}
-              {priceQuoteError ? <p className="text-destructive">{priceQuoteError}</p> : null}
+              {priceQuotes?.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No provider quotes available.
+                </p>
+              ) : null}
+              {priceQuoteError ? (
+                <p className="text-destructive">{priceQuoteError}</p>
+              ) : null}
             </div>
           ) : null}
           {collections.length ? (

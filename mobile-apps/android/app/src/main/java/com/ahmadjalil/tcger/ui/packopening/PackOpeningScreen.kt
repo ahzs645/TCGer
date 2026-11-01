@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"packOpening.simulationHistory","platform":"android","status":"planned","limitation":"The simulator exists; a separate durable simulation-only history is not implemented on Android."}
 // @tcger-feature {"id":"packOpening.browse","platform":"android","status":"implemented"}
 // @tcger-feature {"id":"packOpening.selectSet","platform":"android","status":"implemented"}
 // @tcger-feature {"id":"packOpening.selectVariant","platform":"android","status":"implemented"}

@@ -113,6 +113,20 @@ class ServerAPIContractTest(private val interactionId: String) {
                     }
                 }
                 "removeCopy" -> { api.removeCard(auth, "contract-binder", "contract-copy"); assertEquals(204, status) }
+                "deletePhysicalCopy" -> {
+                    api.deletePhysicalCopy(auth, "contract-binder", "contract-copy")
+                    assertEquals(204, status)
+                }
+                "commitIntake" -> {
+                    val result = api.commitIntake(auth, "contract-binder", request.getValue("body").jsonObject)
+                    assertTrue("Expected HTTP failure", status < 400)
+                    assertEquals(Json.decodeFromJsonElement<InventoryIntakeReceiptDto>(payload), result)
+                }
+                "recordSale" -> {
+                    val result = api.recordSale(auth, request.getValue("body").jsonObject)
+                    assertTrue("Expected HTTP failure", status < 400)
+                    assertEquals(Json.decodeFromJsonElement<InventorySaleReceiptDto>(payload), result)
+                }
                 "openSealed" -> {
                     val result = api.createSealedOpening(auth, "contract-inventory", Json.decodeFromJsonElement<CreateSealedOpeningRequest>(request.getValue("body")))
                     assertTrue("Expected HTTP failure", status < 400)

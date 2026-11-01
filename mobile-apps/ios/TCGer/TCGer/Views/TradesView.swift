@@ -13,6 +13,7 @@ struct TradesView: View {
     @State private var errorMessage: String?
     @State private var filter = TradeFilter.all
     @State private var selectedMatch: TradeMatch?
+    @State private var pendingTradeIDs: Set<String> = []
 
     private let apiService = APIService()
 
@@ -53,6 +54,13 @@ struct TradesView: View {
                     Section {
                         TradeSummary(trades: trades, currentUserID: environmentStore.currentUser?.id)
                     }
+                    if !environmentStore.serverFeatures.tradeSettlement {
+                        Section {
+                            Text("This server can track proposals, but cannot safely settle trades. Accept is unavailable until the server supports settlement of both collectors’ copies.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     Section {
                         Picker("Status", selection: $filter) {
                             ForEach(TradeFilter.allCases) { Text($0.title).tag($0) }
@@ -85,15 +93,18 @@ struct TradesView: View {
                                             Label("Accept", systemImage: "checkmark")
                                         }
                                         .tint(.green)
+                                        .disabled(!environmentStore.serverFeatures.tradeSettlement || pendingTradeIDs.contains(trade.id))
                                         Button { Task { await perform("decline", on: trade) } } label: {
                                             Label("Decline", systemImage: "xmark")
                                         }
                                         .tint(.orange)
+                                        .disabled(pendingTradeIDs.contains(trade.id))
                                     }
                                     if trade.senderId == environmentStore.currentUser?.id {
                                         Button(role: .destructive) { Task { await remove(trade) } } label: {
                                             Label("Delete", systemImage: "trash")
                                         }
+                                        .disabled(pendingTradeIDs.contains(trade.id))
                                     }
                                 }
                             }
@@ -138,6 +149,7 @@ struct TradesView: View {
 
     @MainActor
     private func load() async {
+        let session = environmentStore.sessionIdentity
         guard !environmentStore.serverConfiguration.isOnDevice else { isLoading = false; return }
         guard let token = environmentStore.authToken else {
             isLoading = false
@@ -145,64 +157,100 @@ struct TradesView: View {
             return
         }
         isLoading = trades.isEmpty
+        defer { if environmentStore.matches(session) { isLoading = false } }
         do {
-            trades = try await apiService.getTrades(config: environmentStore.serverConfiguration, token: token)
-        } catch { errorMessage = error.localizedDescription }
-        isLoading = false
+            let loaded = try await apiService.getTrades(config: session.configuration, token: token)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            trades = loaded
+            errorMessage = nil
+        } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 
     @MainActor
     private func loadMatches() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return }
         isLoadingMatches = true
+        defer { if environmentStore.matches(session) { isLoadingMatches = false } }
         do {
-            matches = try await apiService.getTradeMatches(
-                config: environmentStore.serverConfiguration, token: token
+            let loaded = try await apiService.getTradeMatches(
+                config: session.configuration, token: token
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            matches = loaded
             if matches.isEmpty {
                 errorMessage = "No suggested matches are available yet. Add cards to wishlists and binders to improve matching."
             }
-        } catch { errorMessage = error.localizedDescription }
-        isLoadingMatches = false
+        } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 
     @MainActor
     private func propose(_ match: TradeMatch, message: String?) async -> Bool {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return false }
         do {
             let trade = try await apiService.createTrade(
-                config: environmentStore.serverConfiguration, token: token, match: match, message: message
+                config: session.configuration, token: token, match: match, message: message
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return false }
             trades.insert(trade, at: 0)
             HapticManager.notification(.success)
             return true
-        } catch { errorMessage = error.localizedDescription; return false }
+        } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return false }
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     @MainActor
     private func perform(_ action: String, on trade: Trade) async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return }
+        guard action != "accept" || environmentStore.serverFeatures.tradeSettlement else {
+            errorMessage = "This server does not support safe trade settlement. Ask the server administrator to enable settlement before accepting a trade."
+            return
+        }
+        guard pendingTradeIDs.insert(trade.id).inserted else { return }
+        defer { if environmentStore.matches(session) { pendingTradeIDs.remove(trade.id) } }
         do {
             let updated = try await apiService.updateTradeStatus(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 tradeId: trade.id,
                 action: action
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             if let index = trades.firstIndex(where: { $0.id == trade.id }) { trades[index] = updated }
             HapticManager.notification(.success)
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 
     @MainActor
     private func remove(_ trade: Trade) async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return }
+        guard pendingTradeIDs.insert(trade.id).inserted else { return }
+        defer { if environmentStore.matches(session) { pendingTradeIDs.remove(trade.id) } }
         do {
             try await apiService.deleteTrade(
-                config: environmentStore.serverConfiguration, token: token, tradeId: trade.id
+                config: session.configuration, token: token, tradeId: trade.id
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             trades.removeAll { $0.id == trade.id }
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -311,8 +359,15 @@ private struct TradeDetailView: View {
             TradeSideSection(title: "Receiver Gives", cards: trade.cards.filter { $0.side == "receiver" })
             if trade.status == "pending", trade.receiverId == environmentStore.currentUser?.id {
                 Section {
-                    Button("Accept Trade") { Task { await action("accept") } }.foregroundStyle(.green)
+                    Button("Accept Trade") { Task { await action("accept") } }
+                        .foregroundStyle(.green)
+                        .disabled(!environmentStore.serverFeatures.tradeSettlement)
                     Button("Decline Trade", role: .destructive) { Task { await action("decline") } }
+                    if !environmentStore.serverFeatures.tradeSettlement {
+                        Text("Accept requires a server that can settle both collectors’ inventory together.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

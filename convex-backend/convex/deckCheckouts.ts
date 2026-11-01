@@ -1,3 +1,4 @@
+import { committedQuantity, normalizePhysicalCopies } from "./lib/inventoryAvailability";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -46,20 +47,20 @@ export const active = internalQuery({
 export const checkout = internalMutation({
   args: { subject: v.string(), deckId: v.id("decks"), note: v.optional(v.string()) }, returns: sessionValidator,
   handler: async (ctx, args) => {
-    const user = await viewer(ctx, args.subject); await deckFor(ctx, args.deckId, user._id);
+    const user = await viewer(ctx, args.subject); const deck = await deckFor(ctx, args.deckId, user._id);
     const activeSession = await ctx.db.query("deckCheckoutSessions").withIndex("by_deck_and_status", q => q.eq("deckId", args.deckId).eq("status", "checked_out")).unique();
     if (activeSession) throw new ConvexError({ code: "CONFLICT", message: "Deck is already checked out" });
     const deckCards = await ctx.db.query("deckCards").withIndex("by_deck", q => q.eq("deckId", args.deckId)).take(1000);
-    const entries = await ctx.db.query("collectionEntries").withIndex("by_user", q => q.eq("userId", user._id)).take(16000);
+    let entries = await ctx.db.query("collectionEntries").withIndex("by_user", q => q.eq("userId", user._id)).take(16000);
+    if (entries.some(entry => entry.quantity !== 1)) {
+      for (const entry of entries) await normalizePhysicalCopies(ctx, entry);
+      entries = await ctx.db.query("collectionEntries").withIndex("by_user", q => q.eq("userId", user._id)).take(16000);
+    }
     const cards = await Promise.all(entries.map(entry => ctx.db.get(entry.cardId)));
     const candidates = entries.map((entry, index) => ({ entry, card: cards[index] })).filter((value): value is { entry: Doc<"collectionEntries">; card: Doc<"cards"> } => value.card !== null);
     const reserved = new Map<Id<"collectionEntries">, number>();
     for (const candidate of candidates) {
-      const rows = await ctx.db.query("deckCheckoutAllocations").withIndex("by_user_and_entry", q => q.eq("userId", user._id).eq("collectionEntryId", candidate.entry._id)).take(1000);
-      for (const row of rows) {
-        const session = await ctx.db.get(row.sessionId);
-        if (session?.status === "checked_out") reserved.set(candidate.entry._id, (reserved.get(candidate.entry._id) ?? 0) + row.quantity);
-      }
+      reserved.set(candidate.entry._id, await committedQuantity(ctx, candidate.entry));
     }
     const planned: Array<{ deckCard: Doc<"deckCards">; entry: Doc<"collectionEntries">; quantity: number }> = [];
     for (const deckCard of deckCards) {
@@ -67,7 +68,7 @@ export const checkout = internalMutation({
       for (const candidate of candidates) {
         if (needed < 1) break;
         const ids = [candidate.card.externalId, candidate.card.baseExternalId].filter(Boolean);
-        if (!ids.includes(deckCard.externalId)) continue;
+        if (candidate.card.tcg !== deck.tcg || !ids.includes(deckCard.externalId)) continue;
         const free = candidate.entry.quantity - (reserved.get(candidate.entry._id) ?? 0) - planned.filter(row => row.entry._id === candidate.entry._id).reduce((sum, row) => sum + row.quantity, 0);
         const quantity = Math.min(needed, Math.max(0, free));
         if (quantity) { planned.push({ deckCard, entry: candidate.entry, quantity }); needed -= quantity; }

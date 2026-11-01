@@ -43,6 +43,7 @@ export interface NormalizedCollectionImportRow {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   currency?: string;
   binderName?: string;
   isFoil?: boolean;
@@ -241,6 +242,7 @@ function parseMarketplaceCsv(
       condition: get(source, "condition"), language: get(source, "language"), binderName: get(source, "binder_name", "binder", "folder"),
       price: money(get(source, "market_price", "tcg_market_price") ?? ""), isFoil: foilText.includes("foil") || foilText === "true" || foilText === "yes",
       acquisitionPrice: money(get(source, "purchase_price", "acquisition_price", "cost") ?? ""),
+      acquisitionCurrency: optionalString(get(source, "acquisition_currency", "purchase_price_currency", "purchase_currency"))?.toUpperCase(),
       isSigned: boolean(get(source, "signed")), isAltered: boolean(get(source, "altered", "alter")),
       tags: get(source, "tags")?.split(";").map((tag) => tag.trim()).filter(Boolean), original: fields.join(","),
     }, resolutions[sourceRow] ?? resolutions[offset + 1]);
@@ -442,6 +444,7 @@ export function parseCollectionJson(
       return;
     }
     const source = record as Record<string, unknown>;
+    const acquisitionAmount = source.acquisitionPrice ?? source.acquisition_price;
     const tcg = optionalString(source.tcg ?? source.game)?.toLowerCase();
     const cardName = optionalString(source.cardName ?? source.card_name ?? source.name);
     const quantity = integer(source.quantity ?? source.qty ?? 1);
@@ -473,6 +476,8 @@ export function parseCollectionJson(
       edition: optionalString(source.edition),
       notes: optionalString(source.notes ?? source.comment),
       price: typeof source.price === "number" ? source.price : optionalString(source.price) ? money(String(source.price)) : undefined,
+      acquisitionPrice: typeof acquisitionAmount === "number" ? acquisitionAmount : optionalString(acquisitionAmount) ? money(String(acquisitionAmount)) : undefined,
+      acquisitionCurrency: optionalString(source.acquisitionCurrency ?? source.acquisition_currency)?.toUpperCase(),
       currency: optionalString(source.currency),
       binderName: optionalString(source.binderName ?? source.binder_name ?? source.binder),
       isFoil: boolean(source.isFoil ?? source.is_foil),

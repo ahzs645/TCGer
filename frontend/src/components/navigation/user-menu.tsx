@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { beginAuthAction } from "@/lib/auth-lifecycle";
 import { signOut } from "@/lib/auth-client";
 import { isDemoMode, setDemoMode } from "@/lib/demo-mode";
 import { isSingleUserModeEnabled } from "@/lib/single-user-mode";
@@ -37,7 +38,7 @@ export function UserMenu() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
-  const { user, isAuthenticated, clearAuth } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const singleUserMode = isSingleUserModeEnabled();
@@ -68,16 +69,18 @@ export function UserMenu() {
       return;
     }
 
+    const attempt = beginAuthAction("signout");
     const wasDemo = isDemoMode();
     try {
-      await signOut();
+      await attempt.run(() => signOut());
     } catch (error) {
-      console.error("Logout error:", error);
+      if (attempt.current()) console.error("Logout error:", error);
     }
+    if (!attempt.current()) return;
+    attempt.finish();
     if (wasDemo) {
       setDemoMode(false);
     }
-    clearAuth();
     if (wasDemo) {
       router.push("/demo");
     }

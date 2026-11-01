@@ -27,24 +27,35 @@ services:
       dockerfile: docker/convex-backend.Dockerfile
       target: dev
     container_name: tcg-convex-backend
-    command: sh -c "cd /app && npm install && cd /app/convex-backend && npm run dev -- --typecheck disable --tail-logs disable"
+    command:
+      - sh
+      - -ec
+      - |
+        cd /app
+        npm run --workspace=packages/api-types build
+        cd /app/convex-backend
+        exec npm run dev:local
     environment:
       NODE_ENV: development
-      CONVEX_AGENT_MODE: ${CONVEX_AGENT_MODE:-anonymous}
+      TCGER_CONVEX_DEV_TARGET: ${TCGER_CONVEX_DEV_TARGET:-anonymous}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-tcger-local-convex-auth-secret-2026}
       TCGER_BRIDGE_SECRET: ${TCGER_BRIDGE_SECRET:-tcger-local-convex-bridge-secret-2026}
-      BETTER_AUTH_DISABLE_ORIGIN_CHECK: ${BETTER_AUTH_DISABLE_ORIGIN_CHECK:-true}
+      BETTER_AUTH_DISABLE_ORIGIN_CHECK: ${BETTER_AUTH_DISABLE_ORIGIN_CHECK:-false}
       SITE_URL: ${SITE_URL:-http://localhost:3000}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000/api/auth}
-      SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
-      YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
-      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
-      TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
+      BETTER_AUTH_USE_SECURE_COOKIES: ${BETTER_AUTH_USE_SECURE_COOKIES:-}
+      SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-https://api.scryfall.com}
+      YGO_API_BASE_URL: ${YGO_API_BASE_URL:-https://db.ygoprodeck.com/api/v7}
+      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-https://api.tcgdex.net/v2/en}
+      TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-https://api.tcgdex.net/v2/en}
       JUSTTCG_API_BASE_URL: ${JUSTTCG_API_BASE_URL:-https://api.justtcg.com/v1}
       JUSTTCG_API_KEY: ${JUSTTCG_API_KEY:-}
     volumes:
       - ../convex-backend:/app/convex-backend
       - convex_data:/app/convex-backend/.convex
+      - ../packages/api-types:/app/packages/api-types
+      - ../tools/dev:/app/tools/dev:ro
       - /app/node_modules
       - ../tsconfig.base.json:/app/tsconfig.base.json:ro
     healthcheck:
@@ -52,9 +63,10 @@ services:
         [
           "CMD",
           "node",
-          "-e",
-          "fetch('http://127.0.0.1:3211/health').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))",
+          "../tools/dev/convex-dev.mjs",
+          "--health",
         ]
+      start_period: 180s
       interval: 10s
       timeout: 5s
       retries: 10
@@ -162,7 +174,17 @@ services:
       dockerfile: docker/backend.Dockerfile
       target: dev
     container_name: tcg-backend
-    command: sh -c "cd /app && npm install && npm run --workspace=packages/api-types build 2>/dev/null; cd /app/backend && if [ \"${BACKEND_MODE:-convex}\" != \"convex\" ]; then npx prisma db push --accept-data-loss; fi && npm run dev"
+    command:
+      - sh
+      - -ec
+      - |
+        cd /app
+        ONNXRUNTIME_NODE_INSTALL=skip npm ci --workspace=@tcg/backend --workspace=@tcg/api-types --include-workspace-root=false --no-audit --no-fund
+        npm run --workspace=packages/api-types build
+        cd /app/backend
+        npx prisma generate
+        if [ "$${BACKEND_MODE:-convex}" != "convex" ]; then npx prisma migrate deploy; fi
+        exec npm run dev
     environment:
       NODE_ENV: development
       PORT: 3000
@@ -175,16 +197,35 @@ services:
       TCGER_BRIDGE_SECRET: ${TCGER_BRIDGE_SECRET:-tcger-local-convex-bridge-secret-2026}
       SCRYDEX_API_KEY: ${SCRYDEX_API_KEY:-}
       SCRYDEX_TEAM_ID: ${SCRYDEX_TEAM_ID:-}
-      SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-http://scryfall-bulk:4010}
-      YGO_API_BASE_URL: ${YGO_API_BASE_URL:-http://ygo-cache:4020}
-      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-http://tcgdex-cache:4040}
-      TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-http://tcgdex-cache:4040}
+      SCRYFALL_API_BASE_URL: ${SCRYFALL_API_BASE_URL:-https://api.scryfall.com}
+      YGO_API_BASE_URL: ${YGO_API_BASE_URL:-https://db.ygoprodeck.com/api/v7}
+      POKEMON_API_BASE_URL: ${POKEMON_API_BASE_URL:-https://api.tcgdex.net/v2/en}
+      TCGDEX_API_BASE_URL: ${TCGDEX_API_BASE_URL:-https://api.tcgdex.net/v2/en}
       JUSTTCG_API_BASE_URL: ${JUSTTCG_API_BASE_URL:-https://api.justtcg.com/v1}
       JUSTTCG_API_KEY: ${JUSTTCG_API_KEY:-}
       POKEWALLET_API_BASE_URL: ${POKEWALLET_API_BASE_URL:-https://api.pokewallet.io}
       POKEWALLET_API_KEY: ${POKEWALLET_API_KEY:-}
       POKEWALLET_PROXY_SECRET: ${POKEWALLET_PROXY_SECRET:-}
-      PRICE_USD_TO_EUR: ${PRICE_USD_TO_EUR:-0.92}
+      PRICE_USD_TO_EUR: ${PRICE_USD_TO_EUR:-}
+      PRICE_FX_SOURCE: ${PRICE_FX_SOURCE:-}
+      PRICE_FX_AS_OF: ${PRICE_FX_AS_OF:-}
+      TCGCSV_API_BASE_URL: ${TCGCSV_API_BASE_URL:-https://tcgcsv.com/tcgplayer}
+      TCGCSV_MIN_INTERVAL_MS: ${TCGCSV_MIN_INTERVAL_MS:-100}
+      PROVIDER_MAX_RETRIES: ${PROVIDER_MAX_RETRIES:-2}
+      SCRYFALL_MIN_INTERVAL_MS: ${SCRYFALL_MIN_INTERVAL_MS:-120}
+      PSA_API_BASE_URL: ${PSA_API_BASE_URL:-https://api.psacard.com/publicapi}
+      PSA_API_TOKEN: ${PSA_API_TOKEN:-}
+      PSA_MIN_INTERVAL_MS: ${PSA_MIN_INTERVAL_MS:-350}
+      POKEMON_PRICE_TRACKER_API_BASE_URL: ${POKEMON_PRICE_TRACKER_API_BASE_URL:-https://www.pokemonpricetracker.com/api/v2}
+      POKEMON_PRICE_TRACKER_API_KEY: ${POKEMON_PRICE_TRACKER_API_KEY:-}
+      POKEMON_PRICE_TRACKER_LICENSE_ACK: ${POKEMON_PRICE_TRACKER_LICENSE_ACK:-false}
+      POKEMON_PRICE_TRACKER_MIN_INTERVAL_MS: ${POKEMON_PRICE_TRACKER_MIN_INTERVAL_MS:-250}
+      CARD_SCAN_RATE_WINDOW_MS: ${CARD_SCAN_RATE_WINDOW_MS:-60000}
+      CARD_SCAN_RATE_LIMIT: ${CARD_SCAN_RATE_LIMIT:-20}
+      CARD_SCAN_MAX_CONCURRENT: ${CARD_SCAN_MAX_CONCURRENT:-4}
+      CARD_SCAN_MAX_CONCURRENT_PER_USER: ${CARD_SCAN_MAX_CONCURRENT_PER_USER:-1}
+      CARD_SCAN_MAX_PIXELS: ${CARD_SCAN_MAX_PIXELS:-25000000}
+      UPLOADS_DIR: /app/uploads
       EBAY_CLIENT_ID: ${EBAY_CLIENT_ID:-}
       EBAY_CLIENT_SECRET: ${EBAY_CLIENT_SECRET:-}
       EBAY_MARKETPLACE_ID: ${EBAY_MARKETPLACE_ID:-EBAY_US}
@@ -196,6 +237,7 @@ services:
       APITCG_API_BASE_URL: ${APITCG_API_BASE_URL:-https://api.apitcg.com}
       APITCG_API_KEY: ${APITCG_API_KEY:-}
     volumes:
+      - uploads_data:/app/uploads
       - ../backend:/app/backend
       - ../packages:/app/packages
       - ../data/catalog:/app/data/catalog:ro
@@ -257,6 +299,7 @@ services:
       - tcg-net
 
 volumes:
+  uploads_data:
   postgres_data:
   convex_data:
   scryfall_bulk_data:

@@ -119,6 +119,7 @@ data class OwnedCard(
     val price: Double? = null,
     val acquisitionPrice: Double? = null,
     val details: CollectionDetails = CollectionDetails(),
+    val acquisitionCurrency: String? = null,
 )
 
 data class Binder(

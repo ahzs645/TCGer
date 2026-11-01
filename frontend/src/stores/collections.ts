@@ -1,6 +1,14 @@
+import {
+  inventoryRevision,
+  subscribeInventoryChanges,
+} from "@/lib/inventory-events";
+import {
+  capturePrivateSession,
+  sessionSetter,
+  subscribePrivateSession,
+} from "@/lib/private-session";
 import { create } from "zustand";
 import * as collectionsApi from "@/lib/api/collections";
-import { useAuthStore } from "@/stores/auth";
 
 export type { Collection, CollectionCard } from "@/lib/api/collections";
 
@@ -39,213 +47,244 @@ export interface CollectionsState {
   ) => Promise<void>;
 }
 
-// A previous account's in-flight response must never publish into a new session.
-let sessionGeneration = 0;
-const sessionMatches = (token: string, generation: number, userId: string | null) => {
-  const auth = useAuthStore.getState();
-  return sessionGeneration === generation && auth.token === token && auth.user?.id === userId;
-};
+let latestFetch = 0;
 
-export const useCollectionsStore = create<CollectionsState>()((set, get) => ({
-  collections: [],
-  isLoading: false,
-  error: null,
-  hasFetched: false,
+export const useCollectionsStore = create<CollectionsState>()(
+  (publish, get) => ({
+    collections: [],
+    isLoading: false,
+    error: null,
+    hasFetched: false,
 
-  clearError: () => set({ error: null }),
+    clearError: () => publish({ error: null }),
 
-  fetchCollections: async (token: string) => {
-    const generation = sessionGeneration;
-    const userId = useAuthStore.getState().user?.id ?? null;
-    if (!sessionMatches(token, generation, userId)) return;
-    set({ isLoading: true, error: null });
-    try {
-      const collections = await collectionsApi.getCollections(
-        token,
-        useAuthStore.getState().user,
-      );
-      if (!sessionMatches(token, generation, userId)) return;
-      set({ collections, isLoading: false, hasFetched: true });
-    } catch (error) {
-      if (!sessionMatches(token, generation, userId)) return;
-      set({
-        error:
+    fetchCollections: async (token: string) => {
+      const request = ++latestFetch;
+      const revision = inventoryRevision();
+      const session = capturePrivateSession(token);
+      session.assertCurrent();
+      const set = sessionSetter(publish, session);
+      set({ isLoading: true, error: null });
+      try {
+        const collections = await collectionsApi.getCollections(
+          token,
+          session.user,
+        );
+        if (!session.current() || request !== latestFetch) return;
+        if (revision !== inventoryRevision()) {
+          set({ isLoading: false, hasFetched: false });
+          return;
+        }
+        set({ collections, isLoading: false, hasFetched: true });
+      } catch (error) {
+        if (!session.current() || request !== latestFetch) return;
+        if (revision !== inventoryRevision()) {
+          set({ isLoading: false, hasFetched: false });
+          return;
+        }
+        set({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to fetch collections",
+          isLoading: false,
+          hasFetched: true,
+        });
+      }
+    },
+
+    addCollection: async (
+      token: string,
+      input: { name: string; description?: string },
+    ) => {
+      const session = capturePrivateSession(token);
+      session.assertCurrent();
+      const set = sessionSetter(publish, session);
+      set({ isLoading: true, error: null });
+      try {
+        const newCollection = await collectionsApi.createCollection(
+          token,
+          input,
+          session.user,
+        );
+        set((state) => ({
+          collections: [...state.collections, newCollection],
+          isLoading: false,
+          hasFetched: true,
+        }));
+        return newCollection.id;
+      } catch (error) {
+        set({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to create collection",
+          isLoading: false,
+          hasFetched: true,
+        });
+        throw error;
+      }
+    },
+
+    removeCollection: async (token: string, id: string) => {
+      const session = capturePrivateSession(token);
+      session.assertCurrent();
+      const set = sessionSetter(publish, session);
+      set({ isLoading: true, error: null });
+      try {
+        await collectionsApi.deleteCollection(token, id, session.user);
+        const collections = await collectionsApi.getCollections(
+          token,
+          session.user,
+        );
+        set({
+          collections,
+          isLoading: false,
+          hasFetched: true,
+        });
+      } catch (error) {
+        set({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to delete collection",
+          isLoading: false,
+          hasFetched: true,
+        });
+        throw error;
+      }
+    },
+
+    updateCollection: async (
+      token: string,
+      id: string,
+      input: { name?: string; description?: string; colorHex?: string },
+    ) => {
+      const session = capturePrivateSession(token);
+      session.assertCurrent();
+      const set = sessionSetter(publish, session);
+      set({ isLoading: true, error: null });
+      try {
+        const updated = await collectionsApi.updateCollection(
+          token,
+          id,
+          input,
+          session.user,
+        );
+        set((state) => ({
+          collections: state.collections.map((c) =>
+            c.id === id ? updated : c,
+          ),
+          isLoading: false,
+          hasFetched: true,
+        }));
+      } catch (error) {
+        set({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to update collection",
+          isLoading: false,
+          hasFetched: true,
+        });
+        throw error;
+      }
+    },
+
+    addCardToBinder: async (
+      token: string,
+      binderId: string,
+      input: collectionsApi.AddCardToCollectionInput,
+    ) => {
+      const session = capturePrivateSession(token);
+      session.assertCurrent();
+      const set = sessionSetter(publish, session);
+      try {
+        await collectionsApi.addCardToCollection(
+          token,
+          binderId,
+          input,
+          session.user,
+        );
+        session.assertCurrent();
+        await get().fetchCollections(token);
+      } catch (error) {
+        const message =
           error instanceof Error
             ? error.message
-            : "Failed to fetch collections",
-        isLoading: false,
-        hasFetched: true,
-      });
-    }
-  },
+            : "Failed to add card to collection";
+        set({ error: message, isLoading: false, hasFetched: true });
+        throw error instanceof Error ? error : new Error(message);
+      }
+    },
 
-  addCollection: async (
-    token: string,
-    input: { name: string; description?: string },
-  ) => {
-    set({ isLoading: true, error: null });
-    try {
-      const newCollection = await collectionsApi.createCollection(
-        token,
-        input,
-        useAuthStore.getState().user,
-      );
-      set((state) => ({
-        collections: [...state.collections, newCollection],
-        isLoading: false,
-        hasFetched: true,
-      }));
-      return newCollection.id;
-    } catch (error) {
-      set({
-        error:
+    updateCollectionCard: async (
+      token: string,
+      binderId: string,
+      cardId: string,
+      input: collectionsApi.UpdateCollectionCardInput,
+    ) => {
+      const session = capturePrivateSession(token);
+      session.assertCurrent();
+      const set = sessionSetter(publish, session);
+      try {
+        await collectionsApi.updateCollectionCard(
+          token,
+          binderId,
+          cardId,
+          input,
+          session.user,
+        );
+        session.assertCurrent();
+        await get().fetchCollections(token);
+      } catch (error) {
+        const message =
           error instanceof Error
             ? error.message
-            : "Failed to create collection",
-        isLoading: false,
-        hasFetched: true,
-      });
-      throw error;
-    }
-  },
+            : "Failed to update card in collection";
+        set({ error: message });
+        throw error instanceof Error ? error : new Error(message);
+      }
+    },
 
-  removeCollection: async (token: string, id: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      await collectionsApi.deleteCollection(
-        token,
-        id,
-        useAuthStore.getState().user,
-      );
-      const collections = await collectionsApi.getCollections(
-        token,
-        useAuthStore.getState().user,
-      );
-      set({
-        collections,
-        isLoading: false,
-        hasFetched: true,
-      });
-    } catch (error) {
-      set({
-        error:
+    removeCollectionCard: async (
+      token: string,
+      binderId: string,
+      cardId: string,
+    ) => {
+      const session = capturePrivateSession(token);
+      session.assertCurrent();
+      const set = sessionSetter(publish, session);
+      try {
+        await collectionsApi.removeCardFromCollection(
+          token,
+          binderId,
+          cardId,
+          session.user,
+        );
+        session.assertCurrent();
+        await get().fetchCollections(token);
+      } catch (error) {
+        const message =
           error instanceof Error
             ? error.message
-            : "Failed to delete collection",
-        isLoading: false,
-        hasFetched: true,
-      });
-      throw error;
-    }
-  },
+            : "Failed to remove card from collection";
+        set({ error: message });
+        throw error instanceof Error ? error : new Error(message);
+      }
+    },
+  }),
+);
 
-  updateCollection: async (
-    token: string,
-    id: string,
-    input: { name?: string; description?: string; colorHex?: string },
-  ) => {
-    set({ isLoading: true, error: null });
-    try {
-      const updated = await collectionsApi.updateCollection(
-        token,
-        id,
-        input,
-        useAuthStore.getState().user,
-      );
-      set((state) => ({
-        collections: state.collections.map((c) => (c.id === id ? updated : c)),
-        isLoading: false,
-        hasFetched: true,
-      }));
-    } catch (error) {
-      set({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to update collection",
-        isLoading: false,
-        hasFetched: true,
-      });
-      throw error;
-    }
-  },
+subscribePrivateSession(() => {
+  useCollectionsStore.setState({
+    collections: [],
+    isLoading: false,
+    error: null,
+    hasFetched: false,
+  });
+});
 
-  addCardToBinder: async (
-    token: string,
-    binderId: string,
-    input: collectionsApi.AddCardToCollectionInput,
-  ) => {
-    try {
-      await collectionsApi.addCardToCollection(
-        token,
-        binderId,
-        input,
-        useAuthStore.getState().user,
-      );
-      await get().fetchCollections(token);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to add card to collection";
-      set({ error: message, isLoading: false, hasFetched: true });
-      throw error instanceof Error ? error : new Error(message);
-    }
-  },
-
-  updateCollectionCard: async (
-    token: string,
-    binderId: string,
-    cardId: string,
-    input: collectionsApi.UpdateCollectionCardInput,
-  ) => {
-    try {
-      await collectionsApi.updateCollectionCard(
-        token,
-        binderId,
-        cardId,
-        input,
-        useAuthStore.getState().user,
-      );
-      await get().fetchCollections(token);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to update card in collection";
-      set({ error: message });
-      throw error instanceof Error ? error : new Error(message);
-    }
-  },
-
-  removeCollectionCard: async (
-    token: string,
-    binderId: string,
-    cardId: string,
-  ) => {
-    try {
-      await collectionsApi.removeCardFromCollection(
-        token,
-        binderId,
-        cardId,
-        useAuthStore.getState().user,
-      );
-      await get().fetchCollections(token);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to remove card from collection";
-      set({ error: message });
-      throw error instanceof Error ? error : new Error(message);
-    }
-  },
-}));
-
-// Reset private state when the authenticated identity or credential changes.
-// The generation also invalidates requests already awaiting network responses.
-useAuthStore.subscribe((state, previous) => {
-  if (state.user?.id === previous.user?.id && state.token === previous.token && state.isAuthenticated === previous.isAuthenticated) return;
-  sessionGeneration += 1;
-  useCollectionsStore.setState({ collections: [], isLoading: false, error: null, hasFetched: false });
+subscribeInventoryChanges(() => {
+  useCollectionsStore.setState({ hasFetched: false });
 });

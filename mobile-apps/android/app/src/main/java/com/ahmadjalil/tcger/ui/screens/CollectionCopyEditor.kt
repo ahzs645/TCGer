@@ -102,7 +102,10 @@ fun CollectionCopyEditor(owned: OwnedCard, binders: List<Binder>, local: Boolean
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     ChoiceField("Condition", draft.condition.orEmpty(), copyConditions) { draft = draft.copy(condition = it.ifBlank { null }) }
                     ChoiceField("Language", draft.details.language.orEmpty(), listOf("" to "Not specified") + listOf("English", "Japanese", "French", "German", "Italian", "Spanish", "Portuguese", "Korean", "Chinese").map { it to it }) { draft = draft.copy(details = draft.details.copy(language = it.ifBlank { null })) }
-                    AmountField("Purchase cost (USD)", cost) { cost = it }
+                    AmountField("Purchase cost (${draft.acquisitionCurrency ?: "currency unknown"})", cost) { cost = it }
+                    OutlinedTextField(draft.acquisitionCurrency.orEmpty(), { draft = draft.copy(acquisitionCurrency = it.trim().uppercase().ifBlank { null }) },
+                        Modifier.fillMaxWidth(), label = { Text("Original purchase currency (for example CAD)") }, singleLine = true,
+                        supportingText = { Text("Leave blank if the original currency is unknown.") })
                     if (local) AmountField("Market value (USD)", price) { price = it }
                     ChoiceField("Binder", destination, binders.map { it.id to it.name }) { destination = it }
                     OutlinedTextField(draft.details.notes.orEmpty(), { draft = draft.copy(details = draft.details.copy(notes = it.ifBlank { null })) }, Modifier.fillMaxWidth(), label = { Text("Notes") })
@@ -140,8 +143,8 @@ fun CollectionCopyEditor(owned: OwnedCard, binders: List<Binder>, local: Boolean
                         OutlinedTextField(copies, { copies = it }, Modifier.fillMaxWidth(), label = { Text("Additional identical copies") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                     }
                     HorizontalDivider()
-                    OutlinedButton(enabled = !busy && !dirty, onClick = { selling = true }) { Text("Record a sale") }
-                    if (dirty) Text("Save your edits before recording a sale.", style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(enabled = false, onClick = {}) { Text("Record a sale") }
+                    Text("Record inventory sales in the web or iOS app until Android supports resumable sale saves.", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(16.dp))
                 }
             }
@@ -158,8 +161,8 @@ fun CollectionCopyEditor(owned: OwnedCard, binders: List<Binder>, local: Boolean
 @Composable
 private fun CollectionSaleDialog(owned: OwnedCard, onDismiss: () -> Unit, onSell: suspend (CreateFinanceTransaction, Boolean) -> Unit) {
     var sale by rememberSaveable { mutableStateOf("") }
-    var currency by rememberSaveable { mutableStateOf("USD") }
-    var cost by rememberSaveable { mutableStateOf(owned.acquisitionPrice?.toString().orEmpty()) }
+    var currency by rememberSaveable { mutableStateOf(owned.acquisitionCurrency ?: "USD") }
+    var cost by rememberSaveable { mutableStateOf(if (owned.acquisitionCurrency == null) "" else owned.acquisitionPrice?.toString().orEmpty()) }
     var fees by rememberSaveable { mutableStateOf("") }
     var shipping by rememberSaveable { mutableStateOf("") }
     var platform by rememberSaveable { mutableStateOf("") }

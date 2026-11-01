@@ -14,11 +14,21 @@ import {
 } from "@/lib/single-user-mode";
 import { resolvePublicConvexOrigin } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import {
+  authLifecycleRevision,
+  canSynchronizeAuthSession,
+  subscribeAuthLifecycle,
+} from "@/lib/auth-lifecycle";
 
 function AuthSessionSync() {
   ensureDemoInterceptor();
 
   const { data: session, isPending } = useSession();
+  const authRevision = React.useSyncExternalStore(
+    subscribeAuthLifecycle,
+    authLifecycleRevision,
+    () => 0,
+  );
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const setAuth = useAuthStore((state) => state.setAuth);
   const clearAuth = useAuthStore((state) => state.clearAuth);
@@ -45,6 +55,10 @@ function AuthSessionSync() {
 
     const user = session?.user as Record<string, unknown> | undefined;
     const token = session?.session?.token;
+    // The hook can retain an older response after a failed or superseded fetch.
+    // Only a snapshot approved by the current auth intent may change accounts.
+    if (!canSynchronizeAuthSession(user?.id as string | undefined, token))
+      return;
 
     if (!user || !token) {
       if (isAuthenticated) {
@@ -54,7 +68,15 @@ function AuthSessionSync() {
     }
 
     setAuth(toAuthUser(user), token);
-  }, [clearAuth, isAuthenticated, isPending, session, setAuth, singleUserMode]);
+  }, [
+    authRevision,
+    clearAuth,
+    isAuthenticated,
+    isPending,
+    session,
+    setAuth,
+    singleUserMode,
+  ]);
 
   return null;
 }

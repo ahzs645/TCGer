@@ -52,6 +52,17 @@ final class ServerAPIContractTests: XCTestCase {
     func testScannerSaveInvalid() async throws { try await verify("scanner.save.invalid") }
     func testScannerSaveUnauthorized() async throws { try await verify("scanner.save.unauthorized") }
 
+    func testCollectionsPhysicalCopyDeleteSuccess() async throws { try await verify("collections.physicalCopyDelete.success") }
+    func testCollectionsPhysicalCopyDeleteUnauthorized() async throws { try await verify("collections.physicalCopyDelete.unauthorized") }
+    func testCollectionsPhysicalCopyDeleteForeign() async throws { try await verify("collections.physicalCopyDelete.foreign") }
+    func testScannerAtomicIntakeSuccess() async throws { try await verify("scanner.atomicIntake.success") }
+    func testScannerAtomicIntakeInvalid() async throws { try await verify("scanner.atomicIntake.invalid") }
+    func testScannerAtomicIntakeUnauthorized() async throws { try await verify("scanner.atomicIntake.unauthorized") }
+    func testScannerAtomicIntakeForeign() async throws { try await verify("scanner.atomicIntake.foreign") }
+    func testInventorySaleSuccess() async throws { try await verify("inventory.sale.success") }
+    func testInventorySaleUnauthorized() async throws { try await verify("inventory.sale.unauthorized") }
+    func testInventorySaleForeign() async throws { try await verify("inventory.sale.foreign") }
+
     private func verify(_ id: String) async throws {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "ApiContracts.generated", withExtension: "json"))
         let registry = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
@@ -143,6 +154,27 @@ final class ServerAPIContractTests: XCTestCase {
             case "removeCopy":
                 try await service.deleteCardFromBinder(config: config, token: token, binderId: "contract-binder", collectionCardId: "contract-copy")
                 XCTAssertEqual(status, 204, id)
+            case "deletePhysicalCopy":
+                try await service.deleteCopyFromBinder(config: config, token: token, binderId: "contract-binder", copyId: "contract-copy")
+                XCTAssertEqual(status, 204, id)
+            case "commitIntake":
+                let rowObjects = try XCTUnwrap(body["rows"] as? [[String: Any]])
+                let rows = try rowObjects.map { fields -> InventoryIntakeRow in
+                    let snapshot = try XCTUnwrap(fields["cardData"] as? [String: Any])
+                    let card = Card(id: try XCTUnwrap(snapshot["externalId"] as? String), name: try XCTUnwrap(snapshot["name"] as? String), tcg: try XCTUnwrap(snapshot["tcg"] as? String), setCode: snapshot["setCode"] as? String, setName: snapshot["setName"] as? String, rarity: nil, imageUrl: nil, imageUrlSmall: nil, price: nil, collectorNumber: nil, releasedAt: nil)
+                    return InventoryIntakeRow(rowId: try XCTUnwrap(fields["rowId"] as? String), card: card, details: BinderCardAddDetails(quantity: fields["quantity"] as? Int ?? 1, condition: fields["condition"] as? String, language: fields["language"] as? String, notes: fields["notes"] as? String))
+                }
+                let draft = InventoryIntakeDraft(operationId: try XCTUnwrap(body["operationId"] as? String), collectionId: "contract-binder", source: try XCTUnwrap(body["source"] as? String), rows: rows, sealedInventoryId: body["sealedInventoryId"] as? String, openedQuantity: body["openedQuantity"] as? Int)
+                let result = try await service.commitInventoryIntake(config: config, token: token, draft: draft)
+                XCTAssertLessThan(status, 400, id)
+                let expectedReceipt = try JSONDecoder().decode(InventoryIntakeReceipt.self, from: JSONSerialization.data(withJSONObject: try XCTUnwrap(expected["body"])))
+                XCTAssertEqual(result, expectedReceipt, id)
+            case "recordSale":
+                let sale = try JSONDecoder().decode(InventorySaleRequest.self, from: JSONSerialization.data(withJSONObject: body))
+                let result = try await service.recordInventorySale(config: config, token: token, request: sale)
+                XCTAssertLessThan(status, 400, id)
+                let expectedReceipt = try JSONDecoder().decode(InventorySaleReceipt.self, from: JSONSerialization.data(withJSONObject: try XCTUnwrap(expected["body"])))
+                XCTAssertEqual(result, expectedReceipt, id)
             case "openSealed":
                 let result = try await service.createSealedOpening(config: config, token: token, inventoryId: "contract-inventory", openedQuantity: try XCTUnwrap(body["openedQuantity"] as? Int), collectionIds: body["collectionIds"] as? [String] ?? [], openedAt: body["openedAt"] as? String, notes: body["notes"] as? String)
                 XCTAssertLessThan(status, 400, id)

@@ -1,0 +1,52 @@
+name: Inventory integrity and deployment configuration
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: tcger_test
+          POSTGRES_PASSWORD: disposable_test_password
+          POSTGRES_DB: tcger_acceptance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tcger_test -d tcger_acceptance"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tcger_test:disposable_test_password@localhost:5432/tcger_acceptance
+      NODE_ENV: test
+      BACKEND_MODE: hybrid
+      COLLECTIONS_BACKEND: prisma
+      WISHLISTS_BACKEND: prisma
+      CONVEX_HTTP_ORIGIN: https://identity.acceptance.test
+      TCGER_ACCEPTANCE_DATABASE: disposable
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install --global npm@11.19.0 --no-audit --no-fund
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx prisma generate --schema backend/prisma/schema.prisma
+      - run: npm --workspace=@tcg/api-types run build
+      - run: node --test tools/dev/*.test.mjs
+      - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+      - run: npx tsx backend/src/integration/legacy-provider.acceptance.ts
+      - name: Validate supported Compose configurations
+        run: |
+          docker compose --env-file .env.docker.example -f docker/docker-compose.yml --profile frontend config --quiet
+          docker compose --env-file .env.docker.example -f docker/docker-compose.prod.yml config --quiet

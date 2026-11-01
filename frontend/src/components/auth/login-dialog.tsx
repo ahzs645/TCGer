@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { LogIn } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signIn } from "@/lib/auth-client";
+import { authClient, signIn } from "@/lib/auth-client";
+import { beginAuthAction } from "@/lib/auth-lifecycle";
 import { toAuthUser } from "@/lib/auth-helpers";
-import { useAuthStore } from "@/stores/auth";
 
 interface LoginDialogProps {
   open: boolean;
@@ -32,10 +32,11 @@ export function LoginDialog({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const submitting = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setError("");
     const normalizedUsername = username.trim();
 
@@ -45,12 +46,18 @@ export function LoginDialog({
     }
 
     setLoading(true);
+    submitting.current = true;
+    const attempt = beginAuthAction("signin");
 
     try {
-      const result = await signIn.username({
-        username: normalizedUsername,
-        password,
-      });
+      const result = await attempt.run(
+        async () =>
+          await signIn.username({
+            username: normalizedUsername,
+            password,
+          }),
+      );
+      attempt.assertCurrent();
 
       if (result.error) {
         setError(result.error.message ?? "Login failed");
@@ -59,19 +66,25 @@ export function LoginDialog({
 
       if (result.data) {
         const sessionToken = result.data.token ?? undefined;
-        setAuth(
+        attempt.accept(
           toAuthUser(result.data.user as Record<string, unknown>),
           sessionToken,
         );
+        authClient.$store.notify("$sessionSignal");
       }
 
       setUsername("");
       setPassword("");
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      if (attempt.current())
+        setError(err instanceof Error ? err.message : "Login failed");
     } finally {
-      setLoading(false);
+      submitting.current = false;
+      if (attempt.current()) {
+        attempt.finish();
+        setLoading(false);
+      }
     }
   };
 

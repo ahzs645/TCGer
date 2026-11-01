@@ -16,6 +16,7 @@ import type {
 } from '@tcg/api-types';
 
 import { prisma } from '../../lib/prisma';
+import { legacyCopyAddresses, MAX_NORMALIZATION_COPIES, normalizeLegacyCopy, resolvePhysicalCopyId } from './copy-model.service';
 import {
   createCollectionAudit,
   snapshotCollectionEntries
@@ -400,7 +401,8 @@ function mapCollectionCopy(collection: PrismaCollectionWithCard): CollectionCopy
     language: collection.language ?? undefined,
     notes: collection.notes ?? undefined,
     price: collection.price ? parseFloat(collection.price.toString()) : undefined,
-    acquisitionPrice: collection.acquisitionPrice ? parseFloat(collection.acquisitionPrice.toString()) : undefined,
+    acquisitionPrice: collection.acquisitionPrice === null ? undefined : Number(collection.acquisitionPrice),
+    acquisitionCurrency: collection.acquisitionCurrency ?? undefined,
     serialNumber: collection.serialNumber ?? undefined,
     acquiredAt: collection.acquiredAt ? collection.acquiredAt.toISOString() : undefined,
     isFoil: collection.isFoil || undefined,
@@ -513,7 +515,7 @@ function aggregateCollectionEntries(
     }
 
     const group = grouped.get(key)!;
-    group.copies.push(copyPayload);
+    group.copies.push(...legacyCopyAddresses(entry.id, entry.quantity).map((id) => ({ ...copyPayload, id })));
     group.quantity = group.copies.length;
 
     if (!group.condition && copyPayload.condition) {
@@ -618,7 +620,7 @@ async function applyQuantityAdjustment(
   }
 ) {
   const { userId, cardId, binderId, desiredQuantity, template, tagIds, preserveId } = params;
-  const existing = await tx.collection.findMany({
+  let existing = await tx.collection.findMany({
     where: {
       userId,
       cardId,
@@ -628,6 +630,13 @@ async function applyQuantityAdjustment(
       createdAt: 'asc'
     }
   });
+
+  const legacy = existing.filter((entry) => entry.quantity !== 1);
+  if (legacy.reduce((sum, entry) => sum + entry.quantity, 0) > MAX_NORMALIZATION_COPIES) {
+    throw Object.assign(new Error('Normalize legacy copies in bounded batches before changing this group quantity.'), { status: 409, code: 'COPY_NORMALIZATION_REQUIRED' });
+  }
+  for (const entry of legacy) await normalizeLegacyCopy(tx, userId, entry.id);
+  if (legacy.length) existing = await tx.collection.findMany({ where: { userId, cardId, binderId }, orderBy: { createdAt: 'asc' } });
 
   const currentCount = existing.length;
   const delta = desiredQuantity - currentCount;
@@ -648,6 +657,7 @@ async function applyQuantityAdjustment(
           notes: template.notes,
           price: template.price,
           acquisitionPrice: template.acquisitionPrice,
+          acquisitionCurrency: template.acquisitionCurrency,
           isFoil: template.isFoil,
           finishCode: template.finishCode,
           finishLabel: template.finishLabel,
@@ -1004,6 +1014,7 @@ export async function addCardToBinder(userId: string, binderId: string, input: A
           notes: input.notes,
           price: input.price,
           acquisitionPrice: input.acquisitionPrice,
+          acquisitionCurrency: input.acquisitionCurrency,
           isFoil: input.isFoil ?? inferLegacyFoil(input.finishCode) ?? false,
           finishCode: input.finishCode,
           finishLabel: input.finishLabel,
@@ -1079,6 +1090,7 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
           notes: input.notes,
           price: input.price,
           acquisitionPrice: input.acquisitionPrice,
+          acquisitionCurrency: input.acquisitionCurrency,
           isFoil: input.isFoil ?? inferLegacyFoil(input.finishCode) ?? false,
           finishCode: input.finishCode,
           finishLabel: input.finishLabel,
@@ -1127,73 +1139,47 @@ export async function addCardToLibrary(userId: string, input: AddCardToBinderInp
   return createdEntries[0];
 }
 
-export async function removeCardFromBinder(userId: string, binderId: string, collectionId: string) {
+async function removeCollectionEntries(userId: string, binderId: string, copyId: string, group: boolean) {
   const resolvedBinderId = resolveBinderId(binderId);
-
-  // Verify ownership
-  const collection = await prisma.collection.findFirst({
-    where: {
-      id: collectionId,
-      userId,
-      binderId: resolvedBinderId
-    }
-  });
-
-  if (!collection) {
-    throw new Error('Collection entry not found');
-  }
-
   await prisma.$transaction(async (tx) => {
-    const before = await snapshotCollectionEntries(tx, userId, [collectionId]);
-    await tx.collection.delete({
-      where: { id: collectionId }
-    });
+    const physicalId = await resolvePhysicalCopyId(tx, userId, copyId, resolvedBinderId);
+    const collection = await tx.collection.findFirst({ where: { id: physicalId, userId, binderId: resolvedBinderId } });
+    if (!collection) throw new Error('Collection entry not found');
+    const rows = group
+      ? await tx.collection.findMany({ where: { userId, binderId: resolvedBinderId, cardId: collection.cardId }, select: { id: true } })
+      : [{ id: physicalId }];
+    const ids = rows.map((row) => row.id);
+    const before = await snapshotCollectionEntries(tx, userId, ids);
+    await tx.collection.deleteMany({ where: { userId, id: { in: ids } } });
     await createCollectionAudit(tx, {
-      userId,
-      operationKind: 'remove',
-      binderId: resolvedBinderId,
-      summary: 'Removed a collection copy',
-      before,
-      after: []
+      userId, operationKind: 'remove', binderId: resolvedBinderId,
+      summary: group ? 'Removed the printing group' : 'Removed one physical copy', before, after: [],
     });
-  });
+    if (resolvedBinderId) await tx.binder.update({ where: { id: resolvedBinderId }, data: { updatedAt: new Date() } });
+  }, { isolationLevel: 'Serializable', timeout: 30_000 });
+}
 
-  // Update binder's updatedAt
-  if (resolvedBinderId) {
-    await prisma.binder.update({
-      where: { id: resolvedBinderId },
-      data: { updatedAt: new Date() }
-    });
-  }
+/** Established card DELETE removes the entire same-printing group. */
+export async function removeCardFromBinder(userId: string, binderId: string, copyId: string) {
+  await removeCollectionEntries(userId, binderId, copyId, true);
+}
+
+/** Explicit physical-copy DELETE preserves all sibling IDs and metadata. */
+export async function removeCopyFromBinder(userId: string, binderId: string, copyId: string) {
+  await removeCollectionEntries(userId, binderId, copyId, false);
 }
 
 export async function updateCardInBinder(
   userId: string,
   binderId: string,
-  collectionId: string,
+  collectionAddress: string,
   input: UpdateCollectionCardInput
 ) {
   const resolvedBinderId = resolveBinderId(binderId);
   const hasTargetBinder = typeof input.targetBinderId === 'string';
   const resolvedTargetBinderId = hasTargetBinder ? resolveBinderId(input.targetBinderId as string) : undefined;
 
-  const collection = await prisma.collection.findFirst({
-    where: {
-      id: collectionId,
-      userId,
-      binderId: resolvedBinderId
-    },
-    include: {
-      tags: true
-    }
-  });
-
-  if (!collection) {
-    throw new Error('Collection entry not found');
-  }
-
   const desiredCardId = input.cardOverride?.cardId?.trim();
-  const wantsCardOverride = Boolean(desiredCardId && desiredCardId !== collection.cardId);
 
   const updatePayload: Prisma.CollectionUpdateInput = {};
 
@@ -1215,6 +1201,9 @@ export async function updateCardInBinder(
   }
   if (input.acquisitionPrice !== undefined) {
     updatePayload.acquisitionPrice = input.acquisitionPrice;
+  }
+  if (input.acquisitionCurrency !== undefined) {
+    updatePayload.acquisitionCurrency = input.acquisitionCurrency;
   }
   const parsedAcquiredAt = parseOptionalDate(input.acquiredAt);
   if (parsedAcquiredAt !== undefined) {
@@ -1295,13 +1284,35 @@ export async function updateCardInBinder(
   const shouldSyncTags = input.tags !== undefined || Boolean(input.newTags?.length);
 
   const updated = await prisma.$transaction(async (tx) => {
+    const collectionId = await resolvePhysicalCopyId(tx, userId, collectionAddress, resolvedBinderId);
+    const current = await tx.collection.findFirst({ where: { id: collectionId, userId, binderId: resolvedBinderId } });
+    if (!current) throw new Error('Collection entry not found');
+    const acquisitionChanges =
+      (input.acquisitionPrice !== undefined && input.acquisitionPrice !== (current.acquisitionPrice === null ? null : Number(current.acquisitionPrice))) ||
+      (input.acquisitionCurrency !== undefined && input.acquisitionCurrency !== current.acquisitionCurrency) ||
+      (parsedAcquiredAt !== undefined && (parsedAcquiredAt?.getTime() ?? null) !== (current.acquiredAt?.getTime() ?? null));
+    if (acquisitionChanges && await tx.transaction.findFirst({ where: { userId, type: 'purchase', collectionEntryId: current.id } })) {
+      throw Object.assign(new Error('This copy has a linked purchase. Acquisition changes require the atomic purchase operation on the Convex backend.'), {
+        status: 409, code: 'ACQUISITION_LEDGER_CONFLICT',
+      });
+    }
     const isGroupMutation =
       input.quantity !== undefined ||
       (hasTargetBinder && resolvedTargetBinderId !== resolvedBinderId);
-    const overrideCard = wantsCardOverride && desiredCardId
+    const overrideCard = desiredCardId && desiredCardId !== current.cardId
       ? await ensureCardForCollection(tx, desiredCardId, input.cardOverride?.cardData)
       : undefined;
-    const desiredScopeCardId = overrideCard?.id ?? collection.cardId;
+    const desiredScopeCardId = overrideCard?.id ?? current.cardId;
+    if (input.quantity !== undefined) {
+      const legacy = await tx.collection.findMany({ where: { userId, quantity: { not: 1 }, OR: [
+        { binderId: resolvedBinderId, cardId: current.cardId },
+        { binderId: hasTargetBinder ? resolvedTargetBinderId ?? null : resolvedBinderId, cardId: desiredScopeCardId },
+      ] } });
+      if (legacy.reduce((sum, entry) => sum + entry.quantity, 0) > MAX_NORMALIZATION_COPIES) {
+        throw Object.assign(new Error('Normalize legacy copies in bounded batches before changing this group quantity.'), { status: 409, code: 'COPY_NORMALIZATION_REQUIRED' });
+      }
+      for (const entry of legacy) await normalizeLegacyCopy(tx, userId, entry.id);
+    }
     const beforeRows = isGroupMutation
       ? await tx.collection.findMany({
           where: {
@@ -1309,10 +1320,10 @@ export async function updateCardInBinder(
             OR: [
               {
                 binderId: resolvedBinderId,
-                cardId: collection.cardId
+                cardId: current.cardId
               },
               {
-                binderId: resolvedTargetBinderId ?? null,
+                binderId: hasTargetBinder ? resolvedTargetBinderId ?? null : resolvedBinderId,
                 cardId: desiredScopeCardId
               }
             ]
@@ -1378,7 +1389,7 @@ export async function updateCardInBinder(
             OR: [
               {
                 binderId: resolvedBinderId,
-                cardId: collection.cardId
+                cardId: current.cardId
               },
               {
                 binderId: destinationBinderId ?? null,
@@ -1416,7 +1427,7 @@ export async function updateCardInBinder(
     });
 
     return workingCollection;
-  });
+  }, { isolationLevel: 'Serializable', timeout: 30_000 });
 
   if (resolvedBinderId) {
     await prisma.binder.update({
@@ -1450,55 +1461,34 @@ export async function updateCardInBinder(
 
 export async function addImageToCollection(
   userId: string,
-  collectionId: string,
-  imagePublicPath: string
+  collectionAddress: string,
+  imagePublicPath: string,
+  binderId?: string,
 ) {
-  const collection = await prisma.collection.findFirst({
-    where: { id: collectionId, userId }
-  });
-
-  if (!collection) {
-    throw new Error('Collection entry not found');
-  }
-
-  const updated = await prisma.collection.update({
-    where: { id: collectionId },
-    data: {
-      imageUrls: {
-        push: imagePublicPath
-      }
-    }
-  });
-
-  return updated.imageUrls;
+  return prisma.$transaction(async (tx) => {
+    const id = await resolvePhysicalCopyId(tx, userId, collectionAddress, binderId === undefined ? undefined : resolveBinderId(binderId));
+    const updated = await tx.collection.update({ where: { id }, data: { imageUrls: { push: imagePublicPath } } });
+    return updated.imageUrls;
+  }, { isolationLevel: 'Serializable', timeout: 30_000 });
 }
 
 export async function removeImageFromCollection(
   userId: string,
-  collectionId: string,
-  imageIndex: number
+  collectionAddress: string,
+  imageIndex: number,
+  binderId?: string,
 ) {
-  const collection = await prisma.collection.findFirst({
-    where: { id: collectionId, userId }
-  });
-
-  if (!collection) {
-    throw new Error('Collection entry not found');
-  }
-
-  const urls = [...collection.imageUrls];
-  if (imageIndex < 0 || imageIndex >= urls.length) {
-    throw new Error('Image index out of range');
-  }
-
-  const removedUrl = urls.splice(imageIndex, 1)[0];
-
-  await prisma.collection.update({
-    where: { id: collectionId },
-    data: { imageUrls: urls }
-  });
-
-  return removedUrl;
+  return prisma.$transaction(async (tx) => {
+    const id = await resolvePhysicalCopyId(tx, userId, collectionAddress, binderId === undefined ? undefined : resolveBinderId(binderId));
+    const collection = await tx.collection.findUniqueOrThrow({ where: { id } });
+    const urls = [...collection.imageUrls];
+    if (!Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex >= urls.length) throw new Error('Image index out of range');
+    const removedUrl = urls.splice(imageIndex, 1)[0];
+    await tx.collection.update({ where: { id }, data: { imageUrls: urls } });
+    // A normalized sibling may still refer to the original photograph.
+    const referenced = await tx.collection.count({ where: { imageUrls: { has: removedUrl } } });
+    return referenced === 0 ? removedUrl : undefined;
+  }, { isolationLevel: 'Serializable', timeout: 30_000 });
 }
 
 export async function getUserTags(userId: string) {

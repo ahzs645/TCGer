@@ -5,7 +5,7 @@ import contracts from "../../../../mobile-parity/api-contracts/interactions.json
 import { assertResponse } from "../../../../tools/api-contracts/match.mjs";
 
 vi.mock("../../config/env", () => ({ env: { SINGLE_USER_MODE: false, BACKEND_MODE: "convex", TCGER_BRIDGE_SECRET: "contract-bridge-secret", CONVEX_HTTP_ORIGIN: "https://auth.contract.test" } }));
-vi.mock("../../modules/collections/collections.service", () => ({ getUserBinders: vi.fn(), createBinder: vi.fn(), updateBinder: vi.fn(), deleteBinder: vi.fn(), addCardToBinder: vi.fn(), updateCardInBinder: vi.fn(), removeCardFromBinder: vi.fn() }));
+vi.mock("../../modules/collections/collections.service", () => ({ getUserBinders: vi.fn(), createBinder: vi.fn(), updateBinder: vi.fn(), deleteBinder: vi.fn(), addCardToBinder: vi.fn(), updateCardInBinder: vi.fn(), removeCardFromBinder: vi.fn(), removeCopyFromBinder: vi.fn() }));
 vi.mock("../../modules/collections/export.service", () => ({}));
 vi.mock("../../modules/collections/import.service", () => ({}));
 vi.mock("../../modules/collections/collection-audit.service", () => ({}));
@@ -16,10 +16,12 @@ vi.mock("../../modules/sealed/sealed.service", () => ({ createSealedOpening: vi.
 vi.mock("../../utils/upload", () => ({ uploadImages: { single: () => (_req: unknown, _res: unknown, next: () => void) => next(), array: () => (_req: unknown, _res: unknown, next: () => void) => next() } }));
 vi.mock("../../modules/cards/cards.service", () => ({ searchAllCardsWithStatus: vi.fn() }));
 vi.mock("../../modules/adapters/adapter-registry", () => ({ adapterRegistry: {} }));
-import { getUserBinders, createBinder, updateBinder, deleteBinder, addCardToBinder, updateCardInBinder, removeCardFromBinder } from "../../modules/collections/collections.service";
+import { getUserBinders, createBinder, updateBinder, deleteBinder, addCardToBinder, updateCardInBinder, removeCardFromBinder, removeCopyFromBinder } from "../../modules/collections/collections.service";
 import { searchAllCardsWithStatus } from "../../modules/cards/cards.service";
 import { createSealedOpening } from "../../modules/sealed/sealed.service";
 import { sealedRouter } from "./sealed.router";
+import { convexCollectionsRouter } from "./collections.convex.router";
+import { convexFinanceRouter } from "./finance.convex.router";
 import { collectionsRouter } from "./collections.router";
 import { backupsRouter } from "./backups.router";
 import { cardsRouter } from "./cards.router";
@@ -62,6 +64,9 @@ for (const interaction of contracts.interactions as any[]) {
     vi.mocked(removeCardFromBinder).mockImplementation(async () => {
       if (interaction.state === "foreign-copy") throw new Error("Collection entry not found");
     });
+    vi.mocked(removeCopyFromBinder).mockImplementation(async () => {
+      if (interaction.state === "foreign-copy") throw new Error("Collection entry not found");
+    });
     vi.mocked(createSealedOpening).mockImplementation(async () => {
       if (interaction.response.status === 404 || interaction.response.status === 409) {
         throw Object.assign(new Error(interaction.response.body.message), { status: interaction.response.status });
@@ -71,6 +76,13 @@ for (const interaction of contracts.interactions as any[]) {
     const transport = globalThis.fetch;
     vi.stubGlobal("fetch", async (url: string | URL, options?: RequestInit) => {
       if (String(url).startsWith("https://auth.contract.test/")) {
+        if (["commitIntake", "recordSale"].includes(interaction.operation) && new URL(url).pathname === interaction.request.path) {
+          expect(options?.method).toBe(interaction.request.method);
+          expect(new Headers(options?.headers).get("x-tcger-user-id")).toBe("contract-user");
+          expect(new Headers(options?.headers).get("x-tcger-bridge-key")).toBe("contract-bridge-secret");
+          expect(JSON.parse(options!.body as string)).toEqual(interaction.request.body);
+          return Response.json(interaction.response.body, {status: interaction.response.status});
+        }
         if (new URL(url).pathname === "/backups") {
           expect(options?.method).toBe("POST");
           expect(new Headers(options?.headers).get("x-tcger-user-id")).toBe("contract-user");
@@ -88,7 +100,8 @@ for (const interaction of contracts.interactions as any[]) {
     app.use(express.json());
     app.use((req, _res, next) => { (req as any).log = { error: vi.fn(), warn: vi.fn() }; next(); });
     app.use("/backups", backupsRouter);
-    app.use("/collections", collectionsRouter);
+    app.use("/collections", interaction.operation === "commitIntake" ? convexCollectionsRouter : collectionsRouter);
+    app.use("/finance", convexFinanceRouter);
     app.use("/cards", cardsRouter);
     app.use("/sealed", sealedRouter);
     app.use(errorHandler);
@@ -111,6 +124,7 @@ for (const interaction of contracts.interactions as any[]) {
       expect(addCardToBinder).not.toHaveBeenCalled();
       expect(updateCardInBinder).not.toHaveBeenCalled();
       expect(removeCardFromBinder).not.toHaveBeenCalled();
+      expect(removeCopyFromBinder).not.toHaveBeenCalled();
       expect(createSealedOpening).not.toHaveBeenCalled();
     } else if (interaction.operation === "createBinder") {
       expect(createBinder).toHaveBeenCalledWith("contract-user", expect.objectContaining(interaction.request.body));
@@ -126,6 +140,8 @@ for (const interaction of contracts.interactions as any[]) {
       expect(updateCardInBinder).toHaveBeenCalledWith("contract-user", "contract-binder", "contract-copy", interaction.request.body);
     } else if (interaction.operation === "removeCopy") {
       expect(removeCardFromBinder).toHaveBeenCalledWith("contract-user", "contract-binder", "contract-copy");
+    } else if (interaction.operation === "deletePhysicalCopy") {
+      expect(removeCopyFromBinder).toHaveBeenCalledWith("contract-user", "contract-binder", "contract-copy");
     } else if (interaction.operation === "openSealed") {
       expect(createSealedOpening).toHaveBeenCalledWith("contract-user", "contract-inventory", interaction.request.body);
     } else if (interaction.operation === "searchCards") {

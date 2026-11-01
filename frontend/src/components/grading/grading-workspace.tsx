@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_BASE_URL } from "@/lib/api/base-url";
+import { sessionFetch } from "@/lib/api/session-fetch";
+import { privateStorageKey } from "@/lib/private-storage";
 import { useAuthStore } from "@/stores/auth";
 
 const costLabels: Record<keyof GradingCosts, string> = {
@@ -41,10 +43,10 @@ const verdicts = {
   borderline: "Borderline — close to break-even",
   insufficient: "More data needed for an expected-value verdict",
 };
-const draftKey = "tcger.grading-workspace.v1";
 
 export function GradingWorkspace() {
   const token = useAuthStore((s) => s.token);
+  const draftKey = privateStorageKey("tcger.grading-workspace.v1");
   const [matches, setMatches] = useState<GradingSearchResult["cards"]>([]);
   const [expenses, setExpenses] = useState<GradingExpense[]>([]);
   const [serviceTier, setServiceTier] = useState("");
@@ -94,7 +96,7 @@ export function GradingWorkspace() {
     } catch {
       /* An unavailable or older draft does not prevent manual calculation. */
     }
-  }, []);
+  }, [draftKey]);
   const parsed = useMemo(
     () =>
       gradingCalculationInputSchema.safeParse({
@@ -147,7 +149,7 @@ export function GradingWorkspace() {
     setMatches([]);
     setMessage(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/grading/search`, {
+      const response = await sessionFetch(`${API_BASE_URL}/grading/search`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -180,7 +182,7 @@ export function GradingWorkspace() {
     setBusy(true);
     setMessage(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/grading/snapshot`, {
+      const response = await sessionFetch(`${API_BASE_URL}/grading/snapshot`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

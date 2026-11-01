@@ -8,6 +8,12 @@ import type {
   UpdateTransactionInput,
 } from '@tcg/api-types';
 
+function requireStandaloneTransaction(collectionEntryId: string | null | undefined) {
+  if (collectionEntryId) throw Object.assign(new Error('Linked acquisition edits require the Convex backend so the purchase and physical-copy cost commit together. No records were changed.'), {
+    status: 501, code: 'LINKED_ACQUISITION_UNAVAILABLE',
+  });
+}
+
 function serializeTransaction(transaction: Transaction): TransactionResponse {
   if (
     transaction.type !== 'purchase' &&
@@ -48,6 +54,7 @@ export async function getUserTransactions(
 }
 
 export async function createTransaction(userId: string, input: CreateTransactionInput) {
+  requireStandaloneTransaction(input.collectionEntryId);
   const transaction = await prisma.transaction.create({
     data: {
       userId,
@@ -82,6 +89,8 @@ export async function updateTransaction(
     error.status = 404;
     throw error;
   }
+  requireStandaloneTransaction(existing.collectionEntryId);
+  requireStandaloneTransaction(input.collectionEntryId);
   const transaction = await prisma.transaction.update({
     where: { id: transactionId },
     data: {
@@ -109,6 +118,7 @@ export async function deleteTransaction(userId: string, transactionId: string) {
     error.status = 404;
     throw error;
   }
+  requireStandaloneTransaction(existing.collectionEntryId);
   await prisma.transaction.delete({ where: { id: transactionId } });
 }
 
@@ -118,6 +128,9 @@ export async function getFinanceSummary(userId: string): Promise<FinanceSummary>
   let totalEarned = 0;
 
   for (const t of txns) {
+    // Compatibility summary is USD only. Complete totals are available from
+    // /summary/by-currency; adding CAD/EUR/etc. here would invent an FX rate.
+    if (t.currency.trim().toUpperCase() !== 'USD') continue;
     const amount = t.amount ? parseFloat(t.amount.toString()) : 0;
     if (t.type === 'purchase') totalSpent += amount;
     else if (t.type === 'sale') totalEarned += amount;

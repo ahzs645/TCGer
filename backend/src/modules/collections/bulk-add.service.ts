@@ -235,6 +235,7 @@ function buildCollectionCreateInput(
     notes: row.notes,
     price: row.price,
     acquisitionPrice: row.acquisitionPrice,
+    acquisitionCurrency: row.acquisitionCurrency,
     serialNumber: row.serialNumber,
     acquiredAt: row.acquiredAt ? new Date(row.acquiredAt) : undefined,
     isFoil: row.isFoil ?? inferFoil(row.finishCode) ?? false,

@@ -35,6 +35,11 @@ const KIND_LABELS: Record<
   move: "Moved",
   bulk: "Bulk",
   import: "Imported",
+  sale: "Sale",
+  physical_opening: "Physical opening",
+  normalization: "Physical copy normalization",
+  rapid_entry: "Rapid intake",
+  acquisition_split: "Acquisition allocation",
   trade_settlement: "Trade settled",
   undo: "Undo",
 };

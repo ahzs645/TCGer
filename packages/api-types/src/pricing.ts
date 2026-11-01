@@ -270,6 +270,7 @@ export const updateTransactionSchema = z.object({
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 
 export const acquisitionCostSplitSchema = z.object({
+  operationId: z.string().trim().min(1).max(200).optional(),
   totalCents: z.number().int().positive(),
   currency: z.string().regex(/^[A-Za-z]{3}$/),
   mode: z.enum(["equal", "weighted"]),
@@ -431,6 +432,8 @@ export interface RealizedPerformance {
   inventoryCost: number;
   inventoryMarketValue: number;
   inventoryCurrency: string;
+  /** Acquisition amounts grouped by original currency; never implicitly converted. */
+  inventoryCostsByCurrency?: Array<{ currency: string; cost: number }>;
   truncated: boolean;
 }
 

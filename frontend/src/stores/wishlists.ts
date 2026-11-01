@@ -1,5 +1,13 @@
+import {
+  inventoryRevision,
+  subscribeInventoryChanges,
+} from "@/lib/inventory-events";
+import {
+  capturePrivateSession,
+  sessionSetter,
+  subscribePrivateSession,
+} from "@/lib/private-session";
 import { create } from "zustand";
-import { useAuthStore } from "@/stores/auth";
 import * as wishlistsApi from "@/lib/api/wishlists";
 import {
   syncWishlistRules,
@@ -68,32 +76,37 @@ export interface WishlistsState {
   ) => Promise<WishlistSyncResult>;
 }
 
-// A previous account's in-flight response must never publish into a new session.
-let sessionGeneration = 0;
-const sessionMatches = (token: string, generation: number, userId: string | null) => {
-  const auth = useAuthStore.getState();
-  return sessionGeneration === generation && auth.token === token && auth.user?.id === userId;
-};
+let latestFetch = 0;
 
-export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
+export const useWishlistsStore = create<WishlistsState>()((publish, get) => ({
   wishlists: [],
   isLoading: false,
   error: null,
   hasFetched: false,
 
-  clearError: () => set({ error: null }),
+  clearError: () => publish({ error: null }),
 
   fetchWishlists: async (token: string) => {
-    const generation = sessionGeneration;
-    const userId = useAuthStore.getState().user?.id ?? null;
-    if (!sessionMatches(token, generation, userId)) return;
+    const request = ++latestFetch;
+    const revision = inventoryRevision();
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     set({ isLoading: true, error: null });
     try {
       const wishlists = await wishlistsApi.getWishlists(token);
-      if (!sessionMatches(token, generation, userId)) return;
+      if (!session.current() || request !== latestFetch) return;
+      if (revision !== inventoryRevision()) {
+        set({ isLoading: false, hasFetched: false });
+        return;
+      }
       set({ wishlists, isLoading: false, hasFetched: true });
     } catch (error) {
-      if (!sessionMatches(token, generation, userId)) return;
+      if (!session.current() || request !== latestFetch) return;
+      if (revision !== inventoryRevision()) {
+        set({ isLoading: false, hasFetched: false });
+        return;
+      }
       set({
         error:
           error instanceof Error ? error.message : "Failed to fetch wishlists",
@@ -107,6 +120,9 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     token: string,
     input: wishlistsApi.CreateWishlistInput,
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     set({ isLoading: true, error: null });
     try {
       const newWishlist = await wishlistsApi.createWishlist(token, input);
@@ -132,6 +148,9 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     id: string,
     input: wishlistsApi.UpdateWishlistInput,
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     set({ isLoading: true, error: null });
     try {
       const updated = await wishlistsApi.updateWishlist(token, id, input);
@@ -152,6 +171,9 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
   },
 
   removeWishlist: async (token: string, id: string) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     set({ isLoading: true, error: null });
     try {
       await wishlistsApi.deleteWishlist(token, id);
@@ -176,8 +198,12 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     wishlistId: string,
     input: wishlistsApi.AddWishlistCardInput,
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     try {
       await wishlistsApi.addCardToWishlist(token, wishlistId, input);
+      session.assertCurrent();
       await get().fetchWishlists(token);
     } catch (error) {
       const message =
@@ -194,6 +220,9 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     wishlistId: string,
     input: wishlistsApi.AddWishlistCardsInput,
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     try {
       const updated = await wishlistsApi.addCardsToWishlist(
         token,
@@ -221,8 +250,12 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     cardId: string,
     input: wishlistsApi.UpdateWishlistCardInput,
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     try {
       await wishlistsApi.updateWishlistCard(token, wishlistId, cardId, input);
+      session.assertCurrent();
       await get().fetchWishlists(token);
     } catch (error) {
       const message =
@@ -239,8 +272,12 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     wishlistId: string,
     cardId: string,
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     try {
       await wishlistsApi.removeCardFromWishlist(token, wishlistId, cardId);
+      session.assertCurrent();
       await get().fetchWishlists(token);
     } catch (error) {
       const message =
@@ -257,8 +294,12 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     wishlistId: string,
     input: wishlistsApi.CreateWishlistRuleInput,
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     try {
       const rule = await wishlistsApi.addWishlistRule(token, wishlistId, input);
+      session.assertCurrent();
       await get().fetchWishlists(token);
       return rule;
     } catch (error) {
@@ -270,8 +311,12 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
   },
 
   removeRule: async (token: string, wishlistId: string, ruleId: string) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     try {
       await wishlistsApi.removeWishlistRule(token, wishlistId, ruleId);
+      session.assertCurrent();
       await get().fetchWishlists(token);
     } catch (error) {
       const message =
@@ -288,6 +333,9 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
     wishlistId: string,
     options?: { onProgress?: (message: string) => void },
   ) => {
+    const session = capturePrivateSession(token);
+    session.assertCurrent();
+    const set = sessionSetter(publish, session);
     const wishlist = get().wishlists.find((entry) => entry.id === wishlistId);
     if (!wishlist) {
       throw new Error("Wishlist not found");
@@ -295,8 +343,11 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
 
     try {
       const result = await syncWishlistRules(token, wishlist, wishlist.rules, {
-        onProgress: options?.onProgress,
+        onProgress: (message) => {
+          if (session.current()) options?.onProgress?.(message);
+        },
       });
+      session.assertCurrent();
       await get().fetchWishlists(token);
       if (result.errors.length) {
         set({ error: result.errors[0] });
@@ -311,10 +362,15 @@ export const useWishlistsStore = create<WishlistsState>()((set, get) => ({
   },
 }));
 
-// Reset private state when the authenticated identity or credential changes.
-// The generation also invalidates requests already awaiting network responses.
-useAuthStore.subscribe((state, previous) => {
-  if (state.user?.id === previous.user?.id && state.token === previous.token && state.isAuthenticated === previous.isAuthenticated) return;
-  sessionGeneration += 1;
-  useWishlistsStore.setState({ wishlists: [], isLoading: false, error: null, hasFetched: false });
+subscribePrivateSession(() => {
+  useWishlistsStore.setState({
+    wishlists: [],
+    isLoading: false,
+    error: null,
+    hasFetched: false,
+  });
+});
+
+subscribeInventoryChanges(() => {
+  useWishlistsStore.setState({ hasFetched: false });
 });

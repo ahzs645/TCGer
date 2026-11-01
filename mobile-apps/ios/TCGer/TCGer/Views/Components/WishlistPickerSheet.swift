@@ -94,22 +94,24 @@ struct WishlistPickerSheet: View {
 
     @MainActor
     private func createAndSelect() async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isCreating, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         isCreating = true
-        defer { isCreating = false }
+        defer { if environmentStore.matches(session) { isCreating = false } }
 
         do {
-            let wishlist = try await apiService.createWishlist(
-                config: environmentStore.serverConfiguration,
+            let wishlist = try await wishlistStore.create(
+                config: session.configuration,
                 token: token,
-                name: name
+                input: CreateWishlistInput(name: name, description: nil, colorHex: nil, matchAnyPrinting: false)
             )
-            wishlistStore.insert(wishlist)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             onSelect(wishlist)
             dismiss()
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }

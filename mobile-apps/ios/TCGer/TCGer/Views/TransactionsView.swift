@@ -3,13 +3,15 @@ import SwiftUI
 struct TransactionsView: View {
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @State private var transactions: [Transaction] = []
-    @State private var summary: FinanceSummary?
+    @State private var summary: FinanceSummaryByCurrency?
     @State private var performance: RealizedPerformance?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var filterType: String = "all"
     @State private var showingCreateSheet = false
     @State private var selectedTransaction: Transaction?
+    @State private var deletingIDs: Set<String> = []
+    @State private var loadID: UUID?
 
     private let apiService = APIService()
 
@@ -21,32 +23,36 @@ struct TransactionsView: View {
     var body: some View {
         List {
             if let summary {
-                Section {
-                    HStack(spacing: 16) {
-                        StatItem(title: "Spent", value: abs(summary.totalSpent).priceText, color: .red, icon: "cart.fill")
-                        StatItem(title: "Earned", value: abs(summary.totalEarned).priceText, color: .green, icon: "banknote")
-                        StatItem(
-                            title: "P/L",
-                            value: abs(summary.profitLoss).priceText,
-                            color: summary.profitLoss >= 0 ? .green : .red,
-                            icon: "chart.line.uptrend.xyaxis"
-                        )
+                ForEach(summary.byCurrency, id: \.currency) { totals in
+                    Section("Transactions · \(totals.currency)") {
+                        LabeledContent("Spent", value: totals.totalSpent.priceText(currency: totals.currency))
+                        LabeledContent("Earned", value: totals.totalEarned.priceText(currency: totals.currency))
+                        LabeledContent("Profit / loss", value: totals.profitLoss.priceText(currency: totals.currency))
                     }
-                    .padding(.vertical, 4)
                 }
             }
 
-            if let performance, let realized = performance.byCurrency.first {
-                Section("Sales Performance") {
-                    LabeledContent("Realized profit", value: realized.realizedProfit.priceText)
-                    LabeledContent("Net proceeds", value: realized.netProceeds.priceText)
-                    LabeledContent("Fees + shipping", value: (realized.fees + realized.shippingCost).priceText)
-                    if let days = realized.averageHoldingDays {
-                        LabeledContent("Average hold", value: "\(days) days")
+            if let performance {
+                ForEach(performance.byCurrency, id: \.currency) { realized in
+                    Section("Sales performance · \(realized.currency)") {
+                        LabeledContent("Realized profit", value: realized.realizedProfit.priceText(currency: realized.currency))
+                        LabeledContent("Net proceeds", value: realized.netProceeds.priceText(currency: realized.currency))
+                        LabeledContent("Fees + shipping", value: (realized.fees + realized.shippingCost).priceText(currency: realized.currency))
+                        if let days = realized.averageHoldingDays {
+                            LabeledContent("Average hold", value: "\(days) days")
+                        }
+                        Text("\(realized.costedSaleCount) of \(realized.saleCount) sales include acquisition cost")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    Text("\(realized.costedSaleCount) of \(realized.saleCount) sales include acquisition cost")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                }
+                if let costs = performance.inventoryCostsByCurrency, !costs.isEmpty {
+                    Section("Owned inventory acquisition costs") {
+                        ForEach(costs, id: \.currency) { cost in
+                            LabeledContent(cost.currency == "UNKNOWN" ? "Currency unknown" : cost.currency,
+                                           value: cost.currency == "UNKNOWN" ? String(format: "%.2f", cost.cost) : cost.cost.priceText(currency: cost.currency))
+                        }
+                    }
                 }
             }
 
@@ -89,6 +95,7 @@ struct TransactionsView: View {
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
+                                .disabled(deletingIDs.contains(txn.id))
                             }
                     }
                 }
@@ -109,71 +116,85 @@ struct TransactionsView: View {
         .task { await loadData() }
         .sheet(isPresented: $showingCreateSheet) {
             CreateTransactionSheet { draft in
-                Task {
-                    await createTransaction(draft)
-                }
+                try await createTransaction(draft)
             }
         }
         .sheet(item: $selectedTransaction) { transaction in
             TransactionDetailSheet(transaction: transaction)
         }
+        .alert("Transactions", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) { }
+        } message: { Text(errorMessage ?? "") }
     }
 
     @MainActor
     private func loadData() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else {
             isLoading = false
             return
         }
+        let requestID = UUID()
+        loadID = requestID
         isLoading = transactions.isEmpty
+        defer { if loadID == requestID, environmentStore.matches(session) { isLoading = false } }
         do {
-            async let txns = apiService.getTransactions(config: environmentStore.serverConfiguration, token: token)
-            async let sum = apiService.getFinanceSummary(config: environmentStore.serverConfiguration, token: token)
-            async let realized = apiService.getRealizedPerformance(config: environmentStore.serverConfiguration, token: token)
-            transactions = try await txns
-            summary = try await sum
-            performance = try await realized
-            isLoading = false
+            async let txns = apiService.getTransactions(config: session.configuration, token: token)
+            async let sum = apiService.getFinanceSummaryByCurrency(config: session.configuration, token: token)
+            async let realized = apiService.getRealizedPerformance(config: session.configuration, token: token)
+            let loadedTransactions = try await txns
+            guard environmentStore.matches(session), loadID == requestID, !Task.isCancelled else { return }
+            transactions = loadedTransactions
+            let (loadedSummary, loadedPerformance) = try await (sum, realized)
+            guard environmentStore.matches(session), loadID == requestID, !Task.isCancelled else { return }
+            summary = loadedSummary
+            performance = loadedPerformance
+            errorMessage = nil
         } catch {
+            guard environmentStore.matches(session), loadID == requestID, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
-            isLoading = false
         }
     }
 
     @MainActor
-    private func createTransaction(_ draft: NewTransactionDetails) async {
-        guard let token = environmentStore.authToken else { return }
-        do {
-            let txn = try await apiService.createTransaction(
-                config: environmentStore.serverConfiguration, token: token,
-                type: draft.type, cardName: draft.cardName, tcg: draft.tcg,
-                quantity: draft.quantity, amount: draft.amount, currency: draft.currency,
-                platform: draft.platform,
-                costBasis: draft.costBasis, fees: draft.fees,
-                shippingCost: draft.shippingCost, acquiredAt: draft.acquiredAt,
-                notes: draft.notes
-            )
-            transactions.insert(txn, at: 0)
-            summary = try? await apiService.getFinanceSummary(config: environmentStore.serverConfiguration, token: token)
-            performance = try? await apiService.getRealizedPerformance(config: environmentStore.serverConfiguration, token: token)
-            HapticManager.notification(.success)
-            showingCreateSheet = false
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+    private func createTransaction(_ draft: NewTransactionDetails) async throws {
+        let session = environmentStore.sessionIdentity
+        guard let token = environmentStore.authToken else { throw APIService.APIError.unauthorized }
+        let txn = try await apiService.createTransaction(
+            config: session.configuration, token: token,
+            type: draft.type, cardName: draft.cardName, tcg: draft.tcg,
+            quantity: draft.quantity, amount: draft.amount, currency: draft.currency,
+            platform: draft.platform,
+            costBasis: draft.costBasis, fees: draft.fees,
+            shippingCost: draft.shippingCost, acquiredAt: draft.acquiredAt,
+            notes: draft.notes
+        )
+        guard environmentStore.matches(session), !Task.isCancelled else { throw CancellationError() }
+        transactions.insert(txn, at: 0)
+        HapticManager.notification(.success)
+        await loadData()
     }
 
     @MainActor
     private func deleteTransaction(_ txn: Transaction) async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return }
+        guard session.configuration.isOnDevice || txn.type != "purchase" || txn.collectionEntryId == nil || environmentStore.serverFeatures.linkedAcquisitions else {
+            errorMessage = "This linked purchase requires a server that can update the purchase and owned-copy cost together."
+            return
+        }
+        guard deletingIDs.insert(txn.id).inserted else { return }
+        defer { if environmentStore.matches(session) { deletingIDs.remove(txn.id) } }
         do {
             try await apiService.deleteTransaction(
-                config: environmentStore.serverConfiguration, token: token, transactionId: txn.id
+                config: session.configuration, token: token, transactionId: txn.id
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             transactions.removeAll { $0.id == txn.id }
-            summary = try? await apiService.getFinanceSummary(config: environmentStore.serverConfiguration, token: token)
-            performance = try? await apiService.getRealizedPerformance(config: environmentStore.serverConfiguration, token: token)
+            CollectionMutationNotice.post(config: session.configuration, token: token)
+            await loadData()
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -322,7 +343,7 @@ private struct NewTransactionDetails {
 }
 
 private struct CreateTransactionSheet: View {
-    let onCreate: (NewTransactionDetails) -> Void
+    let onCreate: (NewTransactionDetails) async throws -> Void
     @EnvironmentObject private var environmentStore: EnvironmentStore
     @Environment(\.dismiss) private var dismiss
     @State private var type = "purchase"
@@ -339,6 +360,8 @@ private struct CreateTransactionSheet: View {
     @State private var hasAcquiredDate = false
     @State private var acquiredDate = Date()
     @State private var notes = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
 
     private let platforms = ["", "TCGPlayer", "CardMarket", "eBay", "Local", "Other"]
 
@@ -390,11 +413,11 @@ private struct CreateTransactionSheet: View {
 
                 if type == "sale" {
                     Section("Realized Sale") {
-                        TextField("Acquisition Cost ($)", text: $costBasisText)
+                        TextField("Acquisition cost (\(currency))", text: $costBasisText)
                             .keyboardType(.decimalPad)
-                        TextField("Marketplace Fees ($)", text: $feesText)
+                        TextField("Marketplace fees (\(currency))", text: $feesText)
                             .keyboardType(.decimalPad)
-                        TextField("Shipping Cost ($)", text: $shippingText)
+                        TextField("Shipping cost (\(currency))", text: $shippingText)
                             .keyboardType(.decimalPad)
                         Toggle("Include acquisition date", isOn: $hasAcquiredDate)
                         if hasAcquiredDate {
@@ -409,17 +432,22 @@ private struct CreateTransactionSheet: View {
                 } header: {
                     Text("Notes")
                 }
+                if let errorMessage { Section { Text(errorMessage).foregroundStyle(.red) } }
             }
+            .disabled(isSaving)
             .navigationTitle("New Transaction")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { dismiss() }.disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        guard let amount = Double(amountText), amount > 0 else { return }
-                        onCreate(NewTransactionDetails(
+                    Button(isSaving ? "Saving…" : "Save") {
+                        guard !isSaving, let amount = Double(amountText), amount.isFinite, amount > 0 else { return }
+                        let session = environmentStore.sessionIdentity
+                        isSaving = true
+                        errorMessage = nil
+                        let draft = NewTransactionDetails(
                             type: type,
                             cardName: cardName.isEmpty ? nil : cardName,
                             tcg: tcg.isEmpty ? nil : tcg,
@@ -432,14 +460,25 @@ private struct CreateTransactionSheet: View {
                             shippingCost: Double(shippingText),
                             acquiredAt: hasAcquiredDate ? ISO8601DateFormatter().string(from: acquiredDate) : nil,
                             notes: notes.isEmpty ? nil : notes
-                        ))
-                        dismiss()
+                        )
+                        Task { @MainActor in
+                            defer { isSaving = false }
+                            do {
+                                try await onCreate(draft)
+                                guard environmentStore.matches(session), !Task.isCancelled else { return }
+                                dismiss()
+                            } catch {
+                                guard environmentStore.matches(session), !(error is CancellationError) else { return }
+                                errorMessage = error.localizedDescription
+                            }
+                        }
                     }
-                    .disabled(amountText.isEmpty || Double(amountText) == nil)
+                    .disabled(isSaving || amountText.isEmpty || Double(amountText) == nil)
                 }
             }
         }
         .presentationDetents([.large])
+        .interactiveDismissDisabled(isSaving)
         .onAppear {
             if amountText.isEmpty {
                 currency = environmentStore.displayCurrencyCode

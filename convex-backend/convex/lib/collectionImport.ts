@@ -25,6 +25,7 @@ export type CollectionImportRow = {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   isFoil: boolean;
@@ -59,6 +60,7 @@ const HEADER_ALIASES: Record<string, string> = {
   "set name": "set_name",
   "external id": "external_id",
   "acquisition price": "acquisition_price",
+  "acquisition currency": "acquisition_currency",
   "serial number": "serial_number",
   foil: "is_foil",
   "finish code": "finish_code",
@@ -89,6 +91,7 @@ export const collectionImportTemplateHeaders = [
   "notes",
   "price",
   "acquisition_price",
+  "acquisition_currency",
   "serial_number",
   "acquired_at",
   "is_foil",
@@ -308,6 +311,8 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
       "acquisition_price",
       issues,
     );
+    const acquisitionCurrency = optionalText(source.acquisition_currency)?.toUpperCase();
+    if (acquisitionCurrency && !/^[A-Z]{3}$/.test(acquisitionCurrency)) issues.push({ row: rowNumber, field: "acquisition_currency", message: "must be a three-letter currency code or left blank when unknown" });
     const acquiredAt = optionalText(source.acquired_at);
     if (acquiredAt && Number.isNaN(Date.parse(acquiredAt))) {
       issues.push({
@@ -368,6 +373,7 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
       notes: optionalText(source.notes),
       price,
       acquisitionPrice,
+      acquisitionCurrency,
       serialNumber: optionalText(source.serial_number),
       acquiredAt,
       isFoil,
@@ -398,6 +404,7 @@ export function previewCollectionImport(csv: string): CollectionImportPreview {
       row.notes ?? "",
       row.price ?? null,
       row.acquisitionPrice ?? null,
+      row.acquisitionCurrency ?? null,
       row.serialNumber ?? "",
       row.acquiredAt ?? "",
       row.isFoil,
@@ -555,6 +562,7 @@ function marketplaceRows(
       notes: first(source, "notes", "note", "comments"),
       price: first(source, "market_price", "tcg_market_price"),
       acquisition_price: first(source, "purchase_price", "acquisition_price", "cost"),
+      acquisition_currency: first(source, "acquisition_currency", "purchase_price_currency", "purchase_currency"),
       is_foil: finishCode !== "nonfoil",
       finish_code: finishCode,
       finish_label: finishCode === "nonfoil" ? "Nonfoil" : finishCode === "etched" ? "Foil etched" : "Foil",
@@ -608,7 +616,7 @@ export function previewCollectionImportSource(input: CollectionImportSourceOptio
         set_name: resolution?.setName ?? source.setName ?? source.set_name,
         rarity: resolution?.rarity ?? source.rarity, binder_name: source.binderName ?? source.binder_name ?? source.binder,
         quantity: source.quantity ?? source.qty ?? 1, condition: source.condition, language: source.language,
-        notes: source.notes ?? source.comment, price: source.price, acquisition_price: source.acquisitionPrice ?? source.acquisition_price,
+        notes: source.notes ?? source.comment, price: source.price, acquisition_price: source.acquisitionPrice ?? source.acquisition_price, acquisition_currency: source.acquisitionCurrency ?? source.acquisition_currency,
         serial_number: source.serialNumber ?? source.serial_number, acquired_at: source.acquiredAt ?? source.acquired_at,
         is_foil: source.isFoil ?? source.is_foil, edition: source.edition, is_signed: source.isSigned ?? source.is_signed,
         is_altered: source.isAltered ?? source.is_altered,

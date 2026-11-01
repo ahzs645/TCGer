@@ -131,6 +131,8 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     case securityBiometricLock = "security.biometricLock"
     case releaseReadiness = "release.readiness"
     case collectionsCopies = "collections.copies"
+    case inventorySales = "inventory.sales"
+    case packOpeningSimulationHistory = "packOpening.simulationHistory"
 
     static let implemented: Set<ParityFeatureID> = [
         .homeDashboard,
@@ -238,11 +240,15 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .intakeAcquisitionCosts,
         .intakePsaCertification,
         .pricingProvenance,
+        .storageAudit,
+        .collectionsHistoryUndo,
         .gamesCatalogDownloads,
         .gamesPackageUpdates,
         .gamesCapabilityPriceDownload,
         .gamesCapabilityPackDownload,
         .collectionsCopies,
+        .inventorySales,
+        .packOpeningSimulationHistory,
     ]
 
     static let supportByID: [ParityFeatureID: ParityFeatureSupport] = [
@@ -274,8 +280,8 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .packOpeningReveal: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningView.swift"),
         .packOpeningResultsGrouped: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningResultsViews.swift"),
         .packOpeningResultsInspect: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningResultsViews.swift"),
-        .packOpeningSaveCollection: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"),
-        .packOpeningSaveSealedLedger: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/PackOpeningReviewSheet.swift"),
+        .packOpeningSaveCollection: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["local", "server"], requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift"),
+        .packOpeningSaveSealedLedger: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server", "atomic-intake"], source: "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionReviewView.swift"),
         .packOpeningOfflineDownloads: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Services/PackOfflineDownloadManager.swift"),
         .codesVault: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/OnlineCodesView.swift"),
         .pricesBrowse: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/PricesView.swift"),
@@ -351,8 +357,8 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .intakeAcquisitionCosts: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift"),
         .intakePsaCertification: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift"),
         .pricingProvenance: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift"),
-        .storageAudit: ParityFeatureSupport(status: .planned, limitation: "Storage placement editing exists; location audit observation, preview and commit UI/API calls are absent.", modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift"),
-        .collectionsHistoryUndo: ParityFeatureSupport(status: .partial, limitation: "Rapid-entry receipts can be undone; a general collection mutation history browser and undo control are absent.", modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift"),
+        .storageAudit: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift"),
+        .collectionsHistoryUndo: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/Views/LibraryOperationsView.swift"),
         .gamesCatalogDownloads: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["local"], requirements: ["network-for-download", "publisher-game-package"], source: "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift"),
         .gamesPackageUpdates: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["local"], requirements: ["network-for-download", "publisher-game-package"], source: "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift"),
         .gamesCapabilityScannerDownload: ParityFeatureSupport(status: .partial, limitation: "Package scanner bundles install by stable game ID with integrity checks; recognition selectors still use built-in games, so arbitrary-game recognition remains unsupported.", modes: ["local"], requirements: ["network-for-download", "package-ios-scanner-bundle"], source: "mobile-apps/ios/TCGer/TCGer/Services/GamePackageStore.swift"),
@@ -362,6 +368,8 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .securityBiometricLock: ParityFeatureSupport(status: .partial, limitation: "Device-owner authentication supports biometrics and system passcode fallback and fails closed; physical-device enrollment, lockout and release lifecycle checks remain outstanding.", modes: nil, requirements: ["device-screen-lock"], source: "mobile-apps/ios/TCGer/TCGer/Utils/BiometricAuthManager.swift"),
         .releaseReadiness: ParityFeatureSupport(status: .partial, limitation: "Release archive/export settings and artifact/physical-device readiness tooling are configured; no distribution signing identity, exported IPA or physical-device evidence is verified here.", modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/SettingsView.swift"),
         .collectionsCopies: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/Services/APIService+Collections.swift"),
+        .inventorySales: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["local", "server"], requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Services/InventoryOperations.swift"),
+        .packOpeningSimulationHistory: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["local"], requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Services/PackSimulationStore.swift"),
     ]
 
     var support: ParityFeatureSupport { Self.supportByID[self]! }

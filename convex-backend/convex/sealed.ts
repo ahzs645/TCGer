@@ -83,6 +83,7 @@ const sealedLedgerCardValidator = v.object({
   status: v.union(v.literal("active"), v.literal("sold")),
   liveValue: v.number(),
   realizedProceeds: v.number(),
+  realizedProceedsByCurrency: v.array(v.object({ currency: v.string(), amount: v.number() })),
   soldAt: v.optional(v.string()),
 });
 
@@ -95,6 +96,7 @@ const sealedOpeningLedgerValidator = v.object({
   invested: v.number(),
   liveValue: v.number(),
   realizedProceeds: v.number(),
+  realizedProceedsByCurrency: v.array(v.object({ currency: v.string(), amount: v.number() })),
   profitLoss: v.number(),
   activeCopies: v.number(),
   soldCopies: v.number(),
@@ -953,7 +955,8 @@ export const listOpeningLedgers = internalQuery({
               quantity: openedCard.quantity,
               status: openedCard.status,
               liveValue,
-              realizedProceeds: openedCard.realizedProceeds ?? 0,
+              realizedProceeds: (openedCard.realizedCurrency ?? "USD") === "USD" ? openedCard.realizedProceeds ?? 0 : 0,
+              realizedProceedsByCurrency: openedCard.realizedProceeds === undefined ? [] : [{ currency: openedCard.realizedCurrency ?? "USD", amount: openedCard.realizedProceeds }],
               soldAt:
                 openedCard.soldAt === undefined
                   ? undefined
@@ -964,6 +967,11 @@ export const listOpeningLedgers = internalQuery({
         const invested =
           (inventory.purchasePrice ?? 0) * opening.openedQuantity;
         const liveValue = cards.reduce((sum, card) => sum + card.liveValue, 0);
+        const proceedsByCurrency = new Map<string, number>();
+        for (const openedCard of openedCards) {
+          const currency = openedCard.realizedCurrency ?? "USD";
+          if (openedCard.realizedProceeds !== undefined) proceedsByCurrency.set(currency, (proceedsByCurrency.get(currency) ?? 0) + openedCard.realizedProceeds);
+        }
         const realizedProceeds = cards.reduce(
           (sum, card) => sum + card.realizedProceeds,
           0,
@@ -977,6 +985,7 @@ export const listOpeningLedgers = internalQuery({
           invested,
           liveValue,
           realizedProceeds,
+          realizedProceedsByCurrency: [...proceedsByCurrency].sort(([a], [b]) => a.localeCompare(b)).map(([currency, amount]) => ({ currency, amount })),
           profitLoss: liveValue + realizedProceeds - invested,
           activeCopies: cards
             .filter((card) => card.status === "active")

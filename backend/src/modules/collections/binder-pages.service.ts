@@ -3,8 +3,8 @@ import type { Prisma } from '@prisma/client';
 
 import { prisma } from '../../lib/prisma';
 
-async function requireOwnedBinder(userId: string, binderId: string) {
-  const binder = await prisma.binder.findFirst({
+async function requireOwnedBinder(userId: string, binderId: string, client: Prisma.TransactionClient = prisma) {
+  const binder = await client.binder.findFirst({
     where: { id: binderId, userId },
     select: { id: true }
   });
@@ -12,6 +12,31 @@ async function requireOwnedBinder(userId: string, binderId: string) {
     throw new Error('Binder not found');
   }
   return binder;
+}
+
+function revisionConflict() {
+  return Object.assign(new Error('Binder page changed. Review the current page before saving again.'), {
+    status: 409, code: 'PAGE_REVISION_CONFLICT'
+  });
+}
+
+function requireRevision(expected: number | undefined, actual: number) {
+  if (expected !== undefined && (!Number.isSafeInteger(expected) || expected < 0 || expected !== actual)) {
+    throw revisionConflict();
+  }
+}
+
+async function pageTransaction<T>(action: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  try {
+    return await prisma.$transaction(action, { isolationLevel: 'Serializable' });
+  } catch (error) {
+    // Concurrent create/update/delete is a reviewable conflict, never a silent
+    // overwrite or an opaque server error. No retry may use an obsolete revision.
+    if (error && typeof error === 'object' && 'code' in error && ['P2002', 'P2034'].includes(String(error.code))) {
+      throw revisionConflict();
+    }
+    throw error;
+  }
 }
 
 function mapPage(page: {
@@ -52,24 +77,18 @@ export async function upsertBinderPage(
   binderId: string,
   input: UpsertBinderPageInput
 ): Promise<BinderPage> {
-  await requireOwnedBinder(userId, binderId);
   const capturedAt = input.capturedAt ? new Date(input.capturedAt) : new Date();
   const placements = input.placements as unknown as Prisma.InputJsonValue;
-  const page = await prisma.binderPage.upsert({
-    where: {
-      binderId_pageNumber: { binderId, pageNumber: input.pageNumber }
-    },
-    create: {
-      binderId,
-      pageNumber: input.pageNumber,
-      capturedAt,
-      placements
-    },
-    update: {
-      capturedAt,
-      placements,
-      revision: { increment: 1 }
-    }
+  const page = await pageTransaction(async tx => {
+    await requireOwnedBinder(userId, binderId, tx);
+    const where = { binderId_pageNumber: { binderId, pageNumber: input.pageNumber } };
+    const existing = await tx.binderPage.findUnique({ where });
+    requireRevision(input.expectedRevision, existing?.revision ?? 0);
+    return tx.binderPage.upsert({
+      where,
+      create: { binderId, pageNumber: input.pageNumber, capturedAt, placements },
+      update: { capturedAt, placements, revision: { increment: 1 } }
+    });
   });
   return mapPage(page);
 }
@@ -78,20 +97,19 @@ export async function replaceBinderPageImage(
   userId: string,
   binderId: string,
   pageNumber: number,
-  imageUrl: string
+  imageUrl: string,
+  expectedRevision?: number
 ): Promise<{ page: BinderPage; replacedImageUrl?: string }> {
-  await requireOwnedBinder(userId, binderId);
-  const existing = await prisma.binderPage.findUnique({
-    where: { binderId_pageNumber: { binderId, pageNumber } }
+  return pageTransaction(async tx => {
+    await requireOwnedBinder(userId, binderId, tx);
+    const existing = await tx.binderPage.findUnique({ where: { binderId_pageNumber: { binderId, pageNumber } } });
+    if (!existing) throw new Error('Binder page not found');
+    requireRevision(expectedRevision, existing.revision);
+    const page = await tx.binderPage.update({
+      where: { id: existing.id }, data: { imageUrl, revision: { increment: 1 } }
+    });
+    return { page: mapPage(page), replacedImageUrl: existing.imageUrl ?? undefined };
   });
-  if (!existing) {
-    throw new Error('Binder page not found');
-  }
-  const page = await prisma.binderPage.update({
-    where: { id: existing.id },
-    data: { imageUrl }
-  });
-  return { page: mapPage(page), replacedImageUrl: existing.imageUrl ?? undefined };
 }
 
 export async function removeBinderPageImage(
@@ -99,16 +117,13 @@ export async function removeBinderPageImage(
   binderId: string,
   pageNumber: number
 ): Promise<string | undefined> {
-  await requireOwnedBinder(userId, binderId);
-  const existing = await prisma.binderPage.findUnique({
-    where: { binderId_pageNumber: { binderId, pageNumber } }
+  return pageTransaction(async tx => {
+    await requireOwnedBinder(userId, binderId, tx);
+    const existing = await tx.binderPage.findUnique({ where: { binderId_pageNumber: { binderId, pageNumber } } });
+    if (!existing) throw new Error('Binder page not found');
+    await tx.binderPage.update({
+      where: { id: existing.id }, data: { imageUrl: null, revision: { increment: 1 } }
+    });
+    return existing.imageUrl ?? undefined;
   });
-  if (!existing) {
-    throw new Error('Binder page not found');
-  }
-  await prisma.binderPage.update({
-    where: { id: existing.id },
-    data: { imageUrl: null }
-  });
-  return existing.imageUrl ?? undefined;
 }

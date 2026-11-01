@@ -5,7 +5,7 @@
 
 import { gameLabel } from "@/lib/utils";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, RotateCcw, Search } from "lucide-react";
 
@@ -51,6 +51,9 @@ import {
 } from "@/lib/currency/exchange-rates";
 import { formatMoney } from "@/lib/format-money";
 import { GAME_LABELS, type SupportedGame } from "@/lib/utils";
+import { capturePrivateSession } from "@/lib/private-session";
+import { intakeStorageKey } from "@/lib/intake/durable-intake";
+import { useServerFeatures } from "@/lib/api/health";
 import { useAuthStore } from "@/stores/auth";
 import { useCollectionsStore } from "@/stores/collections";
 import type { Card as CardResult, TcgCode } from "@tcg/api-types";
@@ -390,6 +393,7 @@ interface SelectableCopy {
 }
 
 export function AcquisitionCostSplitter() {
+  const features = useServerFeatures();
   const token = useAuthStore((state) => state.token);
   const collections = useCollectionsStore((state) => state.collections);
   const fetchCollections = useCollectionsStore(
@@ -403,6 +407,39 @@ export function AcquisitionCostSplitter() {
   const [mode, setMode] = useState<"equal" | "proportional">("equal");
   const [source, setSource] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [pendingCost, setPendingCost] = useState<
+    Parameters<typeof splitAcquisitionCost>[1] | null
+  >(null);
+  const [recoveryError, setRecoveryError] = useState("");
+  useEffect(() => {
+    if (!token) return;
+    try {
+      const raw = localStorage.getItem(intakeStorageKey("cost-allocation"));
+      const saved = raw
+        ? (JSON.parse(raw) as Parameters<typeof splitAcquisitionCost>[1])
+        : null;
+      setPendingCost(saved);
+      if (saved) {
+        setTotal(String(saved.totalCents / 100));
+        setCurrency(saved.currency);
+        setMode(saved.mode === "equal" ? "equal" : "proportional");
+        setSelected(
+          Object.fromEntries(
+            saved.lines.map((line) => [
+              line.collectionEntryId,
+              line.weight ?? 1,
+            ]),
+          ),
+        );
+      }
+    } catch (error) {
+      setRecoveryError(
+        error instanceof Error
+          ? error.message
+          : "The saved allocation could not be restored.",
+      );
+    }
+  }, [token]);
   const currenciesQuery = useQuery({
     queryKey: ["currencies", "supported"],
     queryFn: getSupportedCurrencies,
@@ -447,18 +484,40 @@ export function AcquisitionCostSplitter() {
     }
   }, [mode, selected, totalCents]);
   const mutation = useMutation({
-    mutationFn: () =>
-      splitAcquisitionCost(token!, {
-        totalCents,
-        currency,
-        mode: mode === "equal" ? "equal" : "weighted",
-        notes: [source.trim(), date].filter(Boolean).join(" · "),
-        lines: Object.entries(selected).map(([collectionEntryId, weight]) => ({
-          collectionEntryId,
-          weight: mode === "equal" ? undefined : weight,
-        })),
-      }),
-    onSuccess: async () => {
+    mutationFn: async () => {
+      if (!token || features.linkedAcquisitions !== true)
+        throw new Error(
+          "Atomic acquisition allocation requires an updated Convex server.",
+        );
+      const origin = capturePrivateSession(token);
+      origin.assertCurrent();
+      const key = intakeStorageKey("cost-allocation");
+      const stored = localStorage.getItem(key);
+      const input: Parameters<typeof splitAcquisitionCost>[1] = stored
+        ? JSON.parse(stored)
+        : {
+            operationId: crypto.randomUUID(),
+            totalCents,
+            currency,
+            mode: mode === "equal" ? "equal" : "weighted",
+            notes: [source.trim(), date].filter(Boolean).join(" · "),
+            lines: Object.entries(selected).map(
+              ([collectionEntryId, weight]) => ({
+                collectionEntryId,
+                weight: mode === "equal" ? undefined : weight,
+              }),
+            ),
+          };
+      localStorage.setItem(key, JSON.stringify(input));
+      setPendingCost(input);
+      const result = await splitAcquisitionCost(token, input);
+      origin.assertCurrent();
+      return { result, origin, key };
+    },
+    onSuccess: async ({ origin, key }) => {
+      if (!origin.current()) return;
+      localStorage.removeItem(key);
+      setPendingCost(null);
       setSelected({});
       setTotal("");
       await Promise.all([
@@ -497,6 +556,7 @@ export function AcquisitionCostSplitter() {
                 >
                   <Checkbox
                     checked={checked}
+                    disabled={Boolean(pendingCost) || mutation.isPending}
                     onCheckedChange={(value) =>
                       setSelected((current) => {
                         const next = { ...current };
@@ -529,6 +589,7 @@ export function AcquisitionCostSplitter() {
                     <Input
                       className="w-20"
                       aria-label={`Weight for ${copy.name}`}
+                      disabled={Boolean(pendingCost) || mutation.isPending}
                       type="number"
                       min="0.01"
                       step="0.01"
@@ -556,11 +617,32 @@ export function AcquisitionCostSplitter() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {pendingCost && (
+            <p role="status" className="text-sm">
+              A saved allocation of{" "}
+              {formatMoney(pendingCost.totalCents / 100, {
+                currency: pendingCost.currency,
+              })}{" "}
+              for {pendingCost.lines.length} copies is awaiting confirmation.
+              Retry recovers that exact allocation.
+            </p>
+          )}
+          {recoveryError && (
+            <p role="alert" className="text-sm text-destructive">
+              {recoveryError}
+            </p>
+          )}
+          {features.linkedAcquisitions !== true && (
+            <p className="text-sm text-muted-foreground">
+              Atomic acquisition allocation requires an updated Convex server.
+            </p>
+          )}
           <div className="grid grid-cols-[1fr_7rem] gap-3">
             <div className="space-y-2">
               <Label htmlFor="split-total">Total paid</Label>
               <Input
                 id="split-total"
+                disabled={Boolean(pendingCost) || mutation.isPending}
                 type="number"
                 min="0.01"
                 step="0.01"
@@ -571,7 +653,11 @@ export function AcquisitionCostSplitter() {
             </div>
             <div className="space-y-2">
               <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select
+                value={currency}
+                onValueChange={setCurrency}
+                disabled={Boolean(pendingCost) || mutation.isPending}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -589,6 +675,7 @@ export function AcquisitionCostSplitter() {
             <Label>Method</Label>
             <Select
               value={mode}
+              disabled={Boolean(pendingCost) || mutation.isPending}
               onValueChange={(value) => setMode(value as typeof mode)}
             >
               <SelectTrigger>
@@ -615,6 +702,7 @@ export function AcquisitionCostSplitter() {
             <Label htmlFor="split-date">Purchase date</Label>
             <Input
               id="split-date"
+              disabled={Boolean(pendingCost) || mutation.isPending}
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}

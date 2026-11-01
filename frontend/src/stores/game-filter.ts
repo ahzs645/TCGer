@@ -37,7 +37,11 @@ useModuleStore.subscribe((state) => {
 
   const { selectedGame, setGame } = useGameFilterStore.getState();
 
-  if (selectedGame !== "all" && !activeGames.has(selectedGame)) {
+  if (
+    selectedGame !== "all" &&
+    Object.hasOwn(state.enabledGames, selectedGame) &&
+    !activeGames.has(selectedGame)
+  ) {
     const fallback = enabledEntries.find(([, enabled]) => enabled)?.[0];
     setGame(fallback ?? "all");
   }

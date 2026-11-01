@@ -47,6 +47,7 @@ data class PortableOwnedCard(
     val acquisitionPrice: Double? = null,
     val details: CollectionDetails = CollectionDetails(),
     val id: String? = null,
+    val acquisitionCurrency: String? = null,
 )
 
 @Serializable
@@ -118,7 +119,7 @@ object CollectionBackupJson {
                 binder.defaultCondition,
                 binder.containerType,
                 binder.imageUrl,
-                binder.cards.map { PortableOwnedCard(it.card.portable(), it.quantity, it.condition, it.price, it.acquisitionPrice, it.details, it.id) },
+                binder.cards.map { PortableOwnedCard(it.card.portable(), it.quantity, it.condition, it.price, it.acquisitionPrice, it.details, it.id, it.acquisitionCurrency) },
                 binder.id, binder.associatedTcg, binder.associatedSetCode, binder.associatedSetName,
             )
         },
@@ -159,7 +160,7 @@ object CollectionBackupJson {
                 unique(card.id)
                 require(card.card.name.isNotBlank())
                 require(card.quantity in 1..10000 && card.card.id.isNotBlank() && card.card.tcg.isNotBlank()) { "Invalid collection card" }
-                CollectionEdit(card.condition, card.price, card.acquisitionPrice, card.details).validate()
+                CollectionEdit(card.condition, card.price, card.acquisitionPrice, card.details, card.acquisitionCurrency).validate()
             }
         }
         it.wishlists.forEach { wishlist ->
@@ -172,7 +173,7 @@ object CollectionBackupJson {
     }
 
     fun collectionCsv(binders: List<Binder>): String = buildString {
-        appendLine("binder,externalId,name,tcg,setCode,collectorNumber,quantity,condition,price,acquisitionPrice,language,notes,serialNumber,acquiredAt,isFoil,finishCode,finishLabel,edition,stamp,isSealedPromo,isOversized,isPeelOff,isSigned,isAltered,gradingCompany,gradingScore,certNumber,storageLocation,tags")
+        appendLine("binder,externalId,name,tcg,setCode,collectorNumber,quantity,condition,price,acquisitionPrice,acquisitionCurrency,language,notes,serialNumber,acquiredAt,isFoil,finishCode,finishLabel,edition,stamp,isSealedPromo,isOversized,isPeelOff,isSigned,isAltered,gradingCompany,gradingScore,certNumber,storageLocation,tags")
         binders.forEach { binder ->
             binder.cards.forEach { owned ->
                 appendLine(
@@ -187,6 +188,7 @@ object CollectionBackupJson {
                         owned.condition.orEmpty(),
                         owned.price?.toString().orEmpty(),
                         owned.acquisitionPrice?.toString().orEmpty(),
+                        owned.acquisitionCurrency.orEmpty(),
                         owned.details.language.orEmpty(), owned.details.notes.orEmpty(), owned.details.serialNumber.orEmpty(), owned.details.acquiredAt.orEmpty(),
                         owned.details.isFoil.toString(), owned.details.finishCode.orEmpty(), owned.details.finishLabel.orEmpty(), owned.details.edition.orEmpty(), owned.details.stamp.orEmpty(),
                         owned.details.isSealedPromo.toString(), owned.details.isOversized.toString(), owned.details.isPeelOff.toString(), owned.details.isSigned.toString(), owned.details.isAltered.toString(),

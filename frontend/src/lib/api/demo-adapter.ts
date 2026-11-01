@@ -1,3 +1,4 @@
+import { demoAtomicIntake, demoRemovePhysicalCopy } from "./demo-inventory";
 /**
  * Demo route handler — maps URL path + HTTP method to demo store operations
  * and returns real Response objects, so the API files see no difference.
@@ -5,6 +6,7 @@
 
 import {
   commitDemoBackup,
+  demoSupportsDurableOperations,
   useDemoStore,
   whenDemoStoreHydrated,
   type DemoBinder,
@@ -70,10 +72,13 @@ import {
   updateBinderSchema,
   updateSettingsSchema,
   collectionImportRequestSchema,
+  trackedPricesRequestSchema,
 } from "@tcg/api-types";
 import { systemGuideDefinitions } from "@/lib/guides/system-guides.generated";
 import { DEMO_TRANSACTIONS_STORAGE_KEY } from "@/lib/storage/keys";
 import { formatCopyCount } from "@/lib/copy-labels";
+import { trackedPriceLookupKey } from "@/lib/pricing/collection-price-lots";
+import { originalCurrency } from "@/lib/pricing/acquisition-currency";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -122,6 +127,7 @@ const DEMO_IMPORT_HEADERS = [
   "notes",
   "price",
   "acquisition_price",
+  "acquisition_currency",
   "serial_number",
   "acquired_at",
   "is_foil",
@@ -145,6 +151,7 @@ const DEMO_IMPORT_HEADER_ALIASES: Record<string, string> = {
   "set name": "set_name",
   "collector number": "collector_number",
   "acquisition price": "acquisition_price",
+  "acquisition currency": "acquisition_currency",
   "serial number": "serial_number",
   foil: "is_foil",
 };
@@ -402,6 +409,14 @@ function previewDemoCollectionImport(
     );
     const price = money("price");
     const acquisitionPrice = money("acquisition_price");
+    const acquisitionCurrency =
+      source.acquisition_currency?.trim().toUpperCase() || undefined;
+    if (acquisitionCurrency && !/^[A-Z]{3}$/.test(acquisitionCurrency))
+      issues.push({
+        row: rowNumber,
+        field: "acquisition_currency",
+        message: "must be a three-letter currency code",
+      });
     if (issues.length !== before) continue;
     const optional = (field: string) => source[field]?.trim() || undefined;
     rows.push({
@@ -423,6 +438,7 @@ function previewDemoCollectionImport(
       notes: optional("notes"),
       price,
       acquisitionPrice,
+      acquisitionCurrency,
       serialNumber: optional("serial_number"),
       acquiredAt,
       isFoil,
@@ -586,7 +602,9 @@ function getDemoTransactions(): TransactionResponse[] {
 }
 
 function setDemoTransactions(transactions: TransactionResponse[]) {
-  useDemoStore.setState(state => ({ portableSections: { ...state.portableSections, transactions } }));
+  useDemoStore.setState((state) => ({
+    portableSections: { ...state.portableSections, transactions },
+  }));
   if (typeof localStorage === "undefined") {
     demoTransactionsMemory = transactions;
     return;
@@ -809,6 +827,7 @@ async function commitDemoCollectionImport(
         notes: row.notes,
         price: row.price,
         acquisitionPrice: row.acquisitionPrice,
+        acquisitionCurrency: row.acquisitionCurrency,
         serialNumber: row.serialNumber,
         acquiredAt: row.acquiredAt,
         isFoil: row.isFoil,
@@ -1278,6 +1297,11 @@ export async function handleDemoRequest(
       env: "production",
       mode: "convex",
       features: {
+        atomicIntake: demoSupportsDurableOperations(),
+        atomicSales: false,
+        linkedAcquisitions: false,
+        tradeSettlement: false,
+        emailDelivery: false,
         decks: true,
         finance: true,
         sealed: true,
@@ -1302,30 +1326,89 @@ export async function handleDemoRequest(
   if (segments[0] === "collections" && segments[2] === "pages") {
     store().init();
     const binderId = segments[1]!;
-    if (!store().binders.some(binder => binder.id === binderId)) return json({ message: "Binder not found" }, 404);
+    if (!store().binders.some((binder) => binder.id === binderId))
+      return json({ message: "Binder not found" }, 404);
     const sections = store().portableSections;
     const pages = (sections.binderPages ?? []) as Array<Record<string, any>>;
-    if (method === "GET" && segments.length === 3) return json(pages.filter(page => page.binderId === binderId).map(page => ({ ...page, imageUrl: (sections.binderPageImages as Record<string, string> | undefined)?.[page.id] ? `data:image/jpeg;base64,${(sections.binderPageImages as Record<string, string>)[page.id]}` : page.imageUrl })));
+    if (method === "GET" && segments.length === 3)
+      return json(
+        pages
+          .filter((page) => page.binderId === binderId)
+          .map((page) => ({
+            ...page,
+            imageUrl: (
+              sections.binderPageImages as Record<string, string> | undefined
+            )?.[page.id]
+              ? `data:image/jpeg;base64,${(sections.binderPageImages as Record<string, string>)[page.id]}`
+              : page.imageUrl,
+          })),
+      );
     const pageNumber = Number(segments[3]);
-    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > 10000) return json({ message: "Invalid page number" }, 400);
-    const existing = pages.find(page => page.binderId === binderId && page.pageNumber === pageNumber);
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > 10000)
+      return json({ message: "Invalid page number" }, 400);
+    const existing = pages.find(
+      (page) => page.binderId === binderId && page.pageNumber === pageNumber,
+    );
     const now = new Date().toISOString();
     if (method === "PUT" && segments.length === 4) {
       const { upsertBinderPageSchema } = await import("@tcg/api-types");
       const parsed = upsertBinderPageSchema.safeParse(body);
       if (!parsed.success) return json({ message: "Invalid binder page" }, 400);
-      const page = { ...existing, ...parsed.data, id: existing?.id ?? crypto.randomUUID(), binderId, revision: (existing?.revision ?? 0) + 1, capturedAt: parsed.data.capturedAt ?? now, createdAt: existing?.createdAt ?? now, updatedAt: now };
-      await commitDemoBackup({ portableSections: { ...sections, binderPages: [...pages.filter(item => item.id !== page.id), page] } }, false);
+      const page = {
+        ...existing,
+        ...parsed.data,
+        id: existing?.id ?? crypto.randomUUID(),
+        binderId,
+        revision: (existing?.revision ?? 0) + 1,
+        capturedAt: parsed.data.capturedAt ?? now,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+      await commitDemoBackup(
+        {
+          portableSections: {
+            ...sections,
+            binderPages: [...pages.filter((item) => item.id !== page.id), page],
+          },
+        },
+        false,
+      );
       return json(page);
     }
-    if (method === "POST" && segments[4] === "image" && existing && body instanceof FormData) {
+    if (
+      method === "POST" &&
+      segments[4] === "image" &&
+      existing &&
+      body instanceof FormData
+    ) {
       const image = body.get("image");
-      if (!(image instanceof Blob) || !image.type.startsWith("image/")) return json({ message: "Choose an image" }, 400);
-      let binary = ""; const bytes = new Uint8Array(await image.arrayBuffer());
-      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i,i+8192));
+      if (!(image instanceof Blob) || !image.type.startsWith("image/"))
+        return json({ message: "Choose an image" }, 400);
+      let binary = "";
+      const bytes = new Uint8Array(await image.arrayBuffer());
+      for (let i = 0; i < bytes.length; i += 8192)
+        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
       const encoded = btoa(binary);
-      const page: Record<string, any> = { ...existing, imageUrl: `data:${image.type};base64,${encoded}`, updatedAt: now };
-      await commitDemoBackup({ portableSections: { ...sections, binderPages: pages.map(item => item.id === page.id ? page : item), binderPageImages: { ...((sections.binderPageImages ?? {}) as object), [page.id]: encoded } } }, false);
+      const page: Record<string, any> = {
+        ...existing,
+        imageUrl: `data:${image.type};base64,${encoded}`,
+        updatedAt: now,
+      };
+      await commitDemoBackup(
+        {
+          portableSections: {
+            ...sections,
+            binderPages: pages.map((item) =>
+              item.id === page.id ? page : item,
+            ),
+            binderPageImages: {
+              ...((sections.binderPageImages ?? {}) as object),
+              [page.id]: encoded,
+            },
+          },
+        },
+        false,
+      );
       return json(page);
     }
     return json({ message: "Page not found" }, 404);
@@ -1390,6 +1473,68 @@ export async function handleDemoRequest(
     store().init();
     const tcg = new URLSearchParams(queryString || "").get("tcg") ?? undefined;
     return json(demoPriceMovers(tcg));
+  }
+
+  if (
+    segments[0] === "prices" &&
+    segments[1] === "tracked" &&
+    method === "POST"
+  ) {
+    const parsed = trackedPricesRequestSchema.safeParse(body);
+    if (!parsed.success) return json({ message: "Invalid price request" }, 400);
+    const now = Date.now();
+    const prices = parsed.data.items.map((item) => {
+      const card = DEMO_CARDS.find(
+        (candidate) =>
+          candidate.tcg === item.tcg.toLowerCase() &&
+          candidate.id === item.externalId,
+      );
+      // The sample dataset has no variant/date evidence. Never borrow its
+      // unspecified printing price for a requested foil, condition or language.
+      const priced =
+        parsed.data.source === "automatic" &&
+        card &&
+        !item.finishCode &&
+        !item.condition &&
+        !item.language;
+      return {
+        ...item,
+        key: trackedPriceLookupKey(
+          item.tcg,
+          item.externalId,
+          item.finishCode,
+          item.condition,
+          item.language,
+        ),
+        cached: true,
+        source: "Demo sample (not live)",
+        ...(priced
+          ? { price: card.price, currency: "USD" }
+          : {
+              error:
+                "No sample quote for this exact printing and copy details. Connect to a pricing server for live quotes.",
+            }),
+      };
+    });
+    const priced = prices.filter((item) => "price" in item).length;
+    return json({
+      prices,
+      refreshedAt: new Date(now).toISOString(),
+      refreshAfter: new Date(now + 86_400_000).toISOString(),
+      health: {
+        status: "degraded",
+        total: prices.length,
+        priced,
+        fresh: 0,
+        stale: priced,
+        missing: prices.length - priced,
+        failed: 0,
+        lowConfidence: 0,
+        coverage: prices.length ? priced / prices.length : 0,
+        freshnessHours: 24,
+        message: "Sample prices have no market date and are not live quotes.",
+      },
+    });
   }
 
   if (
@@ -1817,11 +1962,25 @@ function handleFinance(
         (sum, { card }) =>
           sum +
           (card.copies ?? []).reduce(
-            (copySum, copy) => copySum + (copy.acquisitionPrice ?? 0),
+            (copySum, copy) =>
+              copySum +
+              (originalCurrency(copy.acquisitionCurrency) === "USD"
+                ? (copy.acquisitionPrice ?? 0)
+                : 0),
             0,
           ),
         0,
       ),
+      inventoryCostsByCurrency: Object.entries(
+        inventory
+          .flatMap(({ card }) => card.copies ?? [])
+          .reduce<Record<string, number>>((totals, copy) => {
+            if (copy.acquisitionPrice === undefined) return totals;
+            const code = originalCurrency(copy.acquisitionCurrency);
+            totals[code] = (totals[code] ?? 0) + (copy.acquisitionPrice ?? 0);
+            return totals;
+          }, {}),
+      ).map(([currency, cost]) => ({ currency, cost })),
       inventoryMarketValue: inventory.reduce(
         (sum, { card }) => sum + card.price * card.quantity,
         0,
@@ -2178,7 +2337,14 @@ async function handleCollections(
     return handleAddCard("__library__", body);
   }
 
-  const collectionId = segments[0];
+  const collectionId = decodeURIComponent(segments[0]);
+  if (segments[1] === "intake" && segments.length === 2 && method === "POST")
+    return demoAtomicIntake(collectionId, body);
+  if (segments[1] === "copies" && segments.length === 3 && method === "DELETE")
+    return demoRemovePhysicalCopy(
+      collectionId,
+      decodeURIComponent(segments[2]!),
+    );
 
   // GET /collections/:id
   // The server serves this (convex/http.ts) and the demo did not, so a client
@@ -2313,7 +2479,10 @@ async function handleAddCard(
 ): Promise<Response> {
   const data = body as AddCardInput;
   const demoCard: DemoOwnedCard | null =
-    DEMO_CARDS.find((c) => c.id === data.cardId && (!data.cardData || c.tcg === data.cardData.tcg)) ||
+    DEMO_CARDS.find(
+      (c) =>
+        c.id === data.cardId && (!data.cardData || c.tcg === data.cardData.tcg),
+    ) ||
     (data.cardData
       ? {
           id: data.cardData.externalId || data.cardId,
@@ -2337,7 +2506,9 @@ async function handleAddCard(
       cardData: data.cardData,
       copy: {
         tags: [
-          ...(data.tags ?? []).flatMap((id) => store().tags.filter((tag) => tag.id === id)),
+          ...(data.tags ?? []).flatMap((id) =>
+            store().tags.filter((tag) => tag.id === id),
+          ),
           ...(data.newTags ?? []).map((tag) => store().addTag(tag)),
         ],
         condition: data.condition,
@@ -2345,6 +2516,7 @@ async function handleAddCard(
         notes: data.notes,
         price: data.price,
         acquisitionPrice: data.acquisitionPrice,
+        acquisitionCurrency: data.acquisitionCurrency,
         isFoil: data.isFoil,
         finishCode: data.finishCode,
         finishLabel: data.finishLabel,
@@ -2458,8 +2630,13 @@ async function handleWishlists(
   ) {
     const data = body as { cards: AddWishlistCardInput[] };
     for (const card of data.cards ?? []) {
-      const wishlist = store().wishlists.find((wl: DemoWishlist) => wl.id === wishlistId);
-      if (wishlist?.excludedCardKeys?.includes(`${card.tcg}:${card.externalId}`)) continue;
+      const wishlist = store().wishlists.find(
+        (wl: DemoWishlist) => wl.id === wishlistId,
+      );
+      if (
+        wishlist?.excludedCardKeys?.includes(`${card.tcg}:${card.externalId}`)
+      )
+        continue;
       const demoCard: DemoOwnedCard = DEMO_CARDS.find(
         (c) => c.id === card.externalId,
       ) || {

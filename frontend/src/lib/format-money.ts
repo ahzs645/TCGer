@@ -15,7 +15,7 @@ const MONEY_LOCALE = "en-US";
 const DEFAULT_CURRENCY = "USD";
 
 export interface FormatMoneyOptions {
-  /** ISO 4217 code. Falls back to USD if the code is not recognised. */
+  /** ISO 4217 code. Explicit unknown/invalid codes stay visibly unknown. */
   currency?: string;
   /** Drop the cents — for axis ticks and other dense labels. */
   compact?: boolean;
@@ -34,8 +34,7 @@ function formatterFor(currency: string, compact: boolean): Intl.NumberFormat {
     });
   } catch {
     return new Intl.NumberFormat(MONEY_LOCALE, {
-      style: "currency",
-      currency: DEFAULT_CURRENCY,
+      style: "decimal",
       minimumFractionDigits: fractionDigits,
       maximumFractionDigits: fractionDigits,
     });
@@ -52,7 +51,9 @@ export function formatMoney(
     signed = false,
   } = options;
   const amount = Number.isFinite(value) ? (value as number) : 0;
-  const formatted = formatterFor(currency, compact).format(Math.abs(amount));
+  const formatted =
+    formatterFor(currency, compact).format(Math.abs(amount)) +
+    (/^[A-Za-z]{3}$/.test(currency) ? "" : " · Currency unknown");
   if (amount < 0) return `-${formatted}`;
   return signed ? `+${formatted}` : formatted;
 }

@@ -338,14 +338,16 @@ struct WishlistDetailView: View {
 
     @MainActor
     private func refreshWishlist() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return }
 
         do {
             let updated = try await apiService.getWishlist(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 id: wishlist.id
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             cards = updated.cards
             rules = updated.expansionRules
             excludedCardKeys = updated.excludedCardKeys ?? []
@@ -356,23 +358,29 @@ struct WishlistDetailView: View {
 
     @MainActor
     private func syncRules() async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isSyncing, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
         isSyncing = true
+        defer { if environmentStore.matches(session) { isSyncing = false } }
         syncStatus = "Syncing…"
 
         let service = WishlistSyncService(
             apiService: apiService,
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token,
-            enabledGames: environmentStore.enabledGames
+            enabledGames: environmentStore.enabledGames,
+            isCurrent: { environmentStore.matches(session) }
         )
         let snapshot = currentWishlist
 
         let result = await service.sync(wishlist: snapshot) { message in
+            guard environmentStore.matches(session) else { return }
             syncStatus = message
         }
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
 
         await refreshWishlist()
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         onUpdate?()
 
         if let firstError = result.errors.first {
@@ -383,7 +391,6 @@ struct WishlistDetailView: View {
         } else {
             syncStatus = "Already up to date."
         }
-        isSyncing = false
     }
 
     @MainActor

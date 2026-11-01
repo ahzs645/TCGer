@@ -121,7 +121,7 @@ extension APIService {
         date: String? = nil
     ) async throws -> Transaction {
         if config.isOnDevice {
-            let transaction = localStore.createTransaction(
+            let transaction = try localStore.createTransaction(
                 type: type, collectionEntryId: collectionEntryId, cardId: cardId,
                 externalId: externalId, cardName: cardName, tcg: tcg,
                 quantity: quantity ?? 1, amount: amount, currency: currency ?? "USD",
@@ -230,7 +230,7 @@ extension APIService {
         transactionId: String
     ) async throws {
         if config.isOnDevice {
-            localStore.deleteTransaction(id: transactionId)
+            try localStore.deleteTransaction(id: transactionId)
             try localStore.requireLatestMutationPersisted()
             return
         }
@@ -260,6 +260,16 @@ extension APIService {
             throw APIError.decodingError
         }
         return summary
+    }
+
+    func getFinanceSummaryByCurrency(config: ServerConfiguration, token: String) async throws -> FinanceSummaryByCurrency {
+        if config.isOnDevice { return localStore.getFinanceSummaryByCurrency() }
+        let (data, response) = try await makeRequest(config: config, path: "finance/summary/by-currency", token: token)
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            throw APIError.serverError(status: response.statusCode, message: parseServerMessage(from: data))
+        }
+        return try JSONDecoder().decode(FinanceSummaryByCurrency.self, from: data)
     }
 
     func getRealizedPerformance(

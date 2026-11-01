@@ -1,9 +1,11 @@
 # TCGer (TCG Collection Manager)
 
-TCGer is a multi-game trading card collection manager with a Node/Express API, a Next.js web client, and optional local cache services for card data. It supports Yu-Gi-Oh!, Magic: The Gathering, and Pokemon.
+TCGer is a multi-game trading card collection manager with a Node/Express API, a Next.js web client, SwiftUI and Android clients, and optional local cache services. Built-in adapters cover Pokémon, Magic: The Gathering, Yu-Gi-Oh!, Disney Lorcana, One Piece, and Dragon Ball Super; community game packages extend the catalogs. Some providers, including Dragon Ball search, require configured API credentials.
+
+The public browser demo uses sample/browser-local data. iOS phone-only data stays on the device. Connected clients share account data only when they use the same authenticated server. See [supported modes and upgrades](docs/backend-modes.md) for the capability boundaries and [audit remediation](docs/audit-remediation-2026-10-31.md) for implementation and verification evidence.
 
 ## Highlights
-- Unified card search across Yu-Gi-Oh!, Magic, and Pokemon via an adapter layer.
+- Unified card search through game adapters and installed community packages.
 - Better Auth sessions backed by Convex, including a first-run admin promotion flow.
 - Binders and per-copy inventory tracking (condition, language, notes, price, acquisition price, serial number, tags).
 - Card prints lookup for Magic and Pokemon (Pokemon returns functional print group metadata).
@@ -28,10 +30,14 @@ Run `npm --prefix docs run dev` to browse the linked guides locally. Specialized
 
 ## Quick start (recommended: frontend on host, services in Docker)
 ```bash
+git clone --recurse-submodules https://github.com/ahzs645/TCGer.git
+cd TCGer
+npm install --global npm@11.19.0
+npm ci
 cp .env.docker.example .env.docker
 cp frontend/.env.local.example frontend/.env.local
 # Set different random BETTER_AUTH_SECRET and TCGER_BRIDGE_SECRET values (32+ characters).
-npm run docker:dev:legacy:bulk
+npm run docker:dev
 ```
 
 In a second terminal:
@@ -45,8 +51,11 @@ Open the app at `http://localhost:3003`.
 This starts:
 - the frontend locally with normal Next.js hot reload
 - the Dockerized backend on `http://localhost:3004`
-- Postgres on `localhost:5432`
-- the cache services from the `bulk` profile
+- Convex for account data, authentication, and atomic inventory operations
+
+Postgres is needed only for the explicit legacy hybrid mode. Optional bulk cache
+workers require the `bulk` profile and matching provider URLs; the example file
+uses public provider APIs so the default stack works without those workers.
 
 If the default ports are already in use on your machine, change `APP_PORT`, `BACKEND_PORT`, `CONVEX_PORT`, or `CONVEX_SITE_PORT` in `.env.docker`.
 
@@ -78,20 +87,44 @@ npm ci
 See the [dependency security review](docs/dependency-security-review-2026-10-08.md)
 for the override rationale, verification and remaining upstream advisories.
 
+In `convex-backend/.env.local`, add the following settings. Generate two different
+secrets with `openssl rand -hex 32` and replace the placeholders. Preserve any
+existing `CONVEX_DEPLOYMENT`, `CONVEX_URL`, and `CONVEX_SITE_URL` lines.
+
+```dotenv
+TCGER_CONVEX_DEV_TARGET=anonymous
+BETTER_AUTH_SECRET=<your-first-random-secret>
+TCGER_BRIDGE_SECRET=<your-second-random-secret>
+SITE_URL=http://localhost:3003
+BETTER_AUTH_URL=http://localhost:3003/api/auth
+BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3003,http://localhost:3004
+BETTER_AUTH_DISABLE_ORIGIN_CHECK=false
+BETTER_AUTH_USE_SECURE_COOKIES=false
+```
+
 Start the local Convex backend first and leave it running:
 ```bash
 cd convex-backend
-BETTER_AUTH_SECRET=tcger-local-convex-auth-secret-2026 \
-TCGER_BRIDGE_SECRET=tcger-local-convex-bridge-secret-2026 \
-npx convex dev
+npm run dev:local
 ```
 
-In a second terminal, start Express in Convex mode. `CONVEX_HTTP_ORIGIN` is the local Convex HTTP/site origin printed by `convex dev` (normally port `3211`):
+The bootstrap writes these settings into the selected local deployment, starts
+the watcher, and checks the authenticated bridge before reporting readiness.
+Passing secrets only to a plain `convex dev` process does not configure the
+function environment. Anonymous mode creates or reuses an anonymous local
+deployment. To reuse an already linked local deployment, set
+`TCGER_CONVEX_DEV_TARGET=local`. Cloud, production, self-hosted, and conflicting
+selections are rejected without changing them; use a separate checkout when
+developing against a different deployment.
+
+In a second terminal, start Express in Convex mode. Use the same bridge secret
+you put in `convex-backend/.env.local`. `CONVEX_HTTP_ORIGIN` is the local
+`CONVEX_SITE_URL` written there by the CLI (normally port `3211`):
 ```bash
 cd backend
 BACKEND_MODE=convex \
 CONVEX_HTTP_ORIGIN=http://127.0.0.1:3211 \
-TCGER_BRIDGE_SECRET=tcger-local-convex-bridge-secret-2026 \
+TCGER_BRIDGE_SECRET='<your-second-random-secret>' \
 APP_ORIGIN=http://localhost:3003 \
 PORT=3004 npm run dev
 ```
@@ -108,6 +141,11 @@ npm run dev -- --port 3003
 ```
 
 Open `http://localhost:3003`. Browser-facing REST requests must go through Express; do not call Convex HTTP routes directly or send `X-TCGER-*` bridge headers from browser code.
+
+Native authentication sends the origin of the configured API URL. When the API
+and website use different hosts or ports, include both client-facing origins in
+`BETTER_AUTH_TRUSTED_ORIGINS`. For a phone on your network, use the reachable
+hostname/IP in that list and in the app configuration. Keep origin checks enabled.
 
 Docker-backed local development shortcuts from the repo root:
 - `npm run docker:dev:legacy` - backend stack + Postgres for hybrid/legacy routes.
@@ -161,7 +199,7 @@ Convex bridge:
 - `TCGER_BRIDGE_SECRET` is shared only by Express and Convex and must be a distinct random value of at least 32 characters in production.
 - Docker persists local Convex users, collections, and file storage in the `convex_data` named volume. Production does not publish the Convex backend or site ports to the host.
 
-In `convex` mode, collections, wishlists, decks, finance, sealed inventory, analytics, trades, and public routes use Convex-native implementations. Notifications, alerts, and automations also have Convex-native routes; prices use the pricing gateway. Shops and shipments return `501 Not Implemented`. In `hybrid` mode the legacy routers remain available, and collections/wishlists can be selected independently with `COLLECTIONS_BACKEND` and `WISHLISTS_BACKEND`. Read `GET /health` and its `features` object to capability-gate clients instead of assuming every deployment supports every group.
+In `convex` mode, collections, wishlists, decks, finance, sealed inventory, analytics, trades, and public routes use Convex-native implementations. Notifications, alerts, and automations also have Convex-native routes; prices use the pricing gateway. Shops and shipments return `501 Not Implemented`. In `hybrid` mode the legacy routers remain available, and collections/wishlists can be selected independently with `COLLECTIONS_BACKEND` and `WISHLISTS_BACKEND`. Hybrid is a compatibility path: atomic sales, atomic intake, linked acquisitions and trade settlement are disabled because they cannot commit across the separate stores. Read `GET /health` and its operation-specific flags instead of inferring settlement support from `trades: true`. Email delivery is not configured in either path and is explicitly unavailable.
 
 ## API overview
 OpenAPI + Swagger:
@@ -178,6 +216,9 @@ Key routes (see `backend/src/api/routes`):
 - `GET /cards/:tcg/:cardId/prints`
 - `GET /collections` (binders + unsorted), `POST /collections`, `PATCH /collections/:binderId`, `DELETE /collections/:binderId`
 - `POST /collections/:binderId/cards`, `PATCH /collections/:binderId/cards/:collectionId`, `DELETE /collections/:binderId/cards/:collectionId`
+- `DELETE /collections/:binderId/copies/:copyId` removes one physical copy; the existing card DELETE removes the printing group.
+- `POST /collections/:binderId/intake` and `POST /finance/sales` commit replayable inventory operations in full Convex mode.
+- `POST /collections/normalize-copies` previews or commits bounded legacy quantity normalization for the current account.
 - `POST /collections/cards` (add to library)
 - `GET /collections/tags`, `POST /collections/tags`
 - `GET /users/me`, `PATCH /users/me`, `POST /users/me/change-password`

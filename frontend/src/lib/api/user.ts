@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   UserProfile,
   UpdateProfileInput,
@@ -12,7 +13,7 @@ export type {
 } from "@tcg/api-types";
 
 export async function getUserProfile(token: string): Promise<UserProfile> {
-  const response = await fetch(`${API_BASE_URL}/users/me`, {
+  const response = await sessionFetch(`${API_BASE_URL}/users/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -29,7 +30,7 @@ export async function updateUserProfile(
   data: UpdateProfileInput,
   token: string,
 ): Promise<Omit<UserProfile, "createdAt">> {
-  const response = await fetch(`${API_BASE_URL}/users/me`, {
+  const response = await sessionFetch(`${API_BASE_URL}/users/me`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -50,14 +51,17 @@ export async function changePassword(
   data: ChangePasswordInput,
   token: string,
 ): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/users/me/change-password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+  const response = await sessionFetch(
+    `${API_BASE_URL}/users/me/change-password`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
     },
-    body: JSON.stringify(data),
-  });
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

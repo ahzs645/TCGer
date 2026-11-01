@@ -6,6 +6,12 @@ import {
 } from "./lib/collectionImport";
 
 describe("collection CSV import parser", () => {
+  test("preserves known currency, unknown currency and different-currency duplicate rows", () => {
+    const preview = previewCollectionImport("tcg,external_id,card_name,acquisition_price,acquisition_currency\nmagic,one,Card,10,cad\nmagic,one,Card,10,USD\nmagic,one,Card,10,");
+    expect(preview.valid).toBe(true); expect(preview.rows).toHaveLength(3);
+    expect(preview.rows.map(row => row.acquisitionCurrency)).toEqual(["CAD", "USD", undefined]);
+    expect(previewCollectionImport("tcg,external_id,card_name,acquisition_currency\nmagic,one,Card,dollars").valid).toBe(false);
+  });
   test("accepts export headings and merges duplicate rows", () => {
     const preview = previewCollectionImport(
       [

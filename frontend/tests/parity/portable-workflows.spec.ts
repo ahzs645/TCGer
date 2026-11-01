@@ -23,7 +23,7 @@ test("[data.portableBackup] repeated imports preserve each physical copy and unk
     await page.getByRole("button", { name: "Import reviewed backup" }).click();
     await expect(
       page.getByText(
-        "Import saved. A recovery point is available. Reload to refresh all open views.",
+        "Import saved and inventory views refreshed. A recovery point is available.",
       ),
     ).toBeVisible();
   }
@@ -128,7 +128,7 @@ test("[scanner.binderCorners] grid crops can be corrected and survive reload", a
   );
 });
 
-test("[scanner.binderReview] save selected cards and reopen a saved page photo", async ({
+test("[scanner.binderReview] recover a committed intake exactly once and reopen a saved page photo", async ({
   page,
 }) => {
   await enterDemo(page);
@@ -140,13 +140,11 @@ test("[scanner.binderReview] save selected cards and reopen a saved page photo",
     canvas.getContext("2d")!.fillRect(0, 0, 600, 900);
     return canvas.toDataURL("image/png").split(",")[1]!;
   });
-  await page
-    .getByLabel("Upload scanner photo")
-    .setInputFiles({
-      name: "page.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(photo, "base64"),
-    });
+  await page.getByLabel("Upload scanner photo").setInputFiles({
+    name: "page.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(photo, "base64"),
+  });
   await page.getByRole("button", { name: "Use grid", exact: true }).click();
   await page.getByLabel("Find a replacement card").fill("Pikachu");
   await page.getByRole("button", { name: "Search", exact: true }).click();
@@ -171,16 +169,117 @@ test("[scanner.binderReview] save selected cards and reopen a saved page photo",
       exact: true,
     })
     .click();
+  // Lose the first response AFTER the real local transaction commits. Recovery
+  // must replay its persisted operation and return the original physical IDs.
+  await page.evaluate(() => {
+    type Audit = {
+      requests: unknown[];
+      receipts: Array<{ operationId: string; entryIds: string[] }>;
+      url: string;
+      headers?: HeadersInit;
+      before: string[];
+    };
+    const audit: Audit = { requests: [], receipts: [], url: "", before: [] };
+    (window as typeof window & { intakeAudit: Audit }).intakeAudit = audit;
+    const original = window.fetch;
+    window.fetch = async (input, init) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (!url.endsWith("/intake")) return original(input, init);
+      audit.url = url.slice(0, -"/intake".length);
+      audit.headers = init?.headers;
+      audit.requests.push(JSON.parse(String(init?.body)));
+      if (audit.requests.length === 1) {
+        const binder = await (
+          await original(audit.url, { headers: audit.headers })
+        ).json();
+        audit.before = binder.cards.flatMap(
+          (card: { copies: Array<{ id: string }> }) =>
+            card.copies.map((copy) => copy.id),
+        );
+      }
+      const result = await original(input, init);
+      if (result.ok) audit.receipts.push(await result.clone().json());
+      if (audit.requests.length === 1 && result.ok)
+        throw new Error("Intake committed; response lost during transport");
+      return result;
+    };
+  });
   await page
-    .getByRole("button", { name: "Add session to binder", exact: true })
+    .getByRole("button", { name: "Save reviewed physical cards", exact: true })
+    .click();
+  await expect(
+    page.getByText("Intake committed; response lost during transport"),
+  ).toBeVisible();
+  await expect(binder).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Recover saved intake", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: /Pikachu.*saved/ }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Add session to binder", exact: true }),
+    page.getByRole("button", {
+      name: "Save reviewed physical cards",
+      exact: true,
+    }),
   ).toBeDisabled();
+  const committed = await page.evaluate(async () => {
+    const audit = (
+      window as typeof window & {
+        intakeAudit: {
+          requests: unknown[];
+          receipts: Array<{ operationId: string; entryIds: string[] }>;
+          url: string;
+          headers?: HeadersInit;
+          before: string[];
+        };
+      }
+    ).intakeAudit;
+    const binder = await (
+      await fetch(audit.url, { headers: audit.headers })
+    ).json();
+    const after: string[] = binder.cards.flatMap(
+      (card: { copies: Array<{ id: string }> }) =>
+        card.copies.map((copy) => copy.id),
+    );
+    return {
+      ...audit,
+      after,
+      added: after.filter((id) => !audit.before.includes(id)),
+    };
+  });
+  expect(committed.requests).toHaveLength(2);
+  expect(committed.requests[1]).toEqual(committed.requests[0]);
+  expect(committed.receipts[1]).toEqual(committed.receipts[0]);
+  expect(committed.added).toEqual(committed.receipts[0]!.entryIds);
+  expect(committed.after).toHaveLength(committed.before.length + 1);
   await page.reload();
+  await expect(
+    page.getByRole("button", { name: /Pikachu.*saved/ }),
+  ).toBeVisible();
+  const savedCopyIds = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("tcger-scanner-review");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<string[]>((resolve, reject) => {
+        const request = db.transaction("drafts").objectStore("drafts").getAll();
+        request.onsuccess = () =>
+          resolve(
+            request.result.flatMap(
+              (draft: { session?: Array<{ entryIds?: string[] }> }) =>
+                draft.session?.flatMap((row) => row.entryIds ?? []) ?? [],
+            ),
+          );
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  });
+  expect(savedCopyIds).toEqual(committed.receipts[0]!.entryIds);
   const saved = page.getByLabel("Saved binder page");
   await expect(saved.locator("option").nth(1)).toContainText("Page 1");
   await saved.selectOption(

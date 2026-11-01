@@ -353,15 +353,7 @@ struct CardScannerView: View {
                 },
                 initialBinderID: startingBinderID,
                 onAddCard: { card, binderId, details in
-                    try await APIService().addCardToBinder(
-                        config: environmentStore.serverConfiguration,
-                        token: environmentStore.authToken,
-                        binderId: binderId,
-                        card: card,
-                        details: details
-                    )
-                    viewModel.markSessionResultsAdded([result.id])
-                    await onCardAdded(binderId)
+                    try await saveReviewedScan(resultID: result.id, card: card, binderID: binderId, details: details)
                 }
             )
             .presentationDetents([.medium, .large])
@@ -2743,5 +2735,32 @@ private struct ScanMetricRow: View {
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.trailing)
         }
+    }
+}
+
+private extension CardScannerView {
+    @MainActor
+    func saveReviewedScan(resultID: UUID, card: Card, binderID: String, details: BinderCardAddDetails) async throws {
+        guard let token = environmentStore.authToken else { throw APIService.APIError.unauthorized }
+        let session = environmentStore.sessionIdentity
+        guard session.configuration.isOnDevice || environmentStore.serverFeatures.atomicIntake else {
+            throw APIService.APIError.serverError(status: 501, message: "This server requires atomic intake support. Use a fully Convex-backed server or phone-only mode.")
+        }
+        let scope = InventoryOperationJournal.scope(config: session.configuration, userID: environmentStore.currentUser?.id, token: token)
+        let saved = try InventoryOperationJournal.shared.pending(scope: scope).compactMap { operation -> InventoryIntakeDraft? in
+            guard case .intake(let draft) = operation, draft.rows.contains(where: { $0.rowId == resultID.uuidString }) else { return nil }
+            return draft
+        }.first
+        let draft = saved ?? InventoryIntakeDraft(operationId: UUID().uuidString, collectionId: binderID, source: "scanner", rows: [InventoryIntakeRow(rowId: resultID.uuidString, card: card, details: details)])
+        try InventoryOperationJournal.shared.save(.intake(draft), scope: scope)
+        let receipt = try await APIService().commitInventoryIntake(config: session.configuration, token: token, draft: draft)
+        guard environmentStore.matches(session), !Task.isCancelled else { throw CancellationError() }
+        let addedIDs = Set(receipt.rows.compactMap { UUID(uuidString: $0.rowId) })
+        try await ScannerStagingStore.shared.markAddedDurably(addedIDs)
+        guard environmentStore.matches(session), !Task.isCancelled else { throw CancellationError() }
+        viewModel.markSessionResultsAdded(addedIDs)
+        try InventoryOperationJournal.shared.complete(id: draft.operationId, scope: scope)
+        CollectionMutationNotice.post(config: session.configuration, token: token)
+        await onCardAdded(draft.collectionId)
     }
 }

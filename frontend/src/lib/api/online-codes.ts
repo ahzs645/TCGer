@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   CreateOnlineCodeBatch,
   CreateOnlineCodeBatchResult,
@@ -23,7 +24,7 @@ async function onlineCodeFetch<T>(
   token: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await sessionFetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {

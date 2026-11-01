@@ -29,4 +29,13 @@ describe('persistent binder page contract', () => {
       placements: [{ ...placement, quad: { ...placement.quad, topLeft: { x: -0.1, y: 1.1 } } }]
     })).toThrow();
   });
+
+  it('accepts an explicit create-only or existing revision and rejects invalid revisions', () => {
+    for (const expectedRevision of [0, 1, 27]) {
+      expect(upsertBinderPageSchema.parse({ pageNumber: 1, placements: [], expectedRevision }).expectedRevision).toBe(expectedRevision);
+    }
+    for (const expectedRevision of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, '1', null]) {
+      expect(() => upsertBinderPageSchema.parse({ pageNumber: 1, placements: [], expectedRevision })).toThrow();
+    }
+  });
 });

@@ -23,6 +23,7 @@ export interface ProjectedCopy {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   isFoil?: boolean;
@@ -69,6 +70,7 @@ const COPY_FIELDS = [
   "notes",
   "price",
   "acquisitionPrice",
+  "acquisitionCurrency",
   "serialNumber",
   "acquiredAt",
   "isFoil",

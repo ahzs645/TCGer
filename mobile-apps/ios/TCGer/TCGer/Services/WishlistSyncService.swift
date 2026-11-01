@@ -16,21 +16,30 @@ struct WishlistSyncService {
     private let config: ServerConfiguration
     private let token: String
     private let enabledGames: [TCGGame]
+    private let isCurrent: @MainActor () -> Bool
 
     init(
         apiService: APIService = APIService(),
         config: ServerConfiguration,
         token: String,
-        enabledGames: [TCGGame]
+        enabledGames: [TCGGame],
+        isCurrent: @escaping @MainActor () -> Bool = { true }
     ) {
         self.apiService = apiService
         self.config = config
         self.token = token
         self.enabledGames = enabledGames
+        self.isCurrent = isCurrent
+    }
+
+    private func requireCurrent() throws {
+        try Task.checkCancellation()
+        guard isCurrent() else { throw CancellationError() }
     }
 
     /// Resolves a rule into the cards it currently matches.
     func expand(rule: WishlistRule) async throws -> [Card] {
+        try requireCurrent()
         switch rule.type {
         case .set:
             guard let tcg = rule.tcg, let setCode = rule.setCode else { return [] }
@@ -54,6 +63,7 @@ struct WishlistSyncService {
 
             var matches: [Card] = []
             for game in enabledGames {
+                try requireCurrent()
                 matches.append(contentsOf: try await apiService.searchAllCards(
                     config: config,
                     token: token,
@@ -93,6 +103,7 @@ struct WishlistSyncService {
         let batchSize = APIService.wishlistCardBatchSize
         var sent = 0
         while sent < cards.count {
+            try requireCurrent()
             let chunk = Array(cards[sent..<min(sent + batchSize, cards.count)])
             _ = try await apiService.addCardsToWishlist(
                 config: config,
@@ -100,6 +111,7 @@ struct WishlistSyncService {
                 wishlistId: wishlistId,
                 cards: chunk
             )
+            try requireCurrent()
             sent += chunk.count
             onProgress?(sent, cards.count)
         }
@@ -121,6 +133,7 @@ struct WishlistSyncService {
         )
 
         let matches = try await expand(rule: rule)
+        try requireCurrent()
         let existing = Set(wishlist.cards.map { "\($0.tcg):\($0.externalId)" } + (wishlist.excludedCardKeys ?? []))
         let fresh = matches.filter { !existing.contains("\($0.tcg):\($0.id)") }
 
@@ -131,6 +144,7 @@ struct WishlistSyncService {
         }
 
         if recordSync {
+            try requireCurrent()
             // Bookkeeping only; a failure here should not fail the sync.
             _ = try? await apiService.updateWishlistRule(
                 config: config,
@@ -156,12 +170,14 @@ struct WishlistSyncService {
 
         for rule in wishlist.expansionRules {
             do {
+                try requireCurrent()
                 onProgress?(
                     rule.type == .set
                         ? "Loading \(rule.setName ?? rule.setCode ?? "set")…"
                         : "Searching for \"\(rule.query ?? "")\"…"
                 )
                 let matches = try await expand(rule: rule)
+                try requireCurrent()
                 result.matchedCards += matches.count
 
                 let fresh = matches.filter { !known.contains("\($0.tcg):\($0.id)") }
@@ -173,6 +189,7 @@ struct WishlistSyncService {
                     result.addedCards += fresh.count
                 }
 
+                try requireCurrent()
                 _ = try? await apiService.updateWishlistRule(
                     config: config,
                     token: token,
@@ -182,6 +199,7 @@ struct WishlistSyncService {
                     lastMatchCount: matches.count
                 )
             } catch {
+                if error is CancellationError { return result }
                 result.errors.append(error.localizedDescription)
             }
         }

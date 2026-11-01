@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   AppSettings,
   AdminAppSettings,
@@ -15,7 +16,7 @@ export async function getSettings(token?: string | null): Promise<AppSettings> {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}/settings`, {
+  const response = await sessionFetch(`${API_BASE_URL}/settings`, {
     headers,
     credentials: "include",
   });
@@ -31,7 +32,7 @@ export async function getSettings(token?: string | null): Promise<AppSettings> {
 export async function getAdminSettings(
   token: string,
 ): Promise<AdminAppSettings> {
-  const response = await fetch(`${API_BASE_URL}/settings`, {
+  const response = await sessionFetch(`${API_BASE_URL}/settings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -46,7 +47,7 @@ export async function updateSettings(
   data: UpdateSettingsInput,
   token: string,
 ): Promise<AppSettings> {
-  const response = await fetch(`${API_BASE_URL}/settings`, {
+  const response = await sessionFetch(`${API_BASE_URL}/settings`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -78,9 +79,12 @@ export interface TestSourceResult {
 export async function getSourceDefaults(
   token: string,
 ): Promise<SourceDefaults> {
-  const response = await fetch(`${API_BASE_URL}/settings/source-defaults`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await sessionFetch(
+    `${API_BASE_URL}/settings/source-defaults`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 
   if (!response.ok) {
     throw new Error("Failed to fetch source defaults");
@@ -93,7 +97,7 @@ export async function testSource(
   source: SourceKey,
   token: string,
 ): Promise<TestSourceResult> {
-  const response = await fetch(`${API_BASE_URL}/settings/test-source`, {
+  const response = await sessionFetch(`${API_BASE_URL}/settings/test-source`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -75,9 +75,9 @@ describe("finance and sealed Convex HTTP routes", () => {
     const summaryResponse = await t.fetch("/finance/summary", { headers });
     expect(summaryResponse.status).toBe(200);
     expect(await summaryResponse.json()).toEqual({
-      totalSpent: 10.1,
+      totalSpent: 0,
       totalEarned: 4.25,
-      profitLoss: -5.85,
+      profitLoss: 4.25,
       transactionCount: 3,
     });
 
@@ -143,9 +143,9 @@ describe("finance and sealed Convex HTTP routes", () => {
     expect(
       await (await t.fetch("/finance/summary", { headers })).json(),
     ).toEqual({
-      totalSpent: 10.1,
+      totalSpent: 0,
       totalEarned: 4.25,
-      profitLoss: -5.85,
+      profitLoss: 4.25,
       transactionCount: 2,
     });
   });
@@ -189,7 +189,9 @@ describe("finance and sealed Convex HTTP routes", () => {
   test("links, filters, and updates a card purchase", async () => {
     const t = createTestConvex();
     const headers = bridgeHeaders("finance_card_purchase");
-    const collectionEntryId = "copy_darkrai_dp24";
+    const binder = await (await t.fetch("/collections", { method: "POST", headers, body: JSON.stringify({ name: "Purchases" }) })).json();
+    const owned = await (await t.fetch(`/collections/${binder.id}/cards`, { method: "POST", headers, body: JSON.stringify({ cardId: "dp24", cardData: { tcg: "pokemon", externalId: "dp24", name: "Darkrai" } }) })).json();
+    const collectionEntryId = owned.copies[0].id;
 
     const createResponse = await t.fetch("/finance/transactions", {
       method: "POST",
@@ -258,6 +260,9 @@ describe("finance and sealed Convex HTTP routes", () => {
       platform: "eBay",
     });
     expect(updated.sourceUrl).toBeUndefined();
+    const copy = await t.run(ctx => ctx.db.get(collectionEntryId as Id<"collectionEntries">));
+    expect(copy).toMatchObject({ acquisitionPrice: 20, acquisitionCurrency: "USD", acquisitionTransactionId: created.id });
+
 
     expect(await (await t.fetch("/finance/summary", { headers })).json()).toEqual({
       totalSpent: 20,

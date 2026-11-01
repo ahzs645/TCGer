@@ -315,9 +315,11 @@ struct AddSetsToWishlistSheet: View {
 
     @MainActor
     private func loadInitialData() async {
+        let session = environmentStore.sessionIdentity
         if fixedWishlist == nil {
             await loadWishlists()
         }
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         if availableSets.isEmpty {
             await loadSets()
         }
@@ -325,11 +327,13 @@ struct AddSetsToWishlistSheet: View {
 
     @MainActor
     private func loadWishlists() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return }
         await wishlistStore.load(
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token
         )
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         if selectedWishlistID == nil, wishlistStore.wishlists.count == 1 {
             selectedWishlistID = wishlistStore.wishlists.first?.id
         }
@@ -337,60 +341,67 @@ struct AddSetsToWishlistSheet: View {
 
     @MainActor
     private func loadSets() async {
+        let session = environmentStore.sessionIdentity
         guard let token = environmentStore.authToken else { return }
         isLoadingSets = true
         setsLoadError = nil
-        defer { isLoadingSets = false }
+        defer { if environmentStore.matches(session) { isLoadingSets = false } }
 
         do {
             let catalog = try await apiService.getSetsWithStatus(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             let enabledGameIDs = Set(environmentStore.enabledGames.map(\.rawValue))
             availableSets = catalog.sets.filter {
                 enabledGameIDs.contains($0.tcg.lowercased())
             }
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             setsLoadError = error.localizedDescription
         }
     }
 
     @MainActor
     private func createWishlist() async {
-        guard let token = environmentStore.authToken else { return }
+        guard !isCreatingWishlist, let token = environmentStore.authToken else { return }
+        let session = environmentStore.sessionIdentity
         let name = newWishlistName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
 
         isCreatingWishlist = true
         errorMessage = nil
-        defer { isCreatingWishlist = false }
+        defer { if environmentStore.matches(session) { isCreatingWishlist = false } }
 
         do {
-            let wishlist = try await apiService.createWishlist(
-                config: environmentStore.serverConfiguration,
+            let wishlist = try await wishlistStore.create(
+                config: session.configuration,
                 token: token,
-                name: name
+                input: CreateWishlistInput(name: name, description: nil, colorHex: nil, matchAnyPrinting: false)
             )
-            wishlistStore.insert(wishlist)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             selectedWishlistID = wishlist.id
             newWishlistName = ""
             didFinish = false
             operationMessage = nil
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
     private func addSets() async {
-        guard let token = environmentStore.authToken,
+        guard !isAdding, let token = environmentStore.authToken,
               let wishlist = selectedWishlist else { return }
+        let session = environmentStore.sessionIdentity
 
         let selectedSets = availableSets.filter { selectedSetIDs.contains($0.id) }
         guard !selectedSets.isEmpty else { return }
 
         isAdding = true
+        defer { if environmentStore.matches(session) { isAdding = false } }
         didFinish = false
         errorMessage = nil
         var completedCount = 0
@@ -399,28 +410,33 @@ struct AddSetsToWishlistSheet: View {
 
         let service = WishlistSyncService(
             apiService: apiService,
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token,
-            enabledGames: environmentStore.enabledGames
+            enabledGames: environmentStore.enabledGames,
+            isCurrent: { environmentStore.matches(session) }
         )
 
         for (index, set) in selectedSets.enumerated() {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             operationMessage = "Loading \(set.name) (\(index + 1) of \(selectedSets.count))…"
 
             do {
                 let cards = try await apiService.getSetCards(
-                    config: environmentStore.serverConfiguration,
+                    config: session.configuration,
                     token: token,
                     tcg: set.tcg,
                     setCode: set.code
                 )
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
 
                 try await service.addCards(cards, toWishlist: wishlist.id) { sent, total in
+                    guard environmentStore.matches(session) else { return }
                     operationMessage = "\(set.name): adding \(sent) of \(total) cards…"
                 }
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
 
                 _ = try await apiService.addWishlistRule(
-                    config: environmentStore.serverConfiguration,
+                    config: session.configuration,
                     token: token,
                     wishlistId: wishlist.id,
                     type: .set,
@@ -430,20 +446,23 @@ struct AddSetsToWishlistSheet: View {
                     includeAllPrintings: true,
                     autoSync: true
                 )
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 completedCount += 1
             } catch {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 failedSetIDs.insert(set.id)
                 failures.append("\(set.name): \(error.localizedDescription)")
             }
         }
 
         await wishlistStore.load(
-            config: environmentStore.serverConfiguration,
+            config: session.configuration,
             token: token,
             force: true
         )
-        if wishlistStore.matches(config: environmentStore.serverConfiguration, token: environmentStore.authToken) {
-            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: environmentStore.widgetSessionID)
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
+        if wishlistStore.matches(config: session.configuration, token: token) {
+            environmentStore.updateWishlistWidgetData(wishlists: wishlistStore.wishlists, sessionID: session.generation)
         }
 
         isAdding = false

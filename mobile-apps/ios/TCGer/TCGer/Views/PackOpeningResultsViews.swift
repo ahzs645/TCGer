@@ -490,46 +490,13 @@ struct PackOpeningCardCloseUp: View {
     @MainActor
     private func addToFavorites() async {
         guard !isSavingFavorite else { return }
-        guard let token = environmentStore.authToken else {
-            favoriteError = "Sign in before adding favorites."
-            return
-        }
         isSavingFavorite = true
         defer { isSavingFavorite = false }
-
         do {
-            let collections = try await apiService.getCollections(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                useCache: false
-            )
-            let existingFavorite = collections.first {
-                $0.name.compare("Favorites", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
-            }
-            let resolvedFavorite: Collection
-            if let existingFavorite {
-                resolvedFavorite = existingFavorite
-            } else {
-                resolvedFavorite = try await apiService.createCollection(
-                    config: environmentStore.serverConfiguration,
-                    token: token,
-                    name: "Favorites",
-                    description: "Favorite cards",
-                    colorHex: "#F59E0B"
-                )
-            }
-            _ = try await apiService.addCardToBinder(
-                config: environmentStore.serverConfiguration,
-                token: token,
-                binderId: resolvedFavorite.id,
-                card: pull.card,
-                details: BinderCardAddDetails(quantity: 1, notes: "Favorited from Pack Opening")
-            )
-            NotificationCenter.default.post(name: .collectionDidChange, object: resolvedFavorite)
+            try PackSimulationStore.shared.favorite(pull.card)
             HapticManager.notification(.success)
-            favoriteMessage = "Added \(pull.name) to Favorites."
-        } catch {
-            favoriteError = error.localizedDescription
-        }
+            favoriteMessage = "Saved \(pull.name) to simulation favorites."
+        } catch { favoriteError = error.localizedDescription }
     }
+
 }

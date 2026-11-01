@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   DeckResponse,
   DeckAnalysis,
@@ -49,7 +50,7 @@ async function authFetch(
   token: string,
   options: RequestInit = {},
 ) {
-  const res = await fetch(url, {
+  const res = await sessionFetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",

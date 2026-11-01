@@ -653,6 +653,7 @@ class DefaultTCGerRepository(
                     collectorNumber = card.collectorNumber, imageUrl = card.imageUrl,
                     quantity = 1, condition = edit.condition,
                     price = edit.price, acquisitionPrice = edit.acquisitionPrice,
+                    acquisitionCurrency = if (edit.acquisitionPrice == null) null else edit.acquisitionCurrency,
                     detailsJson = Json.encodeToString(edit.details), createdAt = System.currentTimeMillis(),
                 )
             }
@@ -667,6 +668,7 @@ class DefaultTCGerRepository(
                     cardId = card.id,
                     quantity = quantity,
                     condition = edit.condition, price = edit.price, acquisitionPrice = edit.acquisitionPrice,
+                    acquisitionCurrency = if (edit.acquisitionPrice == null) null else edit.acquisitionCurrency,
                     details = edit.details,
                     cardData = CardDataRequest(
                         name = card.name,
@@ -693,7 +695,9 @@ class DefaultTCGerRepository(
                 val destination = targetBinderId ?: binderId
                 requireNotNull(dao.getBinder(destination)) { "Destination binder not found" }
                 dao.upsertOwnedCard(existing.copy(binderId = destination, condition = edit.condition,
-                    price = edit.price, acquisitionPrice = edit.acquisitionPrice, detailsJson = Json.encodeToString(edit.details)))
+                    price = edit.price, acquisitionPrice = edit.acquisitionPrice,
+                    acquisitionCurrency = if (edit.acquisitionPrice == null) null else edit.acquisitionCurrency,
+                    detailsJson = Json.encodeToString(edit.details)))
             },
             remote = { api, auth ->
                 val codec = Json { encodeDefaults = true; explicitNulls = true }
@@ -702,6 +706,7 @@ class DefaultTCGerRepository(
                 payload.remove("imageUrls") // images are managed by the dedicated upload endpoint
                 payload["condition"] = edit.condition?.let(::JsonPrimitive) ?: JsonNull
                 payload["acquisitionPrice"] = edit.acquisitionPrice?.let(::JsonPrimitive) ?: JsonNull
+                payload["acquisitionCurrency"] = if (edit.acquisitionPrice == null) JsonNull else edit.acquisitionCurrency?.let(::JsonPrimitive) ?: JsonNull
                 payload["tags"] = JsonArray(edit.details.tags.filter { it.id.isNotBlank() }.map { JsonPrimitive(it.id) })
                 payload["newTags"] = JsonArray(edit.details.tags.filter { it.id.isBlank() }.map {
                     buildJsonObject { put("label", it.label); put("colorHex", it.colorHex) }
@@ -716,7 +721,7 @@ class DefaultTCGerRepository(
 
     override suspend fun removeCard(binderId: String, ownedCardId: String) = withSource(
         local = { dao.deleteOwnedCard(binderId, ownedCardId) },
-        remote = { api, auth -> api.removeCard(auth, binderId, ownedCardId) },
+        remote = { api, auth -> api.deletePhysicalCopy(auth, binderId, ownedCardId) },
     )
 
     override suspend fun saveWishlistRule(wishlistId: String, rule: WishlistRule): WishlistRule {
@@ -1092,7 +1097,7 @@ private fun BinderWithCards.toDomain() = Binder(
     associatedSetCode = binder.associatedSetCode,
     associatedSetName = binder.associatedSetName,
     cards = cards.map { entity ->
-        OwnedCard(entity.id, entity.binderId, entity.toCatalogCard(), entity.quantity, entity.condition, entity.price, entity.acquisitionPrice, Json { ignoreUnknownKeys = true }.decodeFromString<CollectionDetails>(entity.detailsJson))
+        OwnedCard(entity.id, entity.binderId, entity.toCatalogCard(), entity.quantity, entity.condition, entity.price, entity.acquisitionPrice, Json { ignoreUnknownKeys = true }.decodeFromString<CollectionDetails>(entity.detailsJson), entity.acquisitionCurrency)
     },
     createdAt = binder.createdAt,
     updatedAt = binder.updatedAt,
@@ -1274,8 +1279,8 @@ internal fun BinderDto.toDomain() = Binder(
             remote.collectorNumber,
             remote.imageUrlSmall ?: remote.imageUrl,
         )
-        if (remote.copies.isEmpty()) listOf(OwnedCard(remote.id, id, catalog, remote.quantity, remote.condition, remote.price, remote.acquisitionPrice))
-        else remote.copies.map { copy -> OwnedCard(copy.id, id, catalog, 1, copy.condition, copy.price, copy.acquisitionPrice, copy.details()) }
+        if (remote.copies.isEmpty()) listOf(OwnedCard(remote.id, id, catalog, remote.quantity, remote.condition, remote.price, remote.acquisitionPrice, acquisitionCurrency = remote.acquisitionCurrency))
+        else remote.copies.map { copy -> OwnedCard(copy.id, id, catalog, 1, copy.condition, copy.price, copy.acquisitionPrice, copy.details(), copy.acquisitionCurrency) }
     },
 )
 

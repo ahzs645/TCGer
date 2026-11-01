@@ -501,32 +501,79 @@ test("seeds analytics, price movers, and the finance ledger", async () => {
 test("local card PATCH clears tags, preserves omitted tags and metadata, and moves without crossing games", async () => {
   useDemoStore.getState().init();
   const source = useDemoStore.getState().binders[0]!;
-  const target = { id: await useDemoStore.getState().addBinder("Review target", "#123456") };
-  const tag = useDemoStore.getState().addTag({ label: "Review tag", colorHex: "123456" });
-  const payload = { cardId: "review-001", quantity: 2, tags: [tag.id], cardData: { externalId: "review-001", name: "Review Pokemon", tcg: "pokemon", baseExternalId: "review-base", printingKey: "review-print", imageUrl: "https://example.test/card.png" } };
+  const target = {
+    id: await useDemoStore.getState().addBinder("Review target", "#123456"),
+  };
+  const tag = useDemoStore
+    .getState()
+    .addTag({ label: "Review tag", colorHex: "123456" });
+  const payload = {
+    cardId: "review-001",
+    quantity: 2,
+    tags: [tag.id],
+    cardData: {
+      externalId: "review-001",
+      name: "Review Pokemon",
+      tcg: "pokemon",
+      baseExternalId: "review-base",
+      printingKey: "review-print",
+      imageUrl: "https://example.test/card.png",
+    },
+  };
   await handleDemoRequest("POST", `/collections/${source.id}/cards`, payload);
-  await handleDemoRequest("POST", `/collections/${target.id}/cards`, { ...payload, quantity: 1, cardData: { ...payload.cardData, tcg: "magic", name: "Review Magic" } });
-  const card = useDemoStore.getState().binders.find((b) => b.id === source.id)!.cards.find((c) => c.cardId === "review-001" && c.tcg === "pokemon")!;
+  await handleDemoRequest("POST", `/collections/${target.id}/cards`, {
+    ...payload,
+    quantity: 1,
+    cardData: { ...payload.cardData, tcg: "magic", name: "Review Magic" },
+  });
+  const card = useDemoStore
+    .getState()
+    .binders.find((b) => b.id === source.id)!
+    .cards.find((c) => c.cardId === "review-001" && c.tcg === "pokemon")!;
   assert.ok(card);
-  assert.deepEqual(card.copies![0]!.tags.map((t) => t.id), [tag.id]);
+  assert.deepEqual(
+    card.copies![0]!.tags.map((t) => t.id),
+    [tag.id],
+  );
   const copy = card.copies![0]!;
   const patch = async (body: unknown) => {
-    const response = await handleDemoRequest("PATCH", `/collections/${source.id}/cards/${copy.id}`, body);
+    const response = await handleDemoRequest(
+      "PATCH",
+      `/collections/${source.id}/cards/${copy.id}`,
+      body,
+    );
     assert.equal(response.status, 200);
     return response.json();
   };
   await patch({ condition: "LP" });
-  assert.deepEqual(useDemoStore.getState().binders.find((b) => b.id === source.id)!.cards.find((c) => c.id === card.id)!.copies![0]!.tags.map((t) => t.id), [tag.id]);
+  assert.deepEqual(
+    useDemoStore
+      .getState()
+      .binders.find((b) => b.id === source.id)!
+      .cards.find((c) => c.id === card.id)!
+      .copies![0]!.tags.map((t) => t.id),
+    [tag.id],
+  );
   await patch({ tags: [] });
-  const remaining = useDemoStore.getState().binders.find((b) => b.id === source.id)!.cards.find((c) => c.id === card.id)!;
+  const remaining = useDemoStore
+    .getState()
+    .binders.find((b) => b.id === source.id)!
+    .cards.find((c) => c.id === card.id)!;
   assert.deepEqual(remaining.copies![0]!.tags, []);
-  assert.deepEqual(remaining.copies![1]!.tags.map((t) => t.id), [tag.id]);
+  assert.deepEqual(
+    remaining.copies![1]!.tags.map((t) => t.id),
+    [tag.id],
+  );
   await patch({ targetBinderId: target.id });
-  const moved = useDemoStore.getState().binders.find((b) => b.id === target.id)!;
+  const moved = useDemoStore
+    .getState()
+    .binders.find((b) => b.id === target.id)!;
   assert.equal(moved.cards.length, 2);
-  assert.equal(moved.cards.find((c) => c.tcg === "pokemon")?.cardData?.baseExternalId, "review-base");
+  assert.equal(
+    moved.cards.find((c) => c.tcg === "pokemon")?.cardData?.baseExternalId,
+    "review-base",
+  );
 });
-
 
 test("wishlist removals survive repeated sync batches and explicit adds restore them", async () => {
   useDemoStore.getState().init();
@@ -556,4 +603,54 @@ test("wishlist removals survive repeated sync batches and explicit adds restore 
   const restored = await request("GET", `/wishlists/${list.id}`);
   assert.equal(restored.cards.length, 1);
   assert.deepEqual(restored.excludedCardKeys, []);
+});
+
+test("demo scanner prices label sample values and never borrow another game's or finish's quote", async () => {
+  const response = await handleDemoRequest("POST", "/prices/tracked", {
+    items: [
+      { tcg: "pokemon", externalId: "pkm-001" },
+      { tcg: "pokemon", externalId: "pkm-001", finishCode: "holo" },
+      { tcg: "magic", externalId: "pkm-001" },
+    ],
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(typeof result.prices[0].price, "number");
+  assert.equal(result.prices[0].source, "Demo sample (not live)");
+  assert.equal(result.prices[0].updatedAt, undefined);
+  assert.equal(result.prices[1].price, undefined);
+  assert.equal(result.prices[2].price, undefined);
+});
+
+test("demo inventory keeps unlabeled legacy costs in UNKNOWN and excludes them from its USD scalar", async () => {
+  useDemoStore.getState().init();
+  const binder = useDemoStore.getState().binders[0]!;
+  const before = await (
+    await handleDemoRequest("GET", "/finance/realized-performance")
+  ).json();
+  const saved = await handleDemoRequest(
+    "POST",
+    `/collections/${binder.id}/cards`,
+    {
+      cardId: "unknown-currency-copy",
+      quantity: 1,
+      acquisitionPrice: 100,
+      cardData: {
+        externalId: "unknown-currency-copy",
+        tcg: "pokemon",
+        name: "Legacy amount without currency",
+      },
+    },
+  );
+  assert.equal(saved.status, 200);
+  const after = await (
+    await handleDemoRequest("GET", "/finance/realized-performance")
+  ).json();
+  const unknown = (value: {
+    inventoryCostsByCurrency: Array<{ currency: string; cost: number }>;
+  }) =>
+    value.inventoryCostsByCurrency.find((row) => row.currency === "UNKNOWN")
+      ?.cost ?? 0;
+  assert.equal(after.inventoryCost, before.inventoryCost);
+  assert.equal(unknown(after) - unknown(before), 100);
 });

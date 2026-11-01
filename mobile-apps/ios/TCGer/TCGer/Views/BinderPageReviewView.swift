@@ -27,7 +27,10 @@ struct BinderPageReviewView: View {
     @State private var showsAllCards = false
     @State private var statusFilter: BinderCardDetectionStatus?
     @State private var storedPages: [SavedBinderPage] = []
+    @State private var storedPagesLoadID: UUID?
     @State private var isSavingPage = false
+    @State private var pendingPageSaveID: String?
+    @State private var pageSaveReview: BinderPageRecoveryReviewContext?
     @AppStorage("binderScanner.savePageImages") private var savesPageImages = true
     @AppStorage("binderScanner.replacePageImages") private var replacesPageImages = true
     @AppStorage("binderScanner.hidesUnmatchedCards") private var hidesUnmatchedCards = false
@@ -74,7 +77,7 @@ struct BinderPageReviewView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
-                        .disabled(isAdding || isCreatingBinder)
+                        .disabled(isAdding || isCreatingBinder || isSavingPage)
                 }
                 ToolbarItem(placement: .primaryAction) {
                     if let currentRecord {
@@ -88,7 +91,13 @@ struct BinderPageReviewView: View {
                 }
             }
         }
-        .task { await loadCollections() }
+        .task {
+            let session = environmentStore.sessionIdentity
+            await loadCollections()
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            restorePendingPageSave()
+        }
+        .interactiveDismissDisabled(isAdding || isCreatingBinder || isSavingPage)
         .onChange(of: viewModel.binderPages.count, initial: false) { _, count in
             guard count > 0 else {
                 dismiss()
@@ -119,6 +128,13 @@ struct BinderPageReviewView: View {
                     }
                 )
                     .presentationDetents([.large])
+            }
+        }
+        .sheet(item: $pageSaveReview) { context in
+            BinderPageConflictReviewView(context: context) { resolution in
+                guard environmentStore.matches(context.session) else { throw CancellationError() }
+                try BinderPageRecoveryCoordinator(service: apiService).resolve(context.conflict, keeping: resolution, scope: context.scope)
+                Task { await resumePendingPageSave(context.attempt.id) }
             }
         }
         .alert(
@@ -629,7 +645,7 @@ struct BinderPageReviewView: View {
                     .disabled(isAdding || isCreatingBinder)
                 }
 
-                Text("Adding cards also saves their positions and the optional scan image.")
+                Text("Copies are confirmed first. Their page positions and optional scan image are then saved, with a separate retry if needed.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -668,9 +684,17 @@ struct BinderPageReviewView: View {
             .disabled(
                 isAdding ||
                     isCreatingBinder || isSavingPage ||
+                    pendingPageSaveID != nil ||
                     binderID == nil ||
                     remainingIncludedDetectionCount(in: records) == 0
             )
+            if let pendingPageSaveID {
+                Button("Resume saved binder scan") {
+                    Task { await resumePendingPageSave(pendingPageSaveID) }
+                }
+                .buttonStyle(.glass)
+                .disabled(isAdding || isSavingPage)
+            }
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
@@ -1058,6 +1082,7 @@ struct BinderPageReviewView: View {
 
     @MainActor
     private func loadCollections() async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.serverConfiguration.isOnDevice || environmentStore.authToken != nil else {
             errorMessage = "Not authenticated"
             isLoadingCollections = false
@@ -1065,10 +1090,12 @@ struct BinderPageReviewView: View {
         }
 
         do {
-            collections = try await apiService.getCollections(
-                config: environmentStore.serverConfiguration,
-                token: environmentStore.authToken
+            let loaded = try await apiService.getCollections(
+                config: session.configuration,
+                token: session.token
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            collections = loaded
             sortCollections()
             if let selectedBinderID = viewModel.selectedBinderID,
                collections.contains(where: { $0.id == selectedBinderID }) {
@@ -1078,6 +1105,7 @@ struct BinderPageReviewView: View {
             }
             await loadStoredPages(for: currentRecord.flatMap(destinationBinderID))
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
         isLoadingCollections = false
@@ -1097,18 +1125,20 @@ struct BinderPageReviewView: View {
             return
         }
 
+        let session = environmentStore.sessionIdentity
         isCreatingBinder = true
         defer { isCreatingBinder = false }
 
         do {
             let collection = try await apiService.createCollection(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 name: name,
                 description: description,
                 colorHex: colorHex,
                 defaultCondition: defaultCondition
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             collections.removeAll { $0.id == collection.id }
             collections.append(collection)
             sortCollections()
@@ -1118,58 +1148,146 @@ struct BinderPageReviewView: View {
                 viewModel.selectedBinderID = collection.id
             }
             storedPages = []
-            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
+            CollectionMutationNotice.post(config: session.configuration, token: token, object: collection)
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
     private func addIncludedCards(from records: [BinderPageRecord], to binderID: String) async {
-        guard let token = requestToken else {
-            errorMessage = "Not authenticated"
+        guard !isAdding, let token = requestToken else { return }
+        let session = environmentStore.sessionIdentity
+        guard session.configuration.isOnDevice || (environmentStore.serverFeatures.atomicIntake && environmentStore.serverFeatures.binderPageRevisionGuards) else {
+            errorMessage = "This server needs atomic intake and guarded binder-page saves. Connect to an updated fully Convex-backed server or use phone-only mode."
             return
         }
-
-        let pendingCount = records.reduce(0) { $0 + remainingIncludedDetections(in: $1).count }
-        guard pendingCount > 0 else { return }
-
+        let detections = records.flatMap { remainingIncludedDetections(in: $0) }
+        guard !detections.isEmpty else { return }
+        let scope = InventoryOperationJournal.scope(config: session.configuration, userID: environmentStore.currentUser?.id, token: token)
         isAdding = true
-        var addedThisAttempt = 0
         defer { isAdding = false }
-
-        for record in records {
-            for detection in remainingIncludedDetections(in: record) {
-                guard let candidate = detection.selectedCandidate,
-                      let card = makeCard(from: candidate)
-                else { continue }
-
-                do {
-                    try await apiService.addCardToBinder(
-                        config: environmentStore.serverConfiguration,
-                        token: token,
-                        binderId: binderID,
-                        card: card,
-                        details: BinderCardAddDetails(
-                            condition: CardCondition.nearMint.rawValue,
-                            language: "English"
-                        )
-                    )
-                    if let pageIndex = viewModel.binderPages.firstIndex(where: { $0.id == record.id }) {
-                        viewModel.binderPages[pageIndex].addedDetectionIDs.insert(detection.id)
+        do {
+            let selectedIDs = Set(detections.map { $0.id.uuidString })
+            if let saved = try BinderPageSaveJournal.shared.pending(scope: scope).first(where: {
+                !Set($0.intake.rows.map(\.rowId)).isDisjoint(with: selectedIDs)
+            }) {
+                pendingPageSaveID = saved.id
+                await resumePendingPageSave(saved.id)
+                return
+            }
+            let pending = try InventoryOperationJournal.shared.pending(scope: scope).compactMap { operation -> InventoryIntakeDraft? in
+                guard case .intake(let draft) = operation, !Set(draft.rows.map(\.rowId)).isDisjoint(with: selectedIDs) else { return nil }
+                return draft
+            }.first
+            let draft: InventoryIntakeDraft
+            if let pending { draft = pending }
+            else {
+                let rows = try detections.map { detection -> InventoryIntakeRow in
+                    guard let candidate = detection.selectedCandidate, let card = makeCard(from: candidate) else {
+                        throw APIService.APIError.serverError(status: 400, message: "Review each included card before saving")
                     }
-                    addedThisAttempt += 1
-                } catch {
-                    errorMessage = "Added \(addedThisAttempt) of \(pendingCount) cards. \(error.localizedDescription)"
+                    return InventoryIntakeRow(rowId: detection.id.uuidString, card: card, details: BinderCardAddDetails(condition: CardCondition.nearMint.rawValue, language: "English"))
+                }
+                draft = InventoryIntakeDraft(operationId: UUID().uuidString, collectionId: binderID, source: "scanner", rows: rows)
+            }
+            let rowIDs = Set(draft.rows.map(\.rowId))
+            let pages = try records.map { record -> DeferredBinderPage in
+                let existing = storedPages.first { $0.binderId == draft.collectionId && $0.pageNumber == record.pageNumber }
+                var image: Data?
+                if savesPageImages && (existing?.imageUrl == nil || replacesPageImages) {
+                    guard let encoded = UIImage(cgImage: record.result.capturedImage).jpegData(compressionQuality: 0.82) else {
+                        throw APIService.APIError.serverError(status: 400, message: "The page image could not be prepared. No new inventory request was sent.")
+                    }
+                    image = encoded
+                }
+                return DeferredBinderPage(
+                    pageNumber: record.pageNumber, capturedAt: ISO8601DateFormatter().string(from: record.scannedAt),
+                    placements: record.persistentPlacements,
+                    detectionRowIDs: record.detections.map { $0.id.uuidString }.filter { rowIDs.contains($0) },
+                    imageData: image, expectedRevision: existing?.revision ?? 0, expectedPageID: existing?.id
+                )
+            }
+            // This must succeed before the first inventory request. It also
+            // safely upgrades an older intake-only journal without losing it.
+            let saved = DeferredBinderPageSave(intake: draft, pages: pages)
+            try BinderPageSaveJournal.shared.save(saved, scope: scope)
+            pendingPageSaveID = saved.id
+            await resumePendingPageSave(saved.id)
+        } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func restorePendingPageSave() {
+        guard let token = requestToken else { return }
+        do {
+            let scope = InventoryOperationJournal.scope(config: environmentStore.serverConfiguration, userID: environmentStore.currentUser?.id, token: token)
+            let detectionIDs = Set(viewModel.binderPages.flatMap(\.detections).map { $0.id.uuidString })
+            if let saved = try BinderPageSaveJournal.shared.pending(scope: scope).first(where: {
+                !Set($0.intake.rows.map(\.rowId)).isDisjoint(with: detectionIDs)
+            }) {
+                pendingPageSaveID = saved.id
+                if let receipt = saved.receipt { markConfirmedBinderDetections(receipt) }
+            }
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func markConfirmedBinderDetections(_ receipt: InventoryIntakeReceipt) {
+        let addedIDs = Set(receipt.rows.compactMap { UUID(uuidString: $0.rowId) })
+        for index in viewModel.binderPages.indices {
+            let pageIDs = Set(viewModel.binderPages[index].detections.map(\.id))
+            viewModel.binderPages[index].addedDetectionIDs.formUnion(addedIDs.intersection(pageIDs))
+        }
+    }
+
+    @MainActor
+    private func resumePendingPageSave(_ id: String) async {
+        guard !isSavingPage, let token = requestToken else { return }
+        let session = environmentStore.sessionIdentity
+        let scope = InventoryOperationJournal.scope(config: session.configuration, userID: environmentStore.currentUser?.id, token: token)
+        isSavingPage = true
+        errorMessage = nil
+        defer { isSavingPage = false }
+        do {
+            let saved = try BinderPageSaveJournal.shared.attempt(id: id, scope: scope)
+            guard session.configuration.isOnDevice || (environmentStore.serverFeatures.binderPageRevisionGuards && (saved.receipt != nil || environmentStore.serverFeatures.atomicIntake)) else {
+                throw APIService.APIError.serverError(status: 501, message: "Resume this saved scan on an updated server with guarded page saves and atomic intake.")
+            }
+            // The complete replacement intent already exists in the protected
+            // page journal, so an older intake-only record can now be removed.
+            if try InventoryOperationJournal.shared.pending(scope: scope).contains(where: { $0.id == id }) {
+                try InventoryOperationJournal.shared.complete(id: id, scope: scope)
+            }
+            let result = try await BinderPageRecoveryCoordinator(service: apiService).resume(id: id, scope: scope, config: session.configuration, token: token, isCurrent: { environmentStore.matches(session) })
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            markConfirmedBinderDetections(result.receipt)
+            for page in result.pages {
+                storedPages.removeAll { $0.pageNumber == page.pageNumber }
+                storedPages.append(page)
+            }
+            storedPages.sort { $0.pageNumber < $1.pageNumber }
+            pendingPageSaveID = nil
+            CollectionMutationNotice.post(config: session.configuration, token: token)
+            HapticManager.notification(.success)
+            advanceOrDismissAfterAdding()
+        } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
+            if let saved = try? BinderPageSaveJournal.shared.attempt(id: id, scope: scope) {
+                if let receipt = saved.receipt {
+                    markConfirmedBinderDetections(receipt)
+                    CollectionMutationNotice.post(config: session.configuration, token: token)
+                }
+                if let conflict = error as? BinderPageRecoveryConflict {
+                    pageSaveReview = BinderPageRecoveryReviewContext(conflict: conflict, attempt: saved, scope: scope, session: session)
                     return
                 }
             }
-        }
-
-        if addedThisAttempt > 0 {
-            await persistRecords(records, to: binderID, reportsSuccess: false)
-            HapticManager.notification(.success)
-            advanceOrDismissAfterAdding()
+            errorMessage = "This scan, its image, and any confirmed copy IDs are saved. Resume here or in Settings → Pending saves. " + error.localizedDescription
         }
     }
 
@@ -1194,67 +1312,29 @@ struct BinderPageReviewView: View {
 
     @MainActor
     private func loadStoredPages(for requestedBinderID: String? = nil) async {
+        let session = environmentStore.sessionIdentity
+        let requestID = UUID()
+        storedPagesLoadID = requestID
         guard let binderID = requestedBinderID ?? viewModel.selectedBinderID else {
             storedPages = []
             return
         }
         do {
-            storedPages = try await apiService.getBinderPages(
-                config: environmentStore.serverConfiguration,
+            let loaded = try await apiService.getBinderPages(
+                config: session.configuration,
                 token: requestToken,
                 binderId: binderID
             )
+            guard environmentStore.matches(session), storedPagesLoadID == requestID, !Task.isCancelled else { return }
+            storedPages = loaded
         } catch {
+            guard environmentStore.matches(session), storedPagesLoadID == requestID, !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     private func storedPage(for pageNumber: Int) -> SavedBinderPage? {
         storedPages.first { $0.pageNumber == pageNumber }
-    }
-
-    @MainActor
-    private func persistRecords(
-        _ records: [BinderPageRecord],
-        to binderID: String,
-        reportsSuccess: Bool = true
-    ) async {
-        guard !isSavingPage else { return }
-        isSavingPage = true
-        defer { isSavingPage = false }
-
-        do {
-            for record in records {
-                let existing = storedPage(for: record.pageNumber)
-                var saved = try await apiService.upsertBinderPage(
-                    config: environmentStore.serverConfiguration,
-                    token: requestToken,
-                    binderId: binderID,
-                    pageNumber: record.pageNumber,
-                    capturedAt: record.scannedAt,
-                    placements: record.persistentPlacements
-                )
-                let shouldUploadImage = savesPageImages && (existing?.imageUrl == nil || replacesPageImages)
-                if shouldUploadImage,
-                   let imageData = UIImage(cgImage: record.result.capturedImage)
-                    .jpegData(compressionQuality: 0.82) {
-                    saved = try await apiService.replaceBinderPageImage(
-                        config: environmentStore.serverConfiguration,
-                        token: requestToken,
-                        binderId: binderID,
-                        pageNumber: record.pageNumber,
-                        imageData: imageData
-                    )
-                }
-                storedPages.removeAll { $0.pageNumber == saved.pageNumber }
-                storedPages.append(saved)
-            }
-            storedPages.sort { $0.pageNumber < $1.pageNumber }
-            if reportsSuccess { HapticManager.notification(.success) }
-        } catch {
-            errorMessage = error.localizedDescription
-            HapticManager.notification(.error)
-        }
     }
 
     private var requestToken: String? {

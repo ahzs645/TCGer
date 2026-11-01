@@ -131,6 +131,7 @@ function toEntryRows(
     notes: copy.notes,
     price: copy.price ?? card.price,
     acquisitionPrice: copy.acquisitionPrice,
+    acquisitionCurrency: copy.acquisitionCurrency,
     serialNumber: copy.serialNumber,
     acquiredAt: copy.acquiredAt ?? card.addedAt,
     isFoil: copy.isFoil,
@@ -264,6 +265,7 @@ export function toDemoBinders(
         notes: entry.notes,
         price: entry.price,
         acquisitionPrice: entry.acquisitionPrice,
+        acquisitionCurrency: entry.acquisitionCurrency,
         serialNumber: entry.serialNumber,
         acquiredAt: entry.acquiredAt,
         isFoil: entry.isFoil,
@@ -294,7 +296,9 @@ export function toDemoBinders(
       const demoCardId = card ? demoCardIdFromRow(card) : entry.cardId;
       // Preserve whatever the previous nested card carried that rows do not
       // model — chiefly `cardData`, which catalog enrichment writes back.
-      const previous = demoCards?.get(demoCardKey(binder._id, card?.tcg ?? "", demoCardId));
+      const previous = demoCards?.get(
+        demoCardKey(binder._id, card?.tcg ?? "", demoCardId),
+      );
       grouped.set(entry.cardId, {
         id: entry._id,
         cardId: demoCardId,
@@ -307,7 +311,8 @@ export function toDemoBinders(
         price: entry.price ?? previous?.price ?? 0,
         quantity: 1,
         addedAt: entry.acquiredAt ?? new Date(entry.createdAt).toISOString(),
-        cardData: (card?.cardData as DemoBinderCard["cardData"]) ?? previous?.cardData,
+        cardData:
+          (card?.cardData as DemoBinderCard["cardData"]) ?? previous?.cardData,
         copies: [copy],
       });
     }
@@ -345,7 +350,11 @@ export function toDemoBinders(
 }
 
 /** Key `toDemoBinders` uses to carry non-row fields across a rebuild. */
-export function demoCardKey(binderId: string, tcg: string, demoCardId: string): string {
+export function demoCardKey(
+  binderId: string,
+  tcg: string,
+  demoCardId: string,
+): string {
   return `${binderId}:${tcg}:${demoCardId}`;
 }
 

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 
 import { env } from '../../config/env';
 import { getSingleUserSessionUser } from '../../lib/single-user';
+import { provisionLegacyIdentity } from '../../lib/legacy-identity';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -77,24 +78,37 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  let user: SessionUser | null;
   try {
-    const user = await getSessionUserFromRequest(req);
-
-    if (!user) {
-      res.status(401).json({ error: 'UNAUTHORIZED', message: 'Not authenticated' });
-      return;
-    }
-
-    (req as AuthRequest).user = {
-      id: user.id,
-      email: user.email,
-      username: user.username ?? null,
-      isAdmin: user.isAdmin ?? false,
-      showCardNumbers: user.showCardNumbers ?? true,
-      showPricing: user.showPricing ?? true
-    };
-    next();
+    user = await getSessionUserFromRequest(req);
   } catch {
     res.status(401).json({ error: 'UNAUTHORIZED', message: 'Invalid or expired session' });
+    return;
   }
+
+  if (!user) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Not authenticated' });
+    return;
+  }
+
+  // Convex/BetterAuth authenticates both modes. Provision the same stable
+  // subject before a hybrid route can create a row with a Prisma user FK.
+  if (env.BACKEND_MODE === 'hybrid') {
+    try {
+      await provisionLegacyIdentity(user);
+    } catch (error) {
+      next(error);
+      return;
+    }
+  }
+
+  (req as AuthRequest).user = {
+    id: user.id,
+    email: user.email,
+    username: user.username ?? null,
+    isAdmin: user.isAdmin ?? false,
+    showCardNumbers: user.showCardNumbers ?? true,
+    showPricing: user.showPricing ?? true
+  };
+  next();
 }

@@ -1,3 +1,5 @@
+import { inventoryIntakeSchema, upsertBinderPageSchema } from "@tcg/api-types";
+import { z } from "zod";
 import { ConvexError } from "convex/values";
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
@@ -118,6 +120,7 @@ type NativeEntry = {
   notes?: string;
   price?: number;
   acquisitionPrice?: number;
+  acquisitionCurrency?: string;
   serialNumber?: string;
   acquiredAt?: string;
   isFoil?: boolean;
@@ -240,6 +243,7 @@ function expandLegacyCopies(entry: NativeEntry) {
     notes: entry.notes,
     price: entry.price,
     acquisitionPrice: entry.acquisitionPrice,
+    acquisitionCurrency: entry.acquisitionCurrency,
     serialNumber: entry.serialNumber,
     acquiredAt: entry.acquiredAt,
     isFoil: entry.isFoil,
@@ -307,6 +311,7 @@ function toLegacyBinder(binder: NativeBinderDetail) {
       notes: entry.notes,
       price: entry.price,
       acquisitionPrice: entry.acquisitionPrice,
+      acquisitionCurrency: entry.acquisitionCurrency,
       serialNumber: entry.serialNumber,
       acquiredAt: entry.acquiredAt,
       isFoil: entry.isFoil,
@@ -644,7 +649,7 @@ function pickBulkCopyFields(source: any) {
 }
 
 function asCollectionEntryId(value: string) {
-  return value as any;
+  try { return decodeURIComponent(value) as any; } catch { throw new ConvexError({ code: "BAD_REQUEST", message: "Invalid copy address" }); }
 }
 
 function asBinderId(value: string) {
@@ -702,6 +707,7 @@ function toExportRows(binders: NativeBinderDetail[]) {
         notes: entry.notes ?? null,
         price: entry.price ?? null,
         acquisitionPrice: entry.acquisitionPrice ?? null,
+        acquisitionCurrency: entry.acquisitionCurrency ?? null,
         serialNumber: entry.serialNumber ?? null,
         isFoil: Boolean(entry.isFoil),
         finishCode: entry.finishCode ?? null,
@@ -759,6 +765,7 @@ function toCsv(rows: ReturnType<typeof toExportRows>) {
     "Notes",
     "Price",
     "Acquisition Price",
+    "Acquisition Currency",
     "Serial Number",
     "Foil",
     "Finish Code",
@@ -802,6 +809,7 @@ function toCsv(rows: ReturnType<typeof toExportRows>) {
       escapeCsvField(row.notes),
       escapeCsvField(row.price),
       escapeCsvField(row.acquisitionPrice),
+      escapeCsvField(row.acquisitionCurrency),
       escapeCsvField(row.serialNumber),
       row.isFoil ? "Yes" : "No",
       escapeCsvField(row.finishCode),
@@ -886,11 +894,6 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     try {
       const identity = await requireBridgeIdentity(ctx, request);
-      const setupRequired = await ctx.runQuery(internal.bridge.getSetupRequired, {});
-      if (!setupRequired) {
-        return errorJson(409, "CONFLICT", "Admin user already exists");
-      }
-
       await ctx.runMutation(internal.bridge.promoteViewerToAdmin, identity);
       return json({ message: "Admin account configured successfully" });
     } catch (error) {
@@ -1858,6 +1861,7 @@ http.route({
         price: typeof body.price === "number" ? body.price : undefined,
         acquisitionPrice:
           typeof body.acquisitionPrice === "number" ? body.acquisitionPrice : undefined,
+        acquisitionCurrency: typeof body.acquisitionCurrency === "string" ? body.acquisitionCurrency : undefined,
         serialNumber: typeof body.serialNumber === "string" ? body.serialNumber : undefined,
         acquiredAt: typeof body.acquiredAt === "string" ? body.acquiredAt : undefined,
         isFoil: typeof body.isFoil === "boolean" ? body.isFoil : undefined,
@@ -1939,6 +1943,26 @@ http.route({
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/collections\//, "").split("/").filter(Boolean);
 
+      if (segments.length === 2 && segments[1] === "intake") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        const parsed = inventoryIntakeSchema.safeParse(await parseJsonBody(request));
+        if (!parsed.success) return errorJson(400, "VALIDATION_ERROR", parsed.error.issues.map(issue => issue.message).join("; "));
+        return json(await ctx.runMutation(internal.collectionOperations.commitIntake, {
+          ...parsed.data, subject: identity.subject, binderId: asBinderId(binderId),
+          sealedInventoryId: parsed.data.sealedInventoryId as any,
+        }), 201);
+      }
+      if (segments.length === 1 && segments[0] === "normalize-copies") {
+        const parsed = z.object({
+          dryRun: z.boolean().default(true),
+          limit: z.number().int().min(1).max(100).default(10),
+        }).safeParse(await parseJsonBody(request));
+        if (!parsed.success) return errorJson(400, "VALIDATION_ERROR", parsed.error.issues.map(issue => issue.message).join("; "));
+        return json(await ctx.runMutation(internal.collectionOperations.normalizeLegacyCopies, {
+          subject: identity.subject, ...parsed.data,
+        }));
+      }
+
       if (segments.length === 2 && segments[1] === "share-links") {
         const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
         const body = await parseJsonBody(request);
@@ -1984,6 +2008,7 @@ http.route({
           price: typeof body.price === "number" ? body.price : undefined,
           acquisitionPrice:
             typeof body.acquisitionPrice === "number" ? body.acquisitionPrice : undefined,
+          acquisitionCurrency: typeof body.acquisitionCurrency === "string" ? body.acquisitionCurrency : undefined,
           serialNumber: typeof body.serialNumber === "string" ? body.serialNumber : undefined,
           acquiredAt: typeof body.acquiredAt === "string" ? body.acquiredAt : undefined,
           isFoil: typeof body.isFoil === "boolean" ? body.isFoil : undefined,
@@ -2028,26 +2053,33 @@ http.route({
         if (!(image instanceof File)) {
           return errorJson(400, "BAD_REQUEST", "A page image is required");
         }
+        const revisionValue = form.get("expectedRevision");
+        const expectedRevision = revisionValue === null ? undefined : Number(revisionValue);
+        if (expectedRevision !== undefined && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1)) {
+          return errorJson(400, "BAD_REQUEST", "expectedRevision must be a positive integer");
+        }
         const storageId = await ctx.storage.store(image);
+        let result;
         try {
-          const result = await ctx.runMutation(internal.bridge.attachBinderPageImage, {
+          result = await ctx.runMutation(internal.bridge.attachBinderPageImage, {
             subject: identity.subject,
             binderId: asBinderId(binderId),
             pageNumber,
+            expectedRevision,
             storageId
           });
-          if (result.replacedStorageId) {
-            await ctx.storage.delete(result.replacedStorageId);
-          }
-          const pages = await ctx.runQuery(internal.bridge.listBinderPages, {
-            subject: identity.subject,
-            binderId: asBinderId(binderId)
-          });
-          return json(pages.find((page) => page.pageNumber === pageNumber), 201);
         } catch (error) {
           await ctx.storage.delete(storageId);
           throw error;
         }
+        // Only an uncommitted upload may be cleaned up on failure. Once attached,
+        // later cleanup/read failures must not remove the page's current image.
+        if (result.replacedStorageId) await ctx.storage.delete(result.replacedStorageId);
+        const pages = await ctx.runQuery(internal.bridge.listBinderPages, {
+          subject: identity.subject,
+          binderId: asBinderId(binderId)
+        });
+        return json(pages.find((page) => page.pageNumber === pageNumber), 201);
       }
 
       if (segments.length === 4 && segments[1] === "cards" && segments[3] === "images") {
@@ -2070,6 +2102,7 @@ http.route({
           const result = await ctx.runMutation(internal.bridge.attachImageToEntry, {
             subject: identity.subject,
             entryId: asCollectionEntryId(segments[2]),
+            binderId: await resolveActualBinderId(ctx, identity, segments[0]),
             imageUrl,
             storageId
           });
@@ -2101,19 +2134,19 @@ http.route({
       }
       const pageNumber = Number.parseInt(segments[2] ?? "", 10);
       const body = await parseJsonBody(request);
-      if (!Number.isInteger(pageNumber) || pageNumber < 1 || !Array.isArray(body.placements)) {
-        return errorJson(400, "BAD_REQUEST", "Invalid binder page");
-      }
+      const parsed = upsertBinderPageSchema.safeParse({ ...body, pageNumber });
+      if (!parsed.success) return errorJson(400, "BAD_REQUEST", "Invalid binder page");
       const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
-      const capturedAt = typeof body.capturedAt === "string"
-        ? Date.parse(body.capturedAt)
+      const capturedAt = parsed.data.capturedAt
+        ? Date.parse(parsed.data.capturedAt)
         : undefined;
       const page = await ctx.runMutation(internal.bridge.upsertBinderPage, {
         subject: identity.subject,
         binderId: asBinderId(binderId),
         pageNumber,
+        expectedRevision: parsed.data.expectedRevision,
         capturedAt: capturedAt !== undefined && Number.isFinite(capturedAt) ? capturedAt : undefined,
-        placements: body.placements
+        placements: parsed.data.placements
       });
       return json(page);
     } catch (error) {
@@ -2182,6 +2215,7 @@ http.route({
         const updated = await ctx.runMutation(internal.bridge.updateEntry, {
           subject: identity.subject,
           entryId: asCollectionEntryId(segments[2]),
+          sourceBinderId: await resolveActualBinderId(ctx, identity, segments[0]),
           binderId: targetBinderId,
           // Omitted means "copy", the behaviour this endpoint has always had.
           scope: body.scope === "card" ? "card" : undefined,
@@ -2201,6 +2235,7 @@ http.route({
             typeof body.acquisitionPrice === "number" || body.acquisitionPrice === null
               ? body.acquisitionPrice
               : undefined,
+          acquisitionCurrency: typeof body.acquisitionCurrency === "string" || body.acquisitionCurrency === null ? body.acquisitionCurrency : undefined,
           serialNumber:
             typeof body.serialNumber === "string" || body.serialNumber === null
               ? body.serialNumber
@@ -2292,6 +2327,14 @@ http.route({
       const url = new URL(request.url);
       const segments = url.pathname.replace(/^\/collections\//, "").split("/").filter(Boolean);
 
+      if (segments.length === 3 && segments[1] === "copies") {
+        const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
+        await ctx.runMutation(internal.collectionOperations.removeCopy, {
+          subject: identity.subject, binderId: asBinderId(binderId), entryId: asCollectionEntryId(segments[2]),
+        });
+        return noContent();
+      }
+
       if (segments.length === 3 && segments[1] === "share-links") {
         const binderId = await resolveActualBinderId(ctx, identity, segments[0]);
         await ctx.runMutation(internal.bridge.revokeBinderShareLink, {
@@ -2318,6 +2361,7 @@ http.route({
       if (segments.length === 3 && segments[1] === "cards") {
         await ctx.runMutation(internal.bridge.removeEntry, {
           subject: identity.subject,
+          binderId: await resolveActualBinderId(ctx, identity, segments[0]),
           entryId: asCollectionEntryId(segments[2])
         });
         return noContent();
@@ -2348,6 +2392,7 @@ http.route({
         const result = await ctx.runMutation(internal.bridge.removeImageFromEntry, {
           subject: identity.subject,
           entryId: asCollectionEntryId(segments[2]),
+          binderId: await resolveActualBinderId(ctx, identity, segments[0]),
           imageIndex
         });
         if (result.removedStorageId) {

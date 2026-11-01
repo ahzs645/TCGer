@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "convex dev",
+    "dev:local": "node ../tools/dev/convex-dev.mjs",
     "codegen": "convex codegen",
     "build": "tsc --noEmit",
     "test": "vitest",

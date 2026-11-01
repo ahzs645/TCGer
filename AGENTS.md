@@ -178,10 +178,14 @@ search results while pricing is enabled and online, retain stored estimates when
 quotes fail, and reject replaced/cancelled card, source or session requests.
 
 Copy PATCH changes the addressed physical copy and preserves its siblings;
-the established DELETE card endpoint removes the whole printing group. Scan-save
-contracts verify persistence requests, not recognition or UI review. Sealed opening
-contracts verify ownership, decrements and linked-copy ledgers, not offline or
-idempotent replay. Keep these distinctions in tests and feature declarations.
+the established DELETE card endpoint removes the whole printing group. The
+separate DELETE copy endpoint removes exactly one copy. Atomic intake and sale
+operations freeze a client operation ID and return replayable receipts containing
+the exact copy IDs. Their contracts verify ownership, inventory/ledger commits,
+and replay; they do not prove recognition, UI review, or device recovery. Legacy
+standalone sealed-opening routes have their own narrower contract. Keep these
+distinctions in tests and feature declarations. Simulated pulls belong to
+simulation history; actual owned-card intake must be explicitly reviewed.
 
 
 ### Release evidence and APK distribution

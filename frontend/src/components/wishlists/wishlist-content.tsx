@@ -6,7 +6,7 @@ import { gameLabel } from "@/lib/utils";
 
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -104,6 +104,7 @@ export function WishlistContent() {
   const [isAddCardDialogOpen, setAddCardDialogOpen] = useState(false);
   const [newWishlistName, setNewWishlistName] = useState("");
   const [newWishlistDescription, setNewWishlistDescription] = useState("");
+  const creating = useRef(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   // Mobile view: list vs detail
@@ -161,7 +162,9 @@ export function WishlistContent() {
 
   useEffect(() => {
     if (!requestedWishlistId || !hasFetched) return;
-    const target = wishlists.find((wishlist) => wishlist.id === requestedWishlistId);
+    const target = wishlists.find(
+      (wishlist) => wishlist.id === requestedWishlistId,
+    );
     setActiveWishlistId(target?.id ?? null);
     setMobileView(target ? "detail" : "list");
   }, [wishlists, requestedWishlistId, hasFetched]);
@@ -194,11 +197,6 @@ export function WishlistContent() {
     return cards;
   }, [activeWishlist, collectionSearchTerm, filterOwned]);
 
-  const wishlistCardIds = useMemo(
-    () => new Set((activeWishlist?.cards ?? []).map((card) => card.externalId)),
-    [activeWishlist?.cards],
-  );
-
   // Bulk adds span games, where provider ids can collide (OP01-001 exists in
   // more than one catalogue), so they dedupe on a game-qualified key.
   const wishlistCardKeys = useMemo(
@@ -212,19 +210,20 @@ export function WishlistContent() {
   );
 
   const isCardInWishlist = useCallback(
-    (cardId: string): boolean => wishlistCardIds.has(cardId),
-    [wishlistCardIds],
+    (card: { tcg: string; id: string }): boolean =>
+      wishlistCardKeys.has(`${card.tcg}:${card.id}`),
+    [wishlistCardKeys],
   );
 
   // Cards in search results that can be selected (not already in wishlist)
   const selectableCards = useMemo(
-    () => searchResults.filter((card) => !wishlistCardIds.has(card.id)),
-    [searchResults, wishlistCardIds],
+    () => searchResults.filter((card) => !isCardInWishlist(card)),
+    [searchResults, isCardInWishlist],
   );
 
   const allSelectableSelected =
     selectableCards.length > 0 &&
-    selectableCards.every((c) => selectedCards.has(c.id));
+    selectableCards.every((c) => selectedCards.has(`${c.tcg}:${c.id}`));
 
   const handleSelectWishlist = useCallback((wishlistId: string) => {
     setActiveWishlistId(wishlistId);
@@ -232,7 +231,8 @@ export function WishlistContent() {
   }, []);
 
   const handleCreateWishlist = async () => {
-    if (!token || !newWishlistName.trim()) return;
+    if (!token || !newWishlistName.trim() || creating.current) return;
+    creating.current = true;
     setCreateError(null);
     try {
       const id = await addWishlist(token, {
@@ -248,6 +248,8 @@ export function WishlistContent() {
       setCreateError(
         error instanceof Error ? error.message : "Failed to create wishlist",
       );
+    } finally {
+      creating.current = false;
     }
   };
 
@@ -323,7 +325,9 @@ export function WishlistContent() {
     setIsBulkAdding(true);
     try {
       const cardsToAdd = searchResults
-        .filter((c) => selectedCards.has(c.id) && !isCardInWishlist(c.id))
+        .filter(
+          (c) => selectedCards.has(`${c.tcg}:${c.id}`) && !isCardInWishlist(c),
+        )
         .map((card) => ({
           externalId: card.id,
           tcg: card.tcg,
@@ -516,7 +520,7 @@ export function WishlistContent() {
     if (allSelectableSelected) {
       setSelectedCards(new Set());
     } else {
-      setSelectedCards(new Set(selectableCards.map((c) => c.id)));
+      setSelectedCards(new Set(selectableCards.map((c) => `${c.tcg}:${c.id}`)));
     }
   };
 
@@ -872,7 +876,7 @@ export function WishlistContent() {
                   >
                     {filteredCards.map((card) => (
                       <WishlistCardItem
-                        key={card.id}
+                        key={`${card.tcg}:${card.id}`}
                         card={card}
                         onRemove={() => handleRemoveCard(card.id)}
                         onDesiredQuantityChange={(desiredQuantity) =>
@@ -909,9 +913,13 @@ export function WishlistContent() {
 
   return (
     <>
-      {requestedWishlistId && hasFetched && !wishlists.some((wishlist) => wishlist.id === requestedWishlistId) && (
-        <p role="alert">This wishlist is unavailable for the current account.</p>
-      )}
+      {requestedWishlistId &&
+        hasFetched &&
+        !wishlists.some((wishlist) => wishlist.id === requestedWishlistId) && (
+          <p role="alert">
+            This wishlist is unavailable for the current account.
+          </p>
+        )}
       {error && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           <span>{error}</span>
@@ -1294,11 +1302,13 @@ export function WishlistContent() {
                       </p>
                     )}
                     {searchResults.map((card) => {
-                      const alreadyAdded = isCardInWishlist(card.id);
-                      const isSelected = selectedCards.has(card.id);
+                      const alreadyAdded = isCardInWishlist(card);
+                      const isSelected = selectedCards.has(
+                        `${card.tcg}:${card.id}`,
+                      );
                       return (
                         <div
-                          key={card.id}
+                          key={`${card.tcg}:${card.id}`}
                           className={cn(
                             "flex items-center gap-3 rounded-lg border p-3 transition-colors",
                             isSelected &&
@@ -1310,7 +1320,9 @@ export function WishlistContent() {
                           {!alreadyAdded && (
                             <Checkbox
                               checked={isSelected}
-                              onCheckedChange={() => handleToggleCard(card.id)}
+                              onCheckedChange={() =>
+                                handleToggleCard(`${card.tcg}:${card.id}`)
+                              }
                               aria-label={`Select ${card.name}`}
                               data-oid="vac46wu"
                             />

@@ -10,6 +10,9 @@ export const collectionMutationKindValidator = v.union(
   v.literal("rapid_entry"),
   v.literal("acquisition_split"),
   v.literal("trade_settlement"),
+  v.literal("sale"),
+  v.literal("physical_opening"),
+  v.literal("normalization"),
   v.literal("undo")
 );
 
@@ -24,6 +27,10 @@ export const collectionEntryAuditSnapshotValidator = v.object({
   notes: v.optional(v.string()),
   price: v.optional(v.number()),
   acquisitionPrice: v.optional(v.number()),
+  acquisitionCurrency: v.optional(v.string()),
+  acquisitionTransactionId: v.optional(v.id("transactions")),
+  legacyQuantitySourceId: v.optional(v.id("collectionEntries")),
+  legacyQuantityOrdinal: v.optional(v.number()),
   serialNumber: v.optional(v.string()),
   acquiredAt: v.optional(v.string()),
   isFoil: v.optional(v.boolean()),
@@ -42,7 +49,11 @@ export const collectionEntryAuditSnapshotValidator = v.object({
   storageLocation: v.optional(v.string()),
   imageUrls: v.optional(v.array(v.string())),
   imageStorageIds: v.optional(v.array(v.id("_storage"))),
-  tagIds: v.array(v.id("tags"))
+  tagIds: v.array(v.id("tags")),
+  storagePlacements: v.optional(v.array(v.object({
+    containerId: v.id("storageContainers"), compartmentId: v.id("storageCompartments"),
+    slotIndex: v.number(), quantity: v.number(), stackKey: v.optional(v.string()),
+  }))),
 });
 
 export const collectionMutationAuditEntryValidator = v.object({

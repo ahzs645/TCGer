@@ -115,6 +115,14 @@ struct CollectionsView: View {
         .task {
             await loadCollections()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .collectionDidChange)) { notification in
+            let session = environmentStore.sessionIdentity
+            guard CollectionMutationNotice.matches(notification, config: session.configuration, token: session.token) else { return }
+            Task {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
+                await loadCollections(force: true)
+            }
+        }
         .onAppear {
             handleDeepLink(environmentStore.pendingDeepLinkRequest)
         }
@@ -383,12 +391,12 @@ struct CollectionsView: View {
     }
 
     @MainActor
-    private func loadCollections() async {
+    private func loadCollections(force: Bool = false) async {
         let sessionID = environmentStore.widgetSessionID
         await collectionStore.load(
             config: environmentStore.serverConfiguration,
             token: environmentStore.authToken,
-            useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
+            useCache: !force && environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
         )
 
         if sessionID == environmentStore.widgetSessionID, collectionStore.errorMessage == nil {

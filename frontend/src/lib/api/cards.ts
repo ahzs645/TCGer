@@ -1,4 +1,10 @@
-import type { Card, TcgCode, TcgSet, SearchCardsResponse } from "@tcg/api-types";
+import { sessionFetch } from "./session-fetch";
+import type {
+  Card,
+  TcgCode,
+  TcgSet,
+  SearchCardsResponse,
+} from "@tcg/api-types";
 import { completeSearchCards } from "./search-completeness";
 
 import { API_BASE_URL } from "./base-url";
@@ -20,7 +26,7 @@ export async function searchCards(
 ): Promise<Card[]> {
   const params = new URLSearchParams({ query });
   if (tcg) params.set("tcg", tcg);
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/cards/search?${params.toString()}`,
     {
       headers: authHeaders(token),
@@ -51,7 +57,7 @@ export async function searchAllCards(
   if (options.tcg) params.set("tcg", options.tcg);
   if (options.unique) params.set("unique", options.unique);
   if (options.limit) params.set("limit", String(options.limit));
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/cards/search/all?${params.toString()}`,
     {
       headers: authHeaders(token),
@@ -78,7 +84,7 @@ export async function searchCardsByArtist(
   if (options.tcg) params.set("tcg", options.tcg);
   if (options.unique) params.set("unique", options.unique);
   if (options.limit) params.set("limit", String(options.limit));
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/cards/search/artist?${params.toString()}`,
     { headers: authHeaders(token), credentials: "include" },
   );
@@ -95,7 +101,7 @@ export async function searchCardsByCollectionTag(
 ): Promise<Card[]> {
   const params = new URLSearchParams({ tag: options.tag, tcg: options.tcg });
   if (options.limit) params.set("limit", String(options.limit));
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/cards/search/tag?${params.toString()}`,
     { headers: authHeaders(token), credentials: "include" },
   );
@@ -124,7 +130,7 @@ export async function getSets(token: string, tcg?: TcgCode): Promise<TcgSet[]> {
   const params = new URLSearchParams();
   if (tcg) params.set("tcg", tcg);
   const suffix = params.size ? `?${params.toString()}` : "";
-  const response = await fetch(`${API_BASE_URL}/cards/sets${suffix}`, {
+  const response = await sessionFetch(`${API_BASE_URL}/cards/sets${suffix}`, {
     headers: authHeaders(token),
     credentials: "include",
   });
@@ -137,7 +143,7 @@ export async function getSetCards(
   tcg: TcgCode,
   setCode: string,
 ): Promise<Card[]> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/cards/sets/${encodeURIComponent(tcg)}/${encodeURIComponent(setCode)}`,
     {
       headers: authHeaders(token),

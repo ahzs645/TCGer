@@ -1,3 +1,4 @@
+import { assertAcquisitionMetadataEditable, assertInventoryAvailable, normalizeAcquisitionCurrency, normalizePhysicalCopies, resolvePhysicalCopyId } from "./lib/inventoryAvailability";
 import { ConvexError, v } from "convex/values";
 import { components } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -121,6 +122,7 @@ const collectionImportRowInput = v.object({
   notes: v.optional(v.string()),
   price: v.optional(v.number()),
   acquisitionPrice: v.optional(v.number()),
+  acquisitionCurrency: v.optional(v.string()),
   serialNumber: v.optional(v.string()),
   acquiredAt: v.optional(v.string()),
   isFoil: v.boolean(),
@@ -726,13 +728,12 @@ async function resolveStoredCard(ctx: ReaderCtx, cardId: string) {
     }
   }
 
-  return await ctx.db
-    .query("cards")
-    .withIndex("by_external_id", (q) => q.eq("externalId", cardId))
-    .first();
+  const matches = await ctx.db.query("cards").withIndex("by_external_id", q => q.eq("externalId", cardId)).take(2);
+  if (matches.length > 1) throw new ConvexError({ code: "BAD_REQUEST", message: "Card ID is shared by multiple games; provide game-qualified cardData" });
+  return matches[0] ?? null;
 }
 
-async function resolveCardSnapshot(
+export async function resolveCardSnapshot(
   ctx: ReaderCtx,
   args: {
     cardId?: string;
@@ -769,6 +770,7 @@ async function createCopiesForViewer(
     notes?: string;
     price?: number;
     acquisitionPrice?: number;
+    acquisitionCurrency?: string;
     serialNumber?: string;
     acquiredAt?: string;
     isFoil?: boolean;
@@ -804,6 +806,7 @@ async function createCopiesForViewer(
       notes: args.notes,
       price: args.price,
       acquisitionPrice: args.acquisitionPrice,
+      acquisitionCurrency: args.acquisitionCurrency,
       serialNumber: args.serialNumber,
       acquiredAt: args.acquiredAt,
       isFoil: args.isFoil,
@@ -939,6 +942,7 @@ export const upsertBinderPage = internalMutation({
     subject: v.string(),
     binderId: v.id("binders"),
     pageNumber: v.number(),
+    expectedRevision: v.optional(v.number()),
     capturedAt: v.optional(v.number()),
     placements: v.array(binderPagePlacementValidator)
   },
@@ -956,6 +960,11 @@ export const upsertBinderPage = internalMutation({
         q.eq("binderId", args.binderId).eq("pageNumber", pageNumber)
       )
       .unique();
+    if (args.expectedRevision !== undefined &&
+        (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0 ||
+         args.expectedRevision !== (existing?.revision ?? 0))) {
+      throw new ConvexError({ code: "CONFLICT", message: "Binder page changed. Review the current page before saving again." });
+    }
     const timestamp = now();
     let pageId: Id<"binderPages">;
     if (existing) {
@@ -991,6 +1000,7 @@ export const attachBinderPageImage = internalMutation({
     subject: v.string(),
     binderId: v.id("binders"),
     pageNumber: v.number(),
+    expectedRevision: v.optional(v.number()),
     storageId: v.id("_storage")
   },
   returns: binderPageImageMutationValidator,
@@ -1006,7 +1016,11 @@ export const attachBinderPageImage = internalMutation({
     if (!page) {
       throw new ConvexError({ code: "NOT_FOUND", message: "Binder page not found" });
     }
-    await ctx.db.patch(page._id, { imageStorageId: args.storageId, updatedAt: now() });
+    if (args.expectedRevision !== undefined &&
+        (!Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 1 || args.expectedRevision !== page.revision)) {
+      throw new ConvexError({ code: "CONFLICT", message: "Binder page changed. Review the current page before replacing its image." });
+    }
+    await ctx.db.patch(page._id, { imageStorageId: args.storageId, revision: page.revision + 1, updatedAt: now() });
     return page.imageStorageId ? { replacedStorageId: page.imageStorageId } : {};
   }
 });
@@ -1030,7 +1044,7 @@ export const removeBinderPageImage = internalMutation({
     if (!page) {
       throw new ConvexError({ code: "NOT_FOUND", message: "Binder page not found" });
     }
-    await ctx.db.patch(page._id, { imageStorageId: undefined, updatedAt: now() });
+    await ctx.db.patch(page._id, { imageStorageId: undefined, revision: page.revision + 1, updatedAt: now() });
     return page.imageStorageId ? { replacedStorageId: page.imageStorageId } : {};
   }
 });
@@ -1371,6 +1385,7 @@ export const addCardToBinder = internalMutation({
     notes: v.optional(v.string()),
     price: v.optional(v.number()),
     acquisitionPrice: v.optional(v.number()),
+    acquisitionCurrency: v.optional(v.string()),
     serialNumber: v.optional(v.string()),
     acquiredAt: v.optional(v.string()),
     isFoil: v.optional(v.boolean()),
@@ -1406,7 +1421,7 @@ export const addCardToBinder = internalMutation({
       "cardData is required for the Convex collection bridge"
     );
     const quantity = args.quantity ?? 1;
-    if (!Number.isInteger(quantity) || quantity < 1) {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
       throw new ConvexError({
         code: "BAD_REQUEST",
         message: "quantity must be a positive integer"
@@ -1422,6 +1437,7 @@ export const addCardToBinder = internalMutation({
       notes: args.notes,
       price: args.price,
       acquisitionPrice: args.acquisitionPrice,
+      acquisitionCurrency: args.acquisitionCurrency,
       serialNumber: args.serialNumber,
       acquiredAt: args.acquiredAt,
       isFoil: args.isFoil,
@@ -1498,7 +1514,8 @@ export const importCollectionRows = internalMutation({
           !Number.isInteger(row.quantity) ||
           row.quantity < 1 ||
           !Number.isFinite(row.price ?? 0) ||
-          !Number.isFinite(row.acquisitionPrice ?? 0)
+          !Number.isFinite(row.acquisitionPrice ?? 0) ||
+          (row.acquisitionCurrency !== undefined && !/^[A-Za-z]{3}$/.test(row.acquisitionCurrency))
       )
     ) {
       throw new ConvexError({
@@ -1577,6 +1594,7 @@ export const importCollectionRows = internalMutation({
         notes: row.notes,
         price: row.price,
         acquisitionPrice: row.acquisitionPrice,
+        acquisitionCurrency: row.acquisitionCurrency,
         serialNumber: row.serialNumber,
         acquiredAt: row.acquiredAt,
         isFoil: row.isFoil,
@@ -1619,8 +1637,9 @@ export const importCollectionRows = internalMutation({
 export const updateEntry = internalMutation({
   args: {
     subject: v.string(),
-    entryId: v.id("collectionEntries"),
+    entryId: v.string(),
     binderId: v.optional(v.id("binders")),
+    sourceBinderId: v.optional(v.id("binders")),
     scope: v.optional(v.union(v.literal("card"), v.literal("copy"))),
     quantity: v.optional(v.number()),
     condition: v.optional(nullableString),
@@ -1628,6 +1647,7 @@ export const updateEntry = internalMutation({
     notes: v.optional(nullableString),
     price: v.optional(v.number()),
     acquisitionPrice: v.optional(nullableNumber),
+    acquisitionCurrency: v.optional(nullableString),
     serialNumber: v.optional(nullableString),
     acquiredAt: v.optional(nullableString),
     isFoil: v.optional(v.boolean()),
@@ -1658,16 +1678,26 @@ export const updateEntry = internalMutation({
   returns: entryValidator,
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
-    let entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
+    const physicalEntryId = await resolvePhysicalCopyId(ctx, viewer._id, args.entryId);
+    let entry = await requireEntryForUser(ctx, physicalEntryId, viewer._id);
+    if (args.sourceBinderId && entry.binderId !== args.sourceBinderId) throw new ConvexError({ code: "NOT_FOUND", message: "Collection copy not found in this binder" });
+    await normalizePhysicalCopies(ctx, entry);
+    entry = await requireEntryForUser(ctx, physicalEntryId, viewer._id);
+    await assertAcquisitionMetadataEditable(ctx, entry, args);
+    if (args.cardOverride || args.binderId || args.quantity !== undefined || args.storageLocation !== undefined) await assertInventoryAvailable(ctx, entry);
     let nextCardId = entry.cardId;
     const sourceBinderId = entry.binderId;
     const sourceCardId = entry.cardId;
-    const sourceGroup = await getGroupEntries(
+    let sourceGroup = await getGroupEntries(
       ctx,
       viewer._id,
       sourceBinderId,
       sourceCardId
     );
+    if (args.quantity !== undefined || args.scope === "card") {
+      for (const sibling of sourceGroup) await normalizePhysicalCopies(ctx, sibling);
+      sourceGroup = await getGroupEntries(ctx, viewer._id, sourceBinderId, sourceCardId);
+    }
 
     if (args.cardOverride) {
       const card = await resolveCardSnapshot(
@@ -1709,13 +1739,13 @@ export const updateEntry = internalMutation({
         cardId: nextCardId,
         updatedAt: timestamp
       });
-      entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
+      entry = await requireEntryForUser(ctx, physicalEntryId, viewer._id);
     }
 
     if (args.binderId) {
       await requireBinderForUser(ctx, args.binderId, viewer._id);
     }
-    if (args.quantity !== undefined && (!Number.isInteger(args.quantity) || args.quantity < 1)) {
+    if (args.quantity !== undefined && (!Number.isInteger(args.quantity) || args.quantity < 1 || args.quantity > 500)) {
       throw new ConvexError({
         code: "BAD_REQUEST",
         message: "quantity must be a positive integer"
@@ -1757,6 +1787,9 @@ export const updateEntry = internalMutation({
           : args.acquisitionPrice ?? undefined,
       serialNumber:
         args.serialNumber === undefined ? entry.serialNumber : args.serialNumber ?? undefined,
+      acquisitionCurrency: args.acquisitionCurrency === undefined
+        ? (args.acquisitionPrice === null ? undefined : entry.acquisitionCurrency)
+        : normalizeAcquisitionCurrency(args.acquisitionCurrency),
       acquiredAt:
         args.acquiredAt === undefined ? entry.acquiredAt : args.acquiredAt ?? undefined,
       isFoil:
@@ -1802,6 +1835,7 @@ export const updateEntry = internalMutation({
     }
 
     for (const groupEntry of groupToMove) {
+      await assertInventoryAvailable(ctx, groupEntry);
       await ctx.db.patch(groupEntry._id, {
         binderId: targetBinderId,
         updatedAt: timestamp
@@ -1809,7 +1843,11 @@ export const updateEntry = internalMutation({
     }
 
     const refreshed = await requireEntryForUser(ctx, entry._id, viewer._id);
-    const destinationGroup = await getGroupEntries(ctx, viewer._id, targetBinderId, nextCardId);
+    let destinationGroup = await getGroupEntries(ctx, viewer._id, targetBinderId, nextCardId);
+    if (args.quantity !== undefined) {
+      for (const sibling of destinationGroup) await normalizePhysicalCopies(ctx, sibling);
+      destinationGroup = await getGroupEntries(ctx, viewer._id, targetBinderId, nextCardId);
+    }
     const currentQuantity = destinationGroup.reduce((sum, groupEntry) => sum + groupEntry.quantity, 0);
     // An omitted `quantity` means "leave it alone", matching how every other
     // field in this handler treats undefined. It previously defaulted to 1,
@@ -1837,6 +1875,7 @@ export const updateEntry = internalMutation({
         notes: refreshed.notes,
         price: refreshed.price,
         acquisitionPrice: refreshed.acquisitionPrice,
+        acquisitionCurrency: refreshed.acquisitionCurrency,
         serialNumber: refreshed.serialNumber,
         acquiredAt: refreshed.acquiredAt,
         isFoil: refreshed.isFoil,
@@ -1920,28 +1959,18 @@ export const updateEntry = internalMutation({
 export const removeEntry = internalMutation({
   args: {
     subject: v.string(),
-    entryId: v.id("collectionEntries")
+    entryId: v.id("collectionEntries"),
+    binderId: v.optional(v.id("binders"))
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
+    if (args.binderId && entry.binderId !== args.binderId) throw new ConvexError({ code: "NOT_FOUND", message: "Collection card not found in this binder" });
     const card = await ctx.db.get(entry.cardId);
 
-    // Remove the whole grouped card, not just the addressed row.
-    //
-    // The REST response groups a binder's entries by card and reports the
-    // group's id as `copies[0].id` (http.ts `toLegacyBinder`), so the id a
-    // client holds for "this card" is indistinguishable from the id of its
-    // first copy. Every caller of this endpoint means the card: the web
-    // quantity stepper only issues DELETE once the user reaches 0 and then
-    // reports "Card removed from binder.", and the iOS client's delete, bulk
-    // delete and mark-as-sold paths all pass a card-level id and drop the
-    // whole card from local state afterwards. Deleting one row left the other
-    // copies behind, so the card reappeared on the next refresh.
-    //
-    // Nothing deletes an individual copy through this route — quantity
-    // reductions go through PATCH — so there is no caller this can surprise.
+    // This established route removes the printing group. The separate copies
+    // route addresses exactly one physical copy.
     const group = await getGroupEntries(
       ctx,
       viewer._id,
@@ -2011,7 +2040,7 @@ export const listCollectionMutationHistory = internalQuery({
       cardName: entry.cardName,
       summary: entry.summary,
       sourceAuditId: entry.sourceAuditId,
-      canUndo: entry.operationKind !== "undo" && entry.operationKind !== "trade_settlement" && undoRows[index] === null,
+      canUndo: !["undo", "sale", "physical_opening", "trade_settlement", "normalization"].includes(entry.operationKind) && entry.operationKind !== "trade_settlement" && undoRows[index] === null,
       createdAt: toIso(entry.createdAt)
     }));
   }
@@ -2057,14 +2086,17 @@ export const undoCollectionMutation = internalMutation({
 export const attachImageToEntry = internalMutation({
   args: {
     subject: v.string(),
-    entryId: v.id("collectionEntries"),
+    entryId: v.string(),
+    binderId: v.optional(v.id("binders")),
     imageUrl: v.string(),
     storageId: v.optional(v.id("_storage"))
   },
   returns: imageMutationValidator,
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
-    const entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
+    const entryId = await resolvePhysicalCopyId(ctx, viewer._id, args.entryId);
+    const entry = await requireEntryForUser(ctx, entryId, viewer._id);
+    if (args.binderId && entry.binderId !== args.binderId) throw new ConvexError({ code: "NOT_FOUND", message: "Collection entry not found" });
     const imageUrls = [...(entry.imageUrls ?? []), args.imageUrl];
     const imageStorageIds = [...(entry.imageStorageIds ?? [])];
     if (args.storageId) {
@@ -2086,17 +2118,20 @@ export const attachImageToEntry = internalMutation({
 export const removeImageFromEntry = internalMutation({
   args: {
     subject: v.string(),
-    entryId: v.id("collectionEntries"),
+    entryId: v.string(),
+    binderId: v.optional(v.id("binders")),
     imageIndex: v.number()
   },
   returns: imageMutationValidator,
   handler: async (ctx, args) => {
     const viewer = await requireViewerBySubject(ctx, args.subject);
-    const entry = await requireEntryForUser(ctx, args.entryId, viewer._id);
+    const entryId = await resolvePhysicalCopyId(ctx, viewer._id, args.entryId);
+    const entry = await requireEntryForUser(ctx, entryId, viewer._id);
+    if (args.binderId && entry.binderId !== args.binderId) throw new ConvexError({ code: "NOT_FOUND", message: "Collection entry not found" });
     const imageUrls = [...(entry.imageUrls ?? [])];
     const imageStorageIds = [...(entry.imageStorageIds ?? [])];
 
-    if (args.imageIndex < 0 || args.imageIndex >= imageUrls.length) {
+    if (!Number.isInteger(args.imageIndex) || args.imageIndex < 0 || args.imageIndex >= imageUrls.length) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Image index out of range"
@@ -2104,8 +2139,13 @@ export const removeImageFromEntry = internalMutation({
     }
 
     const removedUrl = imageUrls.splice(args.imageIndex, 1)[0];
-    const removedStorageId =
-      args.imageIndex < imageStorageIds.length ? imageStorageIds.splice(args.imageIndex, 1)[0] : undefined;
+    // Legacy/external URLs have no storage ID, so the two arrays need not have
+    // matching offsets. Match the actual blob URL before removing its ID.
+    let removedStorageId: Id<"_storage"> | undefined;
+    for (const id of imageStorageIds) {
+      if (await ctx.storage.getUrl(id) === removedUrl) { removedStorageId = id; break; }
+    }
+    if (removedStorageId) imageStorageIds.splice(imageStorageIds.indexOf(removedStorageId), 1);
 
     await ctx.db.patch(entry._id, {
       imageUrls,
@@ -2113,10 +2153,16 @@ export const removeImageFromEntry = internalMutation({
       updatedAt: now()
     });
 
+    // Normalization and partial trades may share a photo. Only reclaim a blob
+    // after a bounded scan can prove there are no remaining live references.
+    // For larger libraries retain it conservatively for later garbage collection.
+    const candidates = removedStorageId ? await ctx.db.query("collectionEntries").take(1001) : [];
+    const canDelete = candidates.length < 1001 && !candidates.some(copy => copy.imageStorageIds?.includes(removedStorageId!));
+
     return {
       imageUrls,
       removedUrl,
-      removedStorageId
+      removedStorageId: canDelete ? removedStorageId : undefined
     };
   }
 });
@@ -2762,6 +2808,15 @@ export const promoteViewerToAdmin = internalMutation({
   },
   returns: viewerValidator,
   handler: async (ctx, args) => {
+    // The absence check and promotion must share one transaction. Convex retries
+    // this indexed read on a concurrent write, so only one bootstrap can win.
+    const existingAdmin = await ctx.db
+      .query("users")
+      .withIndex("by_is_admin", (q) => q.eq("isAdmin", true))
+      .first();
+    if (existingAdmin) {
+      throw new ConvexError({ code: "CONFLICT", message: "Admin user already exists" });
+    }
     await ensureViewerBySubject(ctx, args);
     const viewer = await requireViewerBySubject(ctx, args.subject);
     const timestamp = now();

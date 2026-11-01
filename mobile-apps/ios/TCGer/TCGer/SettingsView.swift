@@ -559,6 +559,11 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Saved work") {
+                    NavigationLink("Pending saves") { InventoryRecoveryView() }
+                    NavigationLink("Simulation history") { PackSimulationHistoryView() }
+                }
+
                 // Data & Sync Section
                 Section {
                     if !isLocalMode {
@@ -989,6 +994,7 @@ struct SettingsView: View {
     }
 
     private func syncNow() async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
             return
@@ -1001,14 +1007,16 @@ struct SettingsView: View {
         do {
             // Fetch and cache collections
             _ = try await api.getCollections(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 useCache: false  // Force fresh fetch
             )
 
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             updateCacheInfo()
             isSyncing = false
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             print("Sync failed: \(error)")
             isSyncing = false
         }
@@ -1052,6 +1060,7 @@ private extension SettingsView {
     /// Persist an enable, or block a disable that would orphan owned/wishlisted
     /// cards of that game.
     func handleGameToggle(game: TCGGame, isOn: Bool) async {
+        let session = environmentStore.sessionIdentity
         guard !isApplyingRemotePreferences else { return }
 
         // Enabling never needs a guard.
@@ -1072,8 +1081,10 @@ private extension SettingsView {
         }
 
         let usage = await gameCardUsage(for: game)
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         if usage.collectionCount + usage.wishlistCount > 0 {
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 gameDisableBlock = GameDisableBlock(
                     game: game.rawValue,
                     displayName: game.displayName,
@@ -1086,6 +1097,7 @@ private extension SettingsView {
 
         guard usage.isVerified else {
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 gameDisableCheckError = "TCGer couldn’t verify your collections and wishlists, so \(game.displayName) stayed enabled. Check your connection and try again."
             }
             return
@@ -1106,13 +1118,16 @@ private extension SettingsView {
             )
         }
 
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         if disableSucceeded && environmentStore.defaultGame == game.rawValue {
             await clearDefaultGameAfterDisabling()
         }
     }
 
     func clearDefaultGameAfterDisabling() async {
+        let session = environmentStore.sessionIdentity
         await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             environmentStore.defaultGame = nil
         }
 
@@ -1121,18 +1136,21 @@ private extension SettingsView {
 
         do {
             let preferences = try await APIService().updateUserPreferences(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 defaultGame: .some(nil)
             )
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 isApplyingRemotePreferences = true
                 environmentStore.applyUserPreferences(preferences)
                 DispatchQueue.main.async {
+                    guard environmentStore.matches(session) else { return }
                     isApplyingRemotePreferences = false
                 }
             }
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             print("Failed to clear disabled default game: \(error)")
             await refreshPreferencesIfNeeded()
         }
@@ -1144,6 +1162,7 @@ private extension SettingsView {
 
     /// Count cards of a game across collections and wishlists.
     func gameCardUsage(for game: TCGGame) async -> GameCardUsage {
+        let session = environmentStore.sessionIdentity
         let api = APIService()
         let target = game.rawValue
         var collectionCount = 0
@@ -1153,8 +1172,8 @@ private extension SettingsView {
 
         do {
             let collections = try await api.getCollections(
-                config: environmentStore.serverConfiguration,
-                token: environmentStore.authToken,
+                config: session.configuration,
+                token: session.token,
                 useCache: environmentStore.offlineModeEnabled && environmentStore.isAuthenticated
             )
             collectionCount = collections.reduce(0) { total, collection in
@@ -1169,8 +1188,8 @@ private extension SettingsView {
 
         do {
             let wishlists = try await api.getWishlists(
-                config: environmentStore.serverConfiguration,
-                token: environmentStore.authToken ?? ""
+                config: session.configuration,
+                token: session.token ?? ""
             )
             wishlistCount = wishlists.reduce(0) { total, wishlist in
                 total + wishlist.cards.filter { $0.tcg.lowercased() == target }.count
@@ -1211,6 +1230,7 @@ private extension SettingsView {
     }
 
     func refreshPreferencesIfNeeded() async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
             return
@@ -1220,22 +1240,26 @@ private extension SettingsView {
 
         do {
             let prefs = try await api.getUserPreferences(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token
             )
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 isApplyingRemotePreferences = true
                 environmentStore.applyUserPreferences(prefs)
                 DispatchQueue.main.async {
+                    guard environmentStore.matches(session) else { return }
                     isApplyingRemotePreferences = false
                 }
             }
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             print("Failed to refresh preferences: \(error)")
         }
     }
 
     func refreshProfileIfNeeded() async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
             return
@@ -1245,23 +1269,27 @@ private extension SettingsView {
 
         do {
             let profile = try await api.getUserProfile(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token
             )
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 environmentStore.applyUserProfile(profile)
             }
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             print("Failed to refresh user profile: \(error)")
         }
     }
 
     func refreshAppSettingsIfNeeded() async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.serverConfiguration.isValid else {
             return
         }
 
         await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             isLoadingAppSettings = true
             appSettingsError = nil
         }
@@ -1269,13 +1297,16 @@ private extension SettingsView {
         let api = APIService()
 
         do {
-            let settings = try await api.getSettings(config: environmentStore.serverConfiguration)
+            let settings = try await api.getSettings(config: session.configuration)
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 environmentStore.applyAppSettings(settings)
                 isLoadingAppSettings = false
             }
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 isLoadingAppSettings = false
                 appSettingsError = error.localizedDescription
             }
@@ -1287,12 +1318,14 @@ private extension SettingsView {
         publicCollections: Bool? = nil,
         requireAuth: Bool? = nil
     ) async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.isCurrentUserAdmin,
               let token = environmentStore.authToken else {
             return
         }
 
         await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             isUpdatingAppSettings = true
             appSettingsError = nil
         }
@@ -1301,18 +1334,21 @@ private extension SettingsView {
 
         do {
             let settings = try await api.updateSettings(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 publicDashboard: publicDashboard,
                 publicCollections: publicCollections,
                 requireAuth: requireAuth
             )
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 environmentStore.applyAppSettings(settings)
                 isUpdatingAppSettings = false
             }
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 isUpdatingAppSettings = false
                 appSettingsError = error.localizedDescription
             }
@@ -1332,6 +1368,7 @@ private extension SettingsView {
         enabledDragonball: Bool? = nil,
         defaultGame: String?? = nil
     ) async -> Bool {
+        let session = environmentStore.sessionIdentity
         guard !isApplyingRemotePreferences,
               environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
@@ -1342,7 +1379,7 @@ private extension SettingsView {
 
         do {
             let prefs = try await api.updateUserPreferences(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 showCardNumbers: showCardNumbers,
                 showPricing: showPricing,
@@ -1356,14 +1393,17 @@ private extension SettingsView {
             )
 
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 isApplyingRemotePreferences = true
                 environmentStore.applyUserPreferences(prefs)
                 DispatchQueue.main.async {
+                    guard environmentStore.matches(session) else { return }
                     isApplyingRemotePreferences = false
                 }
             }
-            return true
+            return environmentStore.matches(session) && !Task.isCancelled
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return false }
             print("Failed to update preferences: \(error)")
             await refreshPreferencesIfNeeded()
             return false
@@ -1371,34 +1411,40 @@ private extension SettingsView {
     }
 
     func refreshServerStatus() async {
+        let session = environmentStore.sessionIdentity
         guard networkMonitor.isConnected,
               environmentStore.serverConfiguration.isValid else {
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 serverStatus = .offline
             }
             return
         }
 
         await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             serverStatus = .checking
         }
 
         let api = APIService()
 
-        let reachable = await api.verifyServer(config: environmentStore.serverConfiguration)
+        let reachable = await api.verifyServer(config: session.configuration)
 
         await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             serverStatus = reachable ? .online : .offline
         }
     }
 
     func exportCollection(format: String) async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
             return
         }
 
         await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
             isExporting = true
         }
 
@@ -1406,7 +1452,7 @@ private extension SettingsView {
 
         do {
             let data = try await api.exportCollection(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 format: format
             )
@@ -1414,13 +1460,16 @@ private extension SettingsView {
             let filename = "collection-export.\(ext)"
 
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 exportData = data
                 exportFilename = filename
                 isExporting = false
                 showingExportSheet = true
             }
         } catch {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 isExporting = false
             }
             print("Export failed: \(error)")
@@ -1428,16 +1477,20 @@ private extension SettingsView {
     }
 
     func exportCodeVault() async {
+        let session = environmentStore.sessionIdentity
         guard environmentStore.isAuthenticated,
               let token = environmentStore.authToken else {
             return
         }
 
-        await MainActor.run { isExporting = true }
+        await MainActor.run {
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            isExporting = true
+        }
 
         do {
             let codes = try await APIService().getOnlineCodes(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token
             )
             let groups = Dictionary(grouping: codes) { code in
@@ -1452,13 +1505,18 @@ private extension SettingsView {
             .joined(separator: "\n")
 
             await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
                 exportData = Data(text.utf8)
                 exportFilename = "tcger-code-vault.txt"
                 isExporting = false
                 showingExportSheet = true
             }
         } catch {
-            await MainActor.run { isExporting = false }
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            await MainActor.run {
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
+                isExporting = false
+            }
             print("Code Vault export failed: \(error)")
         }
     }

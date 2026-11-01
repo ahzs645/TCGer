@@ -1,3 +1,4 @@
+import { committedQuantity, assertInventoryAvailable, normalizePhysicalCopies } from "./lib/inventoryAvailability";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -182,12 +183,16 @@ async function allocateOwnedEntries(
     )
     .unique();
   if (!canonical) throw badRequest(`Card ${card.externalId} is not in the local catalog`);
-  const entries = await ctx.db
+  let entries = await ctx.db
     .query("collectionEntries")
     .withIndex("by_user_card", (q) =>
       q.eq("userId", ownerId).eq("cardId", canonical._id)
     )
     .take(1_000);
+  if (entries.some(entry => entry.quantity !== 1)) {
+    for (const entry of entries) await normalizePhysicalCopies(ctx, entry);
+    entries = await ctx.db.query("collectionEntries").withIndex("by_user_card", q => q.eq("userId", ownerId).eq("cardId", canonical._id)).take(1000);
+  }
   const exactEntry = card.collectionEntryId
     ? entries.find((entry) => entry._id === card.collectionEntryId)
     : undefined;
@@ -203,22 +208,7 @@ async function allocateOwnedEntries(
   let remaining = card.quantity;
   const allocations: Array<{ entry: Doc<"collectionEntries">; quantity: number }> = [];
   for (const entry of ordered) {
-    const reservations = await ctx.db
-      .query("tradeReservations")
-      .withIndex("by_entry_and_status", (q) =>
-        q.eq("collectionEntryId", entry._id).eq("status", "reserved")
-      )
-      .take(501);
-    if (reservations.length > 500) {
-      throw new ConvexError({
-        code: "LIMIT_EXCEEDED",
-        message: "This collection entry has too many active trade reservations"
-      });
-    }
-    const available = Math.max(
-      0,
-      entry.quantity - reservations.reduce((sum, reservation) => sum + reservation.quantity, 0)
-    );
+    const available = Math.max(0, entry.quantity - await committedQuantity(ctx, entry));
     const quantity = Math.min(remaining, available);
     if (quantity > 0) allocations.push({ entry, quantity });
     remaining -= quantity;
@@ -438,6 +428,7 @@ async function transferReservedEntry(
       message: "A reserved collection copy is no longer available"
     });
   }
+  await assertInventoryAvailable(ctx, source, reservation.quantity, { excludeTradeId: reservation.tradeId });
   const now = Date.now();
   await consumeStoragePlacements(ctx, source._id, reservation.quantity);
   if (source.quantity === reservation.quantity) {
@@ -523,10 +514,16 @@ async function settleTrade(
   for (const card of cards.filter((item) => item.side === "receiver")) {
     await reserveTradeCard(ctx, trade._id, card._id, trade.receiverId, card);
   }
-  const reservations = await ctx.db
+  let reservations = await ctx.db
     .query("tradeReservations")
     .withIndex("by_trade", (q) => q.eq("tradeId", trade._id))
     .take(200);
+  for (const id of new Set(reservations.filter(row => row.status === "reserved").map(row => row.collectionEntryId))) {
+    const entry = await ctx.db.get(id);
+    if (entry) await normalizePhysicalCopies(ctx, entry);
+  }
+  reservations = await ctx.db.query("tradeReservations").withIndex("by_trade", q => q.eq("tradeId", trade._id)).take(1001);
+  if (reservations.length > 1000) throw new ConvexError({ code: "LIMIT_EXCEEDED", message: "Too many trade reservations" });
   const active = reservations.filter((reservation) => reservation.status === "reserved");
   const senderEntryIds = active
     .filter((reservation) => reservation.ownerId === trade.senderId)

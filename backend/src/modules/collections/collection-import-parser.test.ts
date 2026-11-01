@@ -5,6 +5,16 @@ import {
 } from "./collection-import-parser";
 
 describe("multi-format collection import parser", () => {
+  it("retains numeric and string acquisition amounts with either JSON naming convention", () => {
+    const result = parseCollectionJson(JSON.stringify([
+      { tcg: "pokemon", cardName: "Original currency", externalId: "one", acquisitionPrice: "12.50", acquisitionCurrency: "cad" },
+      { tcg: "pokemon", cardName: "Unknown currency", externalId: "two", acquisition_price: 0 },
+    ]));
+    expect(result.rows[0]).toMatchObject({ acquisitionPrice: 12.5, acquisitionCurrency: "CAD" });
+    expect(result.rows[1].acquisitionPrice).toBe(0);
+    expect(result.rows[1].acquisitionCurrency).toBeUndefined();
+  });
+
   it("parses Cardmarket Yu-Gi-Oh singles and reports exact-print ambiguity", () => {
     const result = parseCardmarketSinglesText([
       "Order contents",

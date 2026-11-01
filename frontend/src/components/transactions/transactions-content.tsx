@@ -24,6 +24,8 @@ import type {
   TransactionResponse,
 } from "@tcg/api-types";
 
+import { PendingSalesRecovery } from "@/components/collections/copy-inventory-actions";
+import { subscribeInventoryChanges } from "@/lib/inventory-events";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,11 +78,7 @@ const TYPE_CONFIG = {
 } as const;
 
 function money(amount: number, currency = "USD") {
-  try {
-    return formatMoney(amount, { currency });
-  } catch {
-    return formatMoney(amount);
-  }
+  return formatMoney(amount, { currency });
 }
 
 export function TransactionsContent() {
@@ -136,6 +134,14 @@ export function TransactionsContent() {
     return () => window.clearTimeout(timeout);
   }, [load]);
 
+  useEffect(
+    () =>
+      subscribeInventoryChanges(() => {
+        void load();
+      }),
+    [load],
+  );
+
   const formatSummary = (key: "totalSpent" | "totalEarned" | "profitLoss") =>
     summary.byCurrency.length
       ? summary.byCurrency
@@ -170,6 +176,7 @@ export function TransactionsContent() {
     <AppShell>
       {confirmDialog}
       <div className="space-y-6">
+        <PendingSalesRecovery />
         <PageHeader
           title="Transactions"
           description="Track purchases, sales, and trade values in one financial ledger."
@@ -431,12 +438,27 @@ function PerformanceDashboard({
           <CardContent className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground">Acquisition cost</p>
-              <p className="text-xl font-semibold tabular-nums">
-                {money(
-                  performance.inventoryCost,
-                  performance.inventoryCurrency,
-                )}
-              </p>
+              {(
+                performance.inventoryCostsByCurrency ?? [
+                  {
+                    currency: "UNKNOWN",
+                    cost: performance.inventoryCost,
+                  },
+                ]
+              ).map((row) => (
+                <p
+                  key={row.currency}
+                  className="text-xl font-semibold tabular-nums"
+                >
+                  {money(row.cost, row.currency)}
+                </p>
+              ))}
+              {(performance.inventoryCostsByCurrency?.length ?? 0) > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  Original currencies are listed separately; no exchange
+                  conversion has been applied.
+                </p>
+              )}
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Market value</p>

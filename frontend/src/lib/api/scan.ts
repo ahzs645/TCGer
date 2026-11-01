@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import { API_BASE_URL } from "@/lib/api/base-url";
 import type { TcgCode } from "@/types/card";
 
@@ -310,7 +311,7 @@ export async function scanCardImageApi(params: {
   }
 
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
-  const response = await fetch(`${API_BASE_URL}/cards/scan${suffix}`, {
+  const response = await sessionFetch(`${API_BASE_URL}/cards/scan${suffix}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -342,13 +343,16 @@ export async function getCardScanHashesPageApi(params: {
   }
 
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
-  const response = await fetch(`${API_BASE_URL}/cards/scan/hashes${suffix}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
+  const response = await sessionFetch(
+    `${API_BASE_URL}/cards/scan/hashes${suffix}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: "include",
+      cache: "no-store",
     },
-    credentials: "include",
-    cache: "no-store",
-  });
+  );
 
   return handleResponse<CardScanHashPageResponse>(response);
 }
@@ -368,7 +372,7 @@ export async function getCardScanDebugCapturesApi(params: {
   }
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
 
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/cards/scan/debug-captures${suffix}`,
     {
       headers: {
@@ -403,7 +407,7 @@ export async function updateCardScanDebugCaptureApi(params: {
     expectedTcg,
   } = params;
 
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/cards/scan/debug-captures/${captureId}`,
     {
       method: "PATCH",
@@ -429,7 +433,7 @@ export async function updateCardScanDebugCaptureApi(params: {
 export async function getCardScanStatsApi(
   token: string,
 ): Promise<CardScanStats> {
-  const response = await fetch(`${API_BASE_URL}/cards/scan/stats`, {
+  const response = await sessionFetch(`${API_BASE_URL}/cards/scan/stats`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

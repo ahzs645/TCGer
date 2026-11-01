@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 // @tcger-feature {"id":"pricing.provenance","platform":"web","status":"partial","modes":["server","local"],"limitation":"Tracked quote APIs retain source/provenance and package snapshots; a dedicated native-style original-quote, FX and match-confidence inspection view is absent."}
 import type {
   PriceAlertResponse,
@@ -41,7 +42,7 @@ async function authFetch(
   token: string,
   options: RequestInit = {},
 ) {
-  const res = await fetch(url, {
+  const res = await sessionFetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -200,9 +201,14 @@ export async function getTrackedCardPrices(
   force = false,
   source: PriceSource = "automatic",
 ): Promise<TrackedPricesResponse> {
-  const packages = source === "automatic" ? await packageTrackedPrices(items) : { remaining: items, response: undefined };
+  const packages =
+    source === "automatic"
+      ? await packageTrackedPrices(items)
+      : { remaining: items, response: undefined };
   items = packages.remaining;
-  const responses: TrackedPricesResponse[] = packages.response ? [packages.response] : [];
+  const responses: TrackedPricesResponse[] = packages.response
+    ? [packages.response]
+    : [];
   for (let index = 0; index < items.length; index += 100) {
     responses.push(
       await authFetch(`${API_BASE_URL}/prices/tracked`, token, {
@@ -237,17 +243,23 @@ export async function getTrackedCardPrices(
     };
   }
   const prices = responses.flatMap((response) => response.prices);
-  const total = responses.reduce((sum, response) => sum + response.health.total, 0);
-  const sum = (field: "priced" | "fresh" | "stale" | "missing" | "failed" | "lowConfidence") =>
-    responses.reduce((value, response) => value + response.health[field], 0);
+  const total = responses.reduce(
+    (sum, response) => sum + response.health.total,
+    0,
+  );
+  const sum = (
+    field:
+      "priced" | "fresh" | "stale" | "missing" | "failed" | "lowConfidence",
+  ) => responses.reduce((value, response) => value + response.health[field], 0);
   const fresh = sum("fresh");
   const lowConfidence = sum("lowConfidence");
   const coverage = total ? Math.round((fresh / total) * 10_000) / 100 : 100;
-  const healthStatus = coverage >= 90 && lowConfidence === 0
-    ? "healthy"
-    : coverage >= 70
-      ? "degraded"
-      : "unsafe";
+  const healthStatus =
+    coverage >= 90 && lowConfidence === 0
+      ? "healthy"
+      : coverage >= 70
+        ? "degraded"
+        : "unsafe";
   return {
     prices,
     refreshedAt: responses[responses.length - 1].refreshedAt,
@@ -266,7 +278,9 @@ export async function getTrackedCardPrices(
       failed: sum("failed"),
       lowConfidence,
       coverage,
-      freshnessHours: Math.max(...responses.map((response) => response.health.freshnessHours)),
+      freshnessHours: Math.max(
+        ...responses.map((response) => response.health.freshnessHours),
+      ),
       message:
         healthStatus === "healthy"
           ? `${fresh} of ${total} cards have fresh, trusted quotes.`
@@ -289,4 +303,15 @@ export async function getPriceMovers(
   if (tcg) params.set("tcg", tcg);
   params.set("period", String(period));
   return authFetch(`${API_BASE_URL}/prices/analytics/movers?${params}`, token);
+}
+
+/** Records finance and optional removal of the exact owned copies atomically. */
+export async function recordInventorySale(
+  token: string,
+  input: import("@tcg/api-types").InventorySaleInput,
+): Promise<import("@tcg/api-types").InventorySaleReceipt> {
+  return authFetch(`${API_BASE_URL}/finance/sales`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

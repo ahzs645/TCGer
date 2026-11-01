@@ -30,6 +30,17 @@ import {
   Video,
 } from "lucide-react";
 
+import {
+  ScanIntakeRecovery,
+  QUICK_SCAN_INTAKE_KEY,
+  useSavedScanIntake,
+} from "./intake-recovery";
+import { useServerFeatures } from "@/lib/api/health";
+import {
+  prepareIntakeDraft,
+  submitIntakeDraft,
+  finishIntakeDraft,
+} from "@/lib/intake/durable-intake";
 import { fetchCardByIdApi, searchCardsApi } from "@/lib/api-client";
 import {
   getCardScanDebugCapturesApi,
@@ -233,7 +244,7 @@ function preferRearCameras(
 }
 
 export function CardScanPanel() {
-  const packageScanners = usePackageCapabilities().filter(c => c.scanner);
+  const packageScanners = usePackageCapabilities().filter((c) => c.scanner);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -811,6 +822,7 @@ export function CardScanPanel() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[360px_1fr]" data-oid="w.4k983">
+      <ScanIntakeRecovery />
       <Card className="overflow-hidden border-dashed" data-oid="yubn0jd">
         <CardHeader data-oid="9_dwbwx">
           <CardTitle className="flex items-center gap-2" data-oid=":1pdwa-">
@@ -946,7 +958,13 @@ export function CardScanPanel() {
                 <SelectItem value="pokemon" data-oid="4:rkdzv">
                   {GAME_LABELS.pokemon}
                 </SelectItem>
-                {[...new Set(packageScanners.map(c => c.gameId))].filter(id => !["pokemon", "magic", "yugioh"].includes(id)).map(id => <SelectItem key={id} value={id}>{gameLabel(id)}</SelectItem>)}
+                {[...new Set(packageScanners.map((c) => c.gameId))]
+                  .filter((id) => !["pokemon", "magic", "yugioh"].includes(id))
+                  .map((id) => (
+                    <SelectItem key={id} value={id}>
+                      {gameLabel(id)}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -2177,22 +2195,19 @@ function AddScanMatchToCollection({
       isAuthenticated: state.isAuthenticated,
     })),
   );
-  const {
-    collections,
-    addCardToBinder,
-    fetchCollections,
-    hasFetched,
-    isLoading,
-  } = useCollectionsStore(
-    useShallow((state) => ({
-      collections: state.collections,
-      addCardToBinder: state.addCardToBinder,
-      fetchCollections: state.fetchCollections,
-      hasFetched: state.hasFetched,
-      isLoading: state.isLoading,
-    })),
-  );
+  const { collections, fetchCollections, hasFetched, isLoading } =
+    useCollectionsStore(
+      useShallow((state) => ({
+        collections: state.collections,
+        fetchCollections: state.fetchCollections,
+        hasFetched: state.hasFetched,
+        isLoading: state.isLoading,
+      })),
+    );
 
+  const savedIntake = useSavedScanIntake();
+  const features = useServerFeatures();
+  const savingRef = useRef(false);
   const [binderId, setBinderId] = useState("");
   const [status, setStatus] = useState<
     "idle" | "pending" | "success" | "error"
@@ -2219,7 +2234,7 @@ function AddScanMatchToCollection({
   useEffect(() => {
     setStatus("idle");
     setMessage(null);
-  }, [match.externalId]);
+  }, [match.tcg, match.externalId]);
 
   if (!isAuthenticated) {
     return (
@@ -2232,33 +2247,59 @@ function AddScanMatchToCollection({
   const showEmptyBinders = hasFetched && collections.length === 0;
 
   const handleAdd = async () => {
-    if (!token || !binderId) return;
+    if (!token || !binderId || savingRef.current) return;
+    savingRef.current = true;
     setStatus("pending");
     setMessage(null);
     try {
-      await addCardToBinder(token, binderId, {
-        cardId: card?.id ?? match.externalId,
-        quantity: 1,
-        cardData: {
-          name: card?.name ?? match.name,
-          tcg: match.tcg,
-          externalId: match.externalId,
-          setCode: card?.setCode ?? match.setCode ?? undefined,
-          setName: card?.setName ?? match.setName ?? undefined,
-          rarity: card?.rarity ?? match.rarity ?? undefined,
-          imageUrl: card?.imageUrl ?? match.imageUrl ?? undefined,
-          imageUrlSmall: card?.imageUrlSmall ?? undefined,
+      if (features.atomicIntake !== true)
+        throw new Error(
+          "Saving reviewed cards requires an updated Convex server with atomic intake.",
+        );
+      // A completed receipt starts a new operation only after this explicit add.
+      if (savedIntake?.receipt) finishIntakeDraft(QUICK_SCAN_INTAKE_KEY);
+      const draft = prepareIntakeDraft(QUICK_SCAN_INTAKE_KEY, {
+        collectionId: binderId,
+        request: {
+          operationId: crypto.randomUUID(),
+          source: "scanner",
+          rows: [
+            {
+              rowId: crypto.randomUUID(),
+              cardId: card?.id ?? match.externalId,
+              quantity: 1,
+              cardData: {
+                name: card?.name ?? match.name,
+                tcg: match.tcg,
+                externalId: match.externalId,
+                setCode: card?.setCode ?? match.setCode ?? undefined,
+                setName: card?.setName ?? match.setName ?? undefined,
+                rarity: card?.rarity ?? match.rarity ?? undefined,
+                imageUrl: card?.imageUrl ?? match.imageUrl ?? undefined,
+                imageUrlSmall: card?.imageUrlSmall ?? undefined,
+              },
+            },
+          ],
         },
       });
+      const receipt = await submitIntakeDraft(
+        token,
+        QUICK_SCAN_INTAKE_KEY,
+        draft,
+      );
       setStatus("success");
-      setMessage("Added to your collection.");
+      setMessage(
+        `${receipt.entryIds.length} physical copy saved to the original destination.`,
+      );
     } catch (error) {
       setStatus("error");
       setMessage(
         error instanceof Error
           ? error.message
-          : "Unable to add card to your collection.",
+          : "Unable to add card to your collection. The original request is saved for recovery.",
       );
+    } finally {
+      savingRef.current = false;
     }
   };
 
@@ -2275,7 +2316,11 @@ function AddScanMatchToCollection({
           <Select
             value={binderId}
             onValueChange={setBinderId}
-            disabled={!collections.length || status === "pending"}
+            disabled={
+              !collections.length ||
+              status === "pending" ||
+              Boolean(savedIntake && !savedIntake.receipt)
+            }
           >
             <SelectTrigger id="scan-add-binder" className="sm:max-w-xs">
               <SelectValue placeholder="Select a binder" />
@@ -2306,7 +2351,13 @@ function AddScanMatchToCollection({
           showEmptyBinders || !binderId || status === "pending" || isLoading
         }
       >
-        {status === "pending" ? "Adding…" : "Add to collection"}
+        {status === "pending"
+          ? "Saving…"
+          : savedIntake && !savedIntake.receipt
+            ? "Recover original card save"
+            : savedIntake?.receipt
+              ? "Add another physical copy"
+              : "Add to collection"}
       </Button>
     </div>
   );

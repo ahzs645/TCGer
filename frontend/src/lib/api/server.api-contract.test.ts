@@ -4,7 +4,9 @@ import { assertRequest, assertResponse } from "../../../../tools/api-contracts/m
 
 vi.mock("./base-url", () => ({ API_BASE_URL: "https://contract.test" }));
 vi.mock("@/lib/game-packages/game-package-client", () => ({ installedCardPrints: vi.fn() }));
-import { createCollection, getCollections, updateCollection, deleteCollection, addCardToCollection, updateCollectionCard, removeCardFromCollection } from "./collections";
+import { createCollection, getCollections, updateCollection, deleteCollection, addCardToCollection, updateCollectionCard, removeCardFromCollection, removeCollectionCopy } from "./collections";
+import { commitInventoryIntake } from "./inventory-intake";
+import { recordInventorySale } from "./pricing";
 import { createSealedOpening } from "./sealed";
 import { importServerBackup } from "./backups";
 import { searchAllCards } from "./cards";
@@ -26,6 +28,9 @@ for (const interaction of contracts.interactions as any[]) {
     const token = interaction.request.headers.Authorization.replace("Bearer ", "");
     let invoke: () => Promise<unknown>;
     switch (interaction.operation) {
+      case "deletePhysicalCopy": invoke = () => removeCollectionCopy(token, "contract-binder", "contract-copy"); break;
+      case "commitIntake": invoke = () => commitInventoryIntake(token, "contract-binder", interaction.request.body); break;
+      case "recordSale": invoke = () => recordInventorySale(token, interaction.request.body); break;
       case "listBinders": invoke = () => getCollections(token); break;
       case "createBinder": invoke = () => createCollection(token, interaction.request.body!); break;
       case "updateBinder": invoke = () => updateCollection(token, "contract-binder", interaction.request.body); break;
@@ -42,7 +47,7 @@ for (const interaction of contracts.interactions as any[]) {
     if (interaction.response.status >= 400 || incompleteSearch) await expect(invoke()).rejects.toThrow();
     else {
       const result = await invoke();
-      if (!["deleteBinder", "addCopy", "removeCopy"].includes(interaction.operation)) assertResponse(result, interaction.operation === "searchCards" ? interaction.response.body.cards : interaction.response.body);
+      if (!["deleteBinder", "addCopy", "removeCopy", "deletePhysicalCopy"].includes(interaction.operation)) assertResponse(result, interaction.operation === "searchCards" ? interaction.response.body.cards : interaction.response.body);
     }
     expect(requests).toBe(1);
     // The separate scanner/search helper must obey the same exhaustive search contract.

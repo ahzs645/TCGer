@@ -1,11 +1,20 @@
 import { ConvexError } from "convex/values";
 
 import type { Doc, Id } from "../_generated/dataModel";
+import { assertInventoryAvailable } from "./inventoryAvailability";
+import { updateSummary } from "../finance";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 type ReaderCtx = QueryCtx | MutationCtx;
 type AuditSnapshot = Doc<"collectionMutationAudits">["beforeState"][number];
 type AuditKind = Doc<"collectionMutationAudits">["operationKind"];
+
+async function placementsForEntry(ctx: ReaderCtx, entryId: Id<"collectionEntries">) {
+  const rows = await ctx.db.query("storagePlacements").withIndex("by_entry", q => q.eq("collectionEntryId", entryId)).take(501);
+  if (rows.length > 500) throw new ConvexError({ code: "LIMIT_EXCEEDED", message: "Too many storage placements to snapshot" });
+  return rows.map(({ containerId, compartmentId, slotIndex, quantity, stackKey }) => ({ containerId, compartmentId, slotIndex, quantity, stackKey }))
+    .sort((a, b) => a.compartmentId.localeCompare(b.compartmentId) || a.slotIndex - b.slotIndex);
+}
 
 async function tagIdsForEntry(
   ctx: ReaderCtx,
@@ -41,6 +50,10 @@ export async function snapshotAuditEntries(
       notes: entry.notes,
       price: entry.price,
       acquisitionPrice: entry.acquisitionPrice,
+      acquisitionCurrency: entry.acquisitionCurrency,
+      acquisitionTransactionId: entry.acquisitionTransactionId,
+      legacyQuantitySourceId: entry.legacyQuantitySourceId,
+      legacyQuantityOrdinal: entry.legacyQuantityOrdinal,
       serialNumber: entry.serialNumber,
       acquiredAt: entry.acquiredAt,
       isFoil: entry.isFoil,
@@ -59,7 +72,8 @@ export async function snapshotAuditEntries(
       storageLocation: entry.storageLocation,
       imageUrls: entry.imageUrls,
       imageStorageIds: entry.imageStorageIds,
-      tagIds: await tagIdsForEntry(ctx, entry._id)
+      tagIds: await tagIdsForEntry(ctx, entry._id),
+      storagePlacements: await placementsForEntry(ctx, entry._id),
     }))
   );
   return snapshots.sort((left, right) => left.id.localeCompare(right.id));
@@ -78,6 +92,7 @@ export async function appendCollectionAudit(
     after: AuditSnapshot[];
     sourceAuditId?: Id<"collectionMutationAudits">;
     idempotencyKey?: string;
+    financialTransactionIds?: Id<"transactions">[];
   }
 ) {
   const beforeCopies = input.before.reduce(
@@ -100,6 +115,7 @@ export async function appendCollectionAudit(
     afterState: input.after,
     sourceAuditId: input.sourceAuditId,
     idempotencyKey: input.idempotencyKey,
+    financialTransactionIds: input.financialTransactionIds,
     createdAt: Date.now()
   });
 }
@@ -119,6 +135,10 @@ function comparable(entries: AuditSnapshot[]) {
         notes: entry.notes ?? null,
         price: entry.price ?? null,
         acquisitionPrice: entry.acquisitionPrice ?? null,
+        acquisitionCurrency: entry.acquisitionCurrency ?? null,
+        acquisitionTransactionId: entry.acquisitionTransactionId ?? null,
+        legacyQuantitySourceId: entry.legacyQuantitySourceId ?? null,
+        legacyQuantityOrdinal: entry.legacyQuantityOrdinal ?? null,
         serialNumber: entry.serialNumber ?? null,
         acquiredAt: entry.acquiredAt ?? null,
         isFoil: entry.isFoil ?? null,
@@ -137,7 +157,8 @@ function comparable(entries: AuditSnapshot[]) {
         storageLocation: entry.storageLocation ?? null,
         imageUrls: entry.imageUrls ?? [],
         imageStorageIds: entry.imageStorageIds ?? [],
-        tagIds: [...entry.tagIds].sort()
+        tagIds: [...entry.tagIds].sort(),
+        storagePlacements: (entry.storagePlacements ?? []).map(placement => ({ containerId: placement.containerId, compartmentId: placement.compartmentId, slotIndex: placement.slotIndex, quantity: placement.quantity, stackKey: placement.stackKey ?? null })),
       }))
   );
 }
@@ -181,6 +202,9 @@ async function deleteEntry(
     .withIndex("by_entry", (q) => q.eq("entryId", entryId))
     .collect();
   await Promise.all(assignments.map((assignment) => ctx.db.delete(assignment._id)));
+  const placements = await ctx.db.query("storagePlacements").withIndex("by_entry", q => q.eq("collectionEntryId", entryId)).take(501);
+  if (placements.length > 500) throw new ConvexError({ code: "LIMIT_EXCEEDED", message: "Too many placements to undo" });
+  for (const placement of placements) await ctx.db.delete(placement._id);
   await ctx.db.delete(entryId);
 }
 
@@ -230,6 +254,10 @@ async function restoreSnapshots(
       notes: snapshot.notes,
       price: snapshot.price,
       acquisitionPrice: snapshot.acquisitionPrice,
+      acquisitionCurrency: snapshot.acquisitionCurrency,
+      acquisitionTransactionId: snapshot.acquisitionTransactionId,
+      legacyQuantitySourceId: snapshot.legacyQuantitySourceId,
+      legacyQuantityOrdinal: snapshot.legacyQuantityOrdinal,
       serialNumber: snapshot.serialNumber,
       acquiredAt: snapshot.acquiredAt,
       isFoil: snapshot.isFoil,
@@ -255,10 +283,32 @@ async function restoreSnapshots(
       await ctx.db.patch(existing._id, value);
       restoredId = existing._id;
     } else {
+      if (snapshot.acquisitionTransactionId) {
+        const acquisition = await ctx.db.get(snapshot.acquisitionTransactionId);
+        if (!acquisition || acquisition.userId !== userId || acquisition.type !== "purchase" || acquisition.amount / acquisition.quantity !== snapshot.acquisitionPrice || acquisition.currency !== snapshot.acquisitionCurrency) throw new ConvexError({ code: "CONFLICT", message: "The deleted copy's acquisition ledger changed; reconcile it before restoring inventory" });
+      }
       restoredId = await ctx.db.insert("collectionEntries", {
         ...value,
         createdAt: Date.now()
       });
+      // Convex generates a fresh document ID on restoration. Reattach every
+      // active inventory/financial reference atomically to the restored copy.
+      const purchases = await ctx.db.query("transactions").withIndex("by_user_and_collection_entry", q => q.eq("userId", userId).eq("collectionEntryId", snapshot.id)).take(501);
+      if (purchases.length > 500) throw new ConvexError({ code: "CONFLICT", message: "Too many linked transactions to restore safely" });
+      for (const purchase of purchases) await ctx.db.patch(purchase._id, { collectionEntryId: restoredId });
+      const openedCards = await ctx.db.query("sealedOpenedCards").withIndex("by_collection", q => q.eq("collectionId", snapshot.id)).take(2);
+      if (openedCards.length > 1 || openedCards.some(row => row.userId !== userId)) throw new ConvexError({ code: "CONFLICT", message: "The opening ledger changed; reconcile it before restoring this copy" });
+      for (const opened of openedCards) await ctx.db.patch(opened._id, { collectionId: restoredId });
+      for (const placement of snapshot.storagePlacements ?? []) {
+        const compartment = await ctx.db.get(placement.compartmentId);
+        const container = await ctx.db.get(placement.containerId);
+        if (!compartment || !container || compartment.userId !== userId || container.userId !== userId || compartment.containerId !== container._id || compartment.locked || container.locked || placement.slotIndex >= compartment.capacity) {
+          throw new ConvexError({ code: "CONFLICT", message: "The original storage location is no longer available; reconcile it before undoing removal" });
+        }
+        const occupants = await ctx.db.query("storagePlacements").withIndex("by_compartment_and_slot", q => q.eq("compartmentId", compartment._id).eq("slotIndex", placement.slotIndex)).take(101);
+        if (occupants.length > 100 || occupants.some(row => !beforeIds.has(row.collectionEntryId) && !restoredIds.includes(row.collectionEntryId) && (!placement.stackKey || row.stackKey !== placement.stackKey))) throw new ConvexError({ code: "CONFLICT", message: "The original storage slot has been reassigned; undo cannot overwrite its contents" });
+        await ctx.db.insert("storagePlacements", { ...placement, userId, collectionEntryId: restoredId, createdAt: Date.now(), updatedAt: Date.now() });
+      }
     }
     await replaceTags(ctx, restoredId, userId, snapshot.tagIds);
     restoredIds.push(restoredId);
@@ -298,11 +348,11 @@ export async function undoAuditedCollectionMutation(
       message: "Collection history entry not found"
     });
   }
-  if (source.operationKind === "undo" || source.operationKind === "trade_settlement") {
+  if (["undo", "trade_settlement", "sale", "physical_opening", "normalization"].includes(source.operationKind)) {
     throw new ConvexError({
       code: "BAD_REQUEST",
-      message: source.operationKind === "trade_settlement"
-        ? "Trade settlements must be reconciled as a complete trade"
+      message: source.operationKind !== "undo"
+        ? "Inventory and finance operations must be reconciled as a complete operation"
         : "Undo records cannot be undone"
     });
   }
@@ -329,6 +379,26 @@ export async function undoAuditedCollectionMutation(
       code: "CONFLICT",
       message: "Undo was not applied because the affected collection copies have changed"
     });
+  }
+
+  for (const snapshot of current) {
+    const entry = await ctx.db.get(snapshot.id);
+    if (entry) await assertInventoryAvailable(ctx, entry);
+  }
+  if (source.operationKind === "acquisition_split") {
+    if (!source.idempotencyKey) throw new ConvexError({ code: "CONFLICT", message: "Acquisition audit lacks its financial allocation identity" });
+    const transactionIds = source.financialTransactionIds ?? (await ctx.db.query("transactions")
+      .withIndex("by_user_and_allocation_group", q => q.eq("userId", input.userId).eq("allocationGroupId", source.idempotencyKey))
+      .take(501)).map(row => row._id);
+    if (transactionIds.length > 500) throw new ConvexError({ code: "CONFLICT", message: "Too many acquisition transactions to reverse" });
+    for (const id of transactionIds) {
+      const transaction = await ctx.db.get(id);
+      if (!transaction || transaction.userId !== input.userId || transaction.type !== "purchase" || transaction.allocationGroupId !== source.idempotencyKey || transaction.updatedAt !== transaction.createdAt) {
+        throw new ConvexError({ code: "CONFLICT", message: "Acquisition transactions changed; reconcile them before undoing the allocation" });
+      }
+      await updateSummary(ctx, input.userId, transaction, -1);
+      await ctx.db.delete(transaction._id);
+    }
   }
 
   const restored = await restoreSnapshots(

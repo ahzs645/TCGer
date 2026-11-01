@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"inventory.sales","platform":"android","status":"partial","modes":["server"],"requires":["authenticated-server","atomic-sales"],"limitation":"Atomic sale transport and receipt decoding exist; the Android inventory sale interface is disabled until durable retry and receipt recovery are wired to this operation."}
 // @tcger-feature {"id":"collections.copies","platform":"android","status":"implemented","modes":["server"],"requires":["authenticated-server"]}
 // @tcger-feature {"id":"collections.manage","platform":"android","status":"implemented"}
 package com.ahmadjalil.tcger.data.remote
@@ -110,6 +111,20 @@ interface TCGerApi {
         @Path("binderId") binderId: String,
         @Path("cardId") cardId: String,
     )
+    @DELETE("collections/{binderId}/copies/{copyId}") suspend fun deletePhysicalCopy(
+        @Header("Authorization") auth: String,
+        @Path("binderId") binderId: String,
+        @Path("copyId") copyId: String,
+    )
+    @POST("collections/{binderId}/intake") suspend fun commitIntake(
+        @Header("Authorization") auth: String,
+        @Path("binderId") binderId: String,
+        @Body request: JsonObject,
+    ): InventoryIntakeReceiptDto
+    @POST("finance/sales") suspend fun recordSale(
+        @Header("Authorization") auth: String,
+        @Body request: JsonObject,
+    ): InventorySaleReceiptDto
     @POST("wishlists/{id}/rules") suspend fun addWishlistRule(@Header("Authorization") auth: String, @Path("id") id: String, @Body rule: com.ahmadjalil.tcger.domain.WishlistRule): com.ahmadjalil.tcger.domain.WishlistRule
     @PATCH("wishlists/{id}/rules/{ruleId}") suspend fun updateWishlistRule(@Header("Authorization") auth: String, @Path("id") id: String, @Path("ruleId") ruleId: String, @Body rule: com.ahmadjalil.tcger.domain.WishlistRule): com.ahmadjalil.tcger.domain.WishlistRule
     @DELETE("wishlists/{id}/rules/{ruleId}") suspend fun deleteWishlistRule(@Header("Authorization") auth: String, @Path("id") id: String, @Path("ruleId") ruleId: String)

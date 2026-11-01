@@ -1,3 +1,5 @@
+// @tcger-feature {"id":"packOpening.save.collection","platform":"ios","status":"implemented","modes":["local","server"]}
+// @tcger-feature {"id":"packOpening.save.sealedLedger","platform":"ios","status":"implemented","modes":["server"],"requires":["authenticated-server","atomic-intake"]}
 // @tcger-feature {"id":"scanner.results.sessionReview","platform":"ios","status":"implemented"}
 
 import SwiftUI
@@ -23,6 +25,10 @@ struct ScannerSessionReviewView: View {
     @State private var isAdding = false
     @State private var isCreatingBinder = false
     @State private var errorMessage: String?
+    @State private var sealedInventory: [SealedInventoryItem] = []
+    @State private var selectedSealedInventoryID = ""
+    @State private var openedQuantity = 1
+
 
     let color: Color
     let showsPrices: Bool
@@ -68,6 +74,27 @@ struct ScannerSessionReviewView: View {
                             summary
                         }
 
+                        if !environmentStore.serverConfiguration.isOnDevice && environmentStore.serverFeatures.atomicIntake {
+                            Section {
+                                Picker("Physical product", selection: $selectedSealedInventoryID) {
+                                    Text("No sealed stock link").tag("")
+                                    ForEach(sealedInventory.filter { $0.quantity > 0 }) { item in
+                                        Text("\(item.product.name) · \(item.quantity) owned").tag(item.id)
+                                    }
+                                }
+                                if !selectedSealedInventoryID.isEmpty {
+                                    Stepper("Opened units: \(openedQuantity)", value: $openedQuantity, in: 1...100)
+                                }
+                            } header: { Text("Record a physical opening") } footer: {
+                                Text("Review the cards you actually opened. Saving records these exact copies and subtracts the opened units together. Simulated pulls never enter physical inventory.")
+                            }
+                            .disabled(isAdding)
+                        }
+                        if !environmentStore.serverConfiguration.isOnDevice && !environmentStore.serverFeatures.atomicIntake {
+                            Section {
+                                Text("Saving scans requires a server with atomic intake support. Connect to a fully Convex-backed TCGer server or use phone-only mode.")
+                            }
+                        }
                         Section("Scanned Cards") {
                             ForEach(viewModel.sessionResults) { result in
                                 sessionRow(result)
@@ -331,7 +358,7 @@ struct ScannerSessionReviewView: View {
             .buttonStyle(.borderedProminent)
             .tint(color)
             .controlSize(.large)
-            .disabled(selectedResultIDs.isEmpty || selectedBinderID == nil || isAdding || isCreatingBinder)
+            .disabled(selectedResultIDs.isEmpty || selectedBinderID == nil || isAdding || isCreatingBinder || (!environmentStore.serverConfiguration.isOnDevice && !environmentStore.serverFeatures.atomicIntake))
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -389,26 +416,29 @@ struct ScannerSessionReviewView: View {
 
     @MainActor
     private func loadCollections() async {
-        guard requestToken != nil else {
+        guard let token = requestToken else {
             errorMessage = "You need to be logged in before adding cards to a binder."
             isLoadingCollections = false
             return
         }
-
+        let session = environmentStore.sessionIdentity
         do {
-            collections = try await apiService.getCollections(
-                config: environmentStore.serverConfiguration,
-                token: environmentStore.authToken
-            ).sortedForDisplay()
-            if let selectedBinderID,
-               collections.contains(where: { $0.id == selectedBinderID }) {
+            let loaded = try await apiService.getCollections(config: session.configuration, token: token).sortedForDisplay()
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            collections = loaded
+            if let selectedBinderID, collections.contains(where: { $0.id == selectedBinderID }) {
                 self.selectedBinderID = selectedBinderID
-            } else {
-                selectedBinderID = collections.first?.id
+            } else { selectedBinderID = collections.first?.id }
+            if !session.configuration.isOnDevice && environmentStore.serverFeatures.atomicIntake {
+                let inventory = try await apiService.getUserSealedInventory(config: session.configuration, token: token)
+                guard environmentStore.matches(session), !Task.isCancelled else { return }
+                sealedInventory = inventory
             }
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
+        guard environmentStore.matches(session), !Task.isCancelled else { return }
         isLoadingCollections = false
     }
 
@@ -424,79 +454,91 @@ struct ScannerSessionReviewView: View {
             return
         }
 
+        let session = environmentStore.sessionIdentity
         isCreatingBinder = true
         defer { isCreatingBinder = false }
 
         do {
             let collection = try await apiService.createCollection(
-                config: environmentStore.serverConfiguration,
+                config: session.configuration,
                 token: token,
                 name: name,
                 description: description,
                 colorHex: colorHex,
                 defaultCondition: defaultCondition
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             collections.removeAll { $0.id == collection.id }
             collections.append(collection)
             collections = collections.sortedForDisplay()
             selectedBinderID = collection.id
-            NotificationCenter.default.post(name: .collectionDidChange, object: collection)
+            CollectionMutationNotice.post(config: session.configuration, token: token, object: collection)
         } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
     private func addSelectedCards() async {
-        guard let binderID = selectedBinderID,
-              let token = requestToken
-        else { return }
-
-        let selectedResults = viewModel.sessionResults.filter { selectedResultIDs.contains($0.id) }
-        guard !selectedResults.isEmpty else { return }
-
+        guard !isAdding, let binderID = selectedBinderID, let token = requestToken else { return }
+        let session = environmentStore.sessionIdentity
+        guard session.configuration.isOnDevice || environmentStore.serverFeatures.atomicIntake else { return }
+        let results = viewModel.sessionResults.filter { selectedResultIDs.contains($0.id) }
+        guard !results.isEmpty else { return }
+        let scope = InventoryOperationJournal.scope(config: session.configuration, userID: environmentStore.currentUser?.id, token: token)
         isAdding = true
-        var addedIDs: Set<CardScanResult.ID> = []
+        errorMessage = nil
         defer { isAdding = false }
-
-        for result in selectedResults {
-            guard let card = makeCard(from: result.primary) else { continue }
-            do {
-                try await apiService.addCardToBinder(
-                    config: environmentStore.serverConfiguration,
-                    token: token,
-                    binderId: binderID,
-                    card: card,
-                    details: BinderCardAddDetails(
-                        condition: selectedBinder?.defaultCondition ?? CardCondition.nearMint.rawValue,
-                        language: language(for: result),
-                        isFoil: PokemonFinishOption.isFoil(finishCode(for: result)),
-                        variant: CardCopyVariant(
-                            finishCode: finishCode(for: result),
-                            finishLabel: finishCode(for: result).map(PokemonFinishOption.label(for:)),
-                            edition: nil,
-                            stamp: nil,
-                            isSealedPromo: false,
-                            isOversized: false,
-                            isPeelOff: false
+        do {
+            let selectedRows = Set(results.map { $0.id.uuidString })
+            let pending = try InventoryOperationJournal.shared.pending(scope: scope).compactMap { operation -> InventoryIntakeDraft? in
+                guard case .intake(let draft) = operation,
+                      !Set(draft.rows.map(\.rowId)).isDisjoint(with: selectedRows) else { return nil }
+                return draft
+            }.first
+            let draft: InventoryIntakeDraft
+            if let pending { draft = pending }
+            else {
+                let rows = try results.map { result -> InventoryIntakeRow in
+                    guard let card = makeCard(from: result.primary) else {
+                        throw APIService.APIError.serverError(status: 400, message: "Review each card's exact game and printing before saving")
+                    }
+                    return InventoryIntakeRow(
+                        rowId: result.id.uuidString, card: card,
+                        details: BinderCardAddDetails(
+                            condition: selectedBinder?.defaultCondition ?? CardCondition.nearMint.rawValue,
+                            language: language(for: result),
+                            isFoil: PokemonFinishOption.isFoil(finishCode(for: result)),
+                            variant: CardCopyVariant(finishCode: finishCode(for: result), finishLabel: finishCode(for: result).map(PokemonFinishOption.label(for:)), edition: nil, stamp: nil, isSealedPromo: false, isOversized: false, isPeelOff: false)
                         )
                     )
+                }
+                draft = InventoryIntakeDraft(
+                    operationId: UUID().uuidString, collectionId: binderID,
+                    source: selectedSealedInventoryID.isEmpty ? "scanner" : "physical-opening", rows: rows,
+                    sealedInventoryId: selectedSealedInventoryID.isEmpty ? nil : selectedSealedInventoryID,
+                    openedQuantity: selectedSealedInventoryID.isEmpty ? nil : openedQuantity,
+                    openedAt: selectedSealedInventoryID.isEmpty ? nil : ISO8601DateFormatter().string(from: Date())
                 )
-                addedIDs.insert(result.id)
-            } catch {
-                viewModel.markSessionResultsAdded(addedIDs)
-                selectedResultIDs.subtract(addedIDs)
-                errorMessage = "Added \(addedIDs.count) of \(selectedResults.count) cards. \(error.localizedDescription)"
-                if !addedIDs.isEmpty { await onCardAdded(binderID) }
-                return
+                try InventoryOperationJournal.shared.save(.intake(draft), scope: scope)
             }
-        }
-
-        viewModel.markSessionResultsAdded(addedIDs)
-        selectedResultIDs.subtract(addedIDs)
-        if !addedIDs.isEmpty {
+            let receipt = try await apiService.commitInventoryIntake(config: session.configuration, token: token, draft: draft)
+            guard environmentStore.matches(session), !Task.isCancelled else { throw CancellationError() }
+            let addedIDs = Set(receipt.rows.compactMap { UUID(uuidString: $0.rowId) })
+            try await ScannerStagingStore.shared.markAddedDurably(addedIDs)
+            guard environmentStore.matches(session), !Task.isCancelled else { throw CancellationError() }
+            viewModel.markSessionResultsAdded(addedIDs)
+            selectedResultIDs.subtract(addedIDs)
+            try InventoryOperationJournal.shared.complete(id: draft.operationId, scope: scope)
+            CollectionMutationNotice.post(config: session.configuration, token: token)
             HapticManager.notification(.success)
-            await onCardAdded(binderID)
+            await onCardAdded(draft.collectionId)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
+            await loadCollections()
+        } catch {
+            guard environmentStore.matches(session), !(error is CancellationError) else { return }
+            errorMessage = "The attempt is saved for recovery. Retry here or in Settings → Pending saves. " + error.localizedDescription
         }
     }
 

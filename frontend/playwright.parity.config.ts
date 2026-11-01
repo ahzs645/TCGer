@@ -13,6 +13,9 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     ...devices["Desktop Chrome"],
+    // Allows an official system Chrome when the pinned testing download is
+    // unavailable. CI continues to use Playwright's pinned browser by default.
+    launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH },
     baseURL,
     colorScheme: "dark",
     locale: "en-CA",
@@ -21,7 +24,9 @@ export default defineConfig({
   },
   webServer: {
     command: `npm run dev --${process.env.PARITY_WEBPACK === "true" ? " --webpack" : ""} --hostname 127.0.0.1 --port ${port}`,
-    url: baseURL,
+    // Compile the heavy scanner route within server startup, before the
+    // unchanged per-test behavior deadline begins on a cold dev server.
+    url: `${baseURL}/demo/scan`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

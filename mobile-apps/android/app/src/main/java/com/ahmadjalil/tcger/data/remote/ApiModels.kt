@@ -173,6 +173,7 @@ data class CollectionCardDto(
     val price: Double? = null,
     val acquisitionPrice: Double? = null,
     val copies: List<CollectionCopyDto> = emptyList(),
+    val acquisitionCurrency: String? = null,
 )
 
 @Serializable
@@ -201,6 +202,7 @@ data class CollectionCopyDto(
     val storageLocation: String? = null,
     val imageUrls: List<String> = emptyList(),
     val tags: List<CollectionTag> = emptyList(),
+    val acquisitionCurrency: String? = null,
 ) {
     fun details(): CollectionDetails = Json { ignoreUnknownKeys = true }.decodeFromJsonElement(Json.encodeToJsonElement(this))
 }
@@ -257,6 +259,7 @@ data class AddCardRequest(
     val price: Double? = null,
     val acquisitionPrice: Double? = null,
     @kotlinx.serialization.Transient val details: CollectionDetails = CollectionDetails(),
+    val acquisitionCurrency: String? = null,
 ) {
     fun payload(): JsonObject {
         val codec = Json { encodeDefaults = true; explicitNulls = false }
@@ -426,3 +429,24 @@ data class AddWishlistCardRequest(
 
 @Serializable
 data class CardPrintsDto(val prints: List<CardDto> = emptyList())
+
+@Serializable
+data class InventoryIntakeRowReceiptDto(val rowId: String, val entryIds: List<String>)
+
+@Serializable
+data class InventoryIntakeReceiptDto(
+    val operationId: String,
+    val entryIds: List<String>,
+    val rows: List<InventoryIntakeRowReceiptDto>,
+    val openingId: String? = null,
+)
+
+@Serializable
+data class InventorySaleReceiptDto(
+    val operationId: String,
+    val transactionId: String,
+    val copyIds: List<String>,
+    val removedCopyIds: List<String>,
+    val amount: Double,
+    val currency: String,
+)

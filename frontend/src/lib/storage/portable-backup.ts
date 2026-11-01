@@ -21,6 +21,9 @@ import {
 } from "./keys";
 import { restoreWebSections } from "./portable-web-sections";
 import type { PersistedDemoState } from "./demo-persistence";
+import { privateStorageKey } from "@/lib/private-storage";
+import { capturePrivateSession } from "@/lib/private-session";
+import { publishInventoryChange } from "@/lib/inventory-events";
 
 export async function exportLocalBackup(): Promise<PortableBackup> {
   const native = await demoBackupSnapshot();
@@ -29,7 +32,10 @@ export async function exportLocalBackup(): Promise<PortableBackup> {
   const localSections = { ...native.portableSections };
   if (typeof localStorage !== "undefined") {
     for (const [section, key] of [
-      ["smartFolders", `${SMART_FOLDER_STORAGE_KEY_PREFIX}demo-user-001`],
+      [
+        "smartFolders",
+        privateStorageKey(SMART_FOLDER_STORAGE_KEY_PREFIX, "demo-user-001"),
+      ],
       ["transactions", DEMO_TRANSACTIONS_STORAGE_KEY],
     ]) {
       const raw = localStorage.getItem(key!);
@@ -68,6 +74,8 @@ export async function exportLocalBackup(): Promise<PortableBackup> {
           price: copy.price,
           acquisitionPrice:
             "acquisitionPrice" in copy ? copy.acquisitionPrice : null,
+          acquisitionCurrency:
+            "acquisitionCurrency" in copy ? copy.acquisitionCurrency : null,
           details: copy,
         }));
       }),
@@ -121,6 +129,7 @@ function mergeRows<T extends { _id: string }>(before: T[], after: T[]): T[] {
   ];
 }
 export async function importLocalBackup(input: unknown): Promise<void> {
+  const origin = capturePrivateSession();
   const incoming = normalizePortableBackup(input);
   const backup = mergePortableBackups(await exportLocalBackup(), incoming);
   const before = await demoBackupSnapshot();
@@ -149,7 +158,8 @@ export async function importLocalBackup(input: unknown): Promise<void> {
         id: i === 0 ? owned.id! : `${owned.id}:${i}`,
         condition: owned.condition,
         price: owned.price,
-        acquisitionPrice: owned.acquisitionPrice,
+        acquisitionPrice: owned.acquisitionPrice ?? undefined,
+        acquisitionCurrency: owned.acquisitionCurrency ?? undefined,
         tags: owned.details.tags ?? [],
       })),
     })),
@@ -241,5 +251,8 @@ export async function importLocalBackup(input: unknown): Promise<void> {
       ),
     },
   };
+  origin.assertCurrent();
   await commitDemoBackup(patch, true, before);
+  origin.assertCurrent();
+  publishInventoryChange(origin);
 }

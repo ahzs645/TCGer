@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   CreateSealedInventoryInput,
   CreateSealedOpeningInput,
@@ -57,7 +58,7 @@ async function authFetch<T>(
   token: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(url, {
+  const response = await sessionFetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -117,10 +118,13 @@ export async function deleteCustomSealedProduct(
   token: string,
   productId: string,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/sealed/products/${productId}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await sessionFetch(
+    `${API_BASE_URL}/sealed/products/${productId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || "Failed to delete custom sealed product");
@@ -169,10 +173,13 @@ export async function deleteSealedInventory(
   token: string,
   itemId: string,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/sealed/inventory/${itemId}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await sessionFetch(
+    `${API_BASE_URL}/sealed/inventory/${itemId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./base-url";
+import { authLifecycleFetch } from "@/lib/auth-lifecycle";
 
 // Re-export Better Auth client for convenience
 export {
@@ -24,10 +25,14 @@ export async function checkSetupRequired(): Promise<SetupCheckResponse> {
 }
 
 export async function promoteToAdmin(): Promise<{ message: string }> {
-  const response = await fetch(`${API_BASE_URL}/setup/setup`, {
-    method: "POST",
-    credentials: "include",
-  });
+  const response = await authLifecycleFetch(
+    fetch,
+    `${API_BASE_URL}/setup/setup`,
+    {
+      method: "POST",
+      credentials: "include",
+    },
+  );
 
   if (!response.ok) {
     const error = await response.json();

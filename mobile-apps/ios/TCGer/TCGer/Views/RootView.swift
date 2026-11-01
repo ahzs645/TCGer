@@ -6,6 +6,9 @@ struct RootView: View {
     @EnvironmentObject private var wishlistStore: WishlistStore
 
     @State private var isAuthenticating = false
+    @State private var authenticationRequestID: UUID?
+    @State private var verificationRequestID: UUID?
+    @State private var bootstrapRequestID: UUID?
     @State private var isVerifyingServer = false
     @State private var isBootstrapping = false
     @State private var isCheckingStartupFeatures = false
@@ -23,7 +26,7 @@ struct RootView: View {
         Group {
             if shouldPresentMainContent {
                 if needsGameInstallation {
-                    GameInstallationView(catalogStore: catalogStore)
+                    GameInstallationView(catalogStore: catalogStore).id(environmentStore.widgetSessionID)
                 } else {
                     MainContentView().id(environmentStore.widgetSessionID)
                 }
@@ -33,7 +36,17 @@ struct RootView: View {
                 }
             }
         }
-        .onChange(of: environmentStore.widgetSessionID) { wishlistStore.reset() }
+        .onChange(of: environmentStore.widgetSessionID) {
+            wishlistStore.reset()
+            authenticationRequestID = nil
+            verificationRequestID = nil
+            bootstrapRequestID = nil
+            isAuthenticating = false
+            isVerifyingServer = false
+            isBootstrapping = false
+            errorMessage = nil
+            showingSignup = false
+        }
         .task(id: "\(environmentStore.serverConfiguration.baseURL)|\(environmentStore.isServerVerified)") {
             guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else {
                 serverFeatureStore.reset()
@@ -180,13 +193,17 @@ struct RootView: View {
     private func verifyServerConnection() async {
         guard environmentStore.serverConfiguration.isValid else { return }
         if isVerifyingServer { return }
+        let requestID = UUID()
+        verificationRequestID = requestID
+        let session = environmentStore.sessionIdentity
         isVerifyingServer = true
-        defer { isVerifyingServer = false }
+        defer { if verificationRequestID == requestID { isVerifyingServer = false } }
 
-        let candidates = environmentStore.serverConfiguration.backendCandidates
+        let candidates = session.configuration.backendCandidates
 
         for candidate in candidates {
             let reachable = await apiService.verifyServer(config: candidate)
+            guard environmentStore.matches(session), verificationRequestID == requestID, !Task.isCancelled else { return }
             if reachable {
                 if candidate.baseURL != environmentStore.serverConfiguration.baseURL {
                     environmentStore.serverConfiguration = candidate
@@ -210,6 +227,12 @@ struct RootView: View {
     @MainActor
     private func resetServerSelection() {
         serverFeatureStore.reset()
+        authenticationRequestID = nil
+        verificationRequestID = nil
+        bootstrapRequestID = nil
+        isAuthenticating = false
+        isVerifyingServer = false
+        isBootstrapping = false
         setupRequired = nil
         showingSignup = false
         errorMessage = nil
@@ -230,92 +253,74 @@ struct RootView: View {
 
     @MainActor
     private func authenticate() async {
-        guard environmentStore.serverConfiguration.isValid else { return }
+        guard environmentStore.serverConfiguration.isValid, !isAuthenticating else { return }
         guard environmentStore.isServerVerified else {
             await verifyServerConnection()
             return
         }
         guard environmentStore.credentials.isComplete else { return }
+        let session = environmentStore.sessionIdentity
+        let credentials = environmentStore.credentials
+        let requestID = UUID()
+        authenticationRequestID = requestID
         isAuthenticating = true
-        defer { isAuthenticating = false }
-
+        defer { if authenticationRequestID == requestID { isAuthenticating = false } }
         do {
-            let response = try await apiService.authenticate(
-                config: environmentStore.serverConfiguration,
-                credentials: environmentStore.credentials
-            )
-            await completeAuthentication(response, fallbackUsername: environmentStore.credentials.username)
+            let response = try await apiService.authenticate(config: session.configuration, credentials: credentials)
+            guard authenticationRequestID == requestID, !Task.isCancelled else { return }
+            await completeAuthentication(response, fallbackUsername: credentials.username, for: session)
         } catch {
-            if let apiError = error as? APIService.APIError {
-                errorMessage = apiError.localizedDescription
-            } else {
-                errorMessage = error.localizedDescription
-            }
-            environmentStore.signOut()
+            guard environmentStore.matches(session), authenticationRequestID == requestID, !(error is CancellationError) else { return }
+            errorMessage = error.localizedDescription
+            // A failed attempt has no authority to sign out a replacement session.
         }
     }
 
     @MainActor
     private func signup(email: String, password: String, username: String) async {
-        guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else { return }
-
+        guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified, !isAuthenticating else { return }
+        let session = environmentStore.sessionIdentity
+        let requestID = UUID()
+        authenticationRequestID = requestID
         isAuthenticating = true
-        defer { isAuthenticating = false }
-
+        defer { if authenticationRequestID == requestID { isAuthenticating = false } }
         do {
-            let response = try await apiService.signup(
-                config: environmentStore.serverConfiguration,
-                email: email,
-                password: password,
-                username: username
-            )
-            await completeAuthentication(response, fallbackUsername: username)
-            showingSignup = false
+            let response = try await apiService.signup(config: session.configuration, email: email, password: password, username: username)
+            guard authenticationRequestID == requestID, !Task.isCancelled else { return }
+            await completeAuthentication(response, fallbackUsername: username, for: session)
         } catch {
-            if let apiError = error as? APIService.APIError {
-                errorMessage = apiError.localizedDescription
-            } else {
-                errorMessage = error.localizedDescription
-            }
+            guard environmentStore.matches(session), authenticationRequestID == requestID, !(error is CancellationError) else { return }
+            errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
     private func createInitialAdmin(email: String, password: String, username: String) async {
-        guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified else { return }
-
+        guard environmentStore.serverConfiguration.isValid, environmentStore.isServerVerified, !isAuthenticating else { return }
+        let session = environmentStore.sessionIdentity
+        let requestID = UUID()
+        authenticationRequestID = requestID
         isAuthenticating = true
-        defer { isAuthenticating = false }
-
+        defer { if authenticationRequestID == requestID { isAuthenticating = false } }
         do {
-            let response = try await apiService.setupInitialAdmin(
-                config: environmentStore.serverConfiguration,
-                email: email,
-                password: password,
-                username: username
-            )
+            let response = try await apiService.setupInitialAdmin(config: session.configuration, email: email, password: password, username: username)
+            guard authenticationRequestID == requestID, environmentStore.matches(session), !Task.isCancelled else { return }
             setupRequired = false
-            await completeAuthentication(response, fallbackUsername: username)
+            await completeAuthentication(response, fallbackUsername: username, for: session)
         } catch {
-            if let apiError = error as? APIService.APIError {
-                errorMessage = apiError.localizedDescription
-            } else {
-                errorMessage = error.localizedDescription
-            }
+            guard environmentStore.matches(session), authenticationRequestID == requestID, !(error is CancellationError) else { return }
+            errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
-    private func completeAuthentication(_ response: AuthResponse, fallbackUsername: String?) async {
-        environmentStore.credentials = LoginCredentials(
-            username: fallbackUsername ?? response.user.username ?? "",
-            password: ""
-        )
-        environmentStore.isUsingSingleUserMode = false
-        environmentStore.applyAuthUser(response.user)
-        environmentStore.storeToken(response.token)
-        environmentStore.isAuthenticated = true
+    private func completeAuthentication(_ response: AuthResponse, fallbackUsername: String?, for session: EnvironmentStore.SessionIdentity) async {
+        guard !Task.isCancelled,
+              environmentStore.completeAuthentication(response, username: fallbackUsername, for: session) else { return }
+        showingSignup = false
+        let authenticatedSession = environmentStore.sessionIdentity
         await fetchPreferences()
+        guard environmentStore.matches(authenticatedSession), !Task.isCancelled else { return }
         await refreshBootstrapState(force: true)
     }
 
@@ -324,11 +329,10 @@ struct RootView: View {
         guard environmentStore.serverConfiguration.isValid,
               let token = environmentStore.authToken else { return }
 
+        let session = environmentStore.sessionIdentity
         do {
-            let prefs = try await apiService.getUserPreferences(
-                config: environmentStore.serverConfiguration,
-                token: token
-            )
+            let prefs = try await apiService.getUserPreferences(config: session.configuration, token: token)
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             environmentStore.applyUserPreferences(prefs)
         } catch {
             // Non-fatal; preferences fall back to persisted defaults
@@ -348,8 +352,10 @@ struct RootView: View {
             return
         }
 
+        let requestID = UUID()
+        bootstrapRequestID = requestID
         isBootstrapping = true
-        defer { isBootstrapping = false }
+        defer { if bootstrapRequestID == requestID { isBootstrapping = false } }
 
         let configuration = environmentStore.serverConfiguration
         let sessionID = environmentStore.widgetSessionID
@@ -410,25 +416,30 @@ struct RootView: View {
             return
         }
 
+        let session = environmentStore.sessionIdentity
         if environmentStore.isUsingSingleUserMode {
             if await probeSingleUserSession() {
                 return
             }
+            guard environmentStore.matches(session), !Task.isCancelled else { return }
             environmentStore.signOut()
         }
 
         if let token = environmentStore.authToken, !environmentStore.isUsingSingleUserMode {
+            let authenticatedSession = environmentStore.sessionIdentity
             do {
                 let profile = try await apiService.getUserProfile(
-                    config: environmentStore.serverConfiguration,
+                    config: authenticatedSession.configuration,
                     token: token
                 )
+                guard environmentStore.matches(authenticatedSession), !Task.isCancelled else { return }
                 environmentStore.applyUserProfile(profile)
                 environmentStore.isAuthenticated = true
                 showingSignup = false
                 await fetchPreferences()
                 return
             } catch let apiError as APIService.APIError {
+                guard environmentStore.matches(authenticatedSession), !Task.isCancelled else { return }
                 if case .unauthorized = apiError {
                     environmentStore.signOut()
                 } else {
@@ -446,10 +457,12 @@ struct RootView: View {
 
     @MainActor
     private func probeSingleUserSession() async -> Bool {
+        let session = environmentStore.sessionIdentity
         do {
             let profile = try await apiService.getUserProfile(
-                config: environmentStore.serverConfiguration
+                config: session.configuration
             )
+            guard environmentStore.matches(session), !Task.isCancelled else { return false }
             environmentStore.enableSingleUserSession(profile: profile)
             showingSignup = false
             await fetchPreferences()

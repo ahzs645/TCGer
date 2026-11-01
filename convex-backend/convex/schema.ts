@@ -566,6 +566,10 @@ export default defineSchema({
     notes: v.optional(v.string()),
     price: v.optional(v.number()),
     acquisitionPrice: v.optional(v.number()),
+    acquisitionCurrency: v.optional(v.string()),
+    acquisitionTransactionId: v.optional(v.id("transactions")),
+    legacyQuantitySourceId: v.optional(v.id("collectionEntries")),
+    legacyQuantityOrdinal: v.optional(v.number()),
     serialNumber: v.optional(v.string()),
     acquiredAt: v.optional(v.string()),
     isFoil: v.optional(v.boolean()),
@@ -588,9 +592,11 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("by_user", ["userId"])
+    .index("by_user_and_quantity", ["userId", "quantity"])
     .index("by_binder", ["binderId"])
     .index("by_binder_and_card", ["binderId", "cardId"])
-    .index("by_user_card", ["userId", "cardId"]),
+    .index("by_user_card", ["userId", "cardId"])
+    .index("by_legacy_source_and_ordinal", ["legacyQuantitySourceId", "legacyQuantityOrdinal"]),
 
   storageContainers: defineTable({
     userId: v.id("users"),
@@ -708,12 +714,22 @@ export default defineSchema({
     afterState: v.array(collectionEntryAuditSnapshotValidator),
     sourceAuditId: v.optional(v.id("collectionMutationAudits")),
     idempotencyKey: v.optional(v.string()),
+    financialTransactionIds: v.optional(v.array(v.id("transactions"))),
     createdAt: v.number()
   })
     .index("by_user", ["userId"])
     .index("by_user_and_operation_kind", ["userId", "operationKind"])
     .index("by_source_audit", ["sourceAuditId"])
     .index("by_user_and_idempotency_key", ["userId", "idempotencyKey"]),
+
+  inventoryOperationReceipts: defineTable({
+    userId: v.id("users"),
+    operationId: v.string(),
+    kind: v.union(v.literal("sale"), v.literal("intake"), v.literal("acquisition")),
+    requestFingerprint: v.string(),
+    receipt: v.any(),
+    createdAt: v.number()
+  }).index("by_user_and_operation", ["userId", "operationId"]).index("by_user", ["userId"]),
 
   // Online code vault
   onlineCodes: defineTable({
@@ -835,7 +851,9 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("by_user_and_date", ["userId", "date"])
-    .index("by_user_and_collection_entry", ["userId", "collectionEntryId"]),
+    .index("by_user_and_collection_entry", ["userId", "collectionEntryId"])
+    .index("by_user_and_allocation_group", ["userId", "allocationGroupId"])
+    .index("by_user_and_currency", ["userId", "currency"]),
 
   financeSummaries: defineTable({
     userId: v.id("users"),
@@ -915,6 +933,7 @@ export default defineSchema({
     quantity: v.number(),
     status: v.union(v.literal("active"), v.literal("sold")),
     realizedProceeds: v.optional(v.number()),
+    realizedCurrency: v.optional(v.string()),
     soldAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number()

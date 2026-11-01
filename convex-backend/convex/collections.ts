@@ -1,3 +1,4 @@
+import { normalizePhysicalCopies } from "./lib/inventoryAvailability";
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireViewer } from "./lib/auth";
@@ -40,10 +41,10 @@ export const addToBinder = mutation({
   handler: async (ctx, args) => {
     const viewer = await requireViewer(ctx);
     const quantity = args.quantity ?? 1;
-    if (!Number.isInteger(quantity) || quantity < 1) {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
       throw new ConvexError({
         code: "BAD_REQUEST",
-        message: "quantity must be a positive integer"
+        message: "quantity must be an integer between 1 and 500"
       });
     }
     const entries: Awaited<ReturnType<typeof addEntryForViewer>>[] = [];
@@ -95,9 +96,15 @@ export const update = mutation({
   returns: entryValidator,
   handler: async (ctx, args) => {
     const viewer = await requireViewer(ctx);
-    const before = await snapshotAuditEntries(ctx, viewer._id, [args.entryId]);
+    const source = await ctx.db.get(args.entryId);
+    const trackedIds = source && source.userId === viewer._id
+      ? (await ctx.db.query("collectionEntries").withIndex("by_binder_and_card", q => q.eq("binderId", source.binderId).eq("cardId", source.cardId)).take(501)).map(row => row._id)
+      : [args.entryId];
+    if (source && args.binderId && args.binderId !== source.binderId) trackedIds.push(...(await ctx.db.query("collectionEntries").withIndex("by_binder_and_card", q => q.eq("binderId", args.binderId!).eq("cardId", source.cardId)).take(501)).map(row => row._id));
+    const before = await snapshotAuditEntries(ctx, viewer._id, trackedIds);
     const entry = await updateEntryForViewer(ctx, viewer._id, args);
-    const after = await snapshotAuditEntries(ctx, viewer._id, [args.entryId]);
+    const destination = await ctx.db.query("collectionEntries").withIndex("by_binder_and_card", q => q.eq("binderId", entry.binderId).eq("cardId", entry.cardId)).take(501);
+    const after = await snapshotAuditEntries(ctx, viewer._id, [...trackedIds, ...destination.map(row => row._id)]);
     const operationKind =
       args.binderId && before[0] && args.binderId !== before[0].binderId
         ? "move"
@@ -130,6 +137,8 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const viewer = await requireViewer(ctx);
+    const existing = await ctx.db.get(args.entryId);
+    if (existing && existing.userId === viewer._id) await normalizePhysicalCopies(ctx, existing);
     const before = await snapshotAuditEntries(ctx, viewer._id, [args.entryId]);
     const card = before[0] ? await ctx.db.get(before[0].cardId) : null;
     await removeEntryForViewer(ctx, viewer._id, args.entryId);
@@ -177,7 +186,7 @@ export const history = query({
       cardName: entry.cardName,
       summary: entry.summary,
       sourceAuditId: entry.sourceAuditId,
-      canUndo: entry.operationKind !== "undo" && undoRows[index] === null,
+      canUndo: !["undo", "sale", "physical_opening", "trade_settlement", "normalization"].includes(entry.operationKind) && undoRows[index] === null,
       createdAt: new Date(entry.createdAt).toISOString()
     }));
   }

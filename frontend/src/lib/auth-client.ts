@@ -3,12 +3,14 @@ import { createAuthClient } from "better-auth/react";
 import { usernameClient } from "better-auth/client/plugins";
 import { demoAwareFetch } from "./demo-mode";
 import { resolvePublicSiteOrigin } from "./utils";
+import { authLifecycleFetch } from "./auth-lifecycle";
 
 export const authClient = createAuthClient({
   baseURL: resolvePublicSiteOrigin(),
   basePath: "/api/auth",
   fetchOptions: {
-    customFetchImpl: demoAwareFetch,
+    customFetchImpl: (input, init) =>
+      authLifecycleFetch(demoAwareFetch, input, init),
   },
   plugins: [convexClient(), usernameClient()],
 });

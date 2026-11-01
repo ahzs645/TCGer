@@ -77,6 +77,7 @@ export const entryValidator = v.object({
   notes: v.optional(v.string()),
   price: v.optional(v.number()),
   acquisitionPrice: v.optional(v.number()),
+  acquisitionCurrency: v.optional(v.string()),
   serialNumber: v.optional(v.string()),
   acquiredAt: v.optional(v.string()),
   isFoil: v.optional(v.boolean()),

@@ -17,7 +17,7 @@ fun normalizeBackupDocument(raw: JsonObject): JsonObject {
                     val copy = copyElement.jsonObject
                     buildJsonObject {
                         put("id", copy.getValue("id")); put("card", nativeCard(card)); put("quantity", 1)
-                        listOf("condition", "price", "acquisitionPrice").forEach { key -> copy[key]?.let { put(key, it) } }
+                        listOf("condition", "price", "acquisitionPrice", "acquisitionCurrency").forEach { key -> copy[key]?.let { put(key, it) } }
                         put("details", JsonObject(copy.filterValues { it !is JsonNull }))
                     }
                 }

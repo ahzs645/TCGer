@@ -78,7 +78,8 @@ export function useCollectionData({
 
     return collection.cards
       .filter((card) => {
-        if (!enabledGames[card.tcg as keyof typeof enabledGames]) return false;
+        if (enabledGames[card.tcg as keyof typeof enabledGames] === false)
+          return false;
         if (game !== "all" && card.tcg !== game) return false;
         if (!normalizedQuery) return true;
         const haystack =

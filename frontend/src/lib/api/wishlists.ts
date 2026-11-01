@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   CreateWishlistInput,
   UpdateWishlistInput,
@@ -26,7 +27,7 @@ export type {
 };
 
 export async function getWishlists(token: string): Promise<WishlistResponse[]> {
-  const response = await fetch(`${API_BASE_URL}/wishlists`, {
+  const response = await sessionFetch(`${API_BASE_URL}/wishlists`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -45,12 +46,15 @@ export async function getWishlist(
   token: string,
   wishlistId: string,
 ): Promise<WishlistResponse> {
-  const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+  const response = await sessionFetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -64,7 +68,7 @@ export async function createWishlist(
   token: string,
   data: CreateWishlistInput,
 ): Promise<WishlistResponse> {
-  const response = await fetch(`${API_BASE_URL}/wishlists`, {
+  const response = await sessionFetch(`${API_BASE_URL}/wishlists`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -86,14 +90,17 @@ export async function updateWishlist(
   wishlistId: string,
   data: UpdateWishlistInput,
 ): Promise<WishlistResponse> {
-  const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+  const response = await sessionFetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
     },
-    body: JSON.stringify(data),
-  });
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -107,12 +114,15 @@ export async function deleteWishlist(
   token: string,
   wishlistId: string,
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
+  const response = await sessionFetch(
+    `${API_BASE_URL}/wishlists/${wishlistId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -125,7 +135,7 @@ export async function addCardToWishlist(
   wishlistId: string,
   data: AddWishlistCardInput,
 ): Promise<WishlistCardResponse> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/cards`,
     {
       method: "POST",
@@ -150,7 +160,7 @@ export async function addCardsToWishlist(
   wishlistId: string,
   data: AddWishlistCardsInput,
 ): Promise<WishlistResponse> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/cards/batch`,
     {
       method: "POST",
@@ -176,7 +186,7 @@ export async function updateWishlistCard(
   cardId: string,
   data: UpdateWishlistCardInput,
 ): Promise<WishlistCardResponse> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/cards/${cardId}`,
     {
       method: "PATCH",
@@ -201,7 +211,7 @@ export async function addWishlistRule(
   wishlistId: string,
   data: CreateWishlistRuleInput,
 ): Promise<WishlistRuleResponse> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/rules`,
     {
       method: "POST",
@@ -227,7 +237,7 @@ export async function updateWishlistRule(
   ruleId: string,
   data: UpdateWishlistRuleInput,
 ): Promise<WishlistRuleResponse> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/rules/${ruleId}`,
     {
       method: "PATCH",
@@ -252,7 +262,7 @@ export async function removeWishlistRule(
   wishlistId: string,
   ruleId: string,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/rules/${ruleId}`,
     {
       method: "DELETE",
@@ -273,7 +283,7 @@ export async function removeCardFromWishlist(
   wishlistId: string,
   cardId: string,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await sessionFetch(
     `${API_BASE_URL}/wishlists/${wishlistId}/cards/${cardId}`,
     {
       method: "DELETE",

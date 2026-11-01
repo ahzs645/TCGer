@@ -40,7 +40,7 @@ test("[navigation.appLinks] a wishlist link selects its record and rejects a mis
   await page.getByRole("menuitem", { name: "Account & preferences" }).click();
   await page.getByLabel("Import portable backup").setInputFiles(path.resolve("../mobile-parity/fixtures/portable-backup-v2.json"));
   await page.getByRole("button", { name: "Import reviewed backup" }).click();
-  await expect(page.getByText("Import saved. A recovery point is available. Reload to refresh all open views.")).toBeVisible();
+  await expect(page.getByText("Import saved and inventory views refreshed. A recovery point is available.")).toBeVisible();
   await page.goto("/demo/collections?binder=missing-target");
   await expect(page.getByText("This binder is unavailable for the current account.")).toBeVisible();
   await page.goto("/demo/collections?binder=all");

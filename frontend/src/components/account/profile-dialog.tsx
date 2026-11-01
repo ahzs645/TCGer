@@ -31,6 +31,7 @@ import {
   changePassword,
 } from "@/lib/api/user";
 import type { UserProfile } from "@/lib/api/user";
+import { capturePrivateSession } from "@/lib/private-session";
 import { useAuthStore } from "@/stores/auth";
 
 interface ProfileDialogProps {
@@ -87,6 +88,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
 
   const handleProfileUpdate = async () => {
     if (!token || !profile) return;
+    const origin = capturePrivateSession(token);
 
     setProfileError("");
     setProfileSaving(true);
@@ -109,6 +111,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       }
 
       const updatedUser = await updateUserProfile(updates, token);
+      if (!origin.current()) return;
 
       // Preserve fields that profile endpoint does not return (enabled game flags).
       if (user) {

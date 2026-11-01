@@ -242,11 +242,13 @@ describe("convex native architecture", () => {
     const tradeDetail = await asAvery.query(api.binders.get, { binderId: tradeBinder.id });
     const pcDetail = await asAvery.query(api.binders.get, { binderId: pcBinder.id });
 
-    expect(updated.quantity).toBe(3);
+    expect(updated.quantity).toBe(1);
+    expect(pcDetail.entries).toHaveLength(3);
+    expect(pcDetail.entries.every(entry => entry.quantity === 1)).toBe(true);
     expect(updated.notes).toBe("Moved into PC");
     expect(updated.binderId).toBe(pcBinder.id);
     expect(tradeDetail.entryCount).toBe(0);
-    expect(pcDetail.entryCount).toBe(1);
+    expect(pcDetail.entryCount).toBe(3);
   });
 
   test("preserves rich catalog metadata and collectible variants", async () => {

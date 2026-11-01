@@ -1,3 +1,4 @@
+import { sessionFetch } from "./session-fetch";
 import type {
   CatalogCorrection,
   CreateCatalogCorrectionInput,
@@ -8,9 +9,9 @@ import { API_BASE_URL } from "./base-url";
 
 async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = (await response.json().catch(() => null)) as
-      | { message?: string }
-      | null;
+    const error = (await response.json().catch(() => null)) as {
+      message?: string;
+    } | null;
     throw new Error(error?.message ?? "Catalog correction request failed");
   }
   return response.json() as Promise<T>;
@@ -29,7 +30,7 @@ export async function getCatalogCorrections(
 ): Promise<CatalogCorrection[]> {
   const query = tcg ? `?tcg=${encodeURIComponent(tcg)}` : "";
   return responseJson(
-    await fetch(`${API_BASE_URL}/catalog-corrections${query}`, {
+    await sessionFetch(`${API_BASE_URL}/catalog-corrections${query}`, {
       headers: headers(token),
       credentials: "include",
     }),
@@ -41,7 +42,7 @@ export async function getCatalogCorrectionHistory(
   limit = 50,
 ): Promise<CatalogCorrection[]> {
   return responseJson(
-    await fetch(
+    await sessionFetch(
       `${API_BASE_URL}/catalog-corrections/history?limit=${Math.min(200, Math.max(1, limit))}`,
       { headers: headers(token), credentials: "include" },
     ),
@@ -53,7 +54,7 @@ export async function createCatalogCorrection(
   input: CreateCatalogCorrectionInput,
 ): Promise<CatalogCorrection> {
   return responseJson(
-    await fetch(`${API_BASE_URL}/catalog-corrections`, {
+    await sessionFetch(`${API_BASE_URL}/catalog-corrections`, {
       method: "POST",
       headers: headers(token),
       credentials: "include",
@@ -67,7 +68,7 @@ export async function rollbackCatalogCorrection(
   correctionId: string,
 ): Promise<CatalogCorrection> {
   return responseJson(
-    await fetch(
+    await sessionFetch(
       `${API_BASE_URL}/catalog-corrections/${encodeURIComponent(correctionId)}/rollback`,
       {
         method: "POST",

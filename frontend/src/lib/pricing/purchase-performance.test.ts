@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Binder, TransactionResponse } from "@tcg/api-types";
+import { inferredSaleCost, UNKNOWN_CURRENCY } from "./acquisition-currency";
+import { formatMoney } from "@/lib/format-money";
 
 import {
   buildPurchasePerformanceLots,
@@ -119,4 +121,86 @@ test("purchase-date and current rates produce a normalized return", () => {
   assert.equal(converted[0].valueInDisplayCurrency, 31);
   assert.equal(converted[0].gain, 15.6);
   assert.ok(Math.abs(converted[0].returnPercent - 101.2987) < 0.001);
+});
+
+test("a copy's original acquisition currency survives without a linked transaction", () => {
+  const owned = structuredClone(collections);
+  const copy = owned[0]!.cards[0]!.copies[0]!;
+  copy.acquisitionPrice = 20;
+  copy.acquisitionCurrency = "CAD";
+  const lots = buildPurchasePerformanceLots(owned, [], []);
+  assert.equal(lots[0]?.paidAmount, 20);
+  assert.equal(lots[0]?.paidCurrency, "CAD");
+  assert.equal(lots[0]?.currentCurrency, "USD");
+});
+
+test("legacy acquisition amounts without a currency remain unknown and never enter USD returns or inferred sale costs", () => {
+  const owned = structuredClone(collections);
+  const copy = owned[0]!.cards[0]!.copies[0]!;
+  copy.acquisitionPrice = 100;
+  delete copy.acquisitionCurrency;
+  const lots = buildPurchasePerformanceLots(owned, [], []);
+  assert.equal(lots[0]?.paidAmount, 100);
+  assert.equal(lots[0]?.paidCurrency, UNKNOWN_CURRENCY);
+  assert.deepEqual(
+    convertPurchasePerformanceLots(lots, () => 1),
+    [],
+  );
+  assert.equal(purchaseCostCoverage(owned, []).costedCopies, 0);
+  assert.equal(inferredSaleCost(copy, "USD"), undefined);
+  assert.equal(
+    formatMoney(100, { currency: UNKNOWN_CURRENCY }),
+    "100.00 · Currency unknown",
+  );
+});
+
+test("a sale may infer only a matching explicitly recorded acquisition currency", () => {
+  assert.equal(
+    inferredSaleCost(
+      { acquisitionPrice: 20, acquisitionCurrency: "CAD" },
+      "USD",
+    ),
+    undefined,
+  );
+  assert.equal(
+    inferredSaleCost(
+      { acquisitionPrice: 20, acquisitionCurrency: "CAD" },
+      "CAD",
+    ),
+    20,
+  );
+});
+
+test("an unavailable foreign quote cannot relabel the stored USD market value", () => {
+  const lots = buildPurchasePerformanceLots(
+    collections,
+    [transaction],
+    [
+      {
+        tcg: "pokemon",
+        externalId: "dp24",
+        finishCode: "non-holo",
+        condition: "Near Mint",
+        language: "English",
+        key: "ignored",
+        currency: "CAD",
+        cached: true,
+        error: "Provider unavailable",
+      },
+    ],
+  );
+  assert.equal(lots[0]?.currentValue, 31);
+  assert.equal(lots[0]?.currentCurrency, "USD");
+});
+
+test("a copy with no market quote does not borrow its printing group's value for returns", () => {
+  const owned = structuredClone(collections);
+  delete owned[0]!.cards[0]!.copies[0]!.price;
+  owned[0]!.cards[0]!.price = 99;
+  const lots = buildPurchasePerformanceLots(owned, [transaction], []);
+  assert.equal(lots[0]?.currentValue, undefined);
+  assert.deepEqual(
+    convertPurchasePerformanceLots(lots, () => 1),
+    [],
+  );
 });
