@@ -104,6 +104,13 @@ device outline stored in each session's `results.json`.
 ## Files
 
 - `RESULTS.json` — the counts above with the runtime hashes.
+- `replay-summary.json`, `replay-per-card.json` — the six-checkpoint replay
+  with `none`: geometry counts and, per card, outline overlap and the
+  recognition decision for the model outline and the hand-drawn outline.
+- `query-mode-per-card.json` — per card and query mode on hand-drawn
+  outlines: top family, score, margin, and the rank and score of the true card.
+- `sept8-baseline.predictions.jsonl` — the September 8 checkpoint's outlines
+  for the 75 photos, as produced here (matches the saved September 10 file).
 - `identity-proposals-phone-20260909.json` — per-card proposals in the shape
   `card_identity_review.py --suggestions` loads (bound to the frozen queue hash).
 - `source/` — the scripts as run. They take a scratch directory holding the

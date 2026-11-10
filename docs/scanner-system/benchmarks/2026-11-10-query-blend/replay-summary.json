@@ -1,0 +1,283 @@
+{
+ "sept8-baseline": {
+  "geometry": {
+   "found": 96,
+   "tight": 40,
+   "missed": 10,
+   "extras": 19
+  },
+  "secondsPerPhoto": 0.139,
+  "recognition": {
+   "modelCrop": {
+    "de:abstain": 5,
+    "de:correct": 12,
+    "en:abstain": 39,
+    "en:correct": 49
+   },
+   "labelCrop": {
+    "de:abstain": 4,
+    "de:correct": 13,
+    "en:abstain": 33,
+    "en:correct": 54,
+    "en:wrong": 1
+   }
+  },
+  "energyCard": {
+   "label": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7536044120788574,
+    "reason": "accepted"
+   },
+   "model": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7538951635360718,
+    "reason": "accepted"
+   }
+  }
+ },
+ "sept10-selected": {
+  "geometry": {
+   "found": 86,
+   "tight": 33,
+   "missed": 20,
+   "extras": 21
+  },
+  "secondsPerPhoto": 0.097,
+  "recognition": {
+   "modelCrop": {
+    "de:abstain": 7,
+    "de:correct": 10,
+    "en:abstain": 42,
+    "en:correct": 45,
+    "en:wrong": 1
+   },
+   "labelCrop": {
+    "de:abstain": 4,
+    "de:correct": 13,
+    "en:abstain": 33,
+    "en:correct": 54,
+    "en:wrong": 1
+   }
+  },
+  "energyCard": {
+   "label": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7536044120788574,
+    "reason": "accepted"
+   },
+   "model": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7557601928710938,
+    "reason": "accepted"
+   }
+  }
+ },
+ "control-20260905": {
+  "geometry": {
+   "found": 91,
+   "tight": 31,
+   "missed": 15,
+   "extras": 13
+  },
+  "secondsPerPhoto": 0.084,
+  "recognition": {
+   "modelCrop": {
+    "de:abstain": 6,
+    "de:correct": 11,
+    "en:abstain": 41,
+    "en:correct": 47
+   },
+   "labelCrop": {
+    "de:abstain": 4,
+    "de:correct": 13,
+    "en:abstain": 33,
+    "en:correct": 54,
+    "en:wrong": 1
+   }
+  },
+  "energyCard": {
+   "label": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7536044120788574,
+    "reason": "accepted"
+   },
+   "model": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.751488447189331,
+    "reason": "accepted"
+   }
+  }
+ },
+ "control-20260906": {
+  "geometry": {
+   "found": 96,
+   "tight": 25,
+   "missed": 10,
+   "extras": 9
+  },
+  "secondsPerPhoto": 0.092,
+  "recognition": {
+   "modelCrop": {
+    "de:abstain": 6,
+    "de:correct": 11,
+    "en:abstain": 42,
+    "en:correct": 46
+   },
+   "labelCrop": {
+    "de:abstain": 4,
+    "de:correct": 13,
+    "en:abstain": 33,
+    "en:correct": 54,
+    "en:wrong": 1
+   }
+  },
+  "energyCard": {
+   "label": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7536044120788574,
+    "reason": "accepted"
+   },
+   "model": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7514575719833374,
+    "reason": "accepted"
+   }
+  }
+ },
+ "rotation-20260905": {
+  "geometry": {
+   "found": 92,
+   "tight": 26,
+   "missed": 14,
+   "extras": 22
+  },
+  "secondsPerPhoto": 0.09,
+  "recognition": {
+   "modelCrop": {
+    "de:abstain": 7,
+    "de:correct": 10,
+    "en:abstain": 45,
+    "en:correct": 43
+   },
+   "labelCrop": {
+    "de:abstain": 4,
+    "de:correct": 13,
+    "en:abstain": 33,
+    "en:correct": 54,
+    "en:wrong": 1
+   }
+  },
+  "energyCard": {
+   "label": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7536044120788574,
+    "reason": "accepted"
+   },
+   "model": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7545952796936035,
+    "reason": "accepted"
+   }
+  }
+ },
+ "rotation-20260906": {
+  "geometry": {
+   "found": 96,
+   "tight": 30,
+   "missed": 10,
+   "extras": 10
+  },
+  "secondsPerPhoto": 0.084,
+  "recognition": {
+   "modelCrop": {
+    "de:abstain": 8,
+    "de:correct": 9,
+    "en:abstain": 43,
+    "en:correct": 45
+   },
+   "labelCrop": {
+    "de:abstain": 4,
+    "de:correct": 13,
+    "en:abstain": 33,
+    "en:correct": 54,
+    "en:wrong": 1
+   }
+  },
+  "energyCard": {
+   "label": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7536044120788574,
+    "reason": "accepted"
+   },
+   "model": {
+    "family": "pokemon:printing:sm1-165",
+    "accepted": true,
+    "topScore": 0.7663273811340332,
+    "reason": "accepted"
+   }
+  }
+ },
+ "_reproduction": {
+  "savedRecordIdsSample": [
+   "scan-session-20260909-231206:frame-0000.jpg",
+   "scan-session-20260909-231206:frame-0001.jpg",
+   "scan-session-20260909-231206:frame-0002.jpg"
+  ],
+  "mineRecordIdsSample": [
+   "scan-session-20260909-231206:frame-0000.jpg",
+   "scan-session-20260909-231206:frame-0001.jpg",
+   "scan-session-20260909-231206:frame-0002.jpg"
+  ],
+  "sameIds": true,
+  "framesWithSameDetectionCount": 75,
+  "savedGeometry": {
+   "found": 96,
+   "tight": 40,
+   "missed": 10,
+   "extras": 19
+  }
+ },
+ "_environment": {
+  "torch": "2.8.0+cpu",
+  "ultralytics": "8.4.138",
+  "decoder": {
+   "minimumConfidence": 0.05,
+   "minimumQuadArea": 0.001,
+   "exteriorMargin": 0.25,
+   "nmsIouThreshold": 0.5,
+   "aspectRatioBands": {
+    "rawCard": [
+     0.5,
+     3.0
+    ],
+    "slab": [
+     0.5,
+     3.0
+    ],
+    "unknown": [
+     0.5,
+     3.0
+    ]
+   }
+  },
+  "threads": 4,
+  "recognition": {
+   "onnx": "cf29f497cd936cc521db341290d0f35ac30411534781f9f25b2aa842cbf66d15",
+   "vectors": "bafded058a2392c8221cf308583cc8ae3fcf2b619a3db9378c1361dd2792d8cf",
+   "metadata": "6d7e2721c94b55e7d32f49ad2a5299c4c515f1398febbe246bdab58c8a054629",
+   "strongThreshold": 0.65,
+   "margin": 0.05
+  }
+ }
+}
