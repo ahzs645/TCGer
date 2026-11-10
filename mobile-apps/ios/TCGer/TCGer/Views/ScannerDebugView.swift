@@ -134,9 +134,9 @@ final class ScannerDebugViewModel: ObservableObject {
         // spawning a Task that retains its buffer until the hop runs.
         let stream = cameraController.makeFrameStream()
         frameConsumerTask = Task { [weak self] in
-            for await pixelBuffer in stream {
+            for await frame in stream {
                 guard let self, !Task.isCancelled else { return }
-                await self.handle(pixelBuffer)
+                await self.handle(frame)
             }
         }
     }
@@ -553,7 +553,7 @@ final class ScannerDebugViewModel: ObservableObject {
         }
     }
 
-    private func handle(_ pixelBuffer: CVPixelBuffer) async {
+    private func handle(_ frame: ScannerCameraFrame) async {
         guard isRunning, !isSimulator, !isAnalyzing else { return }
         let now = Date()
         guard now.timeIntervalSince(lastAnalysis) >= throttle else { return }
@@ -580,7 +580,7 @@ final class ScannerDebugViewModel: ObservableObject {
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            guard let cgImage = ScannerDebugViewModel.makeCGImage(from: pixelBuffer) else {
+            guard let cgImage = ScannerDebugViewModel.makeCGImage(from: frame.pixelBuffer) else {
                 await MainActor.run { self.isAnalyzing = false }
                 return
             }

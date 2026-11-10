@@ -127,7 +127,7 @@ nonisolated final class BoardCardEmbeddingScannerStrategy: ScanStrategy {
         )
     }
 
-    func supports(_ mode: ScanMode) -> Bool {
+    nonisolated func supports(_ mode: ScanMode) -> Bool {
         (supportedModes?.contains(mode) ?? true) &&
             encoder.isAvailable &&
             indexStore.isAvailable &&

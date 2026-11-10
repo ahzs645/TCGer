@@ -203,8 +203,8 @@ final class BinderPageRecoveryCoordinator {
     private let journal: BinderPageSaveJournal
     private let service: any BinderPageRecoveryService
 
-    init(journal: BinderPageSaveJournal = .shared, service: any BinderPageRecoveryService) {
-        self.journal = journal
+    init(journal: BinderPageSaveJournal? = nil, service: any BinderPageRecoveryService) {
+        self.journal = journal ?? .shared
         self.service = service
     }
 

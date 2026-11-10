@@ -9,11 +9,11 @@ extension APIService {
     ) async throws -> CardDiscoveryResponse {
         if config.isOnDevice {
             await prepareLocalCatalog(for: game)
-            let sets = await localStore.getSets(tcg: game == .all ? nil : game.rawValue)
+            let sets = localStore.getSets(tcg: game == .all ? nil : game.rawValue)
             guard let set = sets.randomElement() else {
                 return CardDiscoveryResponse(cards: [], total: 0, sampledFrom: nil)
             }
-            let cards = await localStore.getSetCards(tcg: set.tcg, setCode: set.code)
+            let cards = localStore.getSetCards(tcg: set.tcg, setCode: set.code)
                 .shuffled()
                 .prefix(max(1, min(24, count)))
             let sampled = CardDiscoveryResponse.SampledFrom(

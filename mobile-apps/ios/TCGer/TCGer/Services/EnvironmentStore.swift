@@ -444,7 +444,7 @@ final class EnvironmentStore: ObservableObject {
         $credentials
             .dropFirst()
             .sink { [weak self] creds in
-                guard let self else { return }
+                guard self != nil else { return }
                 if let data = try? JSONEncoder().encode(creds.withoutPassword) {
                     storage.set(data, forKey: Keys.credentials)
                 }
