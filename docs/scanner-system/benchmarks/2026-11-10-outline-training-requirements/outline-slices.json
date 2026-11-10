@@ -1,0 +1,107 @@
+{
+ "schema": "tcger-outline-slice-summary/v1",
+ "date": "2026-11-10",
+ "checkpoint": {
+  "name": "sept8-baseline",
+  "sha256": "0f5bc3e2509c98837b4c57745af55b75f5acac5739a76d68122c46f0b9995327"
+ },
+ "session": "scan-session-20260909-231206",
+ "photos": 75,
+ "cards": 106,
+ "definitions": {
+  "found": "polygon IoU >= 0.50 against the hand-drawn outline",
+  "tight": "polygon IoU >= 0.90",
+  "cutOff": "at least one hand-drawn corner lies outside the photo",
+  "angle": "captureQuality.angleDeviationDegrees recorded by the phone for single-card photos (42 of 63 have a value)"
+ },
+ "overall": {
+  "cards": 106,
+  "found": 96,
+  "tight": 40,
+  "missed": 10,
+  "extraDetections": 19,
+  "medianIoU": 0.862
+ },
+ "slices": [
+  {
+   "slice": "single-card photo, all corners inside",
+   "cards": 31,
+   "found": 30,
+   "tight": 13,
+   "medianIoU": 0.89
+  },
+  {
+   "slice": "single-card photo, one or more corners cut off",
+   "cards": 32,
+   "found": 29,
+   "tight": 4,
+   "medianIoU": 0.805
+  },
+  {
+   "slice": "multi-card photo, all corners inside",
+   "cards": 35,
+   "found": 29,
+   "tight": 20,
+   "medianIoU": 0.918
+  },
+  {
+   "slice": "multi-card photo, one or more corners cut off",
+   "cards": 8,
+   "found": 8,
+   "tight": 3,
+   "medianIoU": 0.825
+  },
+  {
+   "slice": "card fills more than 50% of the photo",
+   "cards": 8,
+   "found": 7,
+   "tight": 2,
+   "medianIoU": 0.836
+  },
+  {
+   "slice": "card fills 25-50% of the photo",
+   "cards": 47,
+   "found": 46,
+   "tight": 14,
+   "medianIoU": 0.85
+  },
+  {
+   "slice": "card fills less than 25% of the photo",
+   "cards": 51,
+   "found": 43,
+   "tight": 24,
+   "medianIoU": 0.878
+  },
+  {
+   "slice": "single card, angle deviation above 12 degrees",
+   "cards": 19,
+   "found": 18,
+   "tight": 2,
+   "medianIoU": 0.823
+  },
+  {
+   "slice": "single card, angle deviation 12 degrees or less",
+   "cards": 23,
+   "found": 23,
+   "tight": 11,
+   "medianIoU": 0.892
+  }
+ ],
+ "missedCards": [
+  "F3-C2",
+  "F7-C4",
+  "F15-C2",
+  "F18-C1",
+  "F18-C2",
+  "F19-C1",
+  "F22-C1",
+  "F23-C1",
+  "F24-C1",
+  "F63-C1"
+ ],
+ "source": "../2026-11-10-query-blend/replay-per-card.json and the frozen identity-review queue quads",
+ "limits": [
+  "One session, 23 distinct cards, inspected repeatedly during development.",
+  "Slices overlap; do not add rows."
+ ]
+}
