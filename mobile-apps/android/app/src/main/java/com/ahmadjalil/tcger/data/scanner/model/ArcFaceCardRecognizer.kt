@@ -30,10 +30,14 @@ class ArcFaceCardRecognizer private constructor(
         candidateLimit: Int = 10,
         setCode: String? = null,
     ): ArcFaceRecognitionResult {
-        lateinit var input: FloatArray
-        val preprocessNs = measureNanoTime { input = ArcFaceImagePreprocessor.preprocess(imageBytes, acceptancePolicy.queryNormalization) }
+        // One encoder pass per query rendering (raw, colour-normalized, or both
+        // for the blend mode); a single rendering is searched unchanged.
+        lateinit var inputs: List<FloatArray>
+        val preprocessNs = measureNanoTime {
+            inputs = ArcFaceImagePreprocessor.preprocessRenderings(imageBytes, acceptancePolicy.queryNormalization)
+        }
         lateinit var embedding: FloatArray
-        val inferenceNs = measureNanoTime { embedding = encoder.encode(input) }
+        val inferenceNs = measureNanoTime { embedding = QueryColorNormalization.blended(inputs.map(encoder::encode)) }
         lateinit var matches: List<CardEmbeddingMatch>
         val searchNs = measureNanoTime {
             matches = index.nearest(

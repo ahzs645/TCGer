@@ -62,20 +62,26 @@ nonisolated struct CardEmbeddingEncoder: Sendable {
             throw EncoderError.imageConstraintUnavailable
         }
 
-        guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh, normalization: queryNormalization) else {
-            throw EncoderError.featureValueCreationFailed
+        // One prediction per query rendering (raw, colour-normalized, or
+        // both for the blend mode); `blended` passes a single one through.
+        var outputs: [[Float]] = []
+        for normalized in QueryColorNormalization.renderings(queryNormalization) {
+            guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh, normalized: normalized) else {
+                throw EncoderError.featureValueCreationFailed
+            }
+
+            let provider = try MLDictionaryFeatureProvider(dictionary: [
+                inputName: MLFeatureValue(pixelBuffer: buffer)
+            ])
+
+            let prediction = try await model.prediction(from: provider)
+            guard let multiArray = prediction.featureValue(for: outputName)?.multiArrayValue else {
+                throw EncoderError.embeddingMissing
+            }
+            outputs.append(multiArray.toArray())
         }
 
-        let provider = try MLDictionaryFeatureProvider(dictionary: [
-            inputName: MLFeatureValue(pixelBuffer: buffer)
-        ])
-
-        let prediction = try await model.prediction(from: provider)
-        guard let multiArray = prediction.featureValue(for: outputName)?.multiArrayValue else {
-            throw EncoderError.embeddingMissing
-        }
-
-        return multiArray.toArray()
+        return QueryColorNormalization.blended(outputs)
     }
 
     /// Embeds several images through one Core ML batch prediction. Batching
@@ -91,18 +97,30 @@ nonisolated struct CardEmbeddingEncoder: Sendable {
             throw EncoderError.imageConstraintUnavailable
         }
 
-        let providers = try images.map { image -> MLDictionaryFeatureProvider in
-            guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh, normalization: queryNormalization) else {
-                throw EncoderError.featureValueCreationFailed
+        // Each image contributes one provider per query rendering, laid out
+        // image-major so image `i`, rendering `r` sits at `i * count + r`.
+        let renderings = QueryColorNormalization.renderings(queryNormalization)
+        var providers: [MLDictionaryFeatureProvider] = []
+        providers.reserveCapacity(images.count * renderings.count)
+        for image in images {
+            for normalized in renderings {
+                guard let buffer = image.pixelBuffer(width: constraint.pixelsWide, height: constraint.pixelsHigh, normalized: normalized) else {
+                    throw EncoderError.featureValueCreationFailed
+                }
+                providers.append(try MLDictionaryFeatureProvider(dictionary: [
+                    inputName: MLFeatureValue(pixelBuffer: buffer)
+                ]))
             }
-            return try MLDictionaryFeatureProvider(dictionary: [
-                inputName: MLFeatureValue(pixelBuffer: buffer)
-            ])
         }
 
         let batch = try model.predictions(fromBatch: MLArrayBatchProvider(array: providers))
-        return (0..<batch.count).map { index in
-            batch.features(at: index).featureValue(for: outputName)?.multiArrayValue?.toArray() ?? []
+        return images.indices.map { imageIndex in
+            let outputs = renderings.indices.map { renderingIndex -> [Float] in
+                let index = imageIndex * renderings.count + renderingIndex
+                guard index < batch.count else { return [] }
+                return batch.features(at: index).featureValue(for: outputName)?.multiArrayValue?.toArray() ?? []
+            }
+            return QueryColorNormalization.blended(outputs)
         }
     }
 }
@@ -216,11 +234,11 @@ private extension CGImage {
     nonisolated func pixelBuffer(
         width: Int,
         height: Int,
-        normalization: ScannerGameAcceptancePolicy.QueryNormalization
+        normalized: Bool
     ) -> CVPixelBuffer? {
         // Query-side colour normalization precedes the geometric contract so
         // the statistics come from the crop the encoder will actually see.
-        let source = QueryColorNormalization.applies(normalization)
+        let source = normalized
             ? (QueryColorNormalization.normalized(self) ?? self)
             : self
         guard let preprocessed = source.centerCroppedAfterResize(

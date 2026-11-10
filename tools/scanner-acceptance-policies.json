@@ -13,7 +13,7 @@
     "hubSimilarity": "Hub rejection: similarity at which neighbours count as hub hits.",
     "hubDistinctNames": "Abstain when at least this many DIFFERENT card names sit at or above hubSimilarity within the top hubTopK neighbours; genuine matches never look like that, degenerate crops (blank, glare-saturated, mis-rectified) do. 0 disables.",
     "hubTopK": "Neighbours inspected by hub rejection.",
-    "queryNormalization": "Colour normalization applied to every query crop before the encoder's resize contract: none | grey-world-autocontrast (grey-world white balance, then per-channel 1% autocontrast — Pillow semantics). Per game because it depends on what the encoder was trained on: a catalog-only encoder gains from pulling phone crops toward render statistics, an encoder trained toward camera captures loses."
+    "queryNormalization": "Colour normalization applied to every query crop before the encoder's resize contract: none | grey-world-autocontrast (grey-world white balance, then per-channel 1% autocontrast — Pillow semantics) | grey-world-autocontrast-blend (embed the raw and the normalized crop, search with the re-normalized mean of the two unit embeddings; twice the encoder cost). Per game because it depends on what the encoder was trained on: a catalog-only encoder gains from pulling phone crops toward render statistics, an encoder trained toward camera captures loses. The blend is implemented on iOS, Android and the offline replay tools but not on web, and no game declares it yet: declare it only after the device replay gates pass, and only in manifests for client builds that know the value (older clients reject an unknown value and fall back to their built-in profile)."
   },
   "games": {
     "pokemon": {

@@ -66,6 +66,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
     case scannerEngineServerEmbedding = "scanner.engine.serverEmbedding"
     case scannerModelArcface = "scanner.model.arcface"
     case scannerModelDinov2 = "scanner.model.dinov2"
+    case scannerModelQueryNormalization = "scanner.model.queryNormalization"
     case scannerOptionsLanguage = "scanner.options.language"
     case scannerOptionsTorch = "scanner.options.torch"
     case scannerResultsAutoOpen = "scanner.results.autoOpen"
@@ -303,6 +304,7 @@ enum ParityFeatureID: String, CaseIterable, Sendable {
         .scannerEngineServerEmbedding: ParityFeatureSupport(status: .implemented, limitation: nil, modes: ["server"], requirements: ["authenticated-server"], source: "mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift"),
         .scannerModelArcface: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift"),
         .scannerModelDinov2: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerEncoderVariant.swift"),
+        .scannerModelQueryNormalization: ParityFeatureSupport(status: .partial, limitation: "Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not yet been compiled or replayed on a simulator or device.", modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/QueryColorNormalization.swift"),
         .scannerOptionsLanguage: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"),
         .scannerOptionsTorch: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: ["camera-torch"], source: "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"),
         .scannerResultsAutoOpen: ParityFeatureSupport(status: .implemented, limitation: nil, modes: nil, requirements: [], source: "mobile-apps/ios/TCGer/TCGer/Views/ScannerSessionControls.swift"),

@@ -2582,6 +2582,62 @@
       }
     },
     {
+      "id": "scanner.model.queryNormalization",
+      "title": "Query colour normalization modes, including the raw + normalized embedding blend",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/scan/embedding-matcher.ts"
+        ],
+        "status": "planned",
+        "implementation": {
+          "path": "frontend/src/lib/scan/embedding-matcher.ts",
+          "line": 3
+        },
+        "limitation": "The browser scanner embeds the raw crop only: it applies neither the per-game grey-world autocontrast normalization nor the raw + normalized blend, and does not read queryNormalization from the acceptance policy."
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/QueryColorNormalization.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/CardEmbeddingEncoder.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerGameAcceptancePolicy.swift"
+        ],
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "scanner.model.queryNormalization",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/ScannerCoreAlgorithmTests.swift"
+          }
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/QueryColorNormalization.swift",
+          "line": 1
+        },
+        "limitation": "Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not yet been compiled or replayed on a simulator or device."
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalization.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ArcFaceImagePreprocessor.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ScannerAcceptancePolicy.kt"
+        ],
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "scanner.model.queryNormalization",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalizationTest.kt"
+          }
+        ],
+        "status": "partial",
+        "implementation": {
+          "path": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalization.kt",
+          "line": 1
+        },
+        "limitation": "Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not been exercised on a device."
+      }
+    },
+    {
       "id": "scanner.options.language",
       "title": "Assumed card-language scanner default",
       "policy": "track",

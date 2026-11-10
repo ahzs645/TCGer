@@ -1855,6 +1855,47 @@
       }
     },
     {
+      "id": "scanner.model.queryNormalization",
+      "title": "Query colour normalization modes, including the raw + normalized embedding blend",
+      "policy": "track",
+      "web": {
+        "sources": [
+          "frontend/src/lib/scan/embedding-matcher.ts"
+        ],
+        "registration": "frontend/src/lib/scan/embedding-matcher.ts"
+      },
+      "ios": {
+        "sources": [
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/QueryColorNormalization.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/CardEmbeddingEncoder.swift",
+          "mobile-apps/ios/TCGer/TCGer/CardScanner/ScannerGameAcceptancePolicy.swift"
+        ],
+        "registration": "mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/QueryColorNormalization.swift",
+        "tests": [
+          {
+            "runner": "xctest",
+            "id": "scanner.model.queryNormalization",
+            "path": "mobile-apps/ios/TCGer/TCGerTests/ScannerCoreAlgorithmTests.swift"
+          }
+        ]
+      },
+      "android": {
+        "sources": [
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalization.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ArcFaceImagePreprocessor.kt",
+          "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ScannerAcceptancePolicy.kt"
+        ],
+        "registration": "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalization.kt",
+        "tests": [
+          {
+            "runner": "junit",
+            "id": "scanner.model.queryNormalization",
+            "path": "mobile-apps/android/app/src/test/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalizationTest.kt"
+          }
+        ]
+      }
+    },
+    {
       "id": "scanner.options.language",
       "title": "Assumed card-language scanner default",
       "policy": "track",

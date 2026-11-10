@@ -79,6 +79,42 @@ class CropParityTests(unittest.TestCase):
         self.assertEqual(result.size, image.size)
         self.assertIs(normalize_query_colors(image, "none"), image)
 
+    def test_query_blend_averages_the_unit_embeddings_of_both_renderings(self):
+        from PIL import Image
+
+        from crop_parity import EncoderRuntime, query_renderings
+
+        self.assertEqual(query_renderings("none"), ("none",))
+        self.assertEqual(query_renderings("grey-world-autocontrast"), ("grey-world-autocontrast",))
+        self.assertEqual(
+            query_renderings("grey-world-autocontrast-blend"),
+            ("none", "grey-world-autocontrast"),
+        )
+        with self.assertRaises(ValueError):
+            query_renderings("blend")
+
+        class Session:
+            """Stands in for the encoder: the output depends on the red mean."""
+
+            def run(self, _outputs, feeds):
+                red = float(next(iter(feeds.values()))[0, 0].mean())
+                return [np.array([[10.0 * red, 2.0 * (1.0 - red)]], dtype=np.float32)]
+
+        def runtime(mode):
+            return EncoderRuntime("test", 0.65, Session(), "pixel_values", np.eye(2, dtype=np.float32), ["a", "b"], mode)
+
+        # A warm cast: normalization pulls red down, so the two renderings differ.
+        image = Image.new("RGB", (240, 336), (200, 120, 60))
+        image.putpixel((0, 0), (40, 24, 12))
+        raw = runtime("none").embed(image)
+        normalized = runtime("grey-world-autocontrast").embed(image)
+        self.assertFalse(np.allclose(raw, normalized))
+        expected = raw + normalized
+        expected /= np.linalg.norm(expected)
+        blended = runtime("grey-world-autocontrast-blend").embed(image)
+        np.testing.assert_allclose(blended, expected, rtol=0, atol=1e-6)
+        self.assertAlmostEqual(float(np.linalg.norm(blended)), 1.0, places=6)
+
     def test_frozen_contract_fixtures_reproduce_reference_hashes(self):
         manifest_path = (
             HERE / "fixtures" / "crop-parity.v1" / "manifest.json"

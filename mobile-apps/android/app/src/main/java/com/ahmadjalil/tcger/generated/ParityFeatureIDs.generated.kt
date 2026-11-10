@@ -63,6 +63,7 @@ object ParityFeatureIDs {
     const val SCANNER_ENGINE_SERVER_EMBEDDING = "scanner.engine.serverEmbedding"
     const val SCANNER_MODEL_ARCFACE = "scanner.model.arcface"
     const val SCANNER_MODEL_DINOV2 = "scanner.model.dinov2"
+    const val SCANNER_MODEL_QUERY_NORMALIZATION = "scanner.model.queryNormalization"
     const val SCANNER_OPTIONS_LANGUAGE = "scanner.options.language"
     const val SCANNER_OPTIONS_TORCH = "scanner.options.torch"
     const val SCANNER_RESULTS_AUTO_OPEN = "scanner.results.autoOpen"
@@ -279,6 +280,7 @@ object ParityFeatureIDs {
         SCANNER_ENGINE_SERVER_EMBEDDING to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, listOf("server"), listOf("authenticated-server"), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt"),
         SCANNER_MODEL_ARCFACE to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/ArcFaceCardRecognizer.kt"),
         SCANNER_MODEL_DINOV2 to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/DinoV2CardRecognizer.kt"),
+        SCANNER_MODEL_QUERY_NORMALIZATION to ParityFeatureSupport(ParitySupportStatus.PARTIAL, "Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not been exercised on a device.", null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalization.kt"),
         SCANNER_OPTIONS_LANGUAGE to ParityFeatureSupport(ParitySupportStatus.PARTIAL, "Language selection is tracked; recognition does not yet implement equivalent language-aware behavior.", null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt"),
         SCANNER_OPTIONS_TORCH to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf("camera-torch"), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"),
         SCANNER_RESULTS_AUTO_OPEN to ParityFeatureSupport(ParitySupportStatus.IMPLEMENTED, null, null, listOf(), "mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/ui/screens/ScannerScreen.kt"),

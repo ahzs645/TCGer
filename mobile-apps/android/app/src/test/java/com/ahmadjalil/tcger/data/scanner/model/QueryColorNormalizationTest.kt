@@ -45,4 +45,45 @@ class QueryColorNormalizationTest {
         assertEquals(0xff, pixels[0] ushr 24)
         assertEquals(0x80, pixels[99] ushr 24)
     }
+
+    @Test
+    fun `declared modes map to the renderings that are embedded`() {
+        assertEquals(listOf(false), QueryColorNormalization.renderings(ScannerAcceptancePolicy.QueryNormalization.NONE))
+        assertEquals(listOf(true), QueryColorNormalization.renderings(ScannerAcceptancePolicy.QueryNormalization.GREY_WORLD_AUTOCONTRAST))
+        assertEquals(
+            listOf(false, true),
+            QueryColorNormalization.renderings(ScannerAcceptancePolicy.QueryNormalization.GREY_WORLD_AUTOCONTRAST_BLEND),
+        )
+    }
+
+    @Test
+    fun `blend averages unit vectors and leaves a single embedding untouched`() {
+        // One rendering passes through as the same array, not re-normalized.
+        val single = floatArrayOf(3f, 4f)
+        assertTrue(QueryColorNormalization.blended(listOf(single)) === single)
+        // Each rendering is L2-normalized first, so a long vector cannot outvote a short one.
+        val mixed = QueryColorNormalization.blended(listOf(floatArrayOf(10f, 0f), floatArrayOf(0f, 1f)))
+        assertEquals(kotlin.math.sqrt(0.5), mixed[0].toDouble(), 1e-6)
+        assertEquals(kotlin.math.sqrt(0.5), mixed[1].toDouble(), 1e-6)
+        val same = QueryColorNormalization.blended(listOf(floatArrayOf(0.6f, 0.8f), floatArrayOf(0.6f, 0.8f)))
+        assertEquals(0.6, same[0].toDouble(), 1e-6)
+        assertEquals(0.8, same[1].toDouble(), 1e-6)
+    }
+
+    @Test
+    fun `blend rejects mismatched or zero embeddings`() {
+        for (bad in listOf(
+            listOf(floatArrayOf(1f, 0f), floatArrayOf(1f, 0f, 0f)),
+            listOf(floatArrayOf(0f, 0f), floatArrayOf(1f, 0f)),
+            emptyList(),
+        )) {
+            var failed = false
+            try {
+                QueryColorNormalization.blended(bad)
+            } catch (_: IllegalArgumentException) {
+                failed = true
+            }
+            assertTrue(failed)
+        }
+    }
 }

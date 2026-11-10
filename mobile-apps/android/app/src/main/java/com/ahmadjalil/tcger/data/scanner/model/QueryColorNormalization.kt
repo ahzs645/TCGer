@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"scanner.model.queryNormalization","platform":"android","status":"partial","limitation":"Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not been exercised on a device."}
 package com.ahmadjalil.tcger.data.scanner.model
 
 import android.graphics.Bitmap
@@ -18,6 +19,44 @@ import android.graphics.Bitmap
  */
 object QueryColorNormalization {
     const val AUTOCONTRAST_CUTOFF_PERCENT = 1
+
+    /**
+     * The query renderings a declared normalization embeds, in order: `false`
+     * is the raw crop, `true` the normalized one. One rendering is searched
+     * as is; two are combined by [blended].
+     */
+    fun renderings(normalization: ScannerAcceptancePolicy.QueryNormalization): List<Boolean> = when (normalization) {
+        ScannerAcceptancePolicy.QueryNormalization.NONE -> listOf(false)
+        ScannerAcceptancePolicy.QueryNormalization.GREY_WORLD_AUTOCONTRAST -> listOf(true)
+        ScannerAcceptancePolicy.QueryNormalization.GREY_WORLD_AUTOCONTRAST_BLEND -> listOf(false, true)
+    }
+
+    /**
+     * Combines the embeddings of one crop's renderings into the vector that is
+     * searched — the twin of iOS `QueryColorNormalization.blended`. A single
+     * embedding passes through untouched, so the existing modes are unchanged.
+     * Several are each L2-normalized, averaged and L2-normalized again: the
+     * mean direction of the raw and the colour-normalized view. Measured
+     * offline with the released Pokémon encoder (2026-11-10): 106
+     * hand-outlined cards of one warm-lit session go from 67 correct / 2
+     * wrong would-be accepts to 93 / 0, and the 51 older labeled frames stay
+     * at 33 correct while losing their one wrong accept.
+     */
+    fun blended(embeddings: List<FloatArray>): FloatArray {
+        require(embeddings.isNotEmpty()) { "no query embeddings to combine" }
+        if (embeddings.size == 1) return embeddings[0]
+        val dimension = embeddings[0].size
+        require(dimension > 0 && embeddings.all { it.size == dimension }) { "query embeddings differ in dimension" }
+        val sum = DoubleArray(dimension)
+        for (embedding in embeddings) {
+            val norm = kotlin.math.sqrt(embedding.fold(0.0) { total, value -> total + value.toDouble() * value })
+            require(norm > 0.0 && norm.isFinite()) { "query embedding is zero or non-finite" }
+            for (index in 0 until dimension) sum[index] += embedding[index] / norm
+        }
+        val norm = kotlin.math.sqrt(sum.fold(0.0) { total, value -> total + value * value })
+        require(norm > 0.0 && norm.isFinite()) { "combined query embedding is zero or non-finite" }
+        return FloatArray(dimension) { (sum[it] / norm).toFloat() }
+    }
 
     fun normalized(bitmap: Bitmap): Bitmap {
         val width = bitmap.width

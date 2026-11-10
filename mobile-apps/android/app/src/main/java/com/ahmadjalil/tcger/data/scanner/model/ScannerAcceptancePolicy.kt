@@ -51,6 +51,11 @@ data class ScannerAcceptancePolicy(
      * on what the encoder was trained on: the catalog-only Magic encoder gains
      * (108 labeled frames: correct family first on 79 raw vs 104 normalized
      * crops), the Pokémon encoder trained toward camera captures loses.
+     * [QueryNormalization.GREY_WORLD_AUTOCONTRAST_BLEND] embeds the raw and
+     * the normalized crop and searches with their re-normalized mean; it is
+     * implemented but no built-in game declares it until the device replay
+     * gates have run (offline evidence:
+     * `docs/scanner-system/benchmarks/2026-11-10-query-blend`).
      */
     val queryNormalization: QueryNormalization = QueryNormalization.NONE,
 ) {
@@ -58,6 +63,7 @@ data class ScannerAcceptancePolicy(
     enum class QueryNormalization {
         @SerialName("none") NONE,
         @SerialName("grey-world-autocontrast") GREY_WORLD_AUTOCONTRAST,
+        @SerialName("grey-world-autocontrast-blend") GREY_WORLD_AUTOCONTRAST_BLEND,
     }
 
     @Serializable

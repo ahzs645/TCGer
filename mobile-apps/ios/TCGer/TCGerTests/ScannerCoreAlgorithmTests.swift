@@ -245,6 +245,10 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         {"schema":"tcger-scanner-acceptance-policy-v1","strongAcceptanceScore":0.7,"queryNormalization":"grey-world-autocontrast"}
         """.utf8))
         XCTAssertEqual(normalized.queryNormalization, .greyWorldAutocontrast)
+        let blended = try JSONDecoder().decode(ScannerGameAcceptancePolicy.self, from: Data("""
+        {"schema":"tcger-scanner-acceptance-policy-v1","strongAcceptanceScore":0.65,"queryNormalization":"grey-world-autocontrast-blend"}
+        """.utf8))
+        XCTAssertEqual(blended.queryNormalization, .greyWorldAutocontrastBlend)
 
         let resolved = ScannerGameAcceptancePolicy.resolve(game: .magic, declared: declared, environment: [:])
         XCTAssertEqual(resolved.strongAcceptanceScore, 0.68, accuracy: 1e-9)
@@ -464,6 +468,34 @@ final class ScannerCoreAlgorithmTests: XCTestCase {
         XCTAssertEqual(Int(mid[0]), Int(mid[1]), accuracy: 2)
         XCTAssertEqual(Int(mid[1]), Int(mid[2]), accuracy: 2)
         XCTAssertEqual(pixels[3], 255)
+    }
+
+    func testQueryNormalizationBlendEmbedsBothRenderingsAndAveragesUnitVectors() {
+        // Declared modes map to the renderings that are embedded.
+        XCTAssertEqual(QueryColorNormalization.renderings(.none, override: nil), [false])
+        XCTAssertEqual(QueryColorNormalization.renderings(.greyWorldAutocontrast, override: nil), [true])
+        XCTAssertEqual(QueryColorNormalization.renderings(.greyWorldAutocontrastBlend, override: nil), [false, true])
+        // The replay override wins over the declaration in every direction.
+        XCTAssertEqual(QueryColorNormalization.renderings(.greyWorldAutocontrastBlend, override: "0"), [false])
+        XCTAssertEqual(QueryColorNormalization.renderings(.none, override: "1"), [true])
+        XCTAssertEqual(QueryColorNormalization.renderings(.none, override: "blend"), [false, true])
+
+        // A single rendering passes through untouched (not re-normalized).
+        XCTAssertEqual(QueryColorNormalization.blended([[3, 4]]), [3, 4])
+        // Two renderings: each is L2-normalized, then the mean is normalized,
+        // so a long vector cannot outvote a short one.
+        let mixed = QueryColorNormalization.blended([[10, 0], [0, 1]])
+        XCTAssertEqual(mixed.count, 2)
+        XCTAssertEqual(mixed[0], Float(0.5).squareRoot(), accuracy: 1e-6)
+        XCTAssertEqual(mixed[1], Float(0.5).squareRoot(), accuracy: 1e-6)
+        let same = QueryColorNormalization.blended([[0.6, 0.8], [0.6, 0.8]])
+        XCTAssertEqual(same[0], 0.6, accuracy: 1e-6)
+        XCTAssertEqual(same[1], 0.8, accuracy: 1e-6)
+        // A failed or mismatched embedding fails the whole query.
+        XCTAssertEqual(QueryColorNormalization.blended([[1, 0], []]), [])
+        XCTAssertEqual(QueryColorNormalization.blended([[1, 0], [1, 0, 0]]), [])
+        XCTAssertEqual(QueryColorNormalization.blended([[0, 0], [1, 0]]), [])
+        XCTAssertEqual(QueryColorNormalization.blended([]), [])
     }
 
     func testOrientationContradictionVoidsCropsThatWouldBeTwoDifferentCards() {

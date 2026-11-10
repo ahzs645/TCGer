@@ -223,7 +223,7 @@ export async function loadAcceptancePolicy(game, overridePath = null) {
   result.hubDistinctNames ??= 2;
   result.hubTopK ??= 5;
   result.queryNormalization ??= "none";
-  if (!["none", "grey-world-autocontrast"].includes(result.queryNormalization)) {
+  if (!["none", "grey-world-autocontrast", "grey-world-autocontrast-blend"].includes(result.queryNormalization)) {
     throw new Error("Acceptance policy queryNormalization is invalid");
   }
   if (!(result.hubSimilarity >= 0 && result.hubSimilarity <= 1)) throw new Error("Acceptance policy hubSimilarity must be within [0, 1]");

@@ -199,6 +199,23 @@ def procedural_fixture_image(width: int, height: int, seed: int) -> np.ndarray:
     ).astype(np.uint8)
 
 
+QUERY_NORMALIZATIONS = ("none", "grey-world-autocontrast", "grey-world-autocontrast-blend")
+
+
+def query_renderings(mode: str) -> tuple[str, ...]:
+    """Per-rendering colour modes one query crop is embedded with.
+
+    The blend embeds the raw and the normalized crop; their unit embeddings
+    are averaged and re-normalized (`EncoderRuntime.embed`), matching
+    `QueryColorNormalization.blended` on iOS and Android.
+    """
+    if mode not in QUERY_NORMALIZATIONS:
+        raise ValueError(f"unknown query normalization: {mode}")
+    if mode == "grey-world-autocontrast-blend":
+        return ("none", "grey-world-autocontrast")
+    return (mode,)
+
+
 def normalize_query_colors(image: Image.Image, mode: str) -> Image.Image:
     """Apply the released per-game query policy before encoder preprocessing."""
     if mode == "none":
@@ -367,7 +384,7 @@ class EncoderRuntime:
             raise ValueError(f"{name}: vector and metadata row counts differ")
         session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
         families = [row.get("recognitionFamilyId") or row["cardId"] for row in rows]
-        if query_normalization not in {"none", "grey-world-autocontrast"}:
+        if query_normalization not in QUERY_NORMALIZATIONS:
             raise ValueError(f"unknown query normalization: {query_normalization}")
         return cls(
             name,
@@ -380,7 +397,15 @@ class EncoderRuntime:
         )
 
     def embed(self, image: Image.Image) -> np.ndarray:
-        image = normalize_query_colors(image.convert("RGB"), self.query_normalization)
+        renderings = query_renderings(self.query_normalization)
+        if len(renderings) == 1:
+            return self._embed_rendering(image, renderings[0])
+        # Mean direction of the unit embeddings of every rendering.
+        combined = np.sum([self._embed_rendering(image, mode) for mode in renderings], axis=0)
+        return combined / np.linalg.norm(combined)
+
+    def _embed_rendering(self, image: Image.Image, mode: str) -> np.ndarray:
+        image = normalize_query_colors(image.convert("RGB"), mode)
         scale = 256 / min(image.size)
         resized = image.resize(
             (math.ceil(image.width * scale), math.ceil(image.height * scale)),

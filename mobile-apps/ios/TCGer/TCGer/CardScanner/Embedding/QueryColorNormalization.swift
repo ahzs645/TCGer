@@ -1,3 +1,4 @@
+// @tcger-feature {"id":"scanner.model.queryNormalization","platform":"ios","status":"partial","limitation":"Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not yet been compiled or replayed on a simulator or device."}
 import CoreGraphics
 import Foundation
 
@@ -20,15 +21,61 @@ import Foundation
 /// after a float grey-world gain with truncating conversion) so the offline
 /// evaluator and the device agree pixel for pixel.
 nonisolated enum QueryColorNormalization {
-    /// Whether a game's declared normalization runs. `SCANNER_QUERY_NORMALIZATION=0`
-    /// forces raw queries for every game and `=1` forces the normalization on,
-    /// for A/B replays; otherwise the per-game policy decides.
-    static func applies(_ declared: ScannerGameAcceptancePolicy.QueryNormalization) -> Bool {
-        switch environmentOverride {
-        case "0", "false": return false
-        case "1", "true": return true
-        default: return declared == .greyWorldAutocontrast
+    /// The query renderings a game's declared normalization embeds, in order:
+    /// `false` is the raw crop and `true` the normalized one. A single
+    /// rendering is searched as is; two are combined by `blended`.
+    /// `SCANNER_QUERY_NORMALIZATION=0` forces raw queries for every game,
+    /// `=1` forces the normalization on and `=blend` forces the raw +
+    /// normalized blend, for A/B replays; otherwise the per-game policy
+    /// decides.
+    static func renderings(_ declared: ScannerGameAcceptancePolicy.QueryNormalization) -> [Bool] {
+        renderings(declared, override: environmentOverride)
+    }
+
+    static func renderings(
+        _ declared: ScannerGameAcceptancePolicy.QueryNormalization,
+        override: String?
+    ) -> [Bool] {
+        switch override {
+        case "0", "false": return [false]
+        case "1", "true": return [true]
+        case "blend": return [false, true]
+        default:
+            switch declared {
+            case .none: return [false]
+            case .greyWorldAutocontrast: return [true]
+            case .greyWorldAutocontrastBlend: return [false, true]
+            }
         }
+    }
+
+    /// Combines the embeddings of one crop's renderings into the vector that
+    /// is searched. One rendering passes through untouched, so the existing
+    /// modes stay bit-identical. Several are each L2-normalized, averaged and
+    /// L2-normalized again — the mean direction of the raw and the
+    /// colour-normalized view. Measured offline with the released Pokémon
+    /// encoder and identical crops (2026-11-10): on 106 hand-outlined cards of
+    /// one warm-lit session the blend takes would-be accepts from 67 correct /
+    /// 2 wrong to 93 / 0, and leaves the 51 older labeled frames at 33 correct
+    /// while removing their one wrong accept — where normalization alone
+    /// loses a frame. A missing or mismatched embedding yields an empty
+    /// result, which callers already treat as a failed embedding.
+    static func blended(_ embeddings: [[Float]]) -> [Float] {
+        guard let first = embeddings.first else { return [] }
+        guard embeddings.count > 1 else { return first }
+        let dimension = first.count
+        guard dimension > 0, embeddings.allSatisfy({ $0.count == dimension }) else { return [] }
+        var sum = [Float](repeating: 0, count: dimension)
+        for embedding in embeddings {
+            let norm = embedding.reduce(Float(0)) { $0 + $1 * $1 }.squareRoot()
+            guard norm > 0, norm.isFinite else { return [] }
+            for index in 0..<dimension {
+                sum[index] += embedding[index] / norm
+            }
+        }
+        let norm = sum.reduce(Float(0)) { $0 + $1 * $1 }.squareRoot()
+        guard norm > 0, norm.isFinite else { return [] }
+        return sum.map { $0 / norm }
     }
 
     static let environmentOverride = ProcessInfo.processInfo.environment["SCANNER_QUERY_NORMALIZATION"]?.lowercased()

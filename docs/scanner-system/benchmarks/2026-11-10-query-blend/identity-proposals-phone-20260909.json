@@ -1,0 +1,962 @@
+{
+ "queueSha256": "f92d584d7720158a08d2f8b7c54ec5bc06cf24b0aa1bc4d815886dc7f1f01e18",
+ "catalogMetadataSha256": "6d7e2721c94b55e7d32f49ad2a5299c4c515f1398febbe246bdab58c8a054629",
+ "note": "Unverified proposals read from the session photos; tier A = collector number and name read, B = name read only, C = artwork only (blurred). German cards map to the English catalog row with the same collector number.",
+ "suggestions": {
+  "F1-C1": {
+   "game": "pokemon",
+   "cardId": "me05-010",
+   "name": "Centiskorch",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F1-C2": {
+   "game": "pokemon",
+   "cardId": "me05-051",
+   "name": "Inkay",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F1-C3": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F1-C4": {
+   "game": "pokemon",
+   "cardId": "me05-039",
+   "name": "Dhelmise",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F2-C1": {
+   "game": "pokemon",
+   "cardId": "me05-010",
+   "name": "Centiskorch",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F2-C2": {
+   "game": "pokemon",
+   "cardId": "me05-051",
+   "name": "Inkay",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F2-C3": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F2-C4": {
+   "game": "pokemon",
+   "cardId": "me05-039",
+   "name": "Dhelmise",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F3-C1": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F3-C2": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F3-C3": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F3-C4": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F3-C5": {
+   "game": "pokemon",
+   "cardId": "me05-074",
+   "name": "Backtrack Badge",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F4-C1": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F4-C2": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F4-C3": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F4-C4": {
+   "game": "pokemon",
+   "cardId": "me05-074",
+   "name": "Backtrack Badge",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F4-C5": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F5-C1": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F5-C2": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F5-C3": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F5-C4": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F5-C5": {
+   "game": "pokemon",
+   "cardId": "me05-074",
+   "name": "Backtrack Badge",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F6-C1": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F6-C2": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F6-C3": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F6-C4": {
+   "game": "pokemon",
+   "cardId": "me05-074",
+   "name": "Backtrack Badge",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F7-C1": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F7-C2": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F7-C3": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F7-C4": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "C",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F7-C5": {
+   "game": "pokemon",
+   "cardId": "me05-074",
+   "name": "Backtrack Badge",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F8-C1": {
+   "game": "pokemon",
+   "cardId": "me05-074",
+   "name": "Backtrack Badge",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F8-C2": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F9-C1": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F10-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F11-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F12-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F13-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F14-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F15-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F15-C2": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "C",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F16-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F17-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F18-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F18-C2": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "C",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F19-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F19-C2": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "C",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F20-C1": {
+   "game": "pokemon",
+   "cardId": "me05-029",
+   "name": "Slowpoke",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F20-C2": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "C",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F20-C3": {
+   "game": "pokemon",
+   "cardId": "me05-018",
+   "name": "Popplio",
+   "evidenceTier": "C",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F21-C1": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F22-C1": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F23-C1": {
+   "game": "pokemon",
+   "cardId": "me05-071",
+   "name": "Bombirdier",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F24-C1": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F25-C1": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F26-C1": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F27-C1": {
+   "game": "pokemon",
+   "cardId": "me05-053",
+   "name": "Nickit",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F28-C1": {
+   "game": "pokemon",
+   "cardId": "me05-043",
+   "name": "Primeape",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F29-C1": {
+   "game": "pokemon",
+   "cardId": "me05-043",
+   "name": "Primeape",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F30-C1": {
+   "game": "pokemon",
+   "cardId": "me05-043",
+   "name": "Primeape",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F31-C1": {
+   "game": "pokemon",
+   "cardId": "me05-040",
+   "name": "Marshadow",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F32-C1": {
+   "game": "pokemon",
+   "cardId": "me05-021",
+   "name": "Finizen",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F33-C1": {
+   "game": "pokemon",
+   "cardId": "me05-063",
+   "name": "Bronzor",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F34-C1": {
+   "game": "pokemon",
+   "cardId": "me05-025",
+   "name": "Charjabug",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F35-C1": {
+   "game": "pokemon",
+   "cardId": "me05-072",
+   "name": "Antique Armor Fossil",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F36-C1": {
+   "game": "pokemon",
+   "cardId": "me05-009",
+   "name": "Sizzlipede",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F37-C1": {
+   "game": "pokemon",
+   "cardId": "me05-043",
+   "name": "Primeape",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F38-C1": {
+   "game": "pokemon",
+   "cardId": "me05-043",
+   "name": "Primeape",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F39-C1": {
+   "game": "pokemon",
+   "cardId": "me05-043",
+   "name": "Primeape",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F40-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F41-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F42-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F43-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F44-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F45-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F46-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F47-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F48-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F49-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F50-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F51-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F52-C1": {
+   "game": "pokemon",
+   "cardId": "me05-077",
+   "name": "Gladion's Final Battle",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F53-C1": {
+   "game": "pokemon",
+   "cardId": "me05-022",
+   "name": "Palafin",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F54-C1": {
+   "game": "pokemon",
+   "cardId": null,
+   "name": "Basic Fire Energy (German, MEE DE 002)",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false,
+   "note": "not a PBL card; no matching row confirmed in the English catalog"
+  },
+  "F55-C1": {
+   "game": "pokemon",
+   "cardId": "me05-051",
+   "name": "Inkay",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F56-C1": {
+   "game": "pokemon",
+   "cardId": "me05-061",
+   "name": "Shieldon",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F57-C1": {
+   "game": "pokemon",
+   "cardId": "me05-044",
+   "name": "Cranidos",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F58-C1": {
+   "game": "pokemon",
+   "cardId": "me05-003",
+   "name": "Fomantis",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F59-C1": {
+   "game": "pokemon",
+   "cardId": "me05-017",
+   "name": "Relicanth",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F60-C1": {
+   "game": "pokemon",
+   "cardId": "me05-039",
+   "name": "Dhelmise",
+   "evidenceTier": "B",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F61-C1": {
+   "game": "pokemon",
+   "cardId": "me05-039",
+   "name": "Dhelmise",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F62-C1": {
+   "game": "pokemon",
+   "cardId": "me05-039",
+   "name": "Dhelmise",
+   "evidenceTier": "B",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F63-C1": {
+   "game": "pokemon",
+   "cardId": "me05-017",
+   "name": "Relicanth",
+   "evidenceTier": "C",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F64-C1": {
+   "game": "pokemon",
+   "cardId": "me05-017",
+   "name": "Relicanth",
+   "evidenceTier": "B",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F65-C1": {
+   "game": "pokemon",
+   "cardId": "me05-017",
+   "name": "Relicanth",
+   "evidenceTier": "B",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F66-C1": {
+   "game": "pokemon",
+   "cardId": "me05-046",
+   "name": "Drilbur",
+   "evidenceTier": "B",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F67-C1": {
+   "game": "pokemon",
+   "cardId": "me05-025",
+   "name": "Charjabug",
+   "evidenceTier": "B",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F68-C1": {
+   "game": "pokemon",
+   "cardId": "me05-022",
+   "name": "Palafin",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F69-C1": {
+   "game": "pokemon",
+   "cardId": "me05-022",
+   "name": "Palafin",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F70-C1": {
+   "game": "pokemon",
+   "cardId": "me05-022",
+   "name": "Palafin",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F71-C1": {
+   "game": "pokemon",
+   "cardId": "me05-022",
+   "name": "Palafin",
+   "evidenceTier": "A",
+   "language": "de",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F72-C1": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "A",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F73-C1": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F74-C1": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  },
+  "F75-C1": {
+   "game": "pokemon",
+   "cardId": "me05-001",
+   "name": "Tropius",
+   "evidenceTier": "B",
+   "language": "en",
+   "source": "Unverified visual reading of the photo",
+   "verified": false
+  }
+ }
+}

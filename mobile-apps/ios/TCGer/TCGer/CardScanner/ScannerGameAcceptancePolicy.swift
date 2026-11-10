@@ -70,12 +70,18 @@ nonisolated struct ScannerGameAcceptancePolicy: Decodable, Equatable, Sendable {
     /// trained on: the catalog-only Magic encoder gains (108 labeled frames:
     /// correct family first on 79 raw vs 104 normalized crops), while the
     /// Pokémon encoder, trained toward camera captures, loses (76-label
-    /// replay 53 → 49). See `QueryColorNormalization`.
+    /// replay 53 → 49). `greyWorldAutocontrastBlend` embeds the raw and the
+    /// normalized crop and searches with their re-normalized mean; it is
+    /// implemented but not declared by any built-in game until the device
+    /// replay gates have run (offline evidence:
+    /// `docs/scanner-system/benchmarks/2026-11-10-query-blend`).
+    /// See `QueryColorNormalization`.
     var queryNormalization: QueryNormalization
 
     enum QueryNormalization: String, Decodable, Sendable {
         case none
         case greyWorldAutocontrast = "grey-world-autocontrast"
+        case greyWorldAutocontrastBlend = "grey-world-autocontrast-blend"
     }
 
     init(

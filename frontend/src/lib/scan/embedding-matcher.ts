@@ -1,5 +1,6 @@
 // @tcger-feature {"id":"scanner.model.arcface","platform":"web","status":"implemented"}
 // @tcger-feature {"id":"scanner.model.dinov2","platform":"web","status":"partial","limitation":"DINOv2 browser paths exist, but production model, gate, and acceptance parity remain incomplete."}
+// @tcger-feature {"id":"scanner.model.queryNormalization","platform":"web","status":"planned","limitation":"The browser scanner embeds the raw crop only: it applies neither the per-game grey-world autocontrast normalization nor the raw + normalized blend, and does not read queryNormalization from the acceptance policy."}
 
 /**
  * Browser-side embedding matcher (client-side, no server in the recognition path).

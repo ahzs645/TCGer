@@ -1,0 +1,208 @@
+{
+ "schema": "tcger-query-blend-offline-evidence/v1",
+ "date": "2026-11-10",
+ "productionPromotion": false,
+ "identityTruth": "UNVERIFIED proposals read from the photos (identity-proposals-phone-20260909.json) for the new session; hand-curated DevModeSessionReplayTests.expectedCards for the older sessions",
+ "runtime": {
+  "torch": "2.8.0+cpu",
+  "ultralytics": "8.4.138",
+  "decoder": {
+   "minimumConfidence": 0.05,
+   "minimumQuadArea": 0.001,
+   "exteriorMargin": 0.25,
+   "nmsIouThreshold": 0.5,
+   "aspectRatioBands": {
+    "rawCard": [
+     0.5,
+     3.0
+    ],
+    "slab": [
+     0.5,
+     3.0
+    ],
+    "unknown": [
+     0.5,
+     3.0
+    ]
+   }
+  },
+  "threads": 4,
+  "recognition": {
+   "onnx": "cf29f497cd936cc521db341290d0f35ac30411534781f9f25b2aa842cbf66d15",
+   "vectors": "bafded058a2392c8221cf308583cc8ae3fcf2b619a3db9378c1361dd2792d8cf",
+   "metadata": "6d7e2721c94b55e7d32f49ad2a5299c4c515f1398febbe246bdab58c8a054629",
+   "strongThreshold": 0.65,
+   "margin": 0.05
+  }
+ },
+ "newSession": {
+  "session": "scan-session-20260909-231206",
+  "photos": 75,
+  "cards": 106,
+  "handDrawnOutlines": {
+   "none": {
+    "correct": 67,
+    "noAnswer": 37,
+    "wrong": 2
+   },
+   "grey-world-autocontrast": {
+    "correct": 86,
+    "noAnswer": 19,
+    "wrong": 1
+   },
+   "grey-world-autocontrast-blend": {
+    "correct": 93,
+    "noAnswer": 13
+   }
+  },
+  "trueCardRankHandDrawn": {
+   "none": {
+    "top1": 80,
+    "top5": 88,
+    "of": 105
+   },
+   "grey-world-autocontrast": {
+    "top1": 97,
+    "top5": 99,
+    "of": 105
+   },
+   "grey-world-autocontrast-blend": {
+    "top1": 97,
+    "top5": 99,
+    "of": 105
+   }
+  },
+  "modelOutlines": {
+   "sept8-baseline": {
+    "none": {
+     "correct": 61,
+     "noAnswer": 44,
+     "wrong": 1
+    },
+    "grey-world-autocontrast-blend": {
+     "correct": 81,
+     "noAnswer": 25,
+     "wrong": 0
+    }
+   },
+   "control-20260906": {
+    "none": {
+     "correct": 57,
+     "noAnswer": 48,
+     "wrong": 1
+    },
+    "grey-world-autocontrast-blend": {
+     "correct": 73,
+     "noAnswer": 33,
+     "wrong": 0
+    }
+   },
+   "rotation-20260906": {
+    "none": {
+     "correct": 54,
+     "noAnswer": 51,
+     "wrong": 1
+    },
+    "grey-world-autocontrast-blend": {
+     "correct": 76,
+     "noAnswer": 30,
+     "wrong": 0
+    }
+   }
+  },
+  "singleCardPhotos63": {
+   "phoneAtCapture": {
+    "correct": 28,
+    "noAnswer": 34,
+    "wrong": 1
+   },
+   "sept8-baseline": {
+    "none": {
+     "correct": 32,
+     "noAnswer": 30,
+     "wrong": 1
+    },
+    "grey-world-autocontrast-blend": {
+     "correct": 49,
+     "noAnswer": 14,
+     "wrong": 0
+    }
+   }
+  },
+  "geometry": {
+   "sept8-baseline": {
+    "found": 96,
+    "tight": 40,
+    "missed": 10,
+    "extras": 19
+   },
+   "sept10-selected": {
+    "found": 86,
+    "tight": 33,
+    "missed": 20,
+    "extras": 21
+   },
+   "control-20260905": {
+    "found": 91,
+    "tight": 31,
+    "missed": 15,
+    "extras": 13
+   },
+   "control-20260906": {
+    "found": 96,
+    "tight": 25,
+    "missed": 10,
+    "extras": 9
+   },
+   "rotation-20260905": {
+    "found": 92,
+    "tight": 26,
+    "missed": 14,
+    "extras": 22
+   },
+   "rotation-20260906": {
+    "found": 96,
+    "tight": 30,
+    "missed": 10,
+    "extras": 10
+   }
+  },
+  "baselineReproducesSavedPredictions": {
+   "found": 96,
+   "tight": 40,
+   "missed": 10,
+   "extras": 19
+  }
+ },
+ "olderSessions": {
+  "sessions": [
+   "scan-session-20260809-160556",
+   "scan-session-20260809-190752",
+   "scan-session-20260809-210958"
+  ],
+  "labelledPokemonFrames": 52,
+  "scored": 51,
+  "outline": "device outline recorded in results.json",
+  "none": {
+   "correct": 33,
+   "noAnswer": 17,
+   "wrong": 1
+  },
+  "grey-world-autocontrast": {
+   "correct": 32,
+   "noAnswer": 18,
+   "wrong": 1
+  },
+  "grey-world-autocontrast-blend": {
+   "correct": 33,
+   "noAnswer": 18,
+   "wrong": 0
+  }
+ },
+ "limits": [
+  "Python replay with the repository's crop, orientation and acceptance code; not the iOS or Android app.",
+  "The blend variant was chosen on the new session it is reported on; the older sessions are the only independent check and show no gain, only no loss.",
+  "New-session identities are unverified proposals; one session, 23 distinct cards, one set (me05).",
+  "No OCR evidence, hub rejection or title rescue in this replay; visual accept at 0.65 with a 0.05 family margin only."
+ ]
+}
