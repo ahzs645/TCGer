@@ -11,7 +11,7 @@ Generated from [product definitions](features.definitions.json) and platform sou
 
 | Platform | Implemented | Partial | Planned | Unavailable | Not applicable | Waived |
 |---|---|---|---|---|---|---|
-| Web | 93 | 14 | 10 | 0 | 2 | 0 |
+| Web | 93 | 15 | 9 | 0 | 2 | 0 |
 | iOS | 114 | 5 | 0 | 0 | 0 | 0 |
 | Android | 93 | 13 | 12 | 0 | 1 | 0 |
 
@@ -70,7 +70,7 @@ Generated from [product definitions](features.definitions.json) and platform sou
 | scanner.engine.serverEmbedding | Selectable server embedding recognition engine | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.model.arcface | ArcFace model, matching index, thresholds, and rejection policy | track | Implemented | Not run | Implemented | — | Implemented | — | Aligned |
 | scanner.model.dinov2 | DINOv2 model, matching index, thresholds, and rejection policy | track | Partial | — | Implemented | — | Implemented | — | Tracked gap |
-| scanner.model.queryNormalization | Query colour normalization modes, including the raw + normalized embedding blend | track | Planned | — | Partial | Not run | Partial | Not run | Tracked gap |
+| scanner.model.queryNormalization | Query colour normalization modes, including the raw + normalized embedding blend | track | Partial | — | Partial | Not run | Partial | Not run | Aligned |
 | scanner.options.language | Assumed card-language scanner default | track | Implemented | Not run | Implemented | — | Partial | — | Tracked gap |
 | scanner.options.torch | Scanner flashlight control | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
 | scanner.results.autoOpen | Automatically open each recognition result | track | Implemented | — | Implemented | — | Implemented | — | Aligned |
@@ -176,7 +176,7 @@ These declarations live beside platform implementations. Unspecified modes are u
 | scanner.engine.serverEmbedding | iOS | Implemented | server | authenticated-server | — | [Source](../mobile-apps/ios/TCGer/TCGer/CardScanner/BackendHashScannerStrategy.swift#L2) |
 | scanner.engine.serverEmbedding | Android | Implemented | server | authenticated-server | — | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L4) |
 | scanner.model.dinov2 | Web | Partial | Not specified | — | DINOv2 browser paths exist, but production model, gate, and acceptance parity remain incomplete. | [Source](../frontend/src/lib/scan/embedding-matcher.ts#L2) |
-| scanner.model.queryNormalization | Web | Planned | Not specified | — | The browser scanner embeds the raw crop only: it applies neither the per-game grey-world autocontrast normalization nor the raw + normalized blend, and does not read queryNormalization from the acceptance policy. | [Source](../frontend/src/lib/scan/embedding-matcher.ts#L3) |
+| scanner.model.queryNormalization | Web | Partial | Not specified | — | Grey-world autocontrast and the raw + normalized blend run on the canvas crop for ArcFace indexes, using the built-in per-game default (Magic) because the published browser index does not carry the acceptance policy. The arithmetic is unit-tested; the canvas path has not been run in a browser against the live index, and canvas resampling differs from the native resize. | [Source](../frontend/src/lib/scan/embedding-matcher.ts#L3) |
 | scanner.model.queryNormalization | iOS | Partial | Not specified | — | Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not yet been compiled or replayed on a simulator or device. | [Source](../mobile-apps/ios/TCGer/TCGer/CardScanner/Embedding/QueryColorNormalization.swift#L1) |
 | scanner.model.queryNormalization | Android | Partial | Not specified | — | Grey-world autocontrast runs for games whose policy declares it (Magic). The raw + normalized blend is implemented with unit tests but no built-in game declares it, and it has not been exercised on a device. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/model/QueryColorNormalization.kt#L1) |
 | scanner.options.language | Android | Partial | Not specified | — | Language selection is tracked; recognition does not yet implement equivalent language-aware behavior. | [Source](../mobile-apps/android/app/src/main/java/com/ahmadjalil/tcger/data/scanner/ScannerOptions.kt#L5) |

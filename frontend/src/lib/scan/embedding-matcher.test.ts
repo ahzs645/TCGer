@@ -306,3 +306,12 @@ test("Magic title OCR rescues only unique, visually supported identities", () =>
     "Thrór's Map",
   ).matched, false);
 });
+
+test("indexes share a query embedding only under the same colour normalization", () => {
+  const magic = shard("magic", "a", [127, 0]);
+  const normalized = { ...shard("magic", "b", [0, 127]), queryNormalization: "grey-world-autocontrast" as const };
+  assert.equal(embeddingIndexesShareModel([magic, shard("magic", "c", [0, 127])]), true);
+  // An index with no declared normalization is treated as raw.
+  assert.equal(embeddingIndexesShareModel([magic, { ...magic, queryNormalization: "none" as const }]), true);
+  assert.equal(embeddingIndexesShareModel([magic, normalized]), false);
+});

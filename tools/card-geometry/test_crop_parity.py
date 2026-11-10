@@ -131,6 +131,24 @@ class CropParityTests(unittest.TestCase):
         self.assertEqual(contract["kernel"], "bilinear")
         self.assertEqual(contract["border"], "black")
         self.assertEqual(contract["color"], "srgb8-rgb")
+        # cv2.warpPerspective rounds bilinear samples differently across
+        # OpenCV major versions (measured mean absolute error <= 0.00089 on
+        # these fixtures, inside the contract tolerance), so the manifest
+        # keeps one exact hash per major version. A new major version needs
+        # its hashes recorded and its difference from the frozen crops
+        # measured before it can be trusted for crop-parity work.
+        import cv2
+
+        hash_key = {"4": "referenceCropSha256", "5": "opencv5CropSha256"}.get(
+            cv2.__version__.split(".")[0]
+        )
+        self.assertIsNotNone(
+            hash_key, f"no crop-parity reference hashes recorded for OpenCV {cv2.__version__}"
+        )
+        self.assertLessEqual(
+            manifest["referenceRuntime"]["maxMeanAbsoluteErrorBetweenRuntimes"],
+            manifest["tolerances"]["meanAbsoluteError"],
+        )
         for fixture in manifest["fixtures"]:
             source = procedural_fixture_image(
                 fixture["sourceWidth"], fixture["sourceHeight"], fixture["seed"]
@@ -147,7 +165,7 @@ class CropParityTests(unittest.TestCase):
                 border=contract["border"],
             )
             self.assertEqual(
-                hashlib.sha256(crop.tobytes()).hexdigest(), fixture["referenceCropSha256"]
+                hashlib.sha256(crop.tobytes()).hexdigest(), fixture[hash_key]
             )
 
 

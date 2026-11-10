@@ -987,7 +987,10 @@ async function rescueWithRectify(
       proposalLabel: "yolo+embedding+rectified",
     });
   }
-  const embedding = await computeEmbeddingFromCanvas(warpedCanvas);
+  const embedding = await computeEmbeddingFromCanvas(
+    warpedCanvas,
+    embeddingIndexes[0]?.queryNormalization,
+  );
   if (!embedding) return null;
   if (
     cardFaceGate &&
@@ -1047,7 +1050,10 @@ async function matchDetectionEmbedding(
   if (!skipLabel) {
     const sharedModel = embeddingIndexesShareModel(embeddingIndexes);
     const embedding = sharedModel
-      ? await computeEmbeddingFromCanvas(cropCanvas)
+      ? await computeEmbeddingFromCanvas(
+          cropCanvas,
+          embeddingIndexes[0]?.queryNormalization,
+        )
       : null;
     if (!sharedModel) {
       candidates = await computeEmbeddingMatchesFromCanvas(

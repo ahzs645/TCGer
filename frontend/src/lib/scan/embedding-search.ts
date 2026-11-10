@@ -12,15 +12,18 @@ import type { ScannerPrintingMode } from "./scanner-options";
 export function embeddingModelKey(
   index: Pick<
     EmbeddingIndex,
-    "model" | "dtype" | "encoder" | "dimension" | "modelUrl"
+    "model" | "dtype" | "encoder" | "dimension" | "modelUrl" | "queryNormalization"
   >,
 ): string {
+  // Indexes share one query embedding only when the encoder AND the colour
+  // normalization applied to the crop are the same.
   return JSON.stringify({
     model: index.model,
     dtype: index.dtype,
     encoder: index.encoder,
     dimension: index.dimension,
     modelUrl: index.modelUrl,
+    queryNormalization: index.queryNormalization ?? "none",
   });
 }
 

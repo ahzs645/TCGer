@@ -54,7 +54,15 @@ nonisolated struct ScannerCaptureQualityReport: Codable, Equatable, Sendable {
     let angleDeviationDegrees: Double?
     let detectorConfidence: Double?
 
-    static let minimumSharpness = 0.001
+    /// Laplacian variance below which the live guide shows the blur hint. It
+    /// only steers the hint and the guide icon; it never blocks a capture.
+    /// Raised from 0.001 on 2026-11-10: every one of the 63 single-card photos
+    /// in `scan-session-20260909-231206` scored at least 0.004, so the old
+    /// floor never fired. On that session no photo below 0.02 had a legible
+    /// collector number (legible ones scored 0.040 or higher), and 0.02 flags
+    /// 4 of the 63, two of which the scanner still recognised. One session on
+    /// one device: revisit with more captures before treating it as calibrated.
+    static let minimumSharpness = 0.02
     static let minimumLuma = 0.18
     static let maximumLuma = 0.90
     static let maximumClippedFraction = 0.08

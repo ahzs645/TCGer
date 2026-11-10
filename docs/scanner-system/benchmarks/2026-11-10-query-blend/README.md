@@ -13,9 +13,13 @@ encoder pass per crop.
 
 It is implemented in the iOS and Android clients and in
 `tools/card-geometry/crop_parity.py` (`EncoderRuntime`), and accepted by the
-publisher validation in `tools/r2/lib.mjs`. The web scanner applies no query
-normalization at all; that gap is recorded as `planned` under the parity
-feature `scanner.model.queryNormalization`.
+publisher validation in `tools/r2/lib.mjs`. The web scanner previously applied
+no query normalization at all; it now applies the same arithmetic to the
+canvas crop (`frontend/src/lib/scan/query-color-normalization.ts`, checked
+against a Pillow reference hash) using the built-in per-game default, so web
+Magic queries are normalized as they are on iOS and Android. All three
+clients are tracked under the parity feature
+`scanner.model.queryNormalization`.
 
 ## Why
 

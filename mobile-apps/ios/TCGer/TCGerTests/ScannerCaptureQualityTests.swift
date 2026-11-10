@@ -47,6 +47,29 @@ final class ScannerCaptureQualityTests: XCTestCase {
         XCTAssertEqual(glare.primaryIssue, .glare)
     }
 
+    func testBlurHintFiresBelowTheSharpnessFloorOnlyWhenNothingElseIsWrong() {
+        func report(sharpness: Double, glare: Double = 0) -> ScannerCaptureQualityReport {
+            ScannerCaptureQualityReport(
+                sharpness: sharpness,
+                meanLuma: 0.5,
+                clippedHighlightFraction: 0,
+                glareFraction: glare,
+                fillRatio: 0.6,
+                angleDeviationDegrees: 3,
+                detectorConfidence: 0.9
+            )
+        }
+        // A soft frame that passed the old 0.001 floor now gets the hint.
+        XCTAssertEqual(report(sharpness: 0.01).primaryIssue, .blur)
+        XCTAssertFalse(report(sharpness: 0.01).allPass)
+        // The floor itself and the sharpness of clearly legible captures pass.
+        XCTAssertNil(report(sharpness: ScannerCaptureQualityReport.minimumSharpness).primaryIssue)
+        XCTAssertNil(report(sharpness: 0.04).primaryIssue)
+        XCTAssertTrue(report(sharpness: 0.04).allPass)
+        // Blur stays the last hint: a more actionable issue is reported first.
+        XCTAssertEqual(report(sharpness: 0.01, glare: 0.15).primaryIssue, .glare)
+    }
+
     func testCropQuadRejectsCrossedCorners() {
         XCTAssertTrue(ScannerCropQuad.centered(in: CGSize(width: 900, height: 1_200)).isValid)
         let crossed = ScannerCropQuad(

@@ -21,7 +21,10 @@ export async function recognizeCrop(
       encoder: index.encoder,
       modelUrl: index.modelUrl,
     });
-    const embedding = await computeEmbeddingFromCanvas(canvas);
+    const embedding = await computeEmbeddingFromCanvas(
+      canvas,
+      index.queryNormalization,
+    );
     if (!embedding) continue;
     const gate = await ensureCardFaceGate(index);
     if (index.gateUrl && !gate)

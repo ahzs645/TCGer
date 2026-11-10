@@ -1,6 +1,6 @@
 // @tcger-feature {"id":"scanner.model.arcface","platform":"web","status":"implemented"}
 // @tcger-feature {"id":"scanner.model.dinov2","platform":"web","status":"partial","limitation":"DINOv2 browser paths exist, but production model, gate, and acceptance parity remain incomplete."}
-// @tcger-feature {"id":"scanner.model.queryNormalization","platform":"web","status":"planned","limitation":"The browser scanner embeds the raw crop only: it applies neither the per-game grey-world autocontrast normalization nor the raw + normalized blend, and does not read queryNormalization from the acceptance policy."}
+// @tcger-feature {"id":"scanner.model.queryNormalization","platform":"web","status":"partial","limitation":"Grey-world autocontrast and the raw + normalized blend run on the canvas crop for ArcFace indexes, using the built-in per-game default (Magic) because the published browser index does not carry the acceptance policy. The arithmetic is unit-tested; the canvas path has not been run in a browser against the live index, and canvas resampling differs from the native resize."}
 
 /**
  * Browser-side embedding matcher (client-side, no server in the recognition path).
@@ -74,6 +74,11 @@ export interface EmbeddingIndex {
   modelUrl: string | null;
   /** Optional content-addressed rejection gate published with this bundle. */
   gateUrl: string | null;
+  /**
+   * Colour normalization applied to every query crop before the encoder
+   * (see query-color-normalization.ts). Absent means raw queries.
+   */
+  queryNormalization?: QueryNormalization;
 }
 
 export {
@@ -92,6 +97,14 @@ import {
   DEFAULT_EMBEDDING_MATCH_THRESHOLDS,
 } from "./embedding-search";
 import type { EmbeddingMatchOptions } from "./embedding-search";
+import {
+  blendEmbeddings,
+  builtinQueryNormalization,
+  normalizeRgba,
+  parseQueryNormalization,
+  queryRenderings,
+  type QueryNormalization,
+} from "./query-color-normalization";
 
 /** Raw artifact shape emitted by build-embedding-index.ts. */
 interface EmbeddingIndexArtifact {
@@ -121,6 +134,8 @@ interface EmbeddingIndexArtifact {
   thresholds?: Partial<EmbeddingMatchThresholds>;
   modelUrl?: string;
   gateUrl?: string;
+  /** Declared per-game policy, when the publisher embeds it. */
+  acceptancePolicy?: { queryNormalization?: string };
 }
 
 function inferEncoder(model: string): EncoderKind {
@@ -173,10 +188,18 @@ export function parseEmbeddingIndex(
     })),
   }));
 
+  const encoder =
+    (artifact.encoder as EncoderKind) ?? inferEncoder(artifact.model);
   return {
     model: artifact.model,
     dtype: artifact.dtype,
-    encoder: (artifact.encoder as EncoderKind) ?? inferEncoder(artifact.model),
+    encoder,
+    // A declared value this build knows wins; an unknown or missing one falls
+    // back to the built-in profile for the game, as the native clients do.
+    queryNormalization:
+      (encoder === "arcface"
+        ? parseQueryNormalization(artifact.acceptancePolicy?.queryNormalization)
+        : null) ?? builtinQueryNormalization(tcg, encoder),
     dimension,
     tcg,
     scale: artifact.scale,
@@ -532,17 +555,42 @@ export async function ensureEmbeddingModel(
  */
 export async function computeEmbeddingFromCanvas(
   cardCanvas: HTMLCanvasElement,
+  queryNormalization: QueryNormalization = "none",
 ): Promise<Float32Array | null> {
-  if (!embedFn) return null;
+  const embed = embedFn;
+  if (!embed) return null;
 
-  const out = await embedFn(cardCanvas); // raw embedding (copied out of tensor)
+  // One encoder pass per query rendering (raw, colour-normalized, or both
+  // for the blend). Normalization precedes the resize contract so its
+  // statistics come from the whole crop, as on iOS and Android.
+  const outputs: Float32Array[] = [];
+  for (const normalize of queryRenderings(queryNormalization)) {
+    const source = normalize ? colorNormalizedCanvas(cardCanvas) : cardCanvas;
+    const out = await embed(source); // raw embedding (copied out of tensor)
 
-  // L2 normalise (query side; entry side handled via precomputed invNorms).
-  let sq = 0;
-  for (let i = 0; i < out.length; i++) sq += out[i]! * out[i]!;
-  const norm = Math.sqrt(sq);
-  if (norm > 1e-8) for (let i = 0; i < out.length; i++) out[i]! /= norm;
-  return out;
+    // L2 normalise (query side; entry side handled via precomputed invNorms).
+    let sq = 0;
+    for (let i = 0; i < out.length; i++) sq += out[i]! * out[i]!;
+    const norm = Math.sqrt(sq);
+    if (norm > 1e-8) for (let i = 0; i < out.length; i++) out[i]! /= norm;
+    outputs.push(out);
+  }
+  return outputs.length === 1 ? outputs[0]! : blendEmbeddings(outputs);
+}
+
+/** A copy of the crop with grey-world white balance and 1 % autocontrast applied. */
+function colorNormalizedCanvas(cardCanvas: HTMLCanvasElement): HTMLCanvasElement {
+  const { width, height } = cardCanvas;
+  if (width <= 0 || height <= 0) return cardCanvas;
+  const normalized = document.createElement("canvas");
+  normalized.width = width;
+  normalized.height = height;
+  const context = getContext2d(normalized);
+  context.drawImage(cardCanvas, 0, 0);
+  const image = context.getImageData(0, 0, width, height);
+  normalizeRgba(image.data);
+  context.putImageData(image, 0, 0);
+  return normalized;
 }
 
 /**
@@ -572,7 +620,10 @@ export async function computeEmbeddingMatchesFromCanvas(
       encoder: primary.encoder,
       modelUrl: primary.modelUrl,
     });
-    const embedding = await computeEmbeddingFromCanvas(cardCanvas);
+    const embedding = await computeEmbeddingFromCanvas(
+      cardCanvas,
+      primary.queryNormalization,
+    );
     if (!embedding) continue;
     const { matchEmbeddingShardsInWorker } =
       await import("./embedding-search-client");
