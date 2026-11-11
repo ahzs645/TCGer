@@ -20,8 +20,8 @@ enum CollectionMutationNotice {
     }
 
     static func matches(_ notification: Notification, config: ServerConfiguration, token: String?) -> Bool {
-        guard let source = notification.userInfo?[sourceKey] as? String,
+        guard let received = notification.userInfo?[sourceKey] as? String,
               let current = source(config: config, token: token) else { return false }
-        return source == current
+        return received == current
     }
 }

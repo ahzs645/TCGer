@@ -570,7 +570,7 @@ struct CardScanScope: Hashable, Sendable {
     }
 }
 
-enum ScanInvocationKind: Sendable {
+nonisolated enum ScanInvocationKind: Sendable {
     case livePreview
     /// A camera shutter capture that has already been framed by the on-screen
     /// guide crop, so the card fills most of the frame with a thin border.

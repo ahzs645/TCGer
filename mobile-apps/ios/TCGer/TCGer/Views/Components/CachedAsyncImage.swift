@@ -102,8 +102,8 @@ final class CachedImageLoader: ObservableObject {
     private let cache: ImageCache
     private let fetch: (URL) async throws -> DecodedRemoteImage
 
-    init(cache: ImageCache = .shared, fetch: ((URL) async throws -> DecodedRemoteImage)? = nil) {
-        self.cache = cache
+    init(cache: ImageCache? = nil, fetch: ((URL) async throws -> DecodedRemoteImage)? = nil) {
+        self.cache = cache ?? .shared
         self.fetch = fetch ?? Self.fetchImage
     }
 

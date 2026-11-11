@@ -219,7 +219,7 @@ extension APIService {
         }
     }
 
-    private struct IntakeRequestRow: Encodable {
+    nonisolated private struct IntakeRequestRow: Encodable {
         let row: InventoryIntakeRow
         init(_ row: InventoryIntakeRow) { self.row = row }
         enum CodingKeys: String, CodingKey { case rowId }

@@ -98,9 +98,10 @@ final class CardScannerCoordinator: @unchecked Sendable {
 
     @MainActor
     static func makeDefault(
-        apiService: APIService = APIService(),
+        apiService: APIService? = nil,
         includeBundledTestFallbacks: Bool = false
     ) -> CardScannerCoordinator {
+        let apiService = apiService ?? APIService()
         var strategies: [ScanStrategy] = [BackendHashScannerStrategy()]
         let downloadableModes = ScannerAssetStore.downloadableGames.map { ($0, ScanMode.game($0)) }
         for (game, mode) in downloadableModes {
